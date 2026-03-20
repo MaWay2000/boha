@@ -666,6 +666,190 @@ main {
   color: var(--cyan);
 }
 
+.stats-shell {
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+}
+
+.stats-shell-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stats-shell-head h3,
+.stats-panel-head h4 {
+  margin: 8px 0 0;
+  font-family: "Oxanium", sans-serif;
+}
+
+.stats-shell-head h3 {
+  font-size: clamp(1.65rem, 3vw, 2.25rem);
+}
+
+.stats-status {
+  margin: 0;
+  max-width: 40ch;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.6;
+}
+
+.stats-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stats-filter-button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(149, 205, 255, 0.18);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(8, 14, 22, 0.55);
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.stats-filter-button:hover {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.stats-filter-button.is-active {
+  color: #091018;
+  border-color: transparent;
+  background: linear-gradient(180deg, #a2f5ff, #55d9f2);
+}
+
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stats-card {
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(149, 205, 255, 0.14);
+  background: rgba(6, 11, 18, 0.5);
+}
+
+.stats-card-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stats-card-value {
+  display: block;
+  margin-top: 12px;
+  font-family: "Oxanium", sans-serif;
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
+  line-height: 1.15;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.stats-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(149, 205, 255, 0.12);
+  background: rgba(5, 10, 16, 0.48);
+}
+
+.stats-table-wrap {
+  overflow: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(149, 205, 255, 0.12);
+  background: rgba(4, 9, 14, 0.72);
+}
+
+.stats-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(149, 205, 255, 0.09);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.stats-table th {
+  color: var(--steel);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(8, 14, 22, 0.95);
+}
+
+.stats-table tbody tr:hover {
+  background: rgba(109, 232, 255, 0.04);
+}
+
+.stats-rank {
+  color: var(--cyan);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-player-name,
+.stats-elo,
+.stats-record,
+.stats-date,
+.stats-duration {
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-player-note,
+.stats-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stats-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--steel);
+  background: rgba(109, 232, 255, 0.08);
+  font-size: 0.82rem;
+}
+
+.stats-replay-link {
+  color: var(--cyan);
+}
+
+.stats-replay-link:hover {
+  color: #b7f7ff;
+}
+
+.stats-empty-row td {
+  color: var(--muted);
+}
+
 .site-footer {
   margin-top: 36px;
   padding: 20px 0 0;
@@ -697,6 +881,7 @@ main {
   .archive-grid,
   .open-data-grid,
   .community-grid,
+  .stats-summary,
   .split-panel,
   .timeline {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -738,6 +923,8 @@ main {
   .archive-grid,
   .open-data-grid,
   .community-grid,
+  .stats-summary,
+  .stats-grid,
   .split-panel,
   .timeline {
     grid-template-columns: 1fr;
@@ -746,6 +933,14 @@ main {
   .live-board-head {
     flex-direction: column;
     align-items: start;
+  }
+
+  .stats-shell-head {
+    flex-direction: column;
+  }
+
+  .stats-status {
+    text-align: left;
   }
 }
 

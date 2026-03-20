@@ -162,7 +162,8 @@
           <h2>Rankings, match history, and replay access with less friction.</h2>
           <p>
             The old hub packed a lot of ranking logic into one section. This remake breaks the
-            categories out into quick-glance cards and keeps the raw data routes easy to reach.
+            categories out into quick-glance cards and now includes an embedded stats board built
+            from the Warzone results data.
           </p>
         </div>
 
@@ -197,6 +198,95 @@
             <h3>NTW / Shared Research / 45+ Min</h3>
             <p>Long-form and rules-specific match slices for deeper analysis.</p>
           </article>
+        </div>
+
+        <div class="stats-shell section-frame" data-reveal>
+          <div class="stats-shell-head">
+            <div>
+              <p class="panel-kicker">Embedded Stats</p>
+              <h3>Leaderboard snapshot and match history</h3>
+            </div>
+            <p class="stats-status" id="resultsStatus">Loading stats snapshot...</p>
+          </div>
+
+          <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+
+          <div class="stats-summary" id="statsSummary">
+            <article class="stats-card">
+              <span class="stats-card-label">Ranked Players</span>
+              <strong class="stats-card-value">--</strong>
+            </article>
+            <article class="stats-card">
+              <span class="stats-card-label">Matches</span>
+              <strong class="stats-card-value">--</strong>
+            </article>
+            <article class="stats-card">
+              <span class="stats-card-label">Top Elo</span>
+              <strong class="stats-card-value">--</strong>
+            </article>
+            <article class="stats-card">
+              <span class="stats-card-label">Latest Match</span>
+              <strong class="stats-card-value">--</strong>
+            </article>
+          </div>
+
+          <div class="stats-grid">
+            <section class="stats-panel">
+              <div class="stats-panel-head">
+                <div>
+                  <p class="panel-kicker">Top Players</p>
+                  <h4>Current leaderboard slice</h4>
+                </div>
+              </div>
+
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Player</th>
+                      <th>Elo</th>
+                      <th>Matches</th>
+                      <th>W/L/D</th>
+                    </tr>
+                  </thead>
+                  <tbody id="statsRanks">
+                    <tr class="stats-empty-row">
+                      <td colspan="5">Stats are still loading.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="stats-panel">
+              <div class="stats-panel-head">
+                <div>
+                  <p class="panel-kicker">Recent Matches</p>
+                  <h4>Latest games in the selected slice</h4>
+                </div>
+              </div>
+
+              <div class="stats-table-wrap">
+                <table class="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Map</th>
+                      <th>Mode</th>
+                      <th>Duration</th>
+                      <th>Replay</th>
+                    </tr>
+                  </thead>
+                  <tbody id="statsMatches">
+                    <tr class="stats-empty-row">
+                      <td colspan="5">Waiting for match history.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
         </div>
 
         <div class="archive-grid" data-reveal>
@@ -418,6 +508,7 @@
     </footer>
   </div>
 
+  <script type="module" src="stats/modern-stats.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

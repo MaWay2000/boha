@@ -1,1 +1,417 @@
-xxx
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warzone 2100 Game Hub</title>
+  <meta
+    name="description"
+    content="A remade Warzone 2100 community hub with live lobby links, leaderboards overview, open data, and alternate lobby server details."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <div class="page-noise" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Warzone 2100 Game Hub">
+        <img src="assets/warzone2100-gamehub-logo.png" alt="Warzone 2100 logo">
+      </a>
+
+      <nav class="topnav" aria-label="Primary">
+        <a href="#lobby">Lobby</a>
+        <a href="#leaderboards">Leaderboards</a>
+        <a href="#rating">Rating</a>
+        <a href="#report">Report</a>
+        <a href="#opendata">Open Data</a>
+        <a href="#community">Community</a>
+      </nav>
+
+      <a class="discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer">
+        Discord Server
+      </a>
+    </header>
+
+    <main>
+      <section class="hero section-frame" id="top" data-reveal>
+        <div class="hero-copy">
+          <p class="eyebrow">Remade Legacy Hub</p>
+          <h1>A modern command hub for Warzone 2100.</h1>
+          <p class="hero-lead">
+            This remake turns the old single-file community page into a cleaner command deck for
+            live lobby awareness, public replay access, leaderboard entry points, and alternate
+            infrastructure built around transparency.
+          </p>
+
+          <div class="hero-actions">
+            <a class="button button-primary" href="#lobby">Open Live Lobby</a>
+            <a class="button button-secondary" href="#opendata">Browse Open Data</a>
+            <a class="button button-ghost" href="https://warzone2100.retropaganda.info/secret.html">Legacy Page</a>
+          </div>
+
+          <div class="hero-stats">
+            <article class="stat-card">
+              <span class="stat-label">Visible Games</span>
+              <strong class="stat-value" id="statGames">--</strong>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Active Players</span>
+              <strong class="stat-value" id="statPlayers">--</strong>
+            </article>
+            <article class="stat-card">
+              <span class="stat-label">Spectators</span>
+              <strong class="stat-value" id="statSpectators">--</strong>
+            </article>
+          </div>
+        </div>
+
+        <aside class="hero-panel panel-cutout">
+          <p class="panel-kicker">System Snapshot</p>
+          <h2>Fast access, clearer context, same mission.</h2>
+          <ul class="feature-list">
+            <li>Live lobby links for HTML, text, JSON, and streaming JSON consumers.</li>
+            <li>Clearer access to rankings, replays, and raw data exports.</li>
+            <li>Condensed incident timeline and alternate lobby instructions.</li>
+          </ul>
+          <div class="hero-note">
+            <span class="status-dot"></span>
+            <span id="heroStatus">Waiting for lobby feed...</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="section-grid" id="lobby">
+        <div class="section-head" data-reveal>
+          <p class="eyebrow">Live Lobby</p>
+          <h2>Live server visibility without digging through a giant page.</h2>
+          <p>
+            The original hub exposed the lobby stream in several formats. The remake keeps that
+            access front and center and gives the live table a dedicated surface.
+          </p>
+        </div>
+
+        <div class="resource-grid" data-reveal>
+          <a class="resource-card" href="https://warzone2100.retropaganda.info/lobby.html">
+            <span class="resource-label">Lobby HTML</span>
+            <strong>Readable browser view</strong>
+            <p>Open the dedicated live lobby page.</p>
+          </a>
+          <a class="resource-card" href="https://warzone2100.retropaganda.info/lobby.txt">
+            <span class="resource-label">Lobby TXT</span>
+            <strong>Terminal-friendly output</strong>
+            <p>Use plain text when you just want the list quickly.</p>
+          </a>
+          <a class="resource-card" href="https://warzone2100.retropaganda.info/lobby.json">
+            <span class="resource-label">Lobby JSON</span>
+            <strong>Automation endpoint</strong>
+            <p>Fetch the latest game list as structured data.</p>
+          </a>
+          <a class="resource-card" href="https://warzone2100.retropaganda.info/lobby.http-event-stream.json">
+            <span class="resource-label">Lobby Stream</span>
+            <strong>EventSource feed</strong>
+            <p>Subscribe to streaming updates with no manual refresh.</p>
+          </a>
+        </div>
+
+        <div class="live-board section-frame" data-reveal>
+          <div class="live-board-head">
+            <div>
+              <p class="panel-kicker">Streaming Lobby View</p>
+              <h3 id="lobbyCaption">Connecting to lobby feed...</h3>
+            </div>
+            <span class="stream-badge" id="lobbyBadge">Offline</span>
+          </div>
+
+          <div class="table-shell">
+            <table class="lobby-table">
+              <thead>
+                <tr>
+                  <th>Host</th>
+                  <th>Players</th>
+                  <th>Spectators</th>
+                  <th>Status</th>
+                  <th>Map</th>
+                  <th>Title</th>
+                </tr>
+              </thead>
+              <tbody id="lobbyGames">
+                <tr class="empty-row">
+                  <td colspan="6">No lobby data loaded yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="section-footnote" id="lobbyStatus">
+            Deploy this page next to the Warzone data endpoints to enable the full live stream.
+          </p>
+        </div>
+      </section>
+
+      <section class="section-grid" id="leaderboards">
+        <div class="section-head" data-reveal>
+          <p class="eyebrow">Leaderboards</p>
+          <h2>Rankings, match history, and replay access with less friction.</h2>
+          <p>
+            The old hub packed a lot of ranking logic into one section. This remake breaks the
+            categories out into quick-glance cards and keeps the raw data routes easy to reach.
+          </p>
+        </div>
+
+        <div class="leaderboard-grid" data-reveal>
+          <article class="mode-card">
+            <span class="mode-tag">Core</span>
+            <h3>Global</h3>
+            <p>All tracked matches combined into the broad leaderboard view.</p>
+          </article>
+          <article class="mode-card">
+            <span class="mode-tag">Duel</span>
+            <h3>1v1 Modes</h3>
+            <p>Standard 1v1, high-oil duels, and classic-map matchups.</p>
+          </article>
+          <article class="mode-card">
+            <span class="mode-tag">Team</span>
+            <h3>2v2 / 3v3 / 4v4 / 5v5</h3>
+            <p>Structured alliance formats with evenly sized teams.</p>
+          </article>
+          <article class="mode-card">
+            <span class="mode-tag">Chaos</span>
+            <h3>FFA & Multi-Team</h3>
+            <p>FFA, 2v2v2v2, and 3v3v3 splits remain tracked separately.</p>
+          </article>
+          <article class="mode-card">
+            <span class="mode-tag">Map-Specific</span>
+            <h3>Shtorm & Matrix</h3>
+            <p>Special leaderboard views for the map names players look for most.</p>
+          </article>
+          <article class="mode-card">
+            <span class="mode-tag">Filters</span>
+            <h3>NTW / Shared Research / 45+ Min</h3>
+            <p>Long-form and rules-specific match slices for deeper analysis.</p>
+          </article>
+        </div>
+
+        <div class="archive-grid" data-reveal>
+          <a class="archive-card" href="https://warzone2100.retropaganda.info/secret.html#Leaderboards">
+            <span class="resource-label">Leaderboards</span>
+            <strong>Legacy ranking view</strong>
+            <p>Open the original leaderboard stack while the results route is unstable.</p>
+          </a>
+          <a class="archive-card" href="https://warzone2100.retropaganda.info/replays/">
+            <span class="resource-label">Replays</span>
+            <strong>Replay archive</strong>
+            <p>Browse the replay store used by the legacy hub.</p>
+          </a>
+          <a class="archive-card" href="https://warzone2100.retropaganda.info/warzone2100.patch">
+            <span class="resource-label">Patch</span>
+            <strong>Integrated rating patch</strong>
+            <p>Download the client-side patch used to surface shared rating data.</p>
+          </a>
+        </div>
+      </section>
+
+      <section class="section-grid" id="rating">
+        <div class="section-head" data-reveal>
+          <p class="eyebrow">Rating & Access</p>
+          <h2>Integrated rating, alternate infrastructure, and practical setup.</h2>
+          <p>
+            In 2026 the integrated rating display was reintroduced through host-sent values using
+            the existing stars and medals UI. The alternate lobby keeps that spirit going by
+            prioritizing open visibility instead of closed gatekeeping.
+          </p>
+        </div>
+
+        <div class="split-panel" data-reveal>
+          <article class="story-card">
+            <p class="panel-kicker">Integrated Rating</p>
+            <h3>Patchable, visible, and compatible.</h3>
+            <p>
+              The modified client sends ratings from the host so everyone sees a shared view instead
+              of meaningless local-only stats. It is framed as a first step toward bringing useful
+              rating context back into Warzone 2100.
+            </p>
+            <a class="button button-secondary" href="https://warzone2100.retropaganda.info/warzone2100.patch">Download Patch</a>
+          </article>
+
+          <article class="config-card">
+            <p class="panel-kicker">Alternate Lobby Server</p>
+            <h3>Point your client at <code>warzone2100.retropaganda.info</code></h3>
+            <p>
+              The replacement lobby server supports confederation, so other servers can exchange
+              listings with it instead of living inside one centralized choke point.
+            </p>
+
+            <div class="config-block">
+              <span class="config-label">config</span>
+              <code id="configHost">masterserver_name=warzone2100.retropaganda.info</code>
+              <button class="copy-button" type="button" data-copy-target="configHost">Copy host</button>
+            </div>
+
+            <div class="config-block">
+              <span class="config-label">port</span>
+              <code id="configPort">masterserver_port=9990</code>
+              <button class="copy-button" type="button" data-copy-target="configPort">Copy port</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-grid" id="report">
+        <div class="section-head" data-reveal>
+          <p class="eyebrow">Situation Report</p>
+          <h2>A calmer, clearer timeline of the legacy page's main claims.</h2>
+          <p>
+            The old page mixed live widgets with a long narrative. Here, the main events are broken
+            into a dated timeline so the context is easier to follow.
+          </p>
+        </div>
+
+        <div class="timeline" data-reveal>
+          <article class="timeline-card">
+            <span class="timeline-date">January 28, 2026</span>
+            <h3>Lobby access ban</h3>
+            <p>
+              The legacy report states that the main IP was banned from <code>lobby.wz2100.net</code>
+              after roughly one day of hosting, which prevented both listing visibility and hosting
+              through that lobby.
+            </p>
+          </article>
+          <article class="timeline-card">
+            <span class="timeline-date">January 28 to February 16, 2026</span>
+            <h3>Severe slot limits</h3>
+            <p>
+              Hosting capacity reportedly dropped from three available slots to effectively half a
+              slot, while other machines were still able to keep multiple simultaneous hosts online.
+            </p>
+          </article>
+          <article class="timeline-card">
+            <span class="timeline-date">February 11 to February 12, 2026</span>
+            <h3>Forged player counts claim</h3>
+            <p>
+              The page documents inconsistent player counts where some viewers saw normal values and
+              the author reportedly saw zero or reduced player totals on the same games.
+            </p>
+          </article>
+          <article class="timeline-card">
+            <span class="timeline-date">Mid-February 2026</span>
+            <h3>Shadow-ban accusation</h3>
+            <p>
+              The legacy claim is that hosted games could still appear to the author while remaining
+              invisible to most other users, creating a one-sided listing effect.
+            </p>
+          </article>
+          <article class="timeline-card">
+            <span class="timeline-date">February 13, 2026</span>
+            <h3>Autohost lockout</h3>
+            <p>
+              The page says access to the <em>Autohost</em> machines was revoked, which also means
+              those match results would no longer end up in this site's public archive.
+            </p>
+          </article>
+          <article class="timeline-card">
+            <span class="timeline-date">March 6, 2026</span>
+            <h3>Discussion removed</h3>
+            <p>
+              A short GitHub discussion titled "Health report on lobby.wz2100.net" was reportedly
+              deleted within two hours, followed by a block on further interaction with the
+              organization.
+            </p>
+          </article>
+        </div>
+
+        <figure class="evidence-card section-frame" data-reveal>
+          <img src="assets/warzone2100-shadow-ban.png" alt="Discord screenshot showing two different lobby views for two IP addresses">
+          <figcaption>
+            Evidence image reused from the legacy page's March 2026 "Health report" section.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section-grid" id="opendata">
+        <div class="section-head" data-reveal>
+          <p class="eyebrow">Open Data</p>
+          <h2>The raw material stays public.</h2>
+          <p>
+            The original hub was explicit about open access to data, replays, and reproducible
+            rankings. That principle stays intact here.
+          </p>
+        </div>
+
+        <div class="open-data-grid" data-reveal>
+          <article class="data-card">
+            <h3>What is published</h3>
+            <ul class="stack-list">
+              <li>Replay files for independent verification.</li>
+              <li>Leaderboard categories derived from the public dataset.</li>
+              <li>Live lobby state as browser, text, JSON, and stream views.</li>
+            </ul>
+          </article>
+
+          <article class="data-card">
+            <h3>Data source notes</h3>
+            <ul class="stack-list">
+              <li>This site's own collected results and replays remain the baseline source.</li>
+              <li>The legacy page noted that other external result sources became unavailable or blocked.</li>
+              <li>The direct <code>results.json</code> route is currently unstable, so the remake favors working entry points.</li>
+              <li>The remake keeps those constraints visible without burying them in long paragraphs.</li>
+            </ul>
+          </article>
+
+          <article class="data-card">
+            <h3>Direct routes</h3>
+            <div class="link-stack">
+              <a href="https://warzone2100.retropaganda.info/lobby.html">lobby.html</a>
+              <a href="https://warzone2100.retropaganda.info/replays/">replays/</a>
+              <a href="https://warzone2100.retropaganda.info/lobby.json">lobby.json</a>
+              <a href="https://warzone2100.retropaganda.info/lobby.http-event-stream.json">lobby.http-event-stream.json</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-grid" id="community">
+        <div class="section-head" data-reveal>
+          <p class="eyebrow">Community</p>
+          <h2>Keep the hub useful, reproducible, and easy to reach.</h2>
+          <p>
+            The original page closed with direct contact routes. The remake keeps that simple:
+            Discord for fast contact, open links for data, and the legacy page still available for
+            the unabridged context.
+          </p>
+        </div>
+
+        <div class="community-grid" data-reveal>
+          <a class="community-card" href="https://discord.com/users/437660839378419713" target="_blank" rel="noreferrer">
+            <span class="resource-label">Direct Contact</span>
+            <strong>Message `_bohan_` on Discord</strong>
+            <p>Reach the maintainer directly.</p>
+          </a>
+          <a class="community-card" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer">
+            <span class="resource-label">Community</span>
+            <strong>Join the dedicated Discord server</strong>
+            <p>Follow updates, ask questions, and coordinate games.</p>
+          </a>
+          <a class="community-card" href="https://warzone2100.retropaganda.info/secret.html">
+            <span class="resource-label">Archive</span>
+            <strong>Open the original legacy page</strong>
+            <p>Compare the remake against the old long-form version.</p>
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>Copyright 2026 Johan Boule. Remade front-end for the Warzone 2100 Game Hub.</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

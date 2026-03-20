@@ -1,0 +1,292 @@
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+
+const STATS_DIR = __dirname;
+const UPSTREAM_ORIGIN = "https://warzone2100.retropaganda.info";
+const STATIC_SOURCES = [
+  {
+    sourceUrl: `${UPSTREAM_ORIGIN}/calculate.js`,
+    outputName: "calculate.js"
+  },
+  {
+    sourceUrl: `${UPSTREAM_ORIGIN}/leaderboards.js`,
+    outputName: "leaderboards.js"
+  },
+  {
+    sourceUrl: `${UPSTREAM_ORIGIN}/results.js`,
+    outputName: "upstream-results.js"
+  },
+  {
+    sourceUrl: `${UPSTREAM_ORIGIN}/player-public-keys.json`,
+    outputName: "player-public-keys.json"
+  }
+];
+
+function sha256(content) {
+  return crypto.createHash("sha256").update(content).digest("hex");
+}
+
+function readTextIfExists(filePath) {
+  return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : null;
+}
+
+function writeTextIfChanged(filePath, nextContent) {
+  const currentContent = readTextIfExists(filePath);
+  if (currentContent === nextContent) {
+    return false;
+  }
+
+  fs.writeFileSync(filePath, nextContent);
+  return true;
+}
+
+function replaceModuleImport(source, from, to) {
+  return source.replace(from, to);
+}
+
+async function fetchTextFile({ sourceUrl, outputName }) {
+  const response = await fetch(sourceUrl, {
+    headers: {
+      Accept: "text/javascript, application/json, text/plain, */*"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to fetch ${sourceUrl}: HTTP ${response.status}`);
+  }
+
+  return {
+    outputName,
+    sourceUrl,
+    content: await response.text()
+  };
+}
+
+async function fetchResultsSnapshot() {
+  const response = await fetch(`${UPSTREAM_ORIGIN}/results.json?id=0%200%200`, {
+    headers: {
+      Accept: "text/event-stream"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to fetch live results stream: HTTP ${response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  const payload = { format: 0, results: [] };
+  let buffer = "";
+  let currentEvent = "message";
+  let currentData = [];
+  let synced = false;
+
+  function flushEvent() {
+    if (!currentData.length) {
+      currentEvent = "message";
+      return;
+    }
+
+    const data = currentData.join("\n");
+    if (currentEvent === "reset") {
+      payload.format = Number(data);
+      payload.results = [];
+    } else if (currentEvent === "message") {
+      payload.results.push(JSON.parse(data));
+    } else if (currentEvent === "synced") {
+      synced = true;
+    }
+
+    currentEvent = "message";
+    currentData = [];
+  }
+
+  while (!synced) {
+    const { value, done } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex !== -1) {
+      const rawLine = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const line = rawLine.replace(/\r$/, "");
+
+      if (!line) {
+        flushEvent();
+      } else if (line.startsWith("event: ")) {
+        currentEvent = line.slice(7);
+      } else if (line.startsWith("data: ")) {
+        currentData.push(line.slice(6));
+      }
+
+      newlineIndex = buffer.indexOf("\n");
+    }
+  }
+
+  if (buffer.length) {
+    currentData.push(buffer.replace(/\r$/, ""));
+    flushEvent();
+  }
+
+  return JSON.stringify(payload);
+}
+
+function getSnapshotMetadata(snapshotText) {
+  const snapshot = JSON.parse(snapshotText);
+  const latestEndDate = snapshot.results.reduce(
+    (max, result) => Math.max(max, Number(result.endDate || 0)),
+    0
+  );
+
+  return {
+    resultsCount: snapshot.results.length,
+    latestEndDate
+  };
+}
+
+function loadCurrentManifest() {
+  const manifestPath = path.join(STATS_DIR, "upstream-manifest.json");
+  const currentText = readTextIfExists(manifestPath);
+  return currentText ? JSON.parse(currentText) : null;
+}
+
+function buildManifest(files, syncedAt) {
+  const manifest = {
+    upstreamOrigin: UPSTREAM_ORIGIN,
+    syncedAt,
+    files
+  };
+
+  manifest.version = sha256(
+    JSON.stringify(
+      Object.fromEntries(
+        Object.entries(files).map(([name, metadata]) => [
+          name,
+          {
+            sha256: metadata.sha256,
+            sizeBytes: metadata.sizeBytes
+          }
+        ])
+      )
+    )
+  ).slice(0, 16);
+
+  return manifest;
+}
+
+function normalizeLeaderboardsSource(content, calculateHash) {
+  return replaceModuleImport(
+    content,
+    "from './calculate.js';",
+    `from './calculate.js?v=${calculateHash.slice(0, 16)}';`
+  );
+}
+
+function normalizeResultsSource(content, hashes) {
+  return content
+    .replace(
+      "import playerPublicKeys from './player-public-keys.json' with {type: 'json'};",
+      `import playerPublicKeys from './player-public-keys.json?v=${hashes.playerKeysHash.slice(0, 16)}' with {type: 'json'};`
+    )
+    .replace(
+      "from './calculate.js';",
+      `from './calculate.js?v=${hashes.calculateHash.slice(0, 16)}';`
+    )
+    .replace(
+      "from './leaderboards.js';",
+      `from './leaderboards.js?v=${hashes.leaderboardsHash.slice(0, 16)}';`
+    );
+}
+
+async function main() {
+  const currentManifest = loadCurrentManifest();
+  const fetchedStaticFiles = await Promise.all(STATIC_SOURCES.map(fetchTextFile));
+
+  const rawFiles = Object.fromEntries(
+    fetchedStaticFiles.map((file) => [file.outputName, file])
+  );
+
+  const calculateHash = sha256(rawFiles["calculate.js"].content);
+  const playerKeysHash = sha256(rawFiles["player-public-keys.json"].content);
+
+  rawFiles["leaderboards.js"].content = normalizeLeaderboardsSource(
+    rawFiles["leaderboards.js"].content,
+    calculateHash
+  );
+
+  const leaderboardsHash = sha256(rawFiles["leaderboards.js"].content);
+
+  rawFiles["upstream-results.js"].content = normalizeResultsSource(
+    rawFiles["upstream-results.js"].content,
+    {
+      calculateHash,
+      leaderboardsHash,
+      playerKeysHash
+    }
+  );
+
+  let snapshotText = null;
+  try {
+    snapshotText = await fetchResultsSnapshot();
+  } catch (error) {
+    const existingSnapshotPath = path.join(STATS_DIR, "results-snapshot.json");
+    const existingSnapshot = readTextIfExists(existingSnapshotPath);
+    if (!existingSnapshot) {
+      throw error;
+    }
+
+    console.warn(`Unable to refresh results-snapshot.json, keeping existing copy. ${error.message}`);
+    snapshotText = existingSnapshot;
+  }
+
+  rawFiles["results-snapshot.json"] = {
+    outputName: "results-snapshot.json",
+    sourceUrl: `${UPSTREAM_ORIGIN}/results.json?id=0%200%200`,
+    content: snapshotText
+  };
+
+  const filesMetadata = {};
+  for (const file of Object.values(rawFiles)) {
+    const filePath = path.join(STATS_DIR, file.outputName);
+    const fileHash = sha256(file.content);
+    filesMetadata[file.outputName] = {
+      sourceUrl: file.sourceUrl,
+      sha256: fileHash,
+      sizeBytes: Buffer.byteLength(file.content, "utf8")
+    };
+
+    if (file.outputName === "results-snapshot.json") {
+      Object.assign(filesMetadata[file.outputName], getSnapshotMetadata(file.content));
+    }
+
+    writeTextIfChanged(filePath, file.content);
+  }
+
+  const nextManifest = buildManifest(filesMetadata, new Date().toISOString());
+  const manifestChanged =
+    !currentManifest ||
+    JSON.stringify(currentManifest.files) !== JSON.stringify(nextManifest.files);
+
+  if (manifestChanged) {
+    writeTextIfChanged(
+      path.join(STATS_DIR, "upstream-manifest.json"),
+      `${JSON.stringify(nextManifest, null, 2)}\n`
+    );
+  }
+
+  if (!manifestChanged) {
+    console.log("No upstream changes detected.");
+    return;
+  }
+
+  console.log(`Synced upstream files with manifest version ${nextManifest.version}.`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

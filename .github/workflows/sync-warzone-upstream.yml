@@ -1,0 +1,41 @@
+name: Sync Warzone Upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-warzone-upstream
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Mirror upstream files
+        run: node stats/sync-upstream.js
+
+      - name: Commit and push updates
+        run: |
+          if [[ -z "$(git status --short)" ]]; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stats/calculate.js stats/leaderboards.js stats/upstream-results.js stats/player-public-keys.json stats/results-snapshot.json stats/upstream-manifest.json
+          git commit -m "Sync upstream Warzone stats"
+          git push

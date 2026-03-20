@@ -1,4 +1,4 @@
-﻿export const eloBase = 1500;
+export const eloBase = 1500;
 export const eloThreshold = 10;
 
 export function gather(results, playerPublicKeys, filterGames) {
@@ -245,4 +245,3 @@ export function calculate(games) {
 		}
 	}
 }
-

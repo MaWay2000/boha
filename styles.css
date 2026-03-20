@@ -78,7 +78,7 @@ code {
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 24px 16px 40px;
+  padding: 10px 16px 40px;
 }
 
 .page-noise {
@@ -94,18 +94,49 @@ code {
   background-size: 180px 180px;
 }
 
+.masthead-band {
+  position: relative;
+  margin: -10px -16px 18px;
+  padding: 8px 16px 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0)),
+    linear-gradient(90deg, rgba(8, 16, 24, 0.92), rgba(8, 14, 22, 0.98) 58%, rgba(35, 23, 17, 0.88));
+  border-bottom: 1px solid rgba(124, 161, 198, 0.08);
+}
+
+.masthead-band::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 4px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(177, 217, 255, 0.22), rgba(255, 172, 109, 0.16));
+}
+
+.masthead-band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 10% 48%, rgba(109, 232, 255, 0.08), transparent 20%),
+    radial-gradient(circle at 91% 48%, rgba(255, 138, 61, 0.12), transparent 18%);
+}
+
 .topbar {
   position: sticky;
-  top: 6px;
+  top: 8px;
   z-index: 30;
   overflow: hidden;
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  grid-template-columns: clamp(220px, 16vw, 286px) minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 28px;
-  margin-bottom: 34px;
-  padding: 22px 28px;
-  min-height: 112px;
+  gap: 30px;
+  margin-bottom: 0;
+  width: 100%;
+  padding: 18px 28px;
+  min-height: 148px;
   border: 1px solid rgba(118, 148, 181, 0.16);
   border-radius: 38px;
   background:
@@ -144,7 +175,7 @@ code {
 
 .brand {
   flex: 0 0 auto;
-  width: clamp(168px, 13vw, 228px);
+  width: clamp(176px, 14vw, 250px);
   filter: drop-shadow(0 10px 24px rgba(7, 12, 18, 0.36));
 }
 
@@ -152,7 +183,7 @@ code {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(18px, 2vw, 34px);
+  gap: clamp(18px, 2.1vw, 38px);
   justify-self: center;
   flex-wrap: nowrap;
 }
@@ -175,7 +206,7 @@ code {
 
 .discord-link {
   justify-self: end;
-  padding: 12px 20px;
+  padding: 13px 22px;
   border-radius: 999px;
   border: 1px solid rgba(255, 138, 61, 0.3);
   background:
@@ -986,6 +1017,11 @@ main {
   .page-shell {
     width: 100%;
     padding-top: 16px;
+    padding-inline: 10px;
+  }
+
+  .masthead-band {
+    margin-inline: -10px;
     padding-inline: 10px;
   }
 

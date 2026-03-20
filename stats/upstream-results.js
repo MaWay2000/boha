@@ -1,11 +1,10 @@
-import playerPublicKeys from './player-public-keys.json?v=de0db0f1e222db4c' with {type: 'json'};
+import playerPublicKeys from './player-public-keys.json?v=8b679b40db46c926' with {type: 'json'};
 import {gather, calculate} from './calculate.js?v=f722ac7f80b811c5';
 import {leaderboards, filterGame, present} from './leaderboards.js?v=5e60a36fdeca21df';
 
 let leaderboard = leaderboards[0];
 let data = {format: 0, results: []};
-let playerLimit = 100;
-let gameLimit = 100;
+let playerLimit = 100, gameLimit = 100;
 
 async function compress(str) {
 	const compressedStream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -67,26 +66,6 @@ function display() {
 	resultsDiv.innerHTML = lines.join('\n');
 }
 
-await load();
-let needSave = false;
-const eventSource = new EventSource(`results.json?id=${data.format} ${data.results.length} ${data.results.length ? data.results[data.results.length - 1].endDate : 0}`);
-eventSource.addEventListener('reset', (event) => {
-	data.format = Number(event.data);
-	data.results.length = 0;
-});
-eventSource.onmessage = (event) => {
-	data.results.push(JSON.parse(event.data));
-	needSave = true;
-};
-eventSource.addEventListener('synced', (event) => {
-	display();
-	if(needSave) {
-		needSave = false;
-		save();
-	}
-});
-addEventListener('beforeunload', (event) => { eventSource.close(); });
-
 for(const leaderboard of leaderboards) {
 	const button = document.createElement('button');
 	button.type = 'button';
@@ -117,3 +96,32 @@ for(const limit of [100, 500, +Infinity]) {
 		display();
 	});
 }
+
+await load();
+let needSave = false;
+let eventSource;
+function createEventSource() {
+	eventSource = new EventSource(`results.json?id=${data.format} ${data.results.length} ${data.results.length ? data.results[data.results.length - 1].endDate : 0}`);
+	eventSource.addEventListener('reset', (event) => {
+		data.format = Number(event.data);
+		data.results.length = 0;
+	});
+	eventSource.onmessage = (event) => {
+		data.results.push(JSON.parse(event.data));
+		needSave = true;
+	};
+	eventSource.addEventListener('synced', (event) => {
+		display();
+		if(needSave) {
+			needSave = false;
+			save();
+		}
+	});
+	eventSource.onerror = (event) => {
+		if (eventSource.readyState !== EventSource.CLOSED) return;
+		eventSource.close();
+		setTimeout(createEventSource, 60_000);
+	};
+}
+createEventSource();
+addEventListener('beforeunload', (event) => { eventSource.close(); });

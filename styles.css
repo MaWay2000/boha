@@ -186,7 +186,7 @@ code {
 
 main {
   display: grid;
-  gap: 48px;
+  gap: 38px;
 }
 
 .section-frame,
@@ -413,6 +413,64 @@ main {
 .section-grid {
   display: grid;
   gap: 24px;
+}
+
+.landing-stats {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(22px, 2.4vw, 30px);
+  background:
+    linear-gradient(90deg, rgba(42, 33, 30, 0.76), rgba(11, 18, 28, 0.92) 18%, rgba(12, 22, 35, 0.98) 68%, rgba(11, 18, 29, 0.95)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+
+.landing-stats::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 11% 14%, rgba(255, 160, 79, 0.13), transparent 26%),
+    radial-gradient(circle at 78% 8%, rgba(84, 143, 215, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 22%);
+  pointer-events: none;
+}
+
+.landing-stats::after {
+  content: "";
+  position: absolute;
+  inset: 18px;
+  border-radius: calc(var(--radius-lg) - 10px);
+  border: 1px solid rgba(149, 205, 255, 0.08);
+  pointer-events: none;
+}
+
+.landing-stats > * {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-stats .stats-shell-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 32vw);
+  gap: 18px;
+  align-items: start;
+}
+
+.landing-stats .stats-shell-head h3 {
+  font-size: clamp(2.2rem, 3.5vw, 3.3rem);
+  line-height: 0.98;
+}
+
+.landing-stats .stats-status {
+  max-width: none;
+}
+
+.landing-stats + .hero {
+  margin-top: -6px;
+}
+
+.leaderboard-overview .section-head {
+  max-width: 920px;
 }
 
 .section-head {
@@ -989,6 +1047,10 @@ main {
 
   .stats-status {
     text-align: left;
+  }
+
+  .landing-stats .stats-shell-head {
+    grid-template-columns: 1fr;
   }
 }
 

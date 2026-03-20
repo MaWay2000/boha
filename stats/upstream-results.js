@@ -101,7 +101,7 @@ await load();
 let needSave = false;
 let eventSource;
 function createEventSource() {
-	eventSource = new EventSource(`results.json?id=${data.format} ${data.results.length} ${data.results.length ? data.results[data.results.length - 1].endDate : 0}`);
+	eventSource = new EventSource(`results.http-event-stream.json?id=${data.format} ${data.results.length} ${data.results.length ? data.results[data.results.length - 1].endDate : 0}`);
 	eventSource.addEventListener('reset', (event) => {
 		data.format = Number(event.data);
 		data.results.length = 0;

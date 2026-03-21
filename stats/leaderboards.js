@@ -37,8 +37,8 @@ export function present(leaderboard, accounts, games, out, playerLimit = +Infini
 	function escape(s) { return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;'); }
 	function escapeAttribute(s) { return escape(s).replaceAll("'", '&apos;').replaceAll('"', '&quot;'); }
 	out(`
-		<div id='Leaderboard: ${leaderboard}' class='encart'>
-			<h1>Leaderboard: ${leaderboard}</h1>
+		<div id='Leaderboard: ${leaderboard}' _class='encart'>
+			<h2>Leaderboard: ${leaderboard}</h2>
 			<table class='results'>
 				<tr>
 					<th class='side-head'><span>${playerLimit < +Infinity ? `${playerLimit} / ` : ''}${accounts.size} RANKS</span></th>

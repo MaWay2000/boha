@@ -74,6 +74,12 @@ for(const leaderboard of leaderboards) {
 }
 resultsLeaderboardButtonsDiv.addEventListener('click', (event) => {
 	leaderboard = event.target.innerText;
+	for(const button of resultsLeaderboardButtonsDiv.childNodes) {
+		console.log(button);
+		button.classList.add('pressed');
+	}
+	console.log(event.target);
+	event.target.classList.add('pressed');
 	display();
 });
 for(const limit of [100, 500, +Infinity]) {

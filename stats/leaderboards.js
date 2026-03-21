@@ -87,16 +87,11 @@ or because the setup was invalid, e.g.:
 			const namesArray = Array.from(account.names.entries());
 			namesArray.sort((a , b) => b[1] - a[1]);
 			function formatName(name, count) { return `<span class='player-names'>${escape(fixName(name))}<small class='dimmed'> <sup>${count}</sup></small></span>`; }
-			/*
-			const frequentNames = namesArray.filter(kv => kv[1] > 4).map(kv => formatName(...kv));
-			const infrequentNames = namesArray.filter(kv => kv[1] <= 4 && kv[1] > 1).map(kv => `<span style='font-size: 0.9em'>${formatName(...kv)}`);
-			const infrequentNamesClose = namesArray.filter(kv => kv[1] <= 4 && kv[1] > 1).map(kv => '</span>');
+			const frequentNames = namesArray.filter(kv => kv[1] >= 10).map(kv => formatName(...kv));
+			const infrequentNames = namesArray.filter(kv => kv[1] < 10 && kv[1] > 1).map(kv => `<span style='font-size: 0.95em'>${formatName(...kv)}`);
+			const infrequentNamesClose = namesArray.filter(kv => kv[1] < 10 && kv[1] > 1).map(kv => '</span>');
 			const onceNames = namesArray.filter(kv => kv[1] === 1).map(kv => formatName(...kv));
 			names = [...frequentNames, ...infrequentNames, ...onceNames, ...infrequentNamesClose].join('&nbsp;&nbsp; ');
-			*/
-			const Names = namesArray.map(kv => `<span style='font-size: 0.95em'>${formatName(...kv)}`);
-			const NamesClose = namesArray.map(kv => '</span>');
-			names = [...Names, ...NamesClose,].join('&nbsp;&nbsp; ');
 		}
 		out(`
 								<tr class='alternate'>

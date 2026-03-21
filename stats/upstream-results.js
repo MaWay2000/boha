@@ -1,6 +1,6 @@
 import playerPublicKeys from './player-public-keys.json?v=7de35fa9961b2795' with {type: 'json'};
 import {gather, calculate} from './calculate.js?v=f722ac7f80b811c5';
-import {leaderboards, filterGame, present} from './leaderboards.js?v=823d238f64b6fbfd';
+import {leaderboards, filterGame, present} from './leaderboards.js?v=720abed466e988a2';
 
 let leaderboard = leaderboards[0];
 let data = {format: 0, results: []};

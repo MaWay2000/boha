@@ -72,36 +72,41 @@ for(const leaderboard of leaderboards) {
 	button.innerText = leaderboard;
 	resultsLeaderboardButtonsDiv.appendChild(button);
 }
+resultsLeaderboardButtonsDiv.querySelector('button').classList.add('pressed');
 resultsLeaderboardButtonsDiv.addEventListener('click', (event) => {
-	leaderboard = event.target.innerText;
-	for(const button of resultsLeaderboardButtonsDiv.childNodes) {
-		console.log(button);
-		button.classList.add('pressed');
-	}
-	console.log(event.target);
+	for(const button of resultsLeaderboardButtonsDiv.querySelectorAll('button')) button.classList.remove('pressed');
 	event.target.classList.add('pressed');
+	leaderboard = event.target.innerText;
 	display();
 });
+
 for(const limit of [100, 500, +Infinity]) {
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.innerText = `Show ${limit < +Infinity ? limit : 'All'} Players`;
 	resultsPlayerLimitButtonsDiv.appendChild(button);
 	button.addEventListener('click', (event) => {
+		for(const button of resultsPlayerLimitButtonsDiv.querySelectorAll('button')) button.classList.remove('pressed');
+		event.target.classList.add('pressed');
 		playerLimit = limit;
 		display();
 	});
 }
+resultsPlayerLimitButtonsDiv.querySelector('button').classList.add('pressed');
+
 for(const limit of [100, 500, +Infinity]) {
 	const button = document.createElement('button');
 	button.type = 'button';
 	button.innerText = `Show ${limit < +Infinity ? limit : 'All'} Games`;
 	resultsGameLimitButtonsDiv.appendChild(button);
 	button.addEventListener('click', (event) => {
+		for(const button of resultsGameLimitButtonsDiv.querySelectorAll('button')) button.classList.remove('pressed');
+		event.target.classList.add('pressed');
 		gameLimit = limit;
 		display();
 	});
 }
+resultsGameLimitButtonsDiv.querySelector('button').classList.add('pressed');
 
 await load();
 let needSave = false;

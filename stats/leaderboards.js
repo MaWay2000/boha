@@ -33,15 +33,13 @@ export function filterGame(leaderboard, game) {
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone.split('/').at(-1);
 
-export function present(leaderboard, accounts, games, out, playerLimit = +Infinity, gameLimit = +Infinity) {
+export function present(accounts, games, out, playerLimit = +Infinity, gameLimit = +Infinity) {
 	function escape(s) { return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;'); }
 	function escapeAttribute(s) { return escape(s).replaceAll("'", '&apos;').replaceAll('"', '&quot;'); }
 	out(`
-		<div id='Leaderboard: ${leaderboard}' _class='encart'>
-			<h2>Leaderboard: ${leaderboard}</h2>
 			<table class='results'>
 				<tr>
-					<th class='side-head'><span>${playerLimit < +Infinity ? `${playerLimit} / ` : ''}${accounts.size} RANKS</span></th>
+					<th class='side-head'><span>${accounts.size} RANKS</span></th>
 					<td>
 						<table class='results-inner sticky-head' style='max-height: 30em'>
 							<thead>
@@ -76,6 +74,7 @@ or because the setup was invalid, e.g.:
 		let name = escape(account.name);
 		function fixName(n) {
 			return {
+				'⁤': '+',
 				'⠀': '࿕',
 				'kracker': 'Fr🤮nch — kracker',
 				'vaut ΣΑ [GN]': 'Only bohan can be that stupid — vaut ΣΑ [GN]',
@@ -87,7 +86,17 @@ or because the setup was invalid, e.g.:
 		else {
 			const namesArray = Array.from(account.names.entries());
 			namesArray.sort((a , b) => b[1] - a[1]);
-			names = namesArray.map(kv => `<span>${escape(fixName(kv[0]))}<small class='dimmed'> <sup>${kv[1]}</sup></small></span>`).join('&nbsp;&nbsp; ');
+			function formatName(name, count) { return `<span class='player-names'>${escape(fixName(name))}<small class='dimmed'> <sup>${count}</sup></small></span>`; }
+			/*
+			const frequentNames = namesArray.filter(kv => kv[1] > 4).map(kv => formatName(...kv));
+			const infrequentNames = namesArray.filter(kv => kv[1] <= 4 && kv[1] > 1).map(kv => `<span style='font-size: 0.9em'>${formatName(...kv)}`);
+			const infrequentNamesClose = namesArray.filter(kv => kv[1] <= 4 && kv[1] > 1).map(kv => '</span>');
+			const onceNames = namesArray.filter(kv => kv[1] === 1).map(kv => formatName(...kv));
+			names = [...frequentNames, ...infrequentNames, ...onceNames, ...infrequentNamesClose].join('&nbsp;&nbsp; ');
+			*/
+			const Names = namesArray.map(kv => `<span style='font-size: 0.95em'>${formatName(...kv)}`);
+			const NamesClose = namesArray.map(kv => '</span>');
+			names = [...Names, ...NamesClose,].join('&nbsp;&nbsp; ');
 		}
 		out(`
 								<tr class='alternate'>
@@ -112,7 +121,7 @@ or because the setup was invalid, e.g.:
 			</table>
 			<table class='results'>
 				<tr>
-					<th class='side-head'><span>${gameLimit < +Infinity ? `${gameLimit} / ` : ''}${games.length} MATCHES</span></th>
+					<th class='side-head'><span>${games.length} MATCHES</span></th>
 					<td>
 						<table class='results-inner sticky-head' style='${gameLimit < +Infinity ? 'max-height: 44em; ' : ''}zoom: 85%'>
 							<thead>
@@ -243,6 +252,5 @@ or because the setup was invalid, e.g.:
 					</td>
 				</tr>
 			</table>
-		</div>
 	`);
 }

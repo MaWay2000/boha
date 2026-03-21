@@ -1,6 +1,6 @@
 import playerPublicKeys from './player-public-keys.json?v=7de35fa9961b2795' with {type: 'json'};
 import {gather, calculate} from './calculate.js?v=f722ac7f80b811c5';
-import {leaderboards, filterGame, present} from './leaderboards.js?v=949c335634fe3446';
+import {leaderboards, filterGame, present} from './leaderboards.js?v=2a3a94fe197d0850';
 
 let leaderboard = leaderboards[0];
 let data = {format: 0, results: []};
@@ -62,7 +62,7 @@ function display() {
 	const {accounts, games} = gather(data.results, playerPublicKeys, function*(games) { for(const game of games) if (filterGame(leaderboard, game)) yield game; });
 	calculate(games);
 	const lines = [];
-	present(leaderboard, accounts, games, (s) => { lines.push(s); }, playerLimit, gameLimit);
+	present(accounts, games, (s) => { lines.push(s); }, playerLimit, gameLimit);
 	resultsDiv.innerHTML = lines.join('\n');
 }
 
@@ -73,7 +73,7 @@ for(const leaderboard of leaderboards) {
 	resultsLeaderboardButtonsDiv.appendChild(button);
 }
 resultsLeaderboardButtonsDiv.querySelector('button').classList.add('pressed');
-resultsLeaderboardButtonsDiv.addEventListener('click', (event) => {
+resultsLeaderboardButtonsDiv.addEventListener('click', event => {
 	for(const button of resultsLeaderboardButtonsDiv.querySelectorAll('button')) button.classList.remove('pressed');
 	event.target.classList.add('pressed');
 	leaderboard = event.target.innerText;
@@ -85,7 +85,7 @@ for(const limit of [100, 500, +Infinity]) {
 	button.type = 'button';
 	button.innerText = `Show ${limit < +Infinity ? limit : 'All'} Players`;
 	resultsPlayerLimitButtonsDiv.appendChild(button);
-	button.addEventListener('click', (event) => {
+	button.addEventListener('click', event => {
 		for(const button of resultsPlayerLimitButtonsDiv.querySelectorAll('button')) button.classList.remove('pressed');
 		event.target.classList.add('pressed');
 		playerLimit = limit;
@@ -99,7 +99,7 @@ for(const limit of [100, 500, +Infinity]) {
 	button.type = 'button';
 	button.innerText = `Show ${limit < +Infinity ? limit : 'All'} Games`;
 	resultsGameLimitButtonsDiv.appendChild(button);
-	button.addEventListener('click', (event) => {
+	button.addEventListener('click', event => {
 		for(const button of resultsGameLimitButtonsDiv.querySelectorAll('button')) button.classList.remove('pressed');
 		event.target.classList.add('pressed');
 		gameLimit = limit;
@@ -113,26 +113,26 @@ let needSave = false;
 let eventSource;
 function createEventSource() {
 	eventSource = new EventSource(`results.http-event-stream.json?id=${data.format} ${data.results.length} ${data.results.length ? data.results[data.results.length - 1].endDate : 0}`);
-	eventSource.addEventListener('reset', (event) => {
+	eventSource.addEventListener('reset', event => {
 		data.format = Number(event.data);
 		data.results.length = 0;
 	});
-	eventSource.onmessage = (event) => {
+	eventSource.onmessage = event => {
 		data.results.push(JSON.parse(event.data));
 		needSave = true;
 	};
-	eventSource.addEventListener('synced', (event) => {
+	eventSource.addEventListener('synced', event => {
 		display();
 		if(needSave) {
 			needSave = false;
 			save();
 		}
 	});
-	eventSource.onerror = (event) => {
+	eventSource.onerror = event => {
 		if (eventSource.readyState !== EventSource.CLOSED) return;
 		eventSource.close();
 		setTimeout(createEventSource, 60_000);
 	};
 }
 createEventSource();
-addEventListener('beforeunload', (event) => { eventSource.close(); });
+addEventListener('beforeunload', event => { eventSource.close(); });

@@ -911,12 +911,20 @@ main {
 }
 
 .stats-panel {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 14px;
   padding: 18px;
   border-radius: var(--radius-md);
   border: 1px solid rgba(149, 205, 255, 0.12);
   background: rgba(5, 10, 16, 0.48);
+}
+
+.stats-panel-head,
+.stats-table-wrap {
+  flex: 0 0 auto;
 }
 
 .stats-table-wrap {

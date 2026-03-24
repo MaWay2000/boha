@@ -83,10 +83,21 @@
         <div class="stats-grid">
           <section class="stats-panel">
             <div class="stats-panel-head">
-              <div>
+              <div class="stats-panel-copy">
                 <p class="panel-kicker">Top Players</p>
                 <h4>Current leaderboard slice</h4>
               </div>
+              <label class="stats-search-field" for="statsPlayerSearch">
+                <span class="visually-hidden">Search top players by nickname or key</span>
+                <input
+                  id="statsPlayerSearch"
+                  class="stats-search-input"
+                  type="search"
+                  placeholder="Nickname / key"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+              </label>
             </div>
 
             <div class="stats-table-wrap">

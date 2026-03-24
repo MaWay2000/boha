@@ -14,6 +14,7 @@ const summaryElement = document.getElementById("statsSummary");
 const buttonsElement = document.getElementById("statsLeaderboardButtons");
 const ranksElement = document.getElementById("statsRanks");
 const rankActionsElement = document.getElementById("statsRanksActions");
+const playerSearchElement = document.getElementById("statsPlayerSearch");
 const matchesElement = document.getElementById("statsMatches");
 
 let selectedLeaderboard = "Global";
@@ -29,6 +30,7 @@ let eventSource = null;
 let refreshTimer = null;
 let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+let playerSearchQuery = "";
 
 function createRuntime() {
   return {
@@ -158,6 +160,10 @@ function getNextPlayerLimit(currentCount, totalCount) {
   return Math.min(currentCount + PLAYER_LIMIT_STEP, totalCount);
 }
 
+function normalizeSearchQuery(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function getLatestEndDate(results) {
   return results.reduce((max, result) => Math.max(max, Number(result.endDate || 0)), 0);
 }
@@ -240,6 +246,19 @@ function getTeamToneClass(userType) {
     default:
       return "stats-team-neutral";
   }
+}
+
+function matchesPlayerSearch(account, searchQuery) {
+  if (!searchQuery) {
+    return true;
+  }
+
+  const playerName = String(account.name || "").toLowerCase();
+  if (playerName.includes(searchQuery)) {
+    return true;
+  }
+
+  return [...account.publicKeys].some((publicKey) => String(publicKey || "").toLowerCase().includes(searchQuery));
 }
 
 function formatTeamNames(team) {
@@ -351,20 +370,24 @@ function renderRanks(accountList) {
   }
 
   const eligibleAccounts = filterVisibleAccounts(accountList);
-  const rows = eligibleAccounts.slice(0, visiblePlayerCount);
+  const searchQuery = normalizeSearchQuery(playerSearchQuery);
+  const matchingRows = eligibleAccounts
+    .map((account, index) => ({ account, rank: index + 1 }))
+    .filter(({ account }) => matchesPlayerSearch(account, searchQuery));
+  const rows = searchQuery ? matchingRows : matchingRows.slice(0, visiblePlayerCount);
 
   if (!rows.length) {
     ranksElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">No ranked players found for this slice.</td>
+        <td colspan="5">${searchQuery ? "No players matched that nickname or key." : "No ranked players found for this slice."}</td>
       </tr>
     `;
-    renderRankActions(0);
+    renderRankActions(eligibleAccounts.length, 0, searchQuery);
     return;
   }
 
   ranksElement.innerHTML = rows
-    .map((account, index) => {
+    .map(({ account, rank }) => {
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
       const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
@@ -391,7 +414,7 @@ function renderRanks(accountList) {
           `;
       return `
         <tr>
-          <td class="stats-rank">${index + 1}</td>
+          <td class="stats-rank">${rank}</td>
           <td class="stats-player-name">
             ${playerDetails}
           </td>
@@ -403,16 +426,24 @@ function renderRanks(accountList) {
     })
     .join("");
 
-  renderRankActions(eligibleAccounts.length);
+  renderRankActions(eligibleAccounts.length, matchingRows.length, searchQuery);
 }
 
-function renderRankActions(totalPlayers) {
+function renderRankActions(totalPlayers, matchingPlayers = totalPlayers, searchQuery = "") {
   if (!rankActionsElement) {
     return;
   }
 
-  if (!totalPlayers) {
+  if (!totalPlayers && !searchQuery) {
     rankActionsElement.innerHTML = "";
+    return;
+  }
+
+  if (searchQuery) {
+    const matchLabel = matchingPlayers === 1 ? "player" : "players";
+    rankActionsElement.innerHTML = `
+      <span class="stats-panel-note">Found ${matchingPlayers} ${matchLabel} for "${escapeHtml(playerSearchQuery.trim())}".</span>
+    `;
     return;
   }
 
@@ -556,6 +587,13 @@ function renderButtons() {
   });
 
   updateActiveButtons();
+}
+
+if (playerSearchElement) {
+  playerSearchElement.addEventListener("input", (event) => {
+    playerSearchQuery = event.currentTarget.value;
+    render();
+  });
 }
 
 function closeLiveFeed() {

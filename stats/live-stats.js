@@ -60,10 +60,6 @@ function getAssetHash(name) {
   return upstreamManifest?.files?.[name]?.sha256?.slice(0, 16) || "local";
 }
 
-function getRefreshIntervalLabel() {
-  return AUTO_REFRESH_MS < 60_000 ? `${Math.round(AUTO_REFRESH_MS / 1000)} seconds` : "1 minute";
-}
-
 function buildVersionedUrl(baseUrl, version, bust = false) {
   const url = new URL(baseUrl);
   if (version) {
@@ -308,12 +304,12 @@ function renderMatchup(game) {
   `;
 }
 
-function getMirrorSyncLabel() {
-  if (!upstreamManifest?.syncedAt) {
-    return "";
+function getLastUpdateTime(results) {
+  if (liveFeedState === "live") {
+    return getLatestEndDate(results) || getMirrorSyncTime();
   }
 
-  return ` Last successful mirror sync ${formatDate(upstreamManifest.syncedAt)}.`;
+  return getMirrorSyncTime() || getLatestEndDate(results);
 }
 
 function updateStatusText(results) {
@@ -321,35 +317,13 @@ function updateStatusText(results) {
     return;
   }
 
-  const latestEndDate = getLatestEndDate(results);
-  const latestLabel = latestEndDate ? formatDate(latestEndDate) : "unknown date";
-  const mirrorLabel = getMirrorSyncLabel();
-  const refreshLabel = getRefreshIntervalLabel();
   const mirrorStale = isMirrorStale();
+  const lastUpdateTime = getLastUpdateTime(results);
 
   statusElement.classList.toggle("is-stale", mirrorStale);
-
-  if (!results.length) {
-    statusElement.textContent = `No mirrored stats data is available yet.${mirrorLabel}`;
-    return;
-  }
-
-  if (liveFeedState === "live") {
-    statusElement.textContent = `Live results feed active through ${latestLabel}.${mirrorLabel}`;
-    return;
-  }
-
-  if (liveFeedState === "unavailable") {
-    if (mirrorStale) {
-      statusElement.textContent = `Mirror is stale. The latest mirrored snapshot ends ${latestLabel}.${mirrorLabel} Live upstream sync is currently unavailable, so the page checks for a fresher mirror every ${refreshLabel}.`;
-      return;
-    }
-
-    statusElement.textContent = `Showing mirrored upstream snapshot through ${latestLabel}.${mirrorLabel} The page checks for a fresher mirror every ${refreshLabel}.`;
-    return;
-  }
-
-  statusElement.textContent = `Showing mirrored upstream snapshot through ${latestLabel}.${mirrorLabel}`;
+  statusElement.textContent = lastUpdateTime
+    ? `Last update: ${formatDate(lastUpdateTime)}`
+    : "Last update: unavailable";
 }
 
 function renderSummary(accountList, gameList) {

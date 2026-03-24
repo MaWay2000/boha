@@ -29,7 +29,6 @@
         <nav class="topnav" aria-label="Primary">
           <a href="#lobby">Lobby</a>
           <a href="#leaderboards">Leaderboards</a>
-          <a href="#rating">Rating</a>
           <a href="#opendata">Open Data</a>
         </nav>
 
@@ -322,57 +321,6 @@
             <strong>Replay archive</strong>
             <p>Browse the replay store used by the legacy hub.</p>
           </a>
-          <a class="archive-card" href="https://warzone2100.retropaganda.info/warzone2100.patch">
-            <span class="resource-label">Patch</span>
-            <strong>Integrated rating patch</strong>
-            <p>Download the client-side patch used to surface shared rating data.</p>
-          </a>
-        </div>
-      </section>
-
-      <section class="section-grid" id="rating">
-        <div class="section-head" data-reveal>
-          <p class="eyebrow">Rating & Access</p>
-          <h2>Integrated rating, alternate infrastructure, and practical setup.</h2>
-          <p>
-            In 2026 the integrated rating display was reintroduced through host-sent values using
-            the existing stars and medals UI. The alternate lobby keeps that spirit going by
-            prioritizing open visibility instead of closed gatekeeping.
-          </p>
-        </div>
-
-        <div class="split-panel" data-reveal>
-          <article class="story-card">
-            <p class="panel-kicker">Integrated Rating</p>
-            <h3>Patchable, visible, and compatible.</h3>
-            <p>
-              The modified client sends ratings from the host so everyone sees a shared view instead
-              of meaningless local-only stats. It is framed as a first step toward bringing useful
-              rating context back into Warzone 2100.
-            </p>
-            <a class="button button-secondary" href="https://warzone2100.retropaganda.info/warzone2100.patch">Download Patch</a>
-          </article>
-
-          <article class="config-card">
-            <p class="panel-kicker">Alternate Lobby Server</p>
-            <h3>Point your client at <code>warzone2100.retropaganda.info</code></h3>
-            <p>
-              The replacement lobby server supports confederation, so other servers can exchange
-              listings with it instead of living inside one centralized choke point.
-            </p>
-
-            <div class="config-block">
-              <span class="config-label">config</span>
-              <code id="configHost">masterserver_name=warzone2100.retropaganda.info</code>
-              <button class="copy-button" type="button" data-copy-target="configHost">Copy host</button>
-            </div>
-
-            <div class="config-block">
-              <span class="config-label">port</span>
-              <code id="configPort">masterserver_port=9990</code>
-              <button class="copy-button" type="button" data-copy-target="configPort">Copy port</button>
-            </div>
-          </article>
         </div>
       </section>
 

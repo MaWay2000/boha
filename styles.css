@@ -637,7 +637,7 @@ main {
 }
 
 .live-board {
-  padding: 24px;
+  padding: 18px;
 }
 
 .live-board-head {
@@ -650,18 +650,18 @@ main {
 .live-board-head h3 {
   margin: 8px 0 0;
   font-family: "Oxanium", sans-serif;
-  font-size: clamp(1.7rem, 3vw, 2.3rem);
+  font-size: clamp(1.35rem, 2.3vw, 1.75rem);
   line-height: 1.05;
 }
 
 .stream-badge {
   flex: 0 0 auto;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid rgba(255, 114, 98, 0.28);
   color: #ffd3ce;
   background: rgba(255, 114, 98, 0.1);
-  font-size: 0.86rem;
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
@@ -672,7 +672,7 @@ main {
 }
 
 .table-shell {
-  margin-top: 22px;
+  margin-top: 16px;
   overflow: auto;
   border-radius: var(--radius-md);
   border: 1px solid rgba(157, 195, 229, 0.14);
@@ -687,9 +687,14 @@ main {
 
 .lobby-table th,
 .lobby-table td {
-  padding: 14px 16px;
+  padding: 10px 14px;
   border-bottom: 1px solid rgba(157, 195, 229, 0.1);
   text-align: left;
+}
+
+.lobby-table td {
+  font-size: 0.92rem;
+  line-height: 1.15;
 }
 
 .lobby-table th {
@@ -697,7 +702,7 @@ main {
   top: 0;
   z-index: 1;
   color: var(--steel);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   background: rgba(9, 15, 24, 0.96);
@@ -710,11 +715,11 @@ main {
 .status-pill {
   display: inline-flex;
   align-items: center;
-  min-width: 88px;
+  min-width: 74px;
   justify-content: center;
-  padding: 7px 10px;
+  padding: 5px 9px;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -752,20 +757,21 @@ main {
 .map-cell {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .map-cell img {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.06);
 }
 
 .section-footnote {
-  margin: 16px 0 0;
+  margin: 12px 0 0;
   color: var(--muted);
+  font-size: 0.92rem;
 }
 
 .split-panel {

@@ -578,6 +578,10 @@ main {
   margin: 12px 0 0;
 }
 
+#opendata .section-head {
+  max-width: 980px;
+}
+
 .resource-grid,
 .leaderboard-grid,
 .archive-grid,
@@ -1227,6 +1231,12 @@ main {
   overflow-y: hidden;
   background: rgba(109, 232, 255, 0.06);
   border: 1px solid rgba(149, 205, 255, 0.12);
+}
+
+@media (min-width: 900px) {
+  #opendata .section-head h2 {
+    white-space: nowrap;
+  }
 }
 
 .stats-matchup {

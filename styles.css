@@ -928,7 +928,7 @@ main {
 
 .stats-table {
   width: 100%;
-  min-width: 560px;
+  min-width: 720px;
   border-collapse: collapse;
 }
 
@@ -971,6 +971,60 @@ main {
   margin-top: 4px;
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.stats-matchup {
+  min-width: 320px;
+}
+
+.stats-matchup-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.stats-team {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.stats-team-winner {
+  color: #dffae0;
+  border-color: rgba(141, 233, 142, 0.24);
+  background: rgba(141, 233, 142, 0.12);
+}
+
+.stats-team-loser {
+  color: #ffd3ce;
+  border-color: rgba(255, 114, 98, 0.24);
+  background: rgba(255, 114, 98, 0.12);
+}
+
+.stats-team-contender {
+  color: #fff0c2;
+  border-color: rgba(255, 198, 96, 0.24);
+  background: rgba(255, 198, 96, 0.12);
+}
+
+.stats-team-neutral {
+  color: var(--steel);
+  border-color: rgba(149, 205, 255, 0.16);
+  background: rgba(109, 232, 255, 0.08);
+}
+
+.stats-versus {
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .stats-tag {

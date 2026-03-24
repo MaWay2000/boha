@@ -210,6 +210,44 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function getTeamToneClass(userType) {
+  switch (userType) {
+    case "winner":
+      return "stats-team-winner";
+    case "loser":
+      return "stats-team-loser";
+    case "contender":
+      return "stats-team-contender";
+    default:
+      return "stats-team-neutral";
+  }
+}
+
+function formatTeamNames(team) {
+  return team.players
+    .map((player) => player.account?.name || "Unknown")
+    .join(", ");
+}
+
+function renderMatchup(game) {
+  const teams = game.teams.filter((team) => team.players.length);
+  if (!teams.length) {
+    return `<span class="stats-note">Player list unavailable.</span>`;
+  }
+
+  return `
+    <div class="stats-matchup-list">
+      ${teams.map((team, index) => {
+        const vsLabel = index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
+        return `
+          <span class="stats-team ${getTeamToneClass(team.userType)}">${escapeHtml(formatTeamNames(team))}</span>
+          ${vsLabel}
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
 function getMirrorSyncLabel() {
   if (!upstreamManifest?.syncedAt) {
     return "";
@@ -336,7 +374,7 @@ function renderMatches(gameList) {
   if (!rows.length) {
     matchesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">No matches found for this slice.</td>
+        <td colspan="6">No matches found for this slice.</td>
       </tr>
     `;
     return;
@@ -354,6 +392,7 @@ function renderMatches(gameList) {
             ${escapeHtml(game.mapName)}
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
           </td>
+          <td class="stats-matchup">${renderMatchup(game)}</td>
           <td><span class="stats-tag">${escapeHtml(formatAlliance(game))}</span></td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td><a class="stats-replay-link" href="${escapeHtml(normalizeReplayUrl(game.replayUrl))}" target="_blank" rel="noreferrer">Replay</a></td>

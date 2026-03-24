@@ -347,13 +347,26 @@ function renderRanks(accountList) {
   ranksElement.innerHTML = rows
     .map((account, index) => {
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
-      const note = account.discounted ? "Provisional" : `${account.publicKeys.size} key(s) tracked`;
+      const publicKeys = [...account.publicKeys].sort();
+      const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
+      const keyDetails = publicKeys.length
+        ? `
+            <details class="stats-key-details">
+              <summary class="stats-player-note stats-key-summary">${escapeHtml(note)}</summary>
+              <div class="stats-key-list">
+                ${publicKeys
+                  .map((publicKey) => `<code class="stats-key-value">${escapeHtml(publicKey)}</code>`)
+                  .join("")}
+              </div>
+            </details>
+          `
+        : `<span class="stats-player-note">${escapeHtml(note)}</span>`;
       return `
         <tr>
           <td class="stats-rank">${index + 1}</td>
           <td class="stats-player-name">
             ${escapeHtml(account.name || "Unknown")}
-            <span class="stats-player-note">${escapeHtml(note)}</span>
+            ${keyDetails}
           </td>
           <td class="stats-elo">${eloLabel}</td>
           <td>${account.games.length}</td>

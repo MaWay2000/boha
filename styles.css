@@ -985,6 +985,57 @@ main {
   font-size: 0.85rem;
 }
 
+.stats-key-details {
+  margin-top: 4px;
+}
+
+.stats-key-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.22em;
+}
+
+.stats-key-summary::marker,
+.stats-key-summary::-webkit-details-marker {
+  display: none;
+  content: "";
+}
+
+.stats-key-summary::after {
+  content: "+";
+  color: var(--cyan);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stats-key-details[open] .stats-key-summary::after {
+  content: "-";
+}
+
+.stats-key-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.stats-key-value {
+  display: block;
+  padding: 7px 9px;
+  border-radius: 10px;
+  color: #cce6ff;
+  font-size: 0.77rem;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  background: rgba(109, 232, 255, 0.06);
+  border: 1px solid rgba(149, 205, 255, 0.12);
+}
+
 .stats-matchup {
   min-width: 320px;
 }

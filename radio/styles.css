@@ -23,8 +23,8 @@
 }
 
 body.embed-topbar .wrap {
-  left: 10px;
-  top: 10px;
+  left: 8px;
+  top: 8px;
 }
 
 .wrap.is-player-hidden {
@@ -142,8 +142,22 @@ body.embed-topbar .wrap {
 }
 
 body.embed-topbar .player {
-  width: min(620px, calc(100vw - 128px));
-  padding-left: 42px;
+  margin-left: 58px;
+  width: calc(100vw - 92px);
+  padding-left: 30px;
+}
+
+body.embed-topbar .logo-button {
+  left: -12px;
+  width: 118px;
+  height: 118px;
+}
+
+body.embed-topbar .logo-sky {
+  left: 14px;
+  top: 9px;
+  width: 88px;
+  height: 62px;
 }
 
 .player-main {

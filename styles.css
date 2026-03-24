@@ -233,7 +233,8 @@ code {
 
 .topbar-radio iframe {
   width: 100%;
-  min-height: 88px;
+  height: 116px;
+  min-height: 116px;
   border: 0;
   border-radius: 20px;
   background: rgba(5, 10, 16, 0.74);

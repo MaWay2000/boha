@@ -6,7 +6,7 @@ const zlib = require("zlib");
 const STATS_DIR = __dirname;
 const UPSTREAM_ORIGIN = "https://warzone2100.retropaganda.info";
 const UPSTREAM_RESULTS_URL = `${UPSTREAM_ORIGIN}/results.json`;
-const UPSTREAM_LOBBY_TEXT_URL = `${UPSTREAM_ORIGIN}/lobby.txt`;
+const UPSTREAM_LOBBY_URL = `${UPSTREAM_ORIGIN}/lobby.json`;
 const STATIC_SOURCES = [
   {
     sourceUrl: `${UPSTREAM_ORIGIN}/calculate.js`,
@@ -103,18 +103,6 @@ async function fetchResultsSnapshot() {
   return `${JSON.stringify(normalizedPayload)}\n`;
 }
 
-function parseRatioPair(value) {
-  const match = String(value || "").match(/(\d+)\s*\/\s*(\d+)/);
-  if (!match) {
-    return { current: 0, max: 0 };
-  }
-
-  return {
-    current: Number(match[1]),
-    max: Number(match[2])
-  };
-}
-
 function getStatusPriority(status) {
   switch (String(status || "").toLowerCase()) {
     case "started":
@@ -130,89 +118,27 @@ function getStatusPriority(status) {
   }
 }
 
-function parseLobbySnapshot(text, syncedAt, sourceLastModified = "") {
-  const motdLines = [];
+function normalizeLobbyGames(games) {
   const gamesByKey = new Map();
-  const lines = String(text).replace(/\r/g, "").split("\n");
-  let readingMotd = false;
-  let gameCount = 0;
-  let inTable = false;
-
-  for (const rawLine of lines) {
-    const line = rawLine.replace(/\t/g, "  ").trimEnd();
-    const trimmed = line.trim();
-
-    if (!trimmed) {
-      readingMotd = false;
-      continue;
-    }
-
-    if (trimmed === "MotD:") {
-      readingMotd = true;
-      continue;
-    }
-
-    if (readingMotd) {
-      motdLines.push(trimmed);
-      continue;
-    }
-
-    const gameCountMatch = trimmed.match(/^Game count:\s*(\d+)/i);
-    if (gameCountMatch) {
-      gameCount = Number(gameCountMatch[1]);
-      continue;
-    }
-
-    if (trimmed.startsWith("Confederate address")) {
-      inTable = true;
-      continue;
-    }
-
-    if (!inTable) {
-      continue;
-    }
-
-    const columns = trimmed.split(/\s{2,}/);
-    if (columns.length < 10) {
-      continue;
-    }
-
-    const [
-      confederateAddress,
-      confederatePortText,
-      hostAddress,
-      hostPortText,
-      spectatorsText,
-      playersText,
-      statusText,
-      mapName,
-      hostName,
-      ...titleParts
-    ] = columns;
-
-    const spectators = parseRatioPair(spectatorsText);
-    const players = parseRatioPair(playersText);
-    const status = String(statusText || "").toLowerCase();
-    const hostPort = Number(hostPortText || 0);
-    const confederatePort = Number(confederatePortText || 0);
+  for (const game of Array.isArray(games) ? games : []) {
+    const status = String(game?.status || "").toLowerCase();
+    const hostAddress = String(game?.host_address || game?.host2 || "");
+    const hostPort = Number(game?.host_port || game?.game_id || 0);
     const dedupeKey = `${hostAddress}:${hostPort}`;
-    const title = titleParts.join("  ").trim() || hostName || hostAddress;
-
     const nextGame = {
-      game_id: hostPort,
-      confederate_address: confederateAddress,
-      confederate_port: confederatePort,
+      ...game,
+      game_id: Number(game?.game_id || hostPort || 0),
       host_address: hostAddress,
       host_port: hostPort,
-      host_name: hostName,
-      host2: hostAddress,
-      current_spectators: spectators.current,
-      max_spectators: spectators.max,
-      current_players: players.current,
-      max_players: players.max,
+      host_name: String(game?.host_name || game?.host2 || hostAddress),
+      host2: String(game?.host2 || hostAddress),
+      current_spectators: Number(game?.current_spectators || 0),
+      max_spectators: Number(game?.max_spectators || 0),
+      current_players: Number(game?.current_players || 0),
+      max_players: Number(game?.max_players || 0),
       status,
-      map_name: mapName,
-      name: title
+      map_name: String(game?.map_name || "-"),
+      name: String(game?.name || game?.host_name || hostAddress || "-")
     };
 
     const existingGame = gamesByKey.get(dedupeKey);
@@ -221,31 +147,43 @@ function parseLobbySnapshot(text, syncedAt, sourceLastModified = "") {
     }
   }
 
-  const games = [...gamesByKey.values()].filter((game) => game.status !== "completed");
+  return [...gamesByKey.values()].filter(
+    (game) => !game.private_game && game.status !== "completed"
+  );
+}
+
+function normalizeLobbySnapshot(payload, syncedAt, sourceLastModified = "") {
+  const motd = String(payload?.motd || "Warzone 2100 lobby");
+  const motdLines = motd
+    .replace(/\r/g, "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const games = normalizeLobbyGames(payload?.games);
 
   return `${JSON.stringify({
-    sourceUrl: UPSTREAM_LOBBY_TEXT_URL,
+    sourceUrl: UPSTREAM_LOBBY_URL,
     syncedAt,
     sourceLastModified,
     motd: motdLines[0] || "Warzone 2100 lobby",
     motdLines,
-    gameCount,
+    gameCount: games.length,
     games
   })}\n`;
 }
 
 async function fetchLobbySnapshot() {
-  const response = await fetch(UPSTREAM_LOBBY_TEXT_URL, {
-    headers: buildUpstreamHeaders("text/plain, */*")
+  const response = await fetch(UPSTREAM_LOBBY_URL, {
+    headers: buildUpstreamHeaders("application/json, text/plain, */*")
   });
 
   if (!response.ok) {
-    throw new Error(`Unable to fetch lobby.txt snapshot: HTTP ${response.status}`);
+    throw new Error(`Unable to fetch lobby.json snapshot: HTTP ${response.status}`);
   }
 
   const syncedAt = new Date().toISOString();
-  return parseLobbySnapshot(
-    await response.text(),
+  return normalizeLobbySnapshot(
+    JSON.parse(await response.text()),
     syncedAt,
     String(response.headers.get("last-modified") || "")
   );
@@ -381,7 +319,7 @@ async function main() {
 
   rawFiles["lobby-snapshot.json"] = {
     outputName: "lobby-snapshot.json",
-    sourceUrl: UPSTREAM_LOBBY_TEXT_URL,
+    sourceUrl: UPSTREAM_LOBBY_URL,
     content: lobbySnapshotText
   };
 

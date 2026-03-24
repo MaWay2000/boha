@@ -180,7 +180,7 @@ async function refreshLobbyFromMirror() {
 }
 
 function startLobbyMirrorLoop() {
-  if (lobbyMirrorTimer || !USE_POLLING_LOBBY_SOURCE) {
+  if (lobbyMirrorTimer) {
     return;
   }
 

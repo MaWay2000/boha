@@ -349,10 +349,14 @@ function renderRanks(accountList) {
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
       const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
-      const keyDetails = publicKeys.length
+      const playerLine = escapeHtml(account.name || "Unknown");
+      const playerDetails = publicKeys.length
         ? `
             <details class="stats-key-details">
-              <summary class="stats-player-note stats-key-summary">${escapeHtml(note)}</summary>
+              <summary class="stats-player-line stats-key-summary">
+                <span class="stats-player-label">${playerLine}</span>
+                <span class="stats-player-note stats-key-note">${escapeHtml(note)}</span>
+              </summary>
               <div class="stats-key-list">
                 ${publicKeys
                   .map((publicKey) => `<code class="stats-key-value">${escapeHtml(publicKey)}</code>`)
@@ -360,13 +364,17 @@ function renderRanks(accountList) {
               </div>
             </details>
           `
-        : `<span class="stats-player-note">${escapeHtml(note)}</span>`;
+        : `
+            <div class="stats-player-line">
+              <span class="stats-player-label">${playerLine}</span>
+              <span class="stats-player-note">${escapeHtml(note)}</span>
+            </div>
+          `;
       return `
         <tr>
           <td class="stats-rank">${index + 1}</td>
           <td class="stats-player-name">
-            <span class="stats-player-label">${escapeHtml(account.name || "Unknown")}</span>
-            ${keyDetails}
+            ${playerDetails}
           </td>
           <td class="stats-elo">${eloLabel}</td>
           <td>${account.games.length}</td>

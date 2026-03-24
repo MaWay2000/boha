@@ -1007,9 +1007,15 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+.stats-player-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .stats-player-label {
   display: inline-block;
-  margin-right: 10px;
 }
 
 .stats-player-note,
@@ -1021,20 +1027,13 @@ main {
 }
 
 .stats-key-details {
-  display: inline-block;
+  display: block;
   margin-top: 0;
-  vertical-align: baseline;
 }
 
 .stats-key-summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   cursor: pointer;
   user-select: none;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 0.22em;
 }
 
 .stats-key-summary::marker,
@@ -1043,14 +1042,23 @@ main {
   content: "";
 }
 
-.stats-key-summary::after {
+.stats-key-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.22em;
+}
+
+.stats-key-note::after {
   content: "+";
   color: var(--cyan);
   font-weight: 700;
   line-height: 1;
 }
 
-.stats-key-details[open] .stats-key-summary::after {
+.stats-key-details[open] .stats-key-note::after {
   content: "-";
 }
 

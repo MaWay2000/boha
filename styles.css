@@ -948,6 +948,10 @@ main {
   table-layout: fixed;
 }
 
+.stats-table-ranks tbody td {
+  vertical-align: top;
+}
+
 .stats-table th,
 .stats-table td {
   padding: 13px 14px;

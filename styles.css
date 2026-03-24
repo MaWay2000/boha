@@ -1007,16 +1007,23 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+.stats-player-label {
+  display: inline-block;
+  margin-right: 10px;
+}
+
 .stats-player-note,
 .stats-note {
-  display: block;
-  margin-top: 4px;
+  display: inline-block;
+  margin-top: 0;
   color: var(--muted);
   font-size: 0.85rem;
 }
 
 .stats-key-details {
-  margin-top: 4px;
+  display: inline-block;
+  margin-top: 0;
+  vertical-align: baseline;
 }
 
 .stats-key-summary {

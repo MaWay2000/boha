@@ -365,7 +365,7 @@ function renderRanks(accountList) {
         <tr>
           <td class="stats-rank">${index + 1}</td>
           <td class="stats-player-name">
-            ${escapeHtml(account.name || "Unknown")}
+            <span class="stats-player-label">${escapeHtml(account.name || "Unknown")}</span>
             ${keyDetails}
           </td>
           <td class="stats-elo">${eloLabel}</td>

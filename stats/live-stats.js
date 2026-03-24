@@ -396,18 +396,23 @@ function renderRanks(accountList) {
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
       const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
+      const keyCountLabel = `${publicKeys.length} key(s) tracked`;
       const playerLine = escapeHtml(account.name || "Unknown");
       const playerDetails = publicKeys.length
         ? `
             <details class="stats-key-details">
               <summary class="stats-player-line stats-key-summary">
                 <span class="stats-player-label">${playerLine}</span>
-                <span class="stats-player-note stats-key-note">${escapeHtml(note)}</span>
+                <span class="stats-key-toggle" aria-hidden="true"></span>
+                <span class="visually-hidden">${escapeHtml(keyCountLabel)}</span>
               </summary>
-              <div class="stats-key-list">
+              <div class="stats-key-panel">
+                <span class="stats-player-note stats-key-count">${escapeHtml(keyCountLabel)}</span>
+                <div class="stats-key-list">
                 ${publicKeys
                   .map((publicKey) => `<code class="stats-key-value">${escapeHtml(publicKey)}</code>`)
                   .join("")}
+                </div>
               </div>
             </details>
           `

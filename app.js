@@ -2,7 +2,6 @@ const revealItems = document.querySelectorAll("[data-reveal]");
 const lobbyCaption = document.getElementById("lobbyCaption");
 const lobbyGames = document.getElementById("lobbyGames");
 const lobbyBadge = document.getElementById("lobbyBadge");
-const lobbyStatus = document.getElementById("lobbyStatus");
 const heroStatus = document.getElementById("heroStatus");
 const statGames = document.getElementById("statGames");
 const statPlayers = document.getElementById("statPlayers");
@@ -146,7 +145,6 @@ function markLobbyState(online, message, badgeLabel = online ? "Live" : "Offline
   if (heroStatus) {
     heroStatus.textContent = message;
   }
-  lobbyStatus.textContent = message;
 }
 
 function loadFallbackLobby(message) {

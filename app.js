@@ -48,9 +48,15 @@ function updateLobbyStats(games) {
   const players = games.reduce((sum, game) => sum + Number(game.current_players || 0), 0);
   const spectators = games.reduce((sum, game) => sum + Number(game.current_spectators || 0), 0);
 
-  statGames.textContent = String(games.length);
-  statPlayers.textContent = String(players);
-  statSpectators.textContent = String(spectators);
+  if (statGames) {
+    statGames.textContent = String(games.length);
+  }
+  if (statPlayers) {
+    statPlayers.textContent = String(players);
+  }
+  if (statSpectators) {
+    statSpectators.textContent = String(spectators);
+  }
 }
 
 function renderLobby(lobby) {
@@ -103,7 +109,9 @@ function renderLobby(lobby) {
 function markLobbyState(online, message) {
   lobbyBadge.textContent = online ? "Live" : "Offline";
   lobbyBadge.classList.toggle("is-live", online);
-  heroStatus.textContent = message;
+  if (heroStatus) {
+    heroStatus.textContent = message;
+  }
   lobbyStatus.textContent = message;
 }
 

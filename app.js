@@ -9,10 +9,17 @@ const statPlayers = document.getElementById("statPlayers");
 const statSpectators = document.getElementById("statSpectators");
 
 const MAP_IMAGE_BASE = "https://warzone2100.retropaganda.info/images/maps/";
+const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
+const USE_REMOTE_LOBBY_MIRROR = window.location.hostname.endsWith("github.io");
+const LOBBY_MIRROR_URL = USE_REMOTE_LOBBY_MIRROR
+  ? new URL("lobby-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
+  : new URL("./stats/lobby-snapshot.json", window.location.href);
+const LOBBY_REFRESH_MS = 15_000;
 const SAMPLE_LOBBY = {
   motd: "Deploy alongside lobby endpoints to activate the live feed.",
   games: []
 };
+let lobbyMirrorTimer = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -59,6 +66,33 @@ function updateLobbyStats(games) {
   }
 }
 
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function getLobbyStatusClass(status) {
+  switch (String(status || "").toLowerCase()) {
+    case "waiting":
+    case "started":
+    case "empty":
+    case "completed":
+      return String(status).toLowerCase();
+    default:
+      return "unknown";
+  }
+}
+
+function formatLobbyStatus(status) {
+  const value = String(status || "unknown").toLowerCase();
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : "Unknown";
+}
+
 function renderLobby(lobby) {
   const games = [...(lobby.games || [])].sort(
     (a, b) =>
@@ -92,7 +126,7 @@ function renderLobby(lobby) {
           <td>${hostName}</td>
           <td class="player-count">${Number(game.current_players || 0)}/${Number(game.max_players || 0)}</td>
           <td class="spectator-count">${Number(game.current_spectators || 0)}/${Number(game.max_spectators || 0)}</td>
-          <td><span class="status-pill ${status === "waiting" || status === "started" ? status : "unknown"}">${escapeHtml(status)}</span></td>
+          <td><span class="status-pill ${getLobbyStatusClass(status)}">${escapeHtml(formatLobbyStatus(status))}</span></td>
           <td>
             <span class="map-cell">
               <img src="${mapImage}" alt="" loading="lazy">
@@ -106,8 +140,8 @@ function renderLobby(lobby) {
     .join("");
 }
 
-function markLobbyState(online, message) {
-  lobbyBadge.textContent = online ? "Live" : "Offline";
+function markLobbyState(online, message, badgeLabel = online ? "Live" : "Offline") {
+  lobbyBadge.textContent = badgeLabel;
   lobbyBadge.classList.toggle("is-live", online);
   if (heroStatus) {
     heroStatus.textContent = message;
@@ -120,9 +154,59 @@ function loadFallbackLobby(message) {
   markLobbyState(false, message);
 }
 
-function connectLobbyStream() {
+async function readLobbySnapshot() {
+  const url = new URL(LOBBY_MIRROR_URL);
+  url.searchParams.set("t", Date.now().toString());
+
+  const response = await fetch(url, {
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to load mirrored lobby snapshot (${response.status})`);
+  }
+
+  return response.json();
+}
+
+async function refreshLobbyFromMirror() {
+  const lobby = await readLobbySnapshot();
+  renderLobby(lobby);
+
+  const lastUpdateLabel = lobby.syncedAt
+    ? `Last update: ${formatDateTime(lobby.syncedAt)}`
+    : "Lobby snapshot loaded.";
+
+  markLobbyState(true, lastUpdateLabel, "Online");
+  return true;
+}
+
+function startLobbyMirrorLoop() {
+  if (lobbyMirrorTimer || !USE_REMOTE_LOBBY_MIRROR) {
+    return;
+  }
+
+  lobbyMirrorTimer = window.setInterval(() => {
+    refreshLobbyFromMirror().catch((error) => {
+      console.warn("Unable to refresh lobby snapshot.", error);
+    });
+  }, LOBBY_REFRESH_MS);
+}
+
+async function connectLobbyStream() {
   if (window.location.protocol === "file:") {
     loadFallbackLobby("Live lobby is unavailable in file preview. Serve this page from the site to enable streaming.");
+    return;
+  }
+
+  if (USE_REMOTE_LOBBY_MIRROR) {
+    try {
+      await refreshLobbyFromMirror();
+      startLobbyMirrorLoop();
+    } catch (error) {
+      console.warn("Unable to load mirrored lobby snapshot.", error);
+      loadFallbackLobby("Lobby mirror unavailable right now.");
+    }
     return;
   }
 
@@ -141,7 +225,10 @@ function connectLobbyStream() {
     stream.onerror = () => {
       if (!hasReceivedData) {
         stream.close();
-        loadFallbackLobby("Lobby stream unavailable here. Deploy beside the lobby endpoints to restore live data.");
+        refreshLobbyFromMirror()
+          .catch(() => {
+            loadFallbackLobby("Lobby stream unavailable here. Lobby snapshot also could not be loaded.");
+          });
       } else {
         markLobbyState(false, "Lobby stream interrupted. Waiting for reconnection...");
       }

@@ -6,6 +6,7 @@ const zlib = require("zlib");
 const STATS_DIR = __dirname;
 const UPSTREAM_ORIGIN = "https://warzone2100.retropaganda.info";
 const UPSTREAM_RESULTS_URL = `${UPSTREAM_ORIGIN}/results.json`;
+const UPSTREAM_LOBBY_TEXT_URL = `${UPSTREAM_ORIGIN}/lobby.txt`;
 const STATIC_SOURCES = [
   {
     sourceUrl: `${UPSTREAM_ORIGIN}/calculate.js`,
@@ -100,6 +101,154 @@ async function fetchResultsSnapshot() {
     : upstreamPayload;
 
   return `${JSON.stringify(normalizedPayload)}\n`;
+}
+
+function parseRatioPair(value) {
+  const match = String(value || "").match(/(\d+)\s*\/\s*(\d+)/);
+  if (!match) {
+    return { current: 0, max: 0 };
+  }
+
+  return {
+    current: Number(match[1]),
+    max: Number(match[2])
+  };
+}
+
+function getStatusPriority(status) {
+  switch (String(status || "").toLowerCase()) {
+    case "started":
+      return 4;
+    case "waiting":
+      return 3;
+    case "empty":
+      return 2;
+    case "completed":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function parseLobbySnapshot(text, syncedAt, sourceLastModified = "") {
+  const motdLines = [];
+  const gamesByKey = new Map();
+  const lines = String(text).replace(/\r/g, "").split("\n");
+  let readingMotd = false;
+  let gameCount = 0;
+  let inTable = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/\t/g, "  ").trimEnd();
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      readingMotd = false;
+      continue;
+    }
+
+    if (trimmed === "MotD:") {
+      readingMotd = true;
+      continue;
+    }
+
+    if (readingMotd) {
+      motdLines.push(trimmed);
+      continue;
+    }
+
+    const gameCountMatch = trimmed.match(/^Game count:\s*(\d+)/i);
+    if (gameCountMatch) {
+      gameCount = Number(gameCountMatch[1]);
+      continue;
+    }
+
+    if (trimmed.startsWith("Confederate address")) {
+      inTable = true;
+      continue;
+    }
+
+    if (!inTable) {
+      continue;
+    }
+
+    const columns = trimmed.split(/\s{2,}/);
+    if (columns.length < 10) {
+      continue;
+    }
+
+    const [
+      confederateAddress,
+      confederatePortText,
+      hostAddress,
+      hostPortText,
+      spectatorsText,
+      playersText,
+      statusText,
+      mapName,
+      hostName,
+      ...titleParts
+    ] = columns;
+
+    const spectators = parseRatioPair(spectatorsText);
+    const players = parseRatioPair(playersText);
+    const status = String(statusText || "").toLowerCase();
+    const hostPort = Number(hostPortText || 0);
+    const confederatePort = Number(confederatePortText || 0);
+    const dedupeKey = `${hostAddress}:${hostPort}`;
+    const title = titleParts.join("  ").trim() || hostName || hostAddress;
+
+    const nextGame = {
+      game_id: hostPort,
+      confederate_address: confederateAddress,
+      confederate_port: confederatePort,
+      host_address: hostAddress,
+      host_port: hostPort,
+      host_name: hostName,
+      host2: hostAddress,
+      current_spectators: spectators.current,
+      max_spectators: spectators.max,
+      current_players: players.current,
+      max_players: players.max,
+      status,
+      map_name: mapName,
+      name: title
+    };
+
+    const existingGame = gamesByKey.get(dedupeKey);
+    if (!existingGame || getStatusPriority(status) >= getStatusPriority(existingGame.status)) {
+      gamesByKey.set(dedupeKey, nextGame);
+    }
+  }
+
+  const games = [...gamesByKey.values()].filter((game) => game.status !== "completed");
+
+  return `${JSON.stringify({
+    sourceUrl: UPSTREAM_LOBBY_TEXT_URL,
+    syncedAt,
+    sourceLastModified,
+    motd: motdLines[0] || "Warzone 2100 lobby",
+    motdLines,
+    gameCount,
+    games
+  })}\n`;
+}
+
+async function fetchLobbySnapshot() {
+  const response = await fetch(UPSTREAM_LOBBY_TEXT_URL, {
+    headers: buildUpstreamHeaders("text/plain, */*")
+  });
+
+  if (!response.ok) {
+    throw new Error(`Unable to fetch lobby.txt snapshot: HTTP ${response.status}`);
+  }
+
+  const syncedAt = new Date().toISOString();
+  return parseLobbySnapshot(
+    await response.text(),
+    syncedAt,
+    String(response.headers.get("last-modified") || "")
+  );
 }
 
 function getSnapshotMetadata(snapshotText) {
@@ -216,6 +365,26 @@ async function main() {
     content: snapshotText
   };
 
+  let lobbySnapshotText = null;
+  try {
+    lobbySnapshotText = await fetchLobbySnapshot();
+  } catch (error) {
+    const existingLobbySnapshotPath = path.join(STATS_DIR, "lobby-snapshot.json");
+    const existingLobbySnapshot = readTextIfExists(existingLobbySnapshotPath);
+    if (!existingLobbySnapshot) {
+      throw error;
+    }
+
+    console.warn(`Unable to refresh lobby-snapshot.json, keeping existing copy. ${error.message}`);
+    lobbySnapshotText = existingLobbySnapshot;
+  }
+
+  rawFiles["lobby-snapshot.json"] = {
+    outputName: "lobby-snapshot.json",
+    sourceUrl: UPSTREAM_LOBBY_TEXT_URL,
+    content: lobbySnapshotText
+  };
+
   const filesMetadata = {};
   for (const file of Object.values(rawFiles)) {
     const filePath = path.join(STATS_DIR, file.outputName);
@@ -228,6 +397,12 @@ async function main() {
 
     if (file.outputName === "results-snapshot.json") {
       Object.assign(filesMetadata[file.outputName], getSnapshotMetadata(file.content));
+    }
+    if (file.outputName === "lobby-snapshot.json") {
+      const lobbySnapshot = JSON.parse(file.content);
+      Object.assign(filesMetadata[file.outputName], {
+        gameCount: lobbySnapshot.games.length
+      });
     }
 
     writeTextIfChanged(filePath, file.content);

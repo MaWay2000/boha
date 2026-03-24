@@ -729,6 +729,16 @@ main {
   background: rgba(255, 114, 98, 0.12);
 }
 
+.status-pill.empty {
+  color: #dbeaff;
+  background: rgba(109, 170, 255, 0.12);
+}
+
+.status-pill.completed {
+  color: #c9d1db;
+  background: rgba(156, 200, 236, 0.08);
+}
+
 .status-pill.unknown {
   color: var(--steel);
   background: rgba(156, 200, 236, 0.12);

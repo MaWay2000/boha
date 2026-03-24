@@ -961,6 +961,14 @@ main {
   background: rgba(5, 10, 16, 0.48);
 }
 
+.stats-panel-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .stats-panel-head,
 .stats-table-wrap {
   flex: 0 0 auto;
@@ -1051,6 +1059,35 @@ main {
   align-items: baseline;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.stats-panel-note {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stats-load-more {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(149, 205, 255, 0.2);
+  border-radius: 999px;
+  color: var(--text);
+  background: rgba(11, 22, 34, 0.84);
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.stats-load-more:hover {
+  color: var(--cyan);
+  border-color: rgba(109, 232, 255, 0.4);
+  transform: translateY(-1px);
+  background: rgba(13, 30, 45, 0.92);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 }
 
 .stats-player-label {

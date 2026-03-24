@@ -4,7 +4,8 @@ const LEADERBOARDS_URL = new URL("./leaderboards.js", import.meta.url);
 const SNAPSHOT_URL = new URL("./results-snapshot.json", import.meta.url);
 const PLAYER_KEYS_URL = new URL("./player-public-keys.json", import.meta.url);
 const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
-const PLAYER_LIMIT = 12;
+const INITIAL_PLAYER_LIMIT = 20;
+const PLAYER_LIMIT_STEP = 100;
 const MATCH_LIMIT = 12;
 const AUTO_REFRESH_MS = 60_000;
 
@@ -12,6 +13,7 @@ const statusElement = document.getElementById("resultsStatus");
 const summaryElement = document.getElementById("statsSummary");
 const buttonsElement = document.getElementById("statsLeaderboardButtons");
 const ranksElement = document.getElementById("statsRanks");
+const rankActionsElement = document.getElementById("statsRanksActions");
 const matchesElement = document.getElementById("statsMatches");
 
 let selectedLeaderboard = "Global";
@@ -26,6 +28,7 @@ let currentSnapshotKey = "";
 let eventSource = null;
 let refreshTimer = null;
 let visibilityListenerAttached = false;
+let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 
 function createRuntime() {
   return {
@@ -124,10 +127,14 @@ async function ensureSnapshot(force = false) {
 
 function ensureSelectedLeaderboard() {
   const availableLeaderboards = runtime.leaderboards?.length ? runtime.leaderboards : ["Global"];
+  const previousLeaderboard = selectedLeaderboard;
   if (!availableLeaderboards.includes(selectedLeaderboard)) {
     selectedLeaderboard = availableLeaderboards.includes("Global")
       ? "Global"
       : availableLeaderboards[0];
+  }
+  if (selectedLeaderboard !== previousLeaderboard) {
+    visiblePlayerCount = INITIAL_PLAYER_LIMIT;
   }
 }
 
@@ -137,6 +144,18 @@ function accountSortKey(account) {
 
 function sortAccounts(accounts) {
   return [...accounts].sort((left, right) => accountSortKey(right) - accountSortKey(left));
+}
+
+function filterVisibleAccounts(accountList) {
+  return accountList.filter((account) => !account.discounted || account.games.length >= 2);
+}
+
+function getNextPlayerLimit(currentCount, totalCount) {
+  if (currentCount < PLAYER_LIMIT_STEP) {
+    return Math.min(PLAYER_LIMIT_STEP, totalCount);
+  }
+
+  return Math.min(currentCount + PLAYER_LIMIT_STEP, totalCount);
 }
 
 function getLatestEndDate(results) {
@@ -331,9 +350,8 @@ function renderRanks(accountList) {
     return;
   }
 
-  const rows = accountList
-    .filter((account) => !account.discounted || account.games.length >= 2)
-    .slice(0, PLAYER_LIMIT);
+  const eligibleAccounts = filterVisibleAccounts(accountList);
+  const rows = eligibleAccounts.slice(0, visiblePlayerCount);
 
   if (!rows.length) {
     ranksElement.innerHTML = `
@@ -341,6 +359,7 @@ function renderRanks(accountList) {
         <td colspan="5">No ranked players found for this slice.</td>
       </tr>
     `;
+    renderRankActions(0);
     return;
   }
 
@@ -383,6 +402,48 @@ function renderRanks(accountList) {
       `;
     })
     .join("");
+
+  renderRankActions(eligibleAccounts.length);
+}
+
+function renderRankActions(totalPlayers) {
+  if (!rankActionsElement) {
+    return;
+  }
+
+  if (!totalPlayers) {
+    rankActionsElement.innerHTML = "";
+    return;
+  }
+
+  const shownCount = Math.min(visiblePlayerCount, totalPlayers);
+  const canLoadMore = shownCount < totalPlayers;
+
+  if (!canLoadMore) {
+    rankActionsElement.innerHTML = `
+      <span class="stats-panel-note">Showing all ${totalPlayers} listed players.</span>
+    `;
+    return;
+  }
+
+  const nextLimit = getNextPlayerLimit(shownCount, totalPlayers);
+  const actionLabel = shownCount < PLAYER_LIMIT_STEP ? "Show more" : "Load more";
+  const targetLabel = nextLimit >= totalPlayers ? `all ${totalPlayers}` : `top ${nextLimit}`;
+
+  rankActionsElement.innerHTML = `
+    <span class="stats-panel-note">Showing top ${shownCount} of ${totalPlayers} listed players.</span>
+    <button class="stats-load-more" id="statsLoadMore" type="button">${actionLabel} (${targetLabel})</button>
+  `;
+
+  const loadMoreButton = rankActionsElement.querySelector(".stats-load-more");
+  if (!loadMoreButton) {
+    return;
+  }
+
+  loadMoreButton.addEventListener("click", () => {
+    visiblePlayerCount = nextLimit;
+    render();
+  });
 }
 
 function renderMatches(gameList) {
@@ -484,6 +545,9 @@ function renderButtons() {
     button.dataset.leaderboard = leaderboard;
     button.textContent = leaderboard;
     button.addEventListener("click", () => {
+      if (selectedLeaderboard !== leaderboard) {
+        visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+      }
       selectedLeaderboard = leaderboard;
       updateActiveButtons();
       render();

@@ -4,6 +4,7 @@ const VOLUME_STORAGE_KEY = "warzone_radio_volume_v1";
 const SHUFFLE_STORAGE_KEY = "warzone_radio_shuffle_v1";
 const DISABLED_TRACKS_STORAGE_KEY = "warzone_radio_disabled_tracks_v2";
 const LEGACY_DISABLED_TRACKS_STORAGE_KEY = "warzone_radio_disabled_tracks_v1";
+const EMBED_MODE = new URLSearchParams(window.location.search).get("embed") === "topbar";
 const TRACKS = [
   { id: "Py5lzGVtjAo", title: "Warzone 2100 OST -  Main Menu", length: "3:01" },
   { id: "bv9GzLEOZk4", title: "Warzone 2100 OST - Martin Severn - Nuclear Silence", length: "7:01" },
@@ -70,6 +71,16 @@ const timeDuration = document.getElementById("timeDuration");
 const versionedAsset = window.versionedAsset || ((path) => path);
 const logo = document.querySelector(".logo");
 const logoToggle = document.getElementById("logoToggle");
+
+if (EMBED_MODE) {
+  document.body.classList.add("embed-topbar");
+  if (radioWrap) {
+    radioWrap.classList.remove("is-player-hidden");
+  }
+  if (logoToggle) {
+    logoToggle.setAttribute("aria-expanded", "true");
+  }
+}
 
 const TUBE_PAD = 6;
 const BAR_MIN_WIDTH = 3;
@@ -995,6 +1006,13 @@ document.addEventListener("keydown", unlockAudio);
 
 (function initDragPosition() {
   const wrap = document.getElementById("radioWrap");
+  if (EMBED_MODE) {
+    wrap.style.left = "10px";
+    wrap.style.top = "10px";
+    wrap.style.right = "auto";
+    return;
+  }
+
   const DRAG_THRESHOLD = 5;
   let pointerActive = false;
   let dragging = false;

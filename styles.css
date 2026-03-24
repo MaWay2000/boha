@@ -882,6 +882,10 @@ main {
   line-height: 1.6;
 }
 
+.stats-status.is-stale {
+  color: #ffb4aa;
+}
+
 .stats-toolbar {
   display: flex;
   flex-wrap: wrap;

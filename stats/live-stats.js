@@ -1,13 +1,22 @@
-const MANIFEST_URL = new URL("./upstream-manifest.json", import.meta.url);
+const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
+const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");
+const MANIFEST_URL = USE_REMOTE_MIRROR_JSON
+  ? new URL("upstream-manifest.json", GITHUB_RAW_STATS_BASE_URL)
+  : new URL("./upstream-manifest.json", import.meta.url);
 const CALCULATE_URL = new URL("./calculate.js", import.meta.url);
 const LEADERBOARDS_URL = new URL("./leaderboards.js", import.meta.url);
-const SNAPSHOT_URL = new URL("./results-snapshot.json", import.meta.url);
-const PLAYER_KEYS_URL = new URL("./player-public-keys.json", import.meta.url);
+const SNAPSHOT_URL = USE_REMOTE_MIRROR_JSON
+  ? new URL("results-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
+  : new URL("./results-snapshot.json", import.meta.url);
+const PLAYER_KEYS_URL = USE_REMOTE_MIRROR_JSON
+  ? new URL("player-public-keys.json", GITHUB_RAW_STATS_BASE_URL)
+  : new URL("./player-public-keys.json", import.meta.url);
 const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
 const MATCH_LIMIT = 12;
-const AUTO_REFRESH_MS = 60_000;
+const AUTO_REFRESH_MS = 15_000;
+const STALE_MIRROR_MS = 20 * 60_000;
 
 const statusElement = document.getElementById("resultsStatus");
 const summaryElement = document.getElementById("statsSummary");
@@ -49,6 +58,10 @@ function stripBom(text) {
 
 function getAssetHash(name) {
   return upstreamManifest?.files?.[name]?.sha256?.slice(0, 16) || "local";
+}
+
+function getRefreshIntervalLabel() {
+  return AUTO_REFRESH_MS < 60_000 ? `${Math.round(AUTO_REFRESH_MS / 1000)} seconds` : "1 minute";
 }
 
 function buildVersionedUrl(baseUrl, version, bust = false) {
@@ -162,6 +175,15 @@ function getNextPlayerLimit(currentCount, totalCount) {
 
 function normalizeSearchQuery(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function getMirrorSyncTime() {
+  return upstreamManifest?.syncedAt ? new Date(upstreamManifest.syncedAt).getTime() : 0;
+}
+
+function isMirrorStale() {
+  const mirrorSyncTime = getMirrorSyncTime();
+  return Boolean(mirrorSyncTime) && Date.now() - mirrorSyncTime > STALE_MIRROR_MS;
 }
 
 function getLatestEndDate(results) {
@@ -291,7 +313,7 @@ function getMirrorSyncLabel() {
     return "";
   }
 
-  return ` Mirror synced ${formatDate(upstreamManifest.syncedAt)}.`;
+  return ` Last successful mirror sync ${formatDate(upstreamManifest.syncedAt)}.`;
 }
 
 function updateStatusText(results) {
@@ -302,6 +324,10 @@ function updateStatusText(results) {
   const latestEndDate = getLatestEndDate(results);
   const latestLabel = latestEndDate ? formatDate(latestEndDate) : "unknown date";
   const mirrorLabel = getMirrorSyncLabel();
+  const refreshLabel = getRefreshIntervalLabel();
+  const mirrorStale = isMirrorStale();
+
+  statusElement.classList.toggle("is-stale", mirrorStale);
 
   if (!results.length) {
     statusElement.textContent = `No mirrored stats data is available yet.${mirrorLabel}`;
@@ -314,7 +340,12 @@ function updateStatusText(results) {
   }
 
   if (liveFeedState === "unavailable") {
-    statusElement.textContent = `Showing mirrored upstream snapshot through ${latestLabel}.${mirrorLabel} Auto-refresh checks every minute.`;
+    if (mirrorStale) {
+      statusElement.textContent = `Mirror is stale. The latest mirrored snapshot ends ${latestLabel}.${mirrorLabel} Live upstream sync is currently unavailable, so the page checks for a fresher mirror every ${refreshLabel}.`;
+      return;
+    }
+
+    statusElement.textContent = `Showing mirrored upstream snapshot through ${latestLabel}.${mirrorLabel} The page checks for a fresher mirror every ${refreshLabel}.`;
     return;
   }
 
@@ -604,7 +635,7 @@ function closeLiveFeed() {
 }
 
 function startLiveSync() {
-  if (window.location.protocol === "file:") {
+  if (window.location.protocol === "file:" || USE_REMOTE_MIRROR_JSON) {
     liveFeedState = "unavailable";
     render();
     return;

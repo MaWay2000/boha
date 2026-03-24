@@ -23,6 +23,23 @@ const STATIC_SOURCES = [
   }
 ];
 
+function buildUpstreamHeaders(acceptValue) {
+  const headers = {
+    Accept: acceptValue
+  };
+  const basicAuthHeader = String(process.env.UPSTREAM_BASIC_AUTH || "").trim();
+  const basicAuthUser = String(process.env.UPSTREAM_BASIC_USER || "");
+  const basicAuthPassword = String(process.env.UPSTREAM_BASIC_PASSWORD || "");
+
+  if (basicAuthHeader) {
+    headers.Authorization = basicAuthHeader;
+  } else if (basicAuthUser || basicAuthPassword) {
+    headers.Authorization = `Basic ${Buffer.from(`${basicAuthUser}:${basicAuthPassword}`).toString("base64")}`;
+  }
+
+  return headers;
+}
+
 function sha256(content) {
   return crypto.createHash("sha256").update(content).digest("hex");
 }
@@ -47,9 +64,7 @@ function replaceModuleImport(source, from, to) {
 
 async function fetchTextFile({ sourceUrl, outputName }) {
   const response = await fetch(sourceUrl, {
-    headers: {
-      Accept: "text/javascript, application/json, text/plain, */*"
-    }
+    headers: buildUpstreamHeaders("text/javascript, application/json, text/plain, */*")
   });
 
   if (!response.ok) {
@@ -65,9 +80,7 @@ async function fetchTextFile({ sourceUrl, outputName }) {
 
 async function fetchResultsSnapshot() {
   const response = await fetch(`${UPSTREAM_ORIGIN}/results.json?id=0%200%200`, {
-    headers: {
-      Accept: "text/event-stream"
-    }
+    headers: buildUpstreamHeaders("text/event-stream")
   });
 
   if (!response.ok) {

@@ -26,6 +26,10 @@ jobs:
           node-version: "22"
 
       - name: Mirror upstream files
+        env:
+          UPSTREAM_BASIC_AUTH: ${{ secrets.UPSTREAM_BASIC_AUTH }}
+          UPSTREAM_BASIC_USER: ${{ secrets.UPSTREAM_BASIC_USER }}
+          UPSTREAM_BASIC_PASSWORD: ${{ secrets.UPSTREAM_BASIC_PASSWORD }}
         run: node stats/sync-upstream.js
 
       - name: Commit and push updates

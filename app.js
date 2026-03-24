@@ -14,7 +14,7 @@ const USE_REMOTE_LOBBY_MIRROR = window.location.hostname.endsWith("github.io");
 const LOBBY_MIRROR_URL = USE_REMOTE_LOBBY_MIRROR
   ? new URL("lobby-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
   : new URL("./stats/lobby-snapshot.json", window.location.href);
-const LOBBY_REFRESH_MS = 15_000;
+const LOBBY_REFRESH_MS = 10_000;
 const SAMPLE_LOBBY = {
   motd: "Deploy alongside lobby endpoints to activate the live feed.",
   games: []

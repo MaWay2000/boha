@@ -9,16 +9,10 @@ const statSpectators = document.getElementById("statSpectators");
 
 const MAP_IMAGE_BASE = "https://warzone2100.retropaganda.info/images/maps/";
 const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
-const LOBBY_PROXY_URL = typeof window.BOHA_LOBBY_PROXY_URL === "string"
-  ? window.BOHA_LOBBY_PROXY_URL.trim()
-  : "";
 const USE_REMOTE_LOBBY_MIRROR = window.location.hostname.endsWith("github.io");
-const LOBBY_SNAPSHOT_URL = LOBBY_PROXY_URL
-  ? new URL(LOBBY_PROXY_URL, window.location.href)
-  : USE_REMOTE_LOBBY_MIRROR
-    ? new URL("lobby-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
-    : new URL("./stats/lobby-snapshot.json", window.location.href);
-const USE_POLLING_LOBBY_SOURCE = Boolean(LOBBY_PROXY_URL) || USE_REMOTE_LOBBY_MIRROR;
+const LOBBY_SNAPSHOT_URL = USE_REMOTE_LOBBY_MIRROR
+  ? new URL("lobby-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
+  : new URL("./stats/lobby-snapshot.json", window.location.href);
 const LOBBY_REFRESH_MS = 10_000;
 const SAMPLE_LOBBY = {
   motd: "Deploy alongside lobby endpoints to activate the live feed.",
@@ -198,12 +192,12 @@ function startLobbyMirrorLoop() {
 }
 
 async function connectLobbyStream() {
-  if (window.location.protocol === "file:" && !LOBBY_PROXY_URL) {
+  if (window.location.protocol === "file:") {
     loadFallbackLobby("Live lobby is unavailable in file preview. Serve this page from the site to enable streaming.");
     return;
   }
 
-  if (USE_POLLING_LOBBY_SOURCE) {
+  if (USE_REMOTE_LOBBY_MIRROR) {
     try {
       await refreshLobbyFromMirror();
       startLobbyMirrorLoop();

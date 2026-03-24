@@ -22,11 +22,6 @@
   min-width: 0;
 }
 
-body.embed-topbar .wrap {
-  left: 8px;
-  top: 8px;
-}
-
 .wrap.is-player-hidden {
   min-width: 125px;
   min-height: 150px;
@@ -139,25 +134,6 @@ body.embed-topbar .wrap {
     inset 0 0 0 1px rgba(255, 255, 255, 0.03),
     0 12px 26px rgba(0, 0, 0, 0.45),
     0 2px 0 rgba(255, 255, 255, 0.04);
-}
-
-body.embed-topbar .player {
-  margin-left: 58px;
-  width: calc(100vw - 92px);
-  padding-left: 30px;
-}
-
-body.embed-topbar .logo-button {
-  left: -12px;
-  width: 118px;
-  height: 118px;
-}
-
-body.embed-topbar .logo-sky {
-  left: 14px;
-  top: 9px;
-  width: 88px;
-  height: 62px;
 }
 
 .player-main {

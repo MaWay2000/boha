@@ -944,6 +944,10 @@ main {
   border-collapse: collapse;
 }
 
+.stats-table-ranks {
+  table-layout: fixed;
+}
+
 .stats-table th,
 .stats-table td {
   padding: 13px 14px;
@@ -964,15 +968,30 @@ main {
   background: rgba(109, 232, 255, 0.04);
 }
 
-.stats-table th:first-child,
-.stats-table td:first-child {
+.stats-table-ranks th:first-child,
+.stats-table-ranks td:first-child {
   width: 64px;
   padding-right: 8px;
 }
 
-.stats-table th:nth-child(2),
-.stats-table td:nth-child(2) {
+.stats-table-ranks th:nth-child(2),
+.stats-table-ranks td:nth-child(2) {
   padding-left: 6px;
+}
+
+.stats-table-ranks th:nth-child(3),
+.stats-table-ranks td:nth-child(3) {
+  width: 150px;
+}
+
+.stats-table-ranks th:nth-child(4),
+.stats-table-ranks td:nth-child(4) {
+  width: 120px;
+}
+
+.stats-table-ranks th:nth-child(5),
+.stats-table-ranks td:nth-child(5) {
+  width: 126px;
 }
 
 .stats-rank {
@@ -1029,20 +1048,26 @@ main {
 }
 
 .stats-key-list {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
   margin-top: 8px;
+  max-width: 100%;
 }
 
 .stats-key-value {
-  display: block;
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
   padding: 7px 9px;
   border-radius: 10px;
   color: #cce6ff;
   font-size: 0.77rem;
   line-height: 1.45;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: rgba(109, 232, 255, 0.06);
   border: 1px solid rgba(149, 205, 255, 0.12);
 }

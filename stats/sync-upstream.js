@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 
 const STATS_DIR = __dirname;
 const UPSTREAM_ORIGIN = "https://warzone2100.retropaganda.info";
@@ -88,8 +89,17 @@ async function fetchResultsSnapshot() {
     throw new Error(`Unable to fetch results.json snapshot: HTTP ${response.status}`);
   }
 
-  const payload = JSON.parse(await response.text());
-  return `${JSON.stringify(payload)}\n`;
+  const compressedBuffer = Buffer.from(await response.arrayBuffer());
+  const contentEncoding = String(response.headers.get("content-encoding") || "").toLowerCase();
+  const decodedBuffer = contentEncoding === "zstd"
+    ? zlib.zstdDecompressSync(compressedBuffer)
+    : compressedBuffer;
+  const upstreamPayload = JSON.parse(decodedBuffer.toString("utf8"));
+  const normalizedPayload = Array.isArray(upstreamPayload)
+    ? { format: 1, results: upstreamPayload }
+    : upstreamPayload;
+
+  return `${JSON.stringify(normalizedPayload)}\n`;
 }
 
 function getSnapshotMetadata(snapshotText) {

@@ -1,4 +1,4 @@
-import playerPublicKeys from './player-public-keys.json?v=0710cd830694c554' with {type: 'json'};
+import playerPublicKeys from './player-public-keys.json?v=a861f876b1d64216' with {type: 'json'};
 import {gather, calculate} from './calculate.js?v=f722ac7f80b811c5';
 import {leaderboards, filterGame, present} from './leaderboards.js?v=720abed466e988a2';
 
@@ -128,11 +128,14 @@ function createEventSource() {
 			save();
 		}
 	});
-	eventSource.onerror = event => {
-		if (eventSource.readyState !== EventSource.CLOSED) return;
-		eventSource.close();
-		setTimeout(createEventSource, 60_000);
-	};
 }
 createEventSource();
 addEventListener('beforeunload', event => { eventSource.close(); });
+setInterval(
+	() => {
+		if (eventSource.readyState !== EventSource.CLOSED) return;
+		eventSource.close();
+		createEventSource();
+	},
+	60_000
+);

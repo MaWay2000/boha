@@ -14,6 +14,9 @@
   --muted: #8fa7bc;
   --steel: #9cc8ec;
   --cyan: #6de8ff;
+  --scrollbar-track: rgba(7, 12, 19, 0.94);
+  --scrollbar-thumb: #58dfff;
+  --scrollbar-thumb-hover: #92efff;
   --orange: #ff8a3d;
   --orange-soft: rgba(255, 138, 61, 0.18);
   --danger: #ff7262;
@@ -26,6 +29,38 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.stats-table-wrap::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+.stats-table-wrap::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+.stats-table-wrap::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--scrollbar-thumb), #2d8ec9);
+  border: 3px solid var(--scrollbar-track);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 1px rgba(181, 235, 255, 0.16),
+    0 0 18px rgba(88, 223, 255, 0.2);
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+.stats-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--scrollbar-thumb-hover), var(--scrollbar-thumb));
 }
 
 body {

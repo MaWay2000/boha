@@ -15,7 +15,7 @@ const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
 const MATCH_LIMIT = 12;
-const AUTO_REFRESH_MS = 15_000;
+const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
 
 const statusElement = document.getElementById("resultsStatus");

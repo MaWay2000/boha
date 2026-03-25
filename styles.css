@@ -1277,34 +1277,42 @@ main {
 .stats-team {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.stats-team-player {
+  display: inline-flex;
+  align-items: center;
   max-width: 100%;
   padding: 6px 10px;
   border-radius: 12px;
   border: 1px solid transparent;
-  font-size: 0.84rem;
-  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.stats-team-winner {
+.stats-team-winner .stats-team-player {
   color: #dffae0;
   border-color: rgba(141, 233, 142, 0.24);
   background: rgba(141, 233, 142, 0.12);
 }
 
-.stats-team-loser {
+.stats-team-loser .stats-team-player {
   color: #ffd3ce;
   border-color: rgba(255, 114, 98, 0.24);
   background: rgba(255, 114, 98, 0.12);
 }
 
-.stats-team-contender {
+.stats-team-contender .stats-team-player {
   color: #fff0c2;
   border-color: rgba(255, 198, 96, 0.24);
   background: rgba(255, 198, 96, 0.12);
 }
 
-.stats-team-neutral {
+.stats-team-neutral .stats-team-player {
   color: var(--steel);
   border-color: rgba(149, 205, 255, 0.16);
   background: rgba(109, 232, 255, 0.08);

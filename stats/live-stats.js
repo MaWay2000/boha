@@ -281,12 +281,6 @@ function matchesPlayerSearch(account, searchQuery) {
   return [...account.publicKeys].some((publicKey) => String(publicKey || "").toLowerCase().includes(searchQuery));
 }
 
-function formatTeamNames(team) {
-  return team.players
-    .map((player) => player.account?.name || "Unknown")
-    .join(", ");
-}
-
 function renderMatchup(game) {
   const teams = game.teams.filter((team) => team.players.length);
   if (!teams.length) {
@@ -298,7 +292,11 @@ function renderMatchup(game) {
       ${teams.map((team, index) => {
         const vsLabel = index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
         return `
-          <span class="stats-team ${getTeamToneClass(team.userType)}">${escapeHtml(formatTeamNames(team))}</span>
+          <span class="stats-team ${getTeamToneClass(team.userType)}">
+            ${team.players
+              .map((player) => `<span class="stats-team-player">${escapeHtml(player.account?.name || "Unknown")}</span>`)
+              .join("")}
+          </span>
           ${vsLabel}
         `;
       }).join("")}

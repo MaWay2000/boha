@@ -511,7 +511,6 @@ function renderMatches(gameList) {
         <tr>
           <td class="stats-date">
             ${escapeHtml(formatDate(game.endDate))}
-            <span class="stats-note">${escapeHtml(game.version || "Unknown version")}</span>
           </td>
           <td>
             ${escapeHtml(game.mapName)}

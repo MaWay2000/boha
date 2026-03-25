@@ -40,6 +40,7 @@ let refreshTimer = null;
 let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 let playerSearchQuery = "";
+let leaderboardGameCounts = new Map();
 
 function createRuntime() {
   return {
@@ -525,6 +526,22 @@ function renderMatches(gameList) {
     .join("");
 }
 
+function collectAllGames() {
+  if (!runtime.gather) {
+    return [];
+  }
+
+  const { games } = runtime.gather(
+    resultsData.results,
+    playerPublicKeys,
+    function* includeAllGames(allGames) {
+      yield* allGames;
+    }
+  );
+
+  return [...games];
+}
+
 function render() {
   if (!runtime.gather || !runtime.calculate || !runtime.filterGame) {
     updateStatusText([]);
@@ -533,12 +550,24 @@ function render() {
 
   if (!resultsData.results.length) {
     updateStatusText([]);
+    leaderboardGameCounts = new Map();
     renderButtons();
     renderSummary([], []);
     renderRanks([]);
     renderMatches([]);
     return;
   }
+
+  const allGames = collectAllGames();
+  leaderboardGameCounts = new Map(
+    (runtime.leaderboards?.length ? runtime.leaderboards : ["Global"]).map((leaderboard) => [
+      leaderboard,
+      allGames.reduce(
+        (count, game) => count + (runtime.filterGame(leaderboard, game) ? 1 : 0),
+        0
+      )
+    ])
+  );
 
   const { accounts, games } = runtime.gather(
     resultsData.results,
@@ -575,18 +604,7 @@ function updateActiveButtons() {
 }
 
 function getLeaderboardGameCount(leaderboard) {
-  if (!runtime.filterGame || !Array.isArray(resultsData.results)) {
-    return 0;
-  }
-
-  let count = 0;
-  for (const game of resultsData.results) {
-    if (runtime.filterGame(leaderboard, game)) {
-      count += 1;
-    }
-  }
-
-  return count;
+  return leaderboardGameCounts.get(leaderboard) || 0;
 }
 
 function getOrderedLeaderboards() {

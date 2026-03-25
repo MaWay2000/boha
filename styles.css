@@ -1129,6 +1129,12 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+.stats-date-time {
+  display: block;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
 .stats-player-line {
   display: flex;
   align-items: baseline;

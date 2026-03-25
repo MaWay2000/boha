@@ -202,6 +202,19 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatMatchDate(value) {
+  const date = new Date(value);
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatMatchTime(value) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  }).format(new Date(value));
+}
+
 function formatShortDate(value) {
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
@@ -508,7 +521,8 @@ function renderMatches(gameList) {
       return `
         <tr>
           <td class="stats-date">
-            ${escapeHtml(formatDate(game.endDate))}
+            ${escapeHtml(formatMatchDate(game.endDate))}
+            <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>
             ${escapeHtml(game.mapName)}

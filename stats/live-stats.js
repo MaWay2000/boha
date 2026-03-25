@@ -17,6 +17,7 @@ const PLAYER_LIMIT_STEP = 100;
 const MATCH_LIMIT = 12;
 const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
+const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
 
 const statusElement = document.getElementById("resultsStatus");
 const summaryElement = document.getElementById("statsSummary");
@@ -610,7 +611,9 @@ function getLeaderboardGameCount(leaderboard) {
 function getOrderedLeaderboards() {
   const availableLeaderboards = runtime.leaderboards?.length ? runtime.leaderboards : ["Global"];
 
-  return [...availableLeaderboards].sort((left, right) => {
+  return [...availableLeaderboards]
+    .filter((leaderboard) => !HIDDEN_LEADERBOARDS.has(leaderboard))
+    .sort((left, right) => {
     const countDelta = getLeaderboardGameCount(right) - getLeaderboardGameCount(left);
     if (countDelta !== 0) {
       return countDelta;
@@ -623,8 +626,8 @@ function getOrderedLeaderboards() {
       return 1;
     }
 
-    return left.localeCompare(right);
-  });
+      return left.localeCompare(right);
+    });
 }
 
 function renderButtons() {

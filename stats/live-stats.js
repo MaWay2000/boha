@@ -533,6 +533,7 @@ function render() {
 
   if (!resultsData.results.length) {
     updateStatusText([]);
+    renderButtons();
     renderSummary([], []);
     renderRanks([]);
     renderMatches([]);
@@ -557,6 +558,7 @@ function render() {
   const gameList = [...games].sort((left, right) => right.endDate - left.endDate);
 
   updateStatusText(resultsData.results);
+  renderButtons();
   renderSummary(accountList, gameList);
   renderRanks(accountList);
   renderMatches(gameList);
@@ -572,14 +574,49 @@ function updateActiveButtons() {
   });
 }
 
+function getLeaderboardGameCount(leaderboard) {
+  if (!runtime.filterGame || !Array.isArray(resultsData.results)) {
+    return 0;
+  }
+
+  let count = 0;
+  for (const game of resultsData.results) {
+    if (runtime.filterGame(leaderboard, game)) {
+      count += 1;
+    }
+  }
+
+  return count;
+}
+
+function getOrderedLeaderboards() {
+  const availableLeaderboards = runtime.leaderboards?.length ? runtime.leaderboards : ["Global"];
+
+  return [...availableLeaderboards].sort((left, right) => {
+    const countDelta = getLeaderboardGameCount(right) - getLeaderboardGameCount(left);
+    if (countDelta !== 0) {
+      return countDelta;
+    }
+
+    if (left === "Global") {
+      return -1;
+    }
+    if (right === "Global") {
+      return 1;
+    }
+
+    return left.localeCompare(right);
+  });
+}
+
 function renderButtons() {
   if (!buttonsElement) {
     return;
   }
 
   buttonsElement.innerHTML = "";
-  const availableLeaderboards = runtime.leaderboards?.length ? runtime.leaderboards : ["Global"];
-  availableLeaderboards.forEach((leaderboard) => {
+  const orderedLeaderboards = getOrderedLeaderboards();
+  orderedLeaderboards.forEach((leaderboard) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "stats-filter-button";

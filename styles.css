@@ -239,6 +239,10 @@ code {
   transform: translateY(-1px);
 }
 
+.topnav a[aria-current="page"] {
+  color: var(--text);
+}
+
 .discord-link {
   justify-self: start;
   padding: 13px 22px;
@@ -278,6 +282,10 @@ code {
 main {
   display: grid;
   gap: 38px;
+}
+
+.lobby-page {
+  margin-top: 4px;
 }
 
 .section-frame,

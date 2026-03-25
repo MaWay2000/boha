@@ -6,7 +6,7 @@
   <title>Warzone 2100 Game Hub</title>
   <meta
     name="description"
-    content="A remade Warzone 2100 community hub with live lobby links, leaderboards overview, open data, alternate lobby server details, and the Warzone Radio player."
+    content="A remade Warzone 2100 webstats viewer with leaderboard snapshots, open data access, and the Warzone Radio player."
   >
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,7 +27,7 @@
         </a>
 
         <nav class="topnav" aria-label="Primary">
-          <a href="#lobby">Lobby</a>
+          <a href="lobby.html">Lobby</a>
           <a href="#leaderboards">Leaderboards</a>
           <a href="#opendata">Open Data</a>
         </nav>
@@ -150,39 +150,6 @@
         </div>
       </section>
 
-      <section class="section-grid" id="lobby">
-        <div class="live-board section-frame" data-reveal>
-          <div class="live-board-head">
-            <div>
-              <p class="panel-kicker">Streaming Lobby View</p>
-              <h3 id="lobbyCaption">Connecting to lobby feed...</h3>
-            </div>
-            <span class="stream-badge" id="lobbyBadge">Offline</span>
-          </div>
-
-          <div class="table-shell">
-            <table class="lobby-table">
-              <thead>
-                <tr>
-                  <th>Host</th>
-                  <th>Players</th>
-                  <th>Spectators</th>
-                  <th>Status</th>
-                  <th>Map</th>
-                  <th>Title</th>
-                </tr>
-              </thead>
-              <tbody id="lobbyGames">
-                <tr class="empty-row">
-                  <td colspan="6">No lobby data loaded yet.</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-        </div>
-      </section>
-
       <section class="section-grid" id="opendata">
         <div class="section-head" data-reveal>
           <p class="eyebrow">Open Data</p>
@@ -233,6 +200,5 @@
   </div>
 
   <script type="module" src="stats/live-stats.js"></script>
-  <script src="app.js"></script>
 </body>
 </html>

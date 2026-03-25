@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warzone 2100 Lobby</title>
+  <meta
+    name="description"
+    content="Live Warzone 2100 lobby viewer with mirrored online games and map details."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <div class="page-noise" aria-hidden="true"></div>
+
+    <div class="masthead-band">
+      <header class="topbar">
+        <a class="brand" href="index.html#top" aria-label="Warzone 2100 Game Hub">
+          <img src="assets/warzone2100-gamehub-logo.png" alt="Warzone 2100 logo">
+        </a>
+
+        <nav class="topnav" aria-label="Primary">
+          <a href="lobby.html" aria-current="page">Lobby</a>
+          <a href="index.html#leaderboards">Leaderboards</a>
+          <a href="index.html#opendata">Open Data</a>
+        </nav>
+
+        <a class="discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer">
+          Discord Server
+        </a>
+
+        <div class="topbar-radio" aria-label="Warzone Radio">
+          <iframe
+            src="https://maway2000.github.io/warzone2100-radio/"
+            title="Warzone Radio"
+            loading="lazy"
+            allow="autoplay; encrypted-media"
+          ></iframe>
+        </div>
+      </header>
+    </div>
+
+    <main id="top">
+      <section class="section-grid lobby-page">
+        <div class="live-board section-frame" data-reveal>
+          <div class="live-board-head">
+            <div>
+              <p class="panel-kicker">Streaming Lobby View</p>
+              <h3 id="lobbyCaption">Connecting to lobby feed...</h3>
+            </div>
+            <span class="stream-badge" id="lobbyBadge">Offline</span>
+          </div>
+
+          <div class="table-shell">
+            <table class="lobby-table">
+              <thead>
+                <tr>
+                  <th>Host</th>
+                  <th>Players</th>
+                  <th>Spectators</th>
+                  <th>Status</th>
+                  <th>Map</th>
+                  <th>Title</th>
+                </tr>
+              </thead>
+              <tbody id="lobbyGames">
+                <tr class="empty-row">
+                  <td colspan="6">No lobby data loaded yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p><a href="https://mit-license.org/" target="_blank" rel="noreferrer">MIT License</a>. Warzone 2100 - webstats viewer by Maway2000</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

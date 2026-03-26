@@ -318,7 +318,17 @@ function matchesPlayerSearch(account, searchQuery) {
     return true;
   }
 
+  if ([...account.names.keys()].some((name) => String(name || "").toLowerCase().includes(searchQuery))) {
+    return true;
+  }
+
   return [...account.publicKeys].some((publicKey) => String(publicKey || "").toLowerCase().includes(searchQuery));
+}
+
+function getSortedAccountNames(account) {
+  return [...account.names.entries()]
+    .filter(([name, count]) => name && count > 0)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
 }
 
 function renderMatchup(game) {
@@ -462,24 +472,51 @@ function renderRanks(accountList) {
     .map(({ account, rank }) => {
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
+      const accountNames = getSortedAccountNames(account);
       const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
       const keyCountLabel = `${publicKeys.length} key(s) tracked`;
       const playerLine = escapeHtml(account.name || "Unknown");
-      const playerDetails = publicKeys.length
+      const hasDetails = Boolean(publicKeys.length || accountNames.length > 1);
+      const nameDetails = accountNames.length > 1
+        ? `
+            <div class="stats-detail-group">
+              <span class="stats-detail-label">Player names</span>
+              <div class="stats-name-list">
+                ${accountNames
+                  .map(([name, count]) => `
+                    <span class="stats-name-chip${name === account.name ? " is-primary" : ""}">
+                      <span class="stats-name-text">${escapeHtml(name)}</span>
+                      <sup class="stats-name-count">${count}</sup>
+                    </span>
+                  `)
+                  .join("")}
+              </div>
+            </div>
+          `
+        : "";
+      const keyDetails = publicKeys.length
+        ? `
+            <div class="stats-detail-group">
+              <span class="stats-detail-label">${escapeHtml(keyCountLabel)}</span>
+              <div class="stats-key-list">
+                ${publicKeys
+                  .map((publicKey) => `<code class="stats-key-value">${escapeHtml(publicKey)}</code>`)
+                  .join("")}
+              </div>
+            </div>
+          `
+        : "";
+      const playerDetails = hasDetails
         ? `
             <details class="stats-key-details">
               <summary class="stats-player-line stats-key-summary">
                 <span class="stats-player-label">${playerLine}</span>
                 <span class="stats-key-toggle" aria-hidden="true"></span>
-                <span class="visually-hidden">${escapeHtml(keyCountLabel)}</span>
+                <span class="visually-hidden">${escapeHtml(accountNames.length ? "Show player names and keys" : keyCountLabel)}</span>
               </summary>
               <div class="stats-key-panel">
-                <span class="stats-player-note stats-key-count">${escapeHtml(keyCountLabel)}</span>
-                <div class="stats-key-list">
-                ${publicKeys
-                  .map((publicKey) => `<code class="stats-key-value">${escapeHtml(publicKey)}</code>`)
-                  .join("")}
-                </div>
+                ${nameDetails}
+                ${keyDetails}
               </div>
             </details>
           `

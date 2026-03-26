@@ -1268,12 +1268,56 @@ main {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 10px;
   margin-top: 8px;
 }
 
-.stats-key-count {
-  display: inline-block;
+.stats-detail-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.stats-detail-label {
+  color: var(--muted);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stats-name-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  max-width: 100%;
+}
+
+.stats-name-chip {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(149, 205, 255, 0.12);
+  background: rgba(109, 232, 255, 0.06);
+  line-height: 1.3;
+}
+
+.stats-name-chip.is-primary {
+  border-color: rgba(109, 232, 255, 0.26);
+  background: rgba(109, 232, 255, 0.1);
+}
+
+.stats-name-text {
+  overflow-wrap: anywhere;
+}
+
+.stats-name-count {
+  color: var(--muted);
+  font-size: 0.74rem;
+  line-height: 1;
 }
 
 .stats-key-list {

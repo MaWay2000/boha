@@ -655,6 +655,32 @@ main {
   gap: 16px;
 }
 
+.live-board-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.live-board-updated {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.live-board-updated-time,
+.live-board-updated-relative {
+  display: block;
+}
+
+.live-board-updated-relative {
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
 .live-board-head h3 {
   margin: 8px 0 0;
   font-family: "Oxanium", sans-serif;
@@ -1476,6 +1502,15 @@ main {
   .live-board-head {
     flex-direction: column;
     align-items: start;
+  }
+
+  .live-board-meta {
+    align-items: flex-start;
+    margin-left: 0;
+  }
+
+  .live-board-updated {
+    text-align: left;
   }
 
   .stats-shell-head {

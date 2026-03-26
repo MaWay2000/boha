@@ -2,6 +2,7 @@ const revealItems = document.querySelectorAll("[data-reveal]");
 const lobbyCaption = document.getElementById("lobbyCaption");
 const lobbyGames = document.getElementById("lobbyGames");
 const lobbyBadge = document.getElementById("lobbyBadge");
+const lobbyUpdated = document.getElementById("lobbyUpdated");
 const heroStatus = document.getElementById("heroStatus");
 const statGames = document.getElementById("statGames");
 const statPlayers = document.getElementById("statPlayers");
@@ -19,6 +20,8 @@ const SAMPLE_LOBBY = {
   games: []
 };
 let lobbyMirrorTimer = null;
+let lobbyUpdatedTimer = null;
+let lastLobbyUpdatedAt = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -73,6 +76,65 @@ function formatDateTime(value) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(new Date(value));
+}
+
+function formatRelativeTime(value) {
+  const updatedAt = new Date(value).getTime();
+  if (!Number.isFinite(updatedAt)) {
+    return "Update unavailable";
+  }
+
+  const diffMs = Math.max(0, Date.now() - updatedAt);
+  if (diffMs < 60_000) {
+    return "Updated just now";
+  }
+
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) {
+    return `Updated ${minutes} min${minutes === 1 ? "" : "s"} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `Updated ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  return `Updated ${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+function updateLobbyUpdatedLabel() {
+  if (!lobbyUpdated) {
+    return;
+  }
+
+  if (!lastLobbyUpdatedAt) {
+    lobbyUpdated.replaceChildren();
+    lobbyUpdated.removeAttribute("title");
+    return;
+  }
+
+  const absoluteLabel = `Last update: ${formatDateTime(lastLobbyUpdatedAt)}`;
+  const relativeLabel = formatRelativeTime(lastLobbyUpdatedAt);
+  const absoluteText = document.createElement("span");
+  absoluteText.className = "live-board-updated-time";
+  absoluteText.textContent = absoluteLabel;
+
+  const relativeText = document.createElement("span");
+  relativeText.className = "live-board-updated-relative";
+  relativeText.textContent = relativeLabel;
+
+  lobbyUpdated.replaceChildren(absoluteText, relativeText);
+  lobbyUpdated.title = `${absoluteLabel} (${relativeLabel})`;
+}
+
+function setLobbyUpdatedAt(value) {
+  lastLobbyUpdatedAt = value ? new Date(value).toISOString() : null;
+  updateLobbyUpdatedLabel();
+
+  if (!lobbyUpdatedTimer) {
+    lobbyUpdatedTimer = window.setInterval(updateLobbyUpdatedLabel, 60_000);
+  }
 }
 
 function getLobbyStatusClass(status) {
@@ -149,6 +211,7 @@ function markLobbyState(online, message, badgeLabel = online ? "Live" : "Offline
 
 function loadFallbackLobby(message) {
   renderLobby(SAMPLE_LOBBY);
+  setLobbyUpdatedAt(null);
   markLobbyState(false, message);
 }
 
@@ -170,12 +233,8 @@ async function readLobbySnapshot() {
 async function refreshLobbyFromMirror() {
   const lobby = await readLobbySnapshot();
   renderLobby(lobby);
-
-  const lastUpdateLabel = lobby.syncedAt
-    ? `Last update: ${formatDateTime(lobby.syncedAt)}`
-    : "Lobby snapshot loaded.";
-
-  markLobbyState(true, lastUpdateLabel, "Online");
+  setLobbyUpdatedAt(lobby.syncedAt || new Date().toISOString());
+  markLobbyState(true, "Lobby snapshot loaded.", "Online");
   return true;
 }
 
@@ -217,6 +276,7 @@ async function connectLobbyStream() {
       hasReceivedData = true;
       const lobby = JSON.parse(event.data);
       renderLobby(lobby);
+      setLobbyUpdatedAt(new Date().toISOString());
       markLobbyState(true, "Lobby stream connected. Updates arrive without refreshing the page.");
     };
 

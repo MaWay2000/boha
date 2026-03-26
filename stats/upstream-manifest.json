@@ -1,6 +1,6 @@
 {
   "upstreamOrigin": "https://warzone2100.retropaganda.info",
-  "syncedAt": "2026-03-26T12:10:17.331Z",
+  "syncedAt": "2026-03-26T13:58:12.824Z",
   "files": {
     "calculate.js": {
       "sourceUrl": "https://warzone2100.retropaganda.info/calculate.js",
@@ -31,10 +31,10 @@
     },
     "lobby-snapshot.json": {
       "sourceUrl": "https://warzone2100.retropaganda.info/lobby.json",
-      "sha256": "6f10e5e34c5ada9c9338f68a9619a0b9ecc5cef206c0f9b3c5045287ef95a8cd",
-      "sizeBytes": 11443,
+      "sha256": "ec38fd5ce7302710755340c6d68966e912d6feaf1eea6425563a632c6fe73020",
+      "sizeBytes": 11439,
       "gameCount": 18
     }
   },
-  "version": "85cba935e448cd99"
+  "version": "1b4bedfadfb27f57"
 }

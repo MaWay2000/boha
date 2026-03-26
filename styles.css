@@ -933,7 +933,18 @@ main {
   max-width: 40ch;
   color: var(--muted);
   text-align: right;
-  line-height: 1.6;
+  line-height: 1.35;
+}
+
+.stats-status-time,
+.stats-status-relative {
+  display: block;
+}
+
+.stats-status-relative {
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 0.9rem;
 }
 
 .stats-status.is-stale {

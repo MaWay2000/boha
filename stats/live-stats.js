@@ -42,6 +42,8 @@ let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 let playerSearchQuery = "";
 let leaderboardGameCounts = new Map();
+let statusRefreshTimer = null;
+let lastStatsUpdateAt = 0;
 
 function createRuntime() {
   return {
@@ -202,6 +204,31 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function formatRelativeTime(value) {
+  const updatedAt = new Date(value).getTime();
+  if (!Number.isFinite(updatedAt)) {
+    return "Update unavailable";
+  }
+
+  const diffMs = Math.max(0, Date.now() - updatedAt);
+  if (diffMs < 60_000) {
+    return "Updated just now";
+  }
+
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 60) {
+    return `Updated ${minutes} min${minutes === 1 ? "" : "s"} ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `Updated ${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+  return `Updated ${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 function formatMatchDate(value) {
   const date = new Date(value);
   return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
@@ -325,18 +352,45 @@ function getLastUpdateTime(results) {
   return getMirrorSyncTime() || getLatestEndDate(results);
 }
 
-function updateStatusText(results) {
+function renderStatusText() {
   if (!statusElement) {
     return;
   }
 
   const mirrorStale = isMirrorStale();
-  const lastUpdateTime = getLastUpdateTime(results);
-
   statusElement.classList.toggle("is-stale", mirrorStale);
-  statusElement.textContent = lastUpdateTime
-    ? `Last update: ${formatDate(lastUpdateTime)}`
-    : "Last update: unavailable";
+
+  if (!lastStatsUpdateAt) {
+    statusElement.textContent = "Last update: unavailable";
+    statusElement.removeAttribute("title");
+    return;
+  }
+
+  const absoluteLabel = `Last update: ${formatDate(lastStatsUpdateAt)}`;
+  const relativeLabel = formatRelativeTime(lastStatsUpdateAt);
+  const absoluteText = document.createElement("span");
+  absoluteText.className = "stats-status-time";
+  absoluteText.textContent = absoluteLabel;
+
+  const relativeText = document.createElement("span");
+  relativeText.className = "stats-status-relative";
+  relativeText.textContent = relativeLabel;
+
+  statusElement.replaceChildren(absoluteText, relativeText);
+  statusElement.title = `${absoluteLabel} (${relativeLabel})`;
+}
+
+function updateStatusText(results) {
+  if (!statusElement) {
+    return;
+  }
+
+  lastStatsUpdateAt = getLastUpdateTime(results);
+  renderStatusText();
+
+  if (!statusRefreshTimer) {
+    statusRefreshTimer = window.setInterval(renderStatusText, 60_000);
+  }
 }
 
 function renderSummary(accountList, gameList) {
@@ -765,6 +819,9 @@ window.addEventListener("beforeunload", () => {
   closeLiveFeed();
   if (refreshTimer) {
     window.clearInterval(refreshTimer);
+  }
+  if (statusRefreshTimer) {
+    window.clearInterval(statusRefreshTimer);
   }
 });
 

@@ -15,7 +15,7 @@ const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
 const MATCH_LIMIT = 12;
-const PLAYER_GAME_LIMIT = 10;
+const PLAYER_GAME_LIMIT = 20;
 const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
 const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
@@ -28,6 +28,7 @@ const rankActionsElement = document.getElementById("statsRanksActions");
 const playerGamesTitleElement = document.getElementById("statsPlayerGamesTitle");
 const playerGamesMetaElement = document.getElementById("statsPlayerGamesMeta");
 const playerGamesElement = document.getElementById("statsPlayerGames");
+const playerGamesActionsElement = document.getElementById("statsPlayerGamesActions");
 const playerSearchElement = document.getElementById("statsPlayerSearch");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
@@ -54,6 +55,7 @@ let lastStatsUpdateAt = 0;
 let expandedAccounts = new Set();
 let activeExpandedAccountKey = null;
 let activeExpandedPlayerGameKey = null;
+let showingAllPlayerGames = false;
 
 function createRuntime() {
   return {
@@ -185,6 +187,11 @@ function getNextPlayerLimit(currentCount, totalCount) {
 
 function normalizeSearchQuery(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function resetPlayerGamesView() {
+  showingAllPlayerGames = false;
+  activeExpandedPlayerGameKey = null;
 }
 
 function getMirrorSyncTime() {
@@ -508,10 +515,13 @@ function renderPlayerGames(accounts) {
   const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
   if (!activeAccount) {
     activeExpandedAccountKey = null;
-    activeExpandedPlayerGameKey = null;
+    resetPlayerGamesView();
     expandedAccounts.clear();
     playerGamesTitleElement.textContent = "Expand a player to inspect recent games";
     playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
+    if (playerGamesActionsElement) {
+      playerGamesActionsElement.innerHTML = "";
+    }
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
         <td colspan="5">Use + on a player to show their latest games here.</td>
@@ -522,7 +532,9 @@ function renderPlayerGames(accounts) {
 
   const sortedGames = [...activeAccount.games]
     .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0));
-  let latestGames = sortedGames.slice(0, PLAYER_GAME_LIMIT);
+  let latestGames = showingAllPlayerGames
+    ? sortedGames
+    : sortedGames.slice(0, PLAYER_GAME_LIMIT);
 
   if (activeExpandedPlayerGameKey) {
     const expandedGame = sortedGames.find((game) => getPlayerGameKey(game) === activeExpandedPlayerGameKey);
@@ -530,7 +542,7 @@ function renderPlayerGames(accounts) {
       latestGames = [
         expandedGame,
         ...latestGames.filter((game) => getPlayerGameKey(game) !== activeExpandedPlayerGameKey)
-      ].slice(0, PLAYER_GAME_LIMIT);
+      ].slice(0, showingAllPlayerGames ? sortedGames.length : PLAYER_GAME_LIMIT);
     }
   }
 
@@ -541,7 +553,10 @@ function renderPlayerGames(accounts) {
   }
 
   playerGamesTitleElement.textContent = `${activeAccount.name || "Player"} recent games`;
-  playerGamesMetaElement.textContent = `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
+  playerGamesMetaElement.textContent = showingAllPlayerGames
+    ? `All ${latestGames.length} matches in the ${selectedLeaderboard} slice.`
+    : `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
+  renderPlayerGameActions(sortedGames.length);
 
   if (!latestGames.length) {
     playerGamesElement.innerHTML = `
@@ -638,9 +653,65 @@ function renderPlayerGames(accounts) {
 
       activeExpandedAccountKey = jumpAccount;
       expandedAccounts = new Set([jumpAccount]);
+      showingAllPlayerGames = false;
       activeExpandedPlayerGameKey = jumpGame || null;
       render();
     });
+  });
+}
+
+function renderPlayerGameActions(totalGames) {
+  if (!playerGamesActionsElement) {
+    return;
+  }
+
+  if (!totalGames) {
+    playerGamesActionsElement.innerHTML = "";
+    return;
+  }
+
+  const shownCount = showingAllPlayerGames
+    ? totalGames
+    : Math.min(PLAYER_GAME_LIMIT, totalGames);
+
+  if (totalGames <= PLAYER_GAME_LIMIT) {
+    playerGamesActionsElement.innerHTML = `
+      <span class="stats-panel-note">Showing all ${totalGames} player games.</span>
+    `;
+    return;
+  }
+
+  if (showingAllPlayerGames) {
+    playerGamesActionsElement.innerHTML = `
+      <span class="stats-panel-note">Showing all ${totalGames} player games.</span>
+      <button class="stats-load-more" id="statsPlayerGamesShowLess" type="button">Show less</button>
+    `;
+
+    const showLessButton = playerGamesActionsElement.querySelector("#statsPlayerGamesShowLess");
+    if (!showLessButton) {
+      return;
+    }
+
+    showLessButton.addEventListener("click", () => {
+      showingAllPlayerGames = false;
+      render();
+    });
+    return;
+  }
+
+  playerGamesActionsElement.innerHTML = `
+    <span class="stats-panel-note">Showing latest ${shownCount} of ${totalGames} player games.</span>
+    <button class="stats-load-more" id="statsPlayerGamesShowAll" type="button">Show all (${totalGames})</button>
+  `;
+
+  const showAllButton = playerGamesActionsElement.querySelector("#statsPlayerGamesShowAll");
+  if (!showAllButton) {
+    return;
+  }
+
+  showAllButton.addEventListener("click", () => {
+    showingAllPlayerGames = true;
+    render();
   });
 }
 
@@ -935,11 +1006,11 @@ function renderRanks(accountList) {
     if (expandedAccounts.has(expandAccount)) {
       expandedAccounts.delete(expandAccount);
       activeExpandedAccountKey = null;
-      activeExpandedPlayerGameKey = null;
+      resetPlayerGamesView();
     } else {
       expandedAccounts = new Set([expandAccount]);
       activeExpandedAccountKey = expandAccount;
-      activeExpandedPlayerGameKey = null;
+      resetPlayerGamesView();
     }
 
     render();
@@ -1176,6 +1247,7 @@ function renderButtons() {
     button.addEventListener("click", () => {
       if (selectedLeaderboard !== leaderboard) {
         visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+        resetPlayerGamesView();
       }
       selectedLeaderboard = leaderboard;
       updateActiveButtons();

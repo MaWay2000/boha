@@ -1219,6 +1219,15 @@ main {
   border-bottom-color: transparent;
 }
 
+.stats-rank-row.is-clickable {
+  cursor: pointer;
+}
+
+.stats-rank-row.is-clickable:hover td,
+.stats-rank-row.is-clickable:focus-within td {
+  background: rgba(109, 232, 255, 0.04);
+}
+
 .stats-panel-note {
   color: var(--muted);
   font-size: 0.9rem;

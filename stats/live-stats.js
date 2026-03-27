@@ -765,7 +765,7 @@ function renderRanks(accountList) {
           `
         : "";
       return `
-        <tr class="stats-rank-row${isExpanded ? " is-expanded" : ""}">
+        <tr class="stats-rank-row${isExpanded ? " is-expanded" : ""}${hasDetails ? " is-clickable" : ""}"${hasDetails ? ` data-expand-account="${escapeHtml(expandKey)}"` : ""}>
           <td class="stats-rank">${rank}</td>
           <td class="stats-player-name">
             ${playerDetails}
@@ -779,24 +779,36 @@ function renderRanks(accountList) {
     })
     .join("");
 
-  ranksElement.querySelectorAll(".stats-expand-toggle").forEach((button) => {
-    button.addEventListener("click", () => {
-      const { expandAccount } = button.dataset;
+  function toggleExpandedAccount(expandAccount) {
+    if (!expandAccount) {
+      return;
+    }
+
+    if (expandedAccounts.has(expandAccount)) {
+      expandedAccounts.delete(expandAccount);
+      activeExpandedAccountKey = null;
+      activeExpandedPlayerGameKey = null;
+    } else {
+      expandedAccounts = new Set([expandAccount]);
+      activeExpandedAccountKey = expandAccount;
+      activeExpandedPlayerGameKey = null;
+    }
+
+    render();
+  }
+
+  ranksElement.querySelectorAll(".stats-rank-row[data-expand-account]").forEach((row) => {
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("a")) {
+        return;
+      }
+
+      const { expandAccount } = row.dataset;
       if (!expandAccount) {
         return;
       }
 
-      if (expandedAccounts.has(expandAccount)) {
-        expandedAccounts.delete(expandAccount);
-        activeExpandedAccountKey = null;
-        activeExpandedPlayerGameKey = null;
-      } else {
-        expandedAccounts = new Set([expandAccount]);
-        activeExpandedAccountKey = expandAccount;
-        activeExpandedPlayerGameKey = null;
-      }
-
-      render();
+      toggleExpandedAccount(expandAccount);
     });
   });
 

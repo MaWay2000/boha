@@ -25,6 +25,7 @@ const buttonsElement = document.getElementById("statsLeaderboardButtons");
 const ranksElement = document.getElementById("statsRanks");
 const rankActionsElement = document.getElementById("statsRanksActions");
 const playerSearchElement = document.getElementById("statsPlayerSearch");
+const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
 
 let selectedLeaderboard = "Global";
@@ -41,6 +42,7 @@ let refreshTimer = null;
 let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 let playerSearchQuery = "";
+let matchesSearchQuery = "";
 let leaderboardGameCounts = new Map();
 let statusRefreshTimer = null;
 let lastStatsUpdateAt = 0;
@@ -330,6 +332,41 @@ function getSortedAccountNames(account) {
   return [...account.names.entries()]
     .filter(([name, count]) => name && count > 0)
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
+}
+
+function matchesRecentGameSearch(game, searchQuery) {
+  if (!searchQuery) {
+    return true;
+  }
+
+  if (String(game.mapName || "").toLowerCase().includes(searchQuery)) {
+    return true;
+  }
+
+  if (String(game.mods || "").toLowerCase().includes(searchQuery)) {
+    return true;
+  }
+
+  if (String(game.replayUrl || "").toLowerCase().includes(searchQuery)) {
+    return true;
+  }
+
+  return game.players.some((slot) => {
+    const account = slot.account;
+    if (!account) {
+      return false;
+    }
+
+    if (String(account.name || "").toLowerCase().includes(searchQuery)) {
+      return true;
+    }
+
+    if ([...account.names.keys()].some((name) => String(name || "").toLowerCase().includes(searchQuery))) {
+      return true;
+    }
+
+    return [...account.publicKeys].some((publicKey) => String(publicKey || "").toLowerCase().includes(searchQuery));
+  });
 }
 
 function getAccountExpandKey(account) {
@@ -650,16 +687,18 @@ function renderMatches(gameList) {
     return;
   }
 
+  const searchQuery = normalizeSearchQuery(matchesSearchQuery);
   const configuredMatchLimit = Number(matchesElement.dataset.matchLimit || MATCH_LIMIT);
   const matchLimit = Number.isFinite(configuredMatchLimit) && configuredMatchLimit > 0
     ? configuredMatchLimit
     : MATCH_LIMIT;
-  const rows = gameList.slice(0, matchLimit);
+  const filteredGames = gameList.filter((game) => matchesRecentGameSearch(game, searchQuery));
+  const rows = filteredGames.slice(0, matchLimit);
 
   if (!rows.length) {
     matchesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">No matches found for this slice.</td>
+        <td colspan="5">${searchQuery ? "No matches matched that nickname, key, or map." : "No matches found for this slice."}</td>
       </tr>
     `;
     return;
@@ -819,6 +858,13 @@ function renderButtons() {
 if (playerSearchElement) {
   playerSearchElement.addEventListener("input", (event) => {
     playerSearchQuery = event.currentTarget.value;
+    render();
+  });
+}
+
+if (matchesSearchElement) {
+  matchesSearchElement.addEventListener("input", (event) => {
+    matchesSearchQuery = event.currentTarget.value;
     render();
   });
 }

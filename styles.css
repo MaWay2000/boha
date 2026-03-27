@@ -1544,6 +1544,29 @@ main {
   gap: 8px;
 }
 
+.stats-matchup-list-tiles {
+  width: 100%;
+}
+
+.stats-team-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.stats-team-tile {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .stats-player-game-result.is-win {
   color: #dffae0;
   background: rgba(141, 233, 142, 0.12);

@@ -48,6 +48,7 @@ let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 let playerSearchQuery = "";
 let matchesSearchQuery = "";
 let leaderboardGameCounts = new Map();
+let globalRankMap = new Map();
 let statusRefreshTimer = null;
 let lastStatsUpdateAt = 0;
 let expandedAccounts = new Set();
@@ -388,6 +389,21 @@ function getAccountExpandKey(account) {
   return `name:${account.name || "unknown"}:${account.games.length}:${account.winCount}:${account.loseCount}:${account.drawCount}`;
 }
 
+function buildGlobalRankMap(accountList) {
+  return new Map(
+    filterVisibleAccounts(accountList)
+      .map((account, index) => [getAccountExpandKey(account), index + 1])
+  );
+}
+
+function getGlobalRankLabel(account) {
+  if (!account) {
+    return "NR";
+  }
+
+  return globalRankMap.get(getAccountExpandKey(account)) || "NR";
+}
+
 function getPlayerGameOutcome(game, account) {
   const slot = game.players.find((playerSlot) => playerSlot.account === account)
     || (game.slots || []).find((playerSlot) => playerSlot.account === account);
@@ -413,14 +429,11 @@ function getPlayerGameKey(game) {
   ].join("|");
 }
 
-function renderPlayerGameDetails(game, outcome) {
+function renderPlayerGameDetails(game) {
   return `
     <div class="stats-player-game-detail-panel">
-      <div class="stats-detail-group">
-        <span class="stats-detail-label">Players</span>
-        <div class="stats-matchup">
-          ${renderMatchup(game)}
-        </div>
+      <div class="stats-matchup stats-matchup-tiles">
+        ${renderMatchup(game, { variant: "tiles", includeGlobalRank: true, showVersus: false })}
       </div>
     </div>
   `;
@@ -477,7 +490,7 @@ function renderPlayerGames(accounts) {
         ? `
           <tr class="stats-player-game-detail-row">
             <td colspan="5">
-              ${renderPlayerGameDetails(game, outcome)}
+              ${renderPlayerGameDetails(game)}
             </td>
           </tr>
         `
@@ -526,20 +539,49 @@ function renderPlayerGames(accounts) {
   });
 }
 
-function renderMatchup(game) {
+function renderMatchup(game, options = {}) {
+  const {
+    variant = "chips",
+    includeGlobalRank = false,
+    showVersus = true
+  } = options;
   const teams = game.teams.filter((team) => team.players.length);
   if (!teams.length) {
     return `<span class="stats-note">Player list unavailable.</span>`;
   }
 
+  const renderPlayerLabel = (player) => {
+    const playerName = player.account?.name || "Unknown";
+    const rankSuffix = includeGlobalRank ? ` [${getGlobalRankLabel(player.account)}]` : "";
+    return `${escapeHtml(playerName)}${escapeHtml(rankSuffix)}`;
+  };
+
+  if (variant === "tiles") {
+    return `
+      <div class="stats-matchup-list stats-matchup-list-tiles">
+        ${teams.map((team) => `
+          <div class="stats-team-grid">
+            ${team.players
+              .map((player) => `
+                <span class="stats-team-tile ${getTeamToneClass(team.userType)}">
+                  ${renderPlayerLabel(player)}
+                </span>
+              `)
+              .join("")}
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
   return `
     <div class="stats-matchup-list">
       ${teams.map((team, index) => {
-        const vsLabel = index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
+        const vsLabel = showVersus && index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
         return `
           <span class="stats-team ${getTeamToneClass(team.userType)}">
             ${team.players
-              .map((player) => `<span class="stats-team-player">${escapeHtml(player.account?.name || "Unknown")}</span>`)
+              .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
               .join("")}
           </span>
           ${vsLabel}
@@ -886,22 +928,6 @@ function renderMatches(gameList) {
     .join("");
 }
 
-function collectAllGames() {
-  if (!runtime.gather) {
-    return [];
-  }
-
-  const { games } = runtime.gather(
-    resultsData.results,
-    playerPublicKeys,
-    function* includeAllGames(allGames) {
-      yield* allGames;
-    }
-  );
-
-  return [...games];
-}
-
 function render() {
   if (!runtime.gather || !runtime.calculate || !runtime.filterGame) {
     updateStatusText([]);
@@ -911,6 +937,7 @@ function render() {
   if (!resultsData.results.length) {
     updateStatusText([]);
     leaderboardGameCounts = new Map();
+    globalRankMap = new Map();
     renderButtons();
     renderSummary([], []);
     renderPlayerGames(renderRanks([]));
@@ -918,7 +945,23 @@ function render() {
     return;
   }
 
-  const allGames = collectAllGames();
+  const {
+    accounts: globalAccounts,
+    games: globalGames
+  } = runtime.gather(
+    resultsData.results,
+    playerPublicKeys,
+    function* includeAllGames(allGames) {
+      yield* allGames;
+    }
+  );
+
+  runtime.calculate(globalGames);
+
+  const allGames = [...globalGames];
+  const globalAccountList = sortAccounts(globalAccounts.values());
+  globalRankMap = buildGlobalRankMap(globalAccountList);
+
   leaderboardGameCounts = new Map(
     (runtime.leaderboards?.length ? runtime.leaderboards : ["Global"]).map((leaderboard) => [
       leaderboard,

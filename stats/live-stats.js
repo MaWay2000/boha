@@ -596,7 +596,11 @@ function renderMatches(gameList) {
     return;
   }
 
-  const rows = gameList.slice(0, MATCH_LIMIT);
+  const configuredMatchLimit = Number(matchesElement.dataset.matchLimit || MATCH_LIMIT);
+  const matchLimit = Number.isFinite(configuredMatchLimit) && configuredMatchLimit > 0
+    ? configuredMatchLimit
+    : MATCH_LIMIT;
+  const rows = gameList.slice(0, matchLimit);
 
   if (!rows.length) {
     matchesElement.innerHTML = `

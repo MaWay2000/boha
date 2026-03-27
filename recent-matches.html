@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Warzone 2100 Lobby</title>
+  <title>Warzone 2100 Recent Matches</title>
   <meta
     name="description"
-    content="Live Warzone 2100 lobby viewer with mirrored online games and map details."
+    content="Recent Warzone 2100 matches with replay links, live mirror updates, and leaderboard slice filters."
   >
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,8 +29,8 @@
 
         <nav class="topnav" aria-label="Primary">
           <a href="index.html#leaderboards">Leaderboards</a>
-          <a href="recent-matches.html">Recent Matches</a>
-          <a href="lobby.html" aria-current="page">Lobby</a>
+          <a href="recent-matches.html" aria-current="page">Recent Matches</a>
+          <a href="lobby.html">Lobby</a>
           <a href="index.html#opendata">Open Data</a>
         </nav>
 
@@ -49,39 +49,45 @@
     </div>
 
     <main id="top">
-      <section class="section-grid lobby-page">
-        <div class="live-board section-frame" data-reveal>
-          <div class="live-board-head">
+      <section class="landing-stats stats-shell section-frame">
+        <div class="stats-shell-head">
+          <div>
+            <p class="panel-kicker">Recent Matches</p>
+            <h3>Replay-ready match list by leaderboard slice</h3>
+          </div>
+          <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
+        </div>
+
+        <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+
+        <section class="stats-panel">
+          <div class="stats-panel-head">
             <div>
-              <p class="panel-kicker">Streaming Lobby View</p>
-              <h3 id="lobbyCaption">Connecting to lobby feed...</h3>
-            </div>
-            <div class="live-board-meta">
-              <p class="live-board-updated" id="lobbyUpdated" aria-live="polite"></p>
-              <span class="stream-badge" id="lobbyBadge">Offline</span>
+              <p class="panel-kicker">Recent Matches</p>
+              <h4>Latest games in the selected slice</h4>
             </div>
           </div>
 
-          <div class="table-shell">
-            <table class="lobby-table">
+          <div class="stats-table-wrap">
+            <table class="stats-table">
               <thead>
                 <tr>
-                  <th>Host</th>
-                  <th>Players</th>
-                  <th>Spectators</th>
-                  <th>Status</th>
+                  <th>Date</th>
                   <th>Map</th>
-                  <th>Title</th>
+                  <th>Players</th>
+                  <th>Mode</th>
+                  <th>Duration</th>
+                  <th>Replay</th>
                 </tr>
               </thead>
-              <tbody id="lobbyGames">
-                <tr class="empty-row">
-                  <td colspan="6">No lobby data loaded yet.</td>
+              <tbody id="statsMatches" data-match-limit="60">
+                <tr class="stats-empty-row">
+                  <td colspan="6">Waiting for match history.</td>
                 </tr>
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
       </section>
     </main>
 
@@ -90,6 +96,6 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="stats/live-stats.js"></script>
 </body>
 </html>

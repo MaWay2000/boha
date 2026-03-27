@@ -404,6 +404,33 @@ function getGlobalRankLabel(account) {
   return globalRankMap.get(getAccountExpandKey(account)) || "NR";
 }
 
+function getNumericGlobalRank(account) {
+  if (!account) {
+    return null;
+  }
+
+  const rank = globalRankMap.get(getAccountExpandKey(account));
+  return Number.isFinite(rank) ? rank : null;
+}
+
+function getTeamStrengthLabel(team) {
+  const totalRankedPlayers = globalRankMap.size;
+  if (!totalRankedPlayers || !team.players.length) {
+    return "N/A";
+  }
+
+  const strengthScore = team.players.reduce((total, player) => {
+    const rank = getNumericGlobalRank(player.account);
+    if (!rank) {
+      return total;
+    }
+
+    return total + ((totalRankedPlayers - rank + 1) / totalRankedPlayers);
+  }, 0);
+
+  return `${Math.round((strengthScore / team.players.length) * 100)}%`;
+}
+
 function getPlayerGameOutcome(game, account) {
   const slot = game.players.find((playerSlot) => playerSlot.account === account)
     || (game.slots || []).find((playerSlot) => playerSlot.account === account);
@@ -568,6 +595,9 @@ function renderMatchup(game, options = {}) {
                 </span>
               `)
               .join("")}
+            <span class="stats-team-strength ${getTeamToneClass(team.userType)}">
+              Team strength: ${escapeHtml(getTeamStrengthLabel(team))}
+            </span>
           </div>
         `).join("")}
       </div>

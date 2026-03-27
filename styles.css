@@ -1555,6 +1555,18 @@ main {
   width: 100%;
 }
 
+.stats-team-strength {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px dashed currentColor;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  opacity: 0.9;
+}
+
 .stats-team-tile {
   display: inline-flex;
   align-items: center;

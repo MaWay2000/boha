@@ -1504,6 +1504,65 @@ main {
   align-items: start;
 }
 
+.stats-player-game-row {
+  cursor: pointer;
+}
+
+.stats-player-game-row td {
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.stats-player-game-row:hover td,
+.stats-player-game-row.is-expanded td {
+  background: rgba(109, 232, 255, 0.05);
+}
+
+.stats-player-game-detail-row td {
+  padding-top: 0;
+}
+
+.stats-player-game-detail-panel {
+  display: grid;
+  gap: 14px;
+  padding: 0 12px 18px;
+}
+
+.stats-player-game-meta {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.stats-player-game-meta-item {
+  display: grid;
+  gap: 5px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(109, 232, 255, 0.05);
+  border: 1px solid rgba(149, 205, 255, 0.1);
+}
+
+.stats-player-game-meta-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stats-player-game-meta-value {
+  color: var(--cloud);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.stats-player-game-detail-panel .stats-matchup {
+  min-width: 0;
+}
+
+.stats-player-game-detail-panel .stats-matchup-list {
+  gap: 8px;
+}
+
 .stats-player-game-result.is-win {
   color: #dffae0;
   background: rgba(141, 233, 142, 0.12);

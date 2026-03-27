@@ -52,6 +52,7 @@ let statusRefreshTimer = null;
 let lastStatsUpdateAt = 0;
 let expandedAccounts = new Set();
 let activeExpandedAccountKey = null;
+let activeExpandedPlayerGameKey = null;
 
 function createRuntime() {
   return {
@@ -403,6 +404,49 @@ function getPlayerGameOutcome(game, account) {
   }
 }
 
+function getPlayerGameKey(game) {
+  return [
+    Number(game.endDate || 0),
+    String(game.mapName || ""),
+    Number(game.duration || 0),
+    String(game.replayUrl || "")
+  ].join("|");
+}
+
+function renderPlayerGameDetails(game, outcome) {
+  const detailItems = [
+    ["Played", formatDate(game.endDate)],
+    ["Map", game.mapName || "Unknown"],
+    ["Mode", formatAlliance(game)],
+    ["Result", outcome.label]
+  ];
+
+  if (game.mods) {
+    detailItems.push(["Rules", game.mods]);
+  }
+
+  return `
+    <div class="stats-player-game-detail-panel">
+      <div class="stats-player-game-meta">
+        ${detailItems
+          .map(([label, value]) => `
+            <div class="stats-player-game-meta-item">
+              <span class="stats-player-game-meta-label">${escapeHtml(label)}</span>
+              <strong class="stats-player-game-meta-value">${escapeHtml(value)}</strong>
+            </div>
+          `)
+          .join("")}
+      </div>
+      <div class="stats-detail-group">
+        <span class="stats-detail-label">Players</span>
+        <div class="stats-matchup">
+          ${renderMatchup(game)}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderPlayerGames(accounts) {
   if (!playerGamesElement || !playerGamesTitleElement || !playerGamesMetaElement) {
     return;
@@ -411,6 +455,7 @@ function renderPlayerGames(accounts) {
   const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
   if (!activeAccount) {
     activeExpandedAccountKey = null;
+    activeExpandedPlayerGameKey = null;
     expandedAccounts.clear();
     playerGamesTitleElement.textContent = "Expand a player to inspect recent games";
     playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
@@ -425,6 +470,11 @@ function renderPlayerGames(accounts) {
   const latestGames = [...activeAccount.games]
     .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0))
     .slice(0, PLAYER_GAME_LIMIT);
+  const latestGameKeys = new Set(latestGames.map(getPlayerGameKey));
+
+  if (activeExpandedPlayerGameKey && !latestGameKeys.has(activeExpandedPlayerGameKey)) {
+    activeExpandedPlayerGameKey = null;
+  }
 
   playerGamesTitleElement.textContent = `${activeAccount.name || "Player"} recent games`;
   playerGamesMetaElement.textContent = `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
@@ -442,8 +492,20 @@ function renderPlayerGames(accounts) {
     .map((game) => {
       const outcome = getPlayerGameOutcome(game, activeAccount);
       const replayUrl = game.replayUrl ? normalizeReplayUrl(game.replayUrl) : "";
+      const gameKey = getPlayerGameKey(game);
+      const isExpanded = activeExpandedPlayerGameKey === gameKey;
+      const detailRow = isExpanded
+        ? `
+          <tr class="stats-player-game-detail-row">
+            <td colspan="5">
+              ${renderPlayerGameDetails(game, outcome)}
+            </td>
+          </tr>
+        `
+        : "";
+
       return `
-        <tr>
+        <tr class="stats-player-game-row${isExpanded ? " is-expanded" : ""}" data-player-game-key="${escapeHtml(gameKey)}">
           <td class="stats-date">
             ${escapeHtml(formatMatchDate(game.endDate))}
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
@@ -460,9 +522,29 @@ function renderPlayerGames(accounts) {
               : `<span class="stats-note">Unavailable</span>`}
           </td>
         </tr>
+        ${detailRow}
       `;
     })
     .join("");
+
+  playerGamesElement.querySelectorAll(".stats-player-game-row").forEach((row) => {
+    row.addEventListener("click", (event) => {
+      if (event.target.closest("a")) {
+        return;
+      }
+
+      const { playerGameKey } = row.dataset;
+      if (!playerGameKey) {
+        return;
+      }
+
+      activeExpandedPlayerGameKey = activeExpandedPlayerGameKey === playerGameKey
+        ? null
+        : playerGameKey;
+
+      renderPlayerGames(accounts);
+    });
+  });
 }
 
 function renderMatchup(game) {
@@ -707,9 +789,11 @@ function renderRanks(accountList) {
       if (expandedAccounts.has(expandAccount)) {
         expandedAccounts.delete(expandAccount);
         activeExpandedAccountKey = null;
+        activeExpandedPlayerGameKey = null;
       } else {
         expandedAccounts = new Set([expandAccount]);
         activeExpandedAccountKey = expandAccount;
+        activeExpandedPlayerGameKey = null;
       }
 
       render();

@@ -456,11 +456,16 @@ function getPlayerGameKey(game) {
   ].join("|");
 }
 
-function renderPlayerGameDetails(game) {
+function renderPlayerGameDetails(game, activeAccount) {
   return `
     <div class="stats-player-game-detail-panel">
       <div class="stats-matchup stats-matchup-tiles">
-        ${renderMatchup(game, { variant: "tiles", includeGlobalRank: true, showVersus: false })}
+        ${renderMatchup(game, {
+          variant: "tiles",
+          includeGlobalRank: true,
+          showVersus: false,
+          highlightedAccountKey: activeAccount ? getAccountExpandKey(activeAccount) : ""
+        })}
       </div>
     </div>
   `;
@@ -517,7 +522,7 @@ function renderPlayerGames(accounts) {
         ? `
           <tr class="stats-player-game-detail-row">
             <td colspan="5">
-              ${renderPlayerGameDetails(game)}
+              ${renderPlayerGameDetails(game, activeAccount)}
             </td>
           </tr>
         `
@@ -570,7 +575,8 @@ function renderMatchup(game, options = {}) {
   const {
     variant = "chips",
     includeGlobalRank = false,
-    showVersus = true
+    showVersus = true,
+    highlightedAccountKey = ""
   } = options;
   const teams = game.teams.filter((team) => team.players.length);
   if (!teams.length) {
@@ -589,11 +595,16 @@ function renderMatchup(game, options = {}) {
         ${teams.map((team) => `
           <div class="stats-team-grid">
             ${team.players
-              .map((player) => `
-                <span class="stats-team-tile ${getTeamToneClass(team.userType)}">
+              .map((player) => {
+                const isHighlighted = highlightedAccountKey
+                  && player.account
+                  && getAccountExpandKey(player.account) === highlightedAccountKey;
+                return `
+                <span class="stats-team-tile ${getTeamToneClass(team.userType)}${isHighlighted ? " is-current-player" : ""}">
                   ${renderPlayerLabel(player)}
                 </span>
-              `)
+              `;
+              })
               .join("")}
             <span class="stats-team-strength ${getTeamToneClass(team.userType)}">
               Team strength: ${escapeHtml(getTeamStrengthLabel(team))}

@@ -34,19 +34,19 @@
         <div class="stats-summary" id="statsSummary">
           <article class="stats-card">
             <span class="stats-card-label">Ranked Players</span>
-            <strong class="stats-card-value">--</strong>
+            <strong class="stats-card-value"><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></strong>
           </article>
           <article class="stats-card">
             <span class="stats-card-label">Matches</span>
-            <strong class="stats-card-value">--</strong>
+            <strong class="stats-card-value"><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></strong>
           </article>
           <article class="stats-card">
             <span class="stats-card-label">Top Elo</span>
-            <strong class="stats-card-value">--</strong>
+            <strong class="stats-card-value"><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></strong>
           </article>
           <article class="stats-card">
             <span class="stats-card-label">Latest Match</span>
-            <strong class="stats-card-value">--</strong>
+            <strong class="stats-card-value"><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></strong>
           </article>
         </div>
 
@@ -74,16 +74,41 @@
               <table class="stats-table stats-table-ranks">
                 <thead>
                   <tr>
-                    <th>Rank</th>
-                    <th>Player</th>
-                    <th>Elo</th>
-                    <th>Matches</th>
-                    <th>W/L/D</th>
+                    <th data-sort-table="ranks" data-sort-key="rank" aria-sort="ascending"><button class="stats-sort-button" type="button">Rank</button></th>
+                    <th data-sort-table="ranks" data-sort-key="player" aria-sort="none"><button class="stats-sort-button" type="button">Player</button></th>
+                    <th data-sort-table="ranks" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
+                    <th data-sort-table="ranks" data-sort-key="matches" aria-sort="none"><button class="stats-sort-button" type="button">Matches</button></th>
+                    <th data-sort-table="ranks" data-sort-key="record" aria-sort="none"><button class="stats-sort-button" type="button">W/L/D</button></th>
                   </tr>
                 </thead>
                 <tbody id="statsRanks">
-                  <tr class="stats-empty-row">
-                    <td colspan="5">Stats are still loading.</td>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                  </tr>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                  </tr>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                  </tr>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></td>
                   </tr>
                 </tbody>
               </table>
@@ -104,16 +129,34 @@
               <table class="stats-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Map</th>
-                    <th>Result</th>
-                    <th>Duration</th>
-                    <th>Replay</th>
+                    <th data-sort-table="player-games" data-sort-key="date" aria-sort="descending"><button class="stats-sort-button" type="button">Date</button></th>
+                    <th data-sort-table="player-games" data-sort-key="map" aria-sort="none"><button class="stats-sort-button" type="button">Map</button></th>
+                    <th data-sort-table="player-games" data-sort-key="result" aria-sort="none"><button class="stats-sort-button" type="button">Result</button></th>
+                    <th data-sort-table="player-games" data-sort-key="duration" aria-sort="none"><button class="stats-sort-button" type="button">Duration</button></th>
+                    <th data-sort-table="player-games" data-sort-key="replay" aria-sort="none"><button class="stats-sort-button" type="button">Replay</button></th>
                   </tr>
                 </thead>
                 <tbody id="statsPlayerGames">
-                  <tr class="stats-empty-row">
-                    <td colspan="5">Use + on a player to show their latest games here.</td>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  </tr>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  </tr>
+                  <tr class="stats-skeleton-row" aria-hidden="true">
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                   </tr>
                 </tbody>
               </table>

@@ -16,6 +16,13 @@ function normalizeTab(value) {
   return tabs[value] ? value : "leaderboards";
 }
 
+function getPageSearchParams() {
+  const url = new URL(window.location.href);
+  const params = new URLSearchParams(url.search);
+  params.delete("tab");
+  return params;
+}
+
 function getTabFromLocation() {
   const url = new URL(window.location.href);
   return normalizeTab(url.searchParams.get("tab"));
@@ -56,8 +63,21 @@ function syncFrameHeightFromDocument() {
   }
 }
 
-function updateLocation(tab, replace = false) {
+function buildFrameUrl(tab, params = getPageSearchParams()) {
+  const normalizedTab = normalizeTab(tab);
+  const tabConfig = tabs[normalizedTab];
+  const url = new URL(tabConfig.href, window.location.href);
+  url.search = params.toString();
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+function updateLocation(tab, replace = false, search = null) {
   const url = new URL(window.location.href);
+  const params = search === null
+    ? getPageSearchParams()
+    : new URLSearchParams(String(search).replace(/^\?/, ""));
+
+  url.search = params.toString();
   if (tab === "leaderboards") {
     url.searchParams.delete("tab");
   } else {
@@ -80,9 +100,11 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false } = {}) {
 
   setActiveTab(normalizedTab);
 
-  if (contentFrame.dataset.currentTab !== normalizedTab) {
+  const nextSrc = buildFrameUrl(normalizedTab);
+  const currentSrc = contentFrame.getAttribute("src") || "";
+  if (contentFrame.dataset.currentTab !== normalizedTab || currentSrc !== nextSrc) {
     contentFrame.dataset.currentTab = normalizedTab;
-    contentFrame.src = tabConfig.href;
+    contentFrame.src = nextSrc;
   }
 
   if (updateHistory) {
@@ -113,13 +135,20 @@ window.addEventListener("message", (event) => {
     return;
   }
 
-  if (event.data?.type !== "boha:frame-height") {
+  if (event.source !== contentFrame.contentWindow) {
     return;
   }
 
-  const height = Number(event.data.height);
-  if (Number.isFinite(height) && height > 0) {
-    contentFrame.style.height = `${Math.max(480, height)}px`;
+  if (event.data?.type === "boha:frame-height") {
+    const height = Number(event.data.height);
+    if (Number.isFinite(height) && height > 0) {
+      contentFrame.style.height = `${Math.max(480, height)}px`;
+    }
+    return;
+  }
+
+  if (event.data?.type === "boha:page-state") {
+    updateLocation(contentFrame.dataset.currentTab || getTabFromLocation(), true, event.data.search || "");
   }
 });
 

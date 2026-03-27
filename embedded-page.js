@@ -32,6 +32,16 @@
     );
   }
 
+  function postState(search = window.location.search) {
+    window.parent.postMessage(
+      {
+        type: "boha:page-state",
+        search
+      },
+      targetOrigin
+    );
+  }
+
   function scheduleHeightPost() {
     if (animationFrame) {
       return;
@@ -65,4 +75,8 @@
 
   window.setTimeout(scheduleHeightPost, 200);
   window.setTimeout(scheduleHeightPost, 1200);
+
+  window.bohaEmbeddedPage = {
+    postState
+  };
 })();

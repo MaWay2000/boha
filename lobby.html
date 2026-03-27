@@ -37,18 +37,47 @@
             <table class="lobby-table">
               <thead>
                 <tr>
-                  <th>Host</th>
-                  <th>Players</th>
-                  <th>Spectators</th>
-                  <th>Status</th>
-                  <th>Map</th>
-                  <th>Title</th>
+                  <th data-sort-table="lobby" data-sort-key="host" aria-sort="none"><button class="stats-sort-button" type="button">Host</button></th>
+                  <th data-sort-table="lobby" data-sort-key="players" aria-sort="descending"><button class="stats-sort-button" type="button">Players</button></th>
+                  <th data-sort-table="lobby" data-sort-key="spectators" aria-sort="none"><button class="stats-sort-button" type="button">Spectators</button></th>
+                  <th data-sort-table="lobby" data-sort-key="status" aria-sort="none"><button class="stats-sort-button" type="button">Status</button></th>
+                  <th data-sort-table="lobby" data-sort-key="map" aria-sort="none"><button class="stats-sort-button" type="button">Map</button></th>
+                  <th data-sort-table="lobby" data-sort-key="title" aria-sort="none"><button class="stats-sort-button" type="button">Title</button></th>
                 </tr>
               </thead>
               <tbody id="lobbyGames">
-                <tr class="empty-row">
-                  <td colspan="6">No lobby data loaded yet.</td>
+                <tr class="lobby-skeleton-row" aria-hidden="true">
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
                 </tr>
+                <tr class="lobby-skeleton-row" aria-hidden="true">
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                </tr>
+                <tr class="lobby-skeleton-row" aria-hidden="true">
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                </tr>
+                <tr class="lobby-skeleton-row" aria-hidden="true">
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                  </tr>
               </tbody>
             </table>
           </div>

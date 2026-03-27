@@ -19,6 +19,45 @@ const PLAYER_GAME_LIMIT = 20;
 const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
 const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
+const SORT_DEFAULTS = {
+  ranks: { key: "rank", direction: "asc" },
+  "player-games": { key: "date", direction: "desc" },
+  matches: { key: "date", direction: "desc" }
+};
+const SORT_ALLOWED_KEYS = {
+  ranks: new Set(["rank", "player", "elo", "matches", "record"]),
+  "player-games": new Set(["date", "map", "result", "duration", "replay"]),
+  matches: new Set(["date", "map", "players", "duration", "replay"])
+};
+const SORT_DEFAULT_DIRECTIONS = {
+  ranks: {
+    rank: "asc",
+    player: "asc",
+    elo: "desc",
+    matches: "desc",
+    record: "desc"
+  },
+  "player-games": {
+    date: "desc",
+    map: "asc",
+    result: "desc",
+    duration: "desc",
+    replay: "desc"
+  },
+  matches: {
+    date: "desc",
+    map: "asc",
+    players: "desc",
+    duration: "desc",
+    replay: "desc"
+  }
+};
+const PLAYER_GAME_RESULT_ORDER = {
+  Lost: 0,
+  Played: 1,
+  Draw: 2,
+  Won: 3
+};
 
 const statusElement = document.getElementById("resultsStatus");
 const summaryElement = document.getElementById("statsSummary");
@@ -32,6 +71,7 @@ const playerGamesActionsElement = document.getElementById("statsPlayerGamesActio
 const playerSearchElement = document.getElementById("statsPlayerSearch");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
+const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data-sort-key]")];
 
 let selectedLeaderboard = "Global";
 let resultsData = { format: 0, results: [] };
@@ -56,6 +96,9 @@ let expandedAccounts = new Set();
 let activeExpandedAccountKey = null;
 let activeExpandedPlayerGameKey = null;
 let showingAllPlayerGames = false;
+let rankSortState = cloneSortState(SORT_DEFAULTS.ranks);
+let playerGamesSortState = cloneSortState(SORT_DEFAULTS["player-games"]);
+let matchesSortState = cloneSortState(SORT_DEFAULTS.matches);
 
 function createRuntime() {
   return {
@@ -68,12 +111,160 @@ function createRuntime() {
   };
 }
 
+function cloneSortState(sortState) {
+  return {
+    key: sortState.key,
+    direction: sortState.direction
+  };
+}
+
 function stripBom(text) {
   return text.replace(/^\uFEFF/, "");
 }
 
 function getAssetHash(name) {
   return upstreamManifest?.files?.[name]?.sha256?.slice(0, 16) || "local";
+}
+
+function getSortState(table) {
+  switch (table) {
+    case "ranks":
+      return rankSortState;
+    case "player-games":
+      return playerGamesSortState;
+    case "matches":
+      return matchesSortState;
+    default:
+      return cloneSortState(SORT_DEFAULTS.ranks);
+  }
+}
+
+function setSortState(table, sortState) {
+  switch (table) {
+    case "ranks":
+      rankSortState = sortState;
+      break;
+    case "player-games":
+      playerGamesSortState = sortState;
+      break;
+    case "matches":
+      matchesSortState = sortState;
+      break;
+    default:
+      break;
+  }
+}
+
+function getDefaultSortDirection(table, key) {
+  return SORT_DEFAULT_DIRECTIONS[table]?.[key] || "asc";
+}
+
+function parseSortState(value, table) {
+  const fallback = SORT_DEFAULTS[table];
+  if (!value || !fallback) {
+    return cloneSortState(fallback || SORT_DEFAULTS.ranks);
+  }
+
+  const [key, direction] = String(value).split(":");
+  if (!SORT_ALLOWED_KEYS[table]?.has(key)) {
+    return cloneSortState(fallback);
+  }
+
+  return {
+    key,
+    direction: direction === "desc" ? "desc" : "asc"
+  };
+}
+
+function encodeSortState(sortState) {
+  return `${sortState.key}:${sortState.direction}`;
+}
+
+function isDefaultSortState(table, sortState) {
+  const fallback = SORT_DEFAULTS[table];
+  return Boolean(fallback)
+    && fallback.key === sortState.key
+    && fallback.direction === sortState.direction;
+}
+
+function compareNumberValues(left, right) {
+  const normalizedLeft = Number.isFinite(left) ? left : Number.NEGATIVE_INFINITY;
+  const normalizedRight = Number.isFinite(right) ? right : Number.NEGATIVE_INFINITY;
+  return normalizedLeft - normalizedRight;
+}
+
+function compareTextValues(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, {
+    sensitivity: "base",
+    numeric: true
+  });
+}
+
+function applySortDirection(result, direction) {
+  return direction === "desc" ? -result : result;
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function updateSortIndicators() {
+  sortHeaderElements.forEach((header) => {
+    const table = header.dataset.sortTable;
+    const key = header.dataset.sortKey;
+    const sortState = getSortState(table);
+    const isActive = sortState.key === key;
+    header.setAttribute(
+      "aria-sort",
+      isActive
+        ? (sortState.direction === "asc" ? "ascending" : "descending")
+        : "none"
+    );
+
+    const button = header.querySelector(".stats-sort-button");
+    if (!button) {
+      return;
+    }
+
+    button.classList.toggle("is-active", isActive);
+    button.dataset.direction = isActive ? sortState.direction : "";
+  });
+}
+
+function setupSortHeaders() {
+  sortHeaderElements.forEach((header) => {
+    const button = header.querySelector(".stats-sort-button");
+    if (!button || button.dataset.sortBound === "true") {
+      return;
+    }
+
+    button.dataset.sortBound = "true";
+    button.addEventListener("click", () => {
+      const table = header.dataset.sortTable;
+      const key = header.dataset.sortKey;
+      if (!table || !key) {
+        return;
+      }
+
+      const currentSort = getSortState(table);
+      const nextSort = currentSort.key === key
+        ? {
+            key,
+            direction: currentSort.direction === "asc" ? "desc" : "asc"
+          }
+        : {
+            key,
+            direction: getDefaultSortDirection(table, key)
+          };
+
+      setSortState(table, nextSort);
+      updateSortIndicators();
+      render();
+    });
+  });
+
+  updateSortIndicators();
 }
 
 function buildVersionedUrl(baseUrl, version, bust = false) {
@@ -187,6 +378,88 @@ function getNextPlayerLimit(currentCount, totalCount) {
 
 function normalizeSearchQuery(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function applyStateFromUrl() {
+  const url = new URL(window.location.href);
+  selectedLeaderboard = url.searchParams.get("leaderboard") || "Global";
+  visiblePlayerCount = Math.max(
+    INITIAL_PLAYER_LIMIT,
+    parsePositiveInteger(url.searchParams.get("players"), INITIAL_PLAYER_LIMIT)
+  );
+  playerSearchQuery = url.searchParams.get("playerSearch") || "";
+  matchesSearchQuery = url.searchParams.get("matchesSearch") || "";
+  activeExpandedAccountKey = url.searchParams.get("player") || null;
+  activeExpandedPlayerGameKey = url.searchParams.get("game") || null;
+  showingAllPlayerGames = url.searchParams.get("playerGames") === "all";
+  rankSortState = parseSortState(url.searchParams.get("ranksSort"), "ranks");
+  playerGamesSortState = parseSortState(url.searchParams.get("playerGamesSort"), "player-games");
+  matchesSortState = parseSortState(url.searchParams.get("matchesSort"), "matches");
+  expandedAccounts = activeExpandedAccountKey ? new Set([activeExpandedAccountKey]) : new Set();
+
+  if (playerSearchElement) {
+    playerSearchElement.value = playerSearchQuery;
+  }
+
+  if (matchesSearchElement) {
+    matchesSearchElement.value = matchesSearchQuery;
+  }
+
+  updateSortIndicators();
+}
+
+function buildStateParams() {
+  const params = new URLSearchParams();
+
+  if (selectedLeaderboard !== "Global") {
+    params.set("leaderboard", selectedLeaderboard);
+  }
+
+  if (ranksElement && visiblePlayerCount > INITIAL_PLAYER_LIMIT) {
+    params.set("players", String(visiblePlayerCount));
+  }
+
+  if (playerSearchElement && playerSearchQuery.trim()) {
+    params.set("playerSearch", playerSearchQuery.trim());
+  }
+
+  if (matchesSearchElement && matchesSearchQuery.trim()) {
+    params.set("matchesSearch", matchesSearchQuery.trim());
+  }
+
+  if (ranksElement && activeExpandedAccountKey) {
+    params.set("player", activeExpandedAccountKey);
+  }
+
+  if (playerGamesElement && activeExpandedPlayerGameKey) {
+    params.set("game", activeExpandedPlayerGameKey);
+  }
+
+  if (playerGamesElement && showingAllPlayerGames) {
+    params.set("playerGames", "all");
+  }
+
+  if (ranksElement && !isDefaultSortState("ranks", rankSortState)) {
+    params.set("ranksSort", encodeSortState(rankSortState));
+  }
+
+  if (playerGamesElement && !isDefaultSortState("player-games", playerGamesSortState)) {
+    params.set("playerGamesSort", encodeSortState(playerGamesSortState));
+  }
+
+  if (matchesElement && !isDefaultSortState("matches", matchesSortState)) {
+    params.set("matchesSort", encodeSortState(matchesSortState));
+  }
+
+  return params;
+}
+
+function syncStateToUrl() {
+  const url = new URL(window.location.href);
+  const params = buildStateParams();
+  url.search = params.toString();
+  window.history.replaceState({ search: url.search }, "", url);
+  window.bohaEmbeddedPage?.postState(url.search);
 }
 
 function resetPlayerGamesView() {
@@ -490,6 +763,154 @@ function getPlayerGameKey(game) {
   ].join("|");
 }
 
+function getReplaySortValue(replayUrl) {
+  if (!replayUrl) {
+    return "";
+  }
+
+  return normalizeReplayUrl(replayUrl);
+}
+
+function getPlayerCount(game) {
+  return Array.isArray(game.players) ? game.players.length : 0;
+}
+
+function getRankRecordScore(account) {
+  const totalGames = account.games.length || 1;
+  return ((account.winCount * 3) + account.drawCount) / totalGames;
+}
+
+function compareRankRows(left, right) {
+  let result = 0;
+
+  switch (rankSortState.key) {
+    case "player":
+      result = compareTextValues(left.account.name, right.account.name)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "elo":
+      result = compareNumberValues(
+        left.account.discounted ? Number.NEGATIVE_INFINITY : left.account.elo,
+        right.account.discounted ? Number.NEGATIVE_INFINITY : right.account.elo
+      ) || compareNumberValues(left.rank, right.rank);
+      break;
+    case "matches":
+      result = compareNumberValues(left.account.games.length, right.account.games.length)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "record":
+      result = compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
+        || compareNumberValues(left.account.winCount, right.account.winCount)
+        || compareNumberValues(right.account.loseCount, left.account.loseCount)
+        || compareNumberValues(left.account.drawCount, right.account.drawCount)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "rank":
+    default:
+      result = compareNumberValues(left.rank, right.rank);
+      break;
+  }
+
+  return applySortDirection(result, rankSortState.direction);
+}
+
+function comparePlayerGames(left, right, activeAccount) {
+  let result = 0;
+
+  switch (playerGamesSortState.key) {
+    case "map":
+      result = compareTextValues(left.mapName, right.mapName)
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "result":
+      result = compareNumberValues(
+        PLAYER_GAME_RESULT_ORDER[getPlayerGameOutcome(left, activeAccount).label] || 0,
+        PLAYER_GAME_RESULT_ORDER[getPlayerGameOutcome(right, activeAccount).label] || 0
+      ) || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "duration":
+      result = compareNumberValues(left.duration, right.duration)
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "replay":
+      result = compareTextValues(getReplaySortValue(left.replayUrl), getReplaySortValue(right.replayUrl))
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "date":
+    default:
+      result = compareNumberValues(left.endDate, right.endDate);
+      break;
+  }
+
+  return applySortDirection(result, playerGamesSortState.direction);
+}
+
+function compareMatches(left, right) {
+  let result = 0;
+
+  switch (matchesSortState.key) {
+    case "map":
+      result = compareTextValues(left.mapName, right.mapName)
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "players":
+      result = compareNumberValues(getPlayerCount(left), getPlayerCount(right))
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "duration":
+      result = compareNumberValues(left.duration, right.duration)
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "replay":
+      result = compareTextValues(getReplaySortValue(left.replayUrl), getReplaySortValue(right.replayUrl))
+        || compareNumberValues(left.endDate, right.endDate);
+      break;
+    case "date":
+    default:
+      result = compareNumberValues(left.endDate, right.endDate);
+      break;
+  }
+
+  return applySortDirection(result, matchesSortState.direction);
+}
+
+async function copyValueToClipboard(button) {
+  const value = button.dataset.copyValue;
+  if (!value) {
+    return;
+  }
+
+  const previousText = button.textContent;
+  try {
+    await navigator.clipboard.writeText(value);
+    button.textContent = "Copied";
+    button.classList.add("is-copied");
+  } catch (error) {
+    button.textContent = "Failed";
+    button.classList.add("is-failed");
+  }
+
+  window.setTimeout(() => {
+    button.textContent = previousText;
+    button.classList.remove("is-copied", "is-failed");
+  }, 1400);
+}
+
+function bindCopyButtons(scope) {
+  scope.querySelectorAll("[data-copy-value]").forEach((button) => {
+    if (button.dataset.copyBound === "true") {
+      return;
+    }
+
+    button.dataset.copyBound = "true";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      copyValueToClipboard(button);
+    });
+  });
+}
+
 function renderPlayerGameDetails(game, activeAccount) {
   return `
     <div class="stats-player-game-detail-panel">
@@ -530,8 +951,7 @@ function renderPlayerGames(accounts) {
     return;
   }
 
-  const sortedGames = [...activeAccount.games]
-    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0));
+  const sortedGames = [...activeAccount.games].sort((left, right) => comparePlayerGames(left, right, activeAccount));
   let latestGames = showingAllPlayerGames
     ? sortedGames
     : sortedGames.slice(0, PLAYER_GAME_LIMIT);
@@ -890,7 +1310,8 @@ function renderRanks(accountList) {
   const searchQuery = normalizeSearchQuery(playerSearchQuery);
   const matchingRows = eligibleAccounts
     .map((account, index) => ({ account, rank: index + 1 }))
-    .filter(({ account }) => matchesPlayerSearch(account, searchQuery));
+    .filter(({ account }) => matchesPlayerSearch(account, searchQuery))
+    .sort(compareRankRows);
   const rows = searchQuery ? matchingRows : matchingRows.slice(0, visiblePlayerCount);
 
   if (!rows.length) {
@@ -927,8 +1348,18 @@ function renderRanks(accountList) {
                 ${accountNames
                   .map(([name, count]) => `
                     <span class="stats-name-chip${name === account.name ? " is-primary" : ""}">
-                      <span class="stats-name-text">${escapeHtml(name)}</span>
-                      <sup class="stats-name-count">${count}</sup>
+                      <span class="stats-name-copy">
+                        <span class="stats-name-text">${escapeHtml(name)}</span>
+                        <sup class="stats-name-count">${count}</sup>
+                      </span>
+                      <button
+                        class="stats-copy-action"
+                        type="button"
+                        data-copy-value="${escapeHtml(name)}"
+                        aria-label="Copy alias ${escapeHtml(name)}"
+                      >
+                        Copy
+                      </button>
                     </span>
                   `)
                   .join("")}
@@ -942,7 +1373,19 @@ function renderRanks(accountList) {
               <span class="stats-detail-label">${escapeHtml(keyCountLabel)}</span>
               <div class="stats-key-list">
                 ${publicKeys
-                  .map((publicKey) => `<code class="stats-key-value">${escapeHtml(publicKey)}</code>`)
+                  .map((publicKey) => `
+                    <div class="stats-key-item">
+                      <code class="stats-key-value">${escapeHtml(publicKey)}</code>
+                      <button
+                        class="stats-copy-action"
+                        type="button"
+                        data-copy-value="${escapeHtml(publicKey)}"
+                        aria-label="Copy public key"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  `)
                   .join("")}
               </div>
             </div>
@@ -1031,6 +1474,8 @@ function renderRanks(accountList) {
     });
   });
 
+  bindCopyButtons(ranksElement);
+
   renderRankActions(eligibleAccounts.length, matchingRows.length, searchQuery);
   return rows.map(({ account }) => account);
 }
@@ -1093,7 +1538,9 @@ function renderMatches(gameList) {
   const matchLimit = Number.isFinite(configuredMatchLimit) && configuredMatchLimit > 0
     ? configuredMatchLimit
     : MATCH_LIMIT;
-  const filteredGames = gameList.filter((game) => matchesRecentGameSearch(game, searchQuery));
+  const filteredGames = gameList
+    .filter((game) => matchesRecentGameSearch(game, searchQuery))
+    .sort(compareMatches);
   const rows = filteredGames.slice(0, matchLimit);
 
   if (!rows.length) {
@@ -1129,6 +1576,8 @@ function renderMatches(gameList) {
 function render() {
   if (!runtime.gather || !runtime.calculate || !runtime.filterGame) {
     updateStatusText([]);
+    updateSortIndicators();
+    syncStateToUrl();
     return;
   }
 
@@ -1140,6 +1589,8 @@ function render() {
     renderSummary([], []);
     renderPlayerGames(renderRanks([]));
     renderMatches([]);
+    updateSortIndicators();
+    syncStateToUrl();
     return;
   }
 
@@ -1193,6 +1644,8 @@ function render() {
   renderRanks(accountList);
   renderPlayerGames(accountList);
   renderMatches(gameList);
+  updateSortIndicators();
+  syncStateToUrl();
 }
 
 function updateActiveButtons() {
@@ -1272,6 +1725,11 @@ if (matchesSearchElement) {
     render();
   });
 }
+
+window.addEventListener("popstate", () => {
+  applyStateFromUrl();
+  render();
+});
 
 function closeLiveFeed() {
   if (eventSource) {
@@ -1370,6 +1828,9 @@ window.addEventListener("beforeunload", () => {
 });
 
 async function init() {
+  applyStateFromUrl();
+  setupSortHeaders();
+
   try {
     await refreshFromMirror(true);
   } catch (error) {

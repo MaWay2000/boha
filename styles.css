@@ -1159,8 +1159,55 @@ main {
   background: rgba(8, 14, 22, 0.95);
 }
 
+.stats-table th[data-sort-table],
+.lobby-table th[data-sort-table] {
+  user-select: none;
+}
+
+.stats-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition: color 180ms ease;
+}
+
+.stats-sort-button::after {
+  content: "↕";
+  color: rgba(143, 167, 188, 0.5);
+  font-size: 0.8em;
+  line-height: 1;
+}
+
+[data-sort-table][aria-sort="ascending"] .stats-sort-button::after {
+  content: "↑";
+  color: var(--cyan);
+}
+
+[data-sort-table][aria-sort="descending"] .stats-sort-button::after {
+  content: "↓";
+  color: var(--cyan);
+}
+
+.stats-sort-button:hover,
+.stats-sort-button.is-active {
+  color: var(--text);
+}
+
 .stats-table tbody tr:hover {
   background: rgba(109, 232, 255, 0.04);
+}
+
+.stats-skeleton-row:hover,
+.lobby-skeleton-row:hover {
+  background: transparent;
 }
 
 .stats-table-ranks th:first-child,
@@ -1372,8 +1419,8 @@ main {
 
 .stats-name-chip {
   display: inline-flex;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
   padding: 5px 9px;
   border-radius: 999px;
   border: 1px solid rgba(149, 205, 255, 0.12);
@@ -1388,6 +1435,12 @@ main {
 
 .stats-name-text {
   overflow-wrap: anywhere;
+}
+
+.stats-name-copy {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .stats-name-count {
@@ -1405,8 +1458,19 @@ main {
   max-width: 100%;
 }
 
+.stats-key-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+}
+
 .stats-key-value {
   display: inline-flex;
+  flex: 1 1 auto;
+  min-width: 0;
   width: fit-content;
   max-width: 100%;
   padding: 7px 9px;
@@ -1419,6 +1483,78 @@ main {
   overflow-y: hidden;
   background: rgba(109, 232, 255, 0.06);
   border: 1px solid rgba(149, 205, 255, 0.12);
+}
+
+.stats-copy-action {
+  flex: 0 0 auto;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid rgba(149, 205, 255, 0.18);
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(8, 14, 22, 0.75);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
+}
+
+.stats-copy-action:hover {
+  color: var(--text);
+  border-color: rgba(109, 232, 255, 0.38);
+  background: rgba(11, 24, 36, 0.92);
+  transform: translateY(-1px);
+}
+
+.stats-copy-action.is-copied {
+  color: #dffae0;
+  border-color: rgba(141, 233, 142, 0.34);
+  background: rgba(141, 233, 142, 0.14);
+}
+
+.stats-copy-action.is-failed {
+  color: #ffd6d0;
+  border-color: rgba(255, 114, 98, 0.34);
+  background: rgba(255, 114, 98, 0.14);
+}
+
+.stats-skeleton {
+  display: inline-flex;
+  width: 100%;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(109, 232, 255, 0.06) 0%,
+      rgba(149, 205, 255, 0.16) 50%,
+      rgba(109, 232, 255, 0.06) 100%
+    );
+  background-size: 220% 100%;
+  animation: stats-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+.stats-skeleton-line {
+  height: 14px;
+}
+
+.stats-skeleton-short {
+  max-width: 72px;
+}
+
+.stats-skeleton-medium {
+  max-width: 112px;
+}
+
+@keyframes stats-skeleton-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 @media (min-width: 900px) {

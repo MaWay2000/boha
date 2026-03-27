@@ -15,6 +15,15 @@ const LOBBY_SNAPSHOT_URL = USE_REMOTE_LOBBY_MIRROR
   ? new URL("lobby-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
   : new URL("./stats/lobby-snapshot.json", window.location.href);
 const LOBBY_REFRESH_MS = 5 * 60_000;
+const LOBBY_SORT_DEFAULT = { key: "players", direction: "desc" };
+const LOBBY_SORT_DIRECTIONS = {
+  host: "asc",
+  players: "desc",
+  spectators: "desc",
+  status: "desc",
+  map: "asc",
+  title: "asc"
+};
 const SAMPLE_LOBBY = {
   motd: "Deploy alongside lobby endpoints to activate the live feed.",
   games: []
@@ -22,6 +31,9 @@ const SAMPLE_LOBBY = {
 let lobbyMirrorTimer = null;
 let lobbyUpdatedTimer = null;
 let lastLobbyUpdatedAt = null;
+let latestLobbySnapshot = null;
+let lobbySortState = { ...LOBBY_SORT_DEFAULT };
+const lobbySortHeaders = [...document.querySelectorAll("[data-sort-table=\"lobby\"][data-sort-key]")];
 
 function escapeHtml(value) {
   return String(value)
@@ -30,6 +42,102 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function compareNumberValues(left, right) {
+  return Number(left || 0) - Number(right || 0);
+}
+
+function compareTextValues(left, right) {
+  return String(left || "").localeCompare(String(right || ""), undefined, {
+    sensitivity: "base",
+    numeric: true
+  });
+}
+
+function applySortDirection(result, direction) {
+  return direction === "desc" ? -result : result;
+}
+
+function parseLobbyStateFromUrl() {
+  const url = new URL(window.location.href);
+  const [key, direction] = String(url.searchParams.get("lobbySort") || "").split(":");
+  if (key && key in LOBBY_SORT_DIRECTIONS) {
+    lobbySortState = {
+      key,
+      direction: direction === "asc" ? "asc" : "desc"
+    };
+  } else {
+    lobbySortState = { ...LOBBY_SORT_DEFAULT };
+  }
+  updateLobbySortIndicators();
+}
+
+function syncLobbyStateToUrl() {
+  const url = new URL(window.location.href);
+  if (
+    lobbySortState.key === LOBBY_SORT_DEFAULT.key
+    && lobbySortState.direction === LOBBY_SORT_DEFAULT.direction
+  ) {
+    url.searchParams.delete("lobbySort");
+  } else {
+    url.searchParams.set("lobbySort", `${lobbySortState.key}:${lobbySortState.direction}`);
+  }
+
+  window.history.replaceState({ search: url.search }, "", url);
+  window.bohaEmbeddedPage?.postState(url.search);
+}
+
+function updateLobbySortIndicators() {
+  lobbySortHeaders.forEach((header) => {
+    const isActive = lobbySortState.key === header.dataset.sortKey;
+    header.setAttribute("aria-sort", isActive
+      ? (lobbySortState.direction === "asc" ? "ascending" : "descending")
+      : "none");
+
+    const button = header.querySelector(".stats-sort-button");
+    if (!button) {
+      return;
+    }
+
+    button.classList.toggle("is-active", isActive);
+    button.dataset.direction = isActive ? lobbySortState.direction : "";
+  });
+}
+
+function setupLobbySortHeaders() {
+  lobbySortHeaders.forEach((header) => {
+    const button = header.querySelector(".stats-sort-button");
+    if (!button || button.dataset.sortBound === "true") {
+      return;
+    }
+
+    button.dataset.sortBound = "true";
+    button.addEventListener("click", () => {
+      const key = header.dataset.sortKey;
+      if (!key) {
+        return;
+      }
+
+      lobbySortState = lobbySortState.key === key
+        ? { key, direction: lobbySortState.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: LOBBY_SORT_DIRECTIONS[key] || "asc" };
+
+      updateLobbySortIndicators();
+      if (latestLobbySnapshot) {
+        renderLobby(latestLobbySnapshot);
+      }
+    });
+  });
+
+  updateLobbySortIndicators();
+}
+
+function renderLobbyLoadingState() {
+  lobbyCaption.textContent = "Connecting to lobby feed...";
+  lobbyBadge.textContent = "Loading";
+  lobbyBadge.classList.remove("is-live");
+  setLobbyUpdatedAt(null);
 }
 
 function revealOnScroll() {
@@ -154,16 +262,64 @@ function formatLobbyStatus(status) {
   return value ? value.charAt(0).toUpperCase() + value.slice(1) : "Unknown";
 }
 
+function getLobbyStatusOrder(status) {
+  switch (String(status || "").toLowerCase()) {
+    case "started":
+      return 4;
+    case "waiting":
+      return 3;
+    case "empty":
+      return 2;
+    case "completed":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function compareLobbyGames(left, right) {
+  let result = 0;
+
+  switch (lobbySortState.key) {
+    case "host":
+      result = compareTextValues(left.host_name || left.host2, right.host_name || right.host2)
+        || compareNumberValues(left.game_id, right.game_id);
+      break;
+    case "spectators":
+      result = compareNumberValues(left.current_spectators || 0, right.current_spectators || 0)
+        || compareNumberValues(left.current_players || 0, right.current_players || 0);
+      break;
+    case "status":
+      result = compareNumberValues(getLobbyStatusOrder(left.status), getLobbyStatusOrder(right.status))
+        || compareNumberValues(left.current_players || 0, right.current_players || 0);
+      break;
+    case "map":
+      result = compareTextValues(left.map_name, right.map_name)
+        || compareNumberValues(left.current_players || 0, right.current_players || 0);
+      break;
+    case "title":
+      result = compareTextValues(left.name, right.name)
+        || compareNumberValues(left.current_players || 0, right.current_players || 0);
+      break;
+    case "players":
+    default:
+      result = compareNumberValues(left.current_players || 0, right.current_players || 0)
+        || compareTextValues(left.host_name || left.host2, right.host_name || right.host2)
+        || compareNumberValues(left.game_id, right.game_id);
+      break;
+  }
+
+  return applySortDirection(result, lobbySortState.direction);
+}
+
 function renderLobby(lobby) {
-  const games = [...(lobby.games || [])].sort(
-    (a, b) =>
-      1000000 * ((b.current_players || 0) - (a.current_players || 0)) +
-      1000 * ((b.host2 || "") < (a.host2 || "") ? 1 : (b.host2 || "") > (a.host2 || "") ? -1 : 0) +
-      ((b.game_id || 0) - (a.game_id || 0))
-  );
+  latestLobbySnapshot = lobby;
+  const games = [...(lobby.games || [])].sort(compareLobbyGames);
 
   lobbyCaption.textContent = lobby.motd || "Warzone 2100 lobby";
   updateLobbyStats(games);
+  updateLobbySortIndicators();
+  syncLobbyStateToUrl();
 
   if (!games.length) {
     lobbyGames.innerHTML = `
@@ -319,6 +475,15 @@ function setupCopyButtons() {
 }
 
 revealOnScroll();
-renderLobby(SAMPLE_LOBBY);
+parseLobbyStateFromUrl();
+setupLobbySortHeaders();
+renderLobbyLoadingState();
 setupCopyButtons();
 connectLobbyStream();
+
+window.addEventListener("popstate", () => {
+  parseLobbyStateFromUrl();
+  if (latestLobbySnapshot) {
+    renderLobby(latestLobbySnapshot);
+  }
+});

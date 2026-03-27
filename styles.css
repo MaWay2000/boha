@@ -1523,6 +1523,23 @@ main {
   margin-left: 6px;
 }
 
+.stats-player-games-panel .stats-team-grid {
+  gap: 6px;
+}
+
+.stats-player-games-panel .stats-team-tile {
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+}
+
+.stats-player-games-panel .stats-team-strength {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 0.74rem;
+}
+
 .stats-player-game-row {
   cursor: pointer;
 }

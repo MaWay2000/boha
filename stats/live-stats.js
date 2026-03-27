@@ -624,18 +624,20 @@ function renderMatchup(game, options = {}) {
           const strengthPercent = teamStrengths[index];
           return `
           <div class="stats-team-grid">
-            ${team.players
-              .map((player) => {
-                const isHighlighted = highlightedAccountKey
-                  && player.account
-                  && getAccountExpandKey(player.account) === highlightedAccountKey;
-                return `
-                <span class="stats-team-tile ${getTeamToneClass(team.userType)}${isHighlighted ? " is-current-player" : ""}">
-                  ${renderPlayerLabel(player)}
-                </span>
-              `;
-              })
-              .join("")}
+            <div class="stats-team-tiles">
+              ${team.players
+                .map((player) => {
+                  const isHighlighted = highlightedAccountKey
+                    && player.account
+                    && getAccountExpandKey(player.account) === highlightedAccountKey;
+                  return `
+                  <span class="stats-team-tile ${getTeamToneClass(team.userType)}${isHighlighted ? " is-current-player" : ""}">
+                    ${renderPlayerLabel(player)}
+                  </span>
+                `;
+                })
+                .join("")}
+            </div>
             <span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>

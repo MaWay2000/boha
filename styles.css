@@ -1549,6 +1549,12 @@ main {
 }
 
 .stats-team-grid {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.stats-team-tiles {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1568,7 +1574,7 @@ main {
   font-size: 0.78rem;
   line-height: 1.2;
   opacity: 0.9;
-  margin-left: auto;
+  justify-self: end;
 }
 
 .stats-team-strength-stronger {

@@ -1558,6 +1558,7 @@ main {
 .stats-team-strength {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 32px;
   padding: 6px 10px;
   border-radius: 10px;
@@ -1567,6 +1568,7 @@ main {
   font-size: 0.78rem;
   line-height: 1.2;
   opacity: 0.9;
+  margin-left: auto;
 }
 
 .stats-team-strength-stronger {

@@ -637,7 +637,7 @@ function renderMatchup(game, options = {}) {
               })
               .join("")}
             <span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
-              Team strength: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
+              Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>
           </div>
         `;

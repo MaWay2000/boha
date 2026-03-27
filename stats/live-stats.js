@@ -15,6 +15,7 @@ const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
 const MATCH_LIMIT = 12;
+const PLAYER_GAME_LIMIT = 10;
 const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
 const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
@@ -24,6 +25,9 @@ const summaryElement = document.getElementById("statsSummary");
 const buttonsElement = document.getElementById("statsLeaderboardButtons");
 const ranksElement = document.getElementById("statsRanks");
 const rankActionsElement = document.getElementById("statsRanksActions");
+const playerGamesTitleElement = document.getElementById("statsPlayerGamesTitle");
+const playerGamesMetaElement = document.getElementById("statsPlayerGamesMeta");
+const playerGamesElement = document.getElementById("statsPlayerGames");
 const playerSearchElement = document.getElementById("statsPlayerSearch");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
@@ -47,6 +51,7 @@ let leaderboardGameCounts = new Map();
 let statusRefreshTimer = null;
 let lastStatsUpdateAt = 0;
 let expandedAccounts = new Set();
+let activeExpandedAccountKey = null;
 
 function createRuntime() {
   return {
@@ -382,6 +387,84 @@ function getAccountExpandKey(account) {
   return `name:${account.name || "unknown"}:${account.games.length}:${account.winCount}:${account.loseCount}:${account.drawCount}`;
 }
 
+function getPlayerGameOutcome(game, account) {
+  const slot = game.players.find((playerSlot) => playerSlot.account === account)
+    || (game.slots || []).find((playerSlot) => playerSlot.account === account);
+
+  switch (slot?.userType) {
+    case "winner":
+      return { label: "Won", className: "is-win" };
+    case "loser":
+      return { label: "Lost", className: "is-loss" };
+    case "contender":
+      return { label: "Draw", className: "is-draw" };
+    default:
+      return { label: "Played", className: "is-neutral" };
+  }
+}
+
+function renderPlayerGames(accounts) {
+  if (!playerGamesElement || !playerGamesTitleElement || !playerGamesMetaElement) {
+    return;
+  }
+
+  const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
+  if (!activeAccount) {
+    activeExpandedAccountKey = null;
+    expandedAccounts.clear();
+    playerGamesTitleElement.textContent = "Expand a player to inspect recent games";
+    playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
+    playerGamesElement.innerHTML = `
+      <tr class="stats-empty-row">
+        <td colspan="5">Use + on a player to show their latest games here.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  const latestGames = [...activeAccount.games]
+    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0))
+    .slice(0, PLAYER_GAME_LIMIT);
+
+  playerGamesTitleElement.textContent = `${activeAccount.name || "Player"} recent games`;
+  playerGamesMetaElement.textContent = `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
+
+  if (!latestGames.length) {
+    playerGamesElement.innerHTML = `
+      <tr class="stats-empty-row">
+        <td colspan="5">No recent games found for this player in the selected slice.</td>
+      </tr>
+    `;
+    return;
+  }
+
+  playerGamesElement.innerHTML = latestGames
+    .map((game) => {
+      const outcome = getPlayerGameOutcome(game, activeAccount);
+      const replayUrl = game.replayUrl ? normalizeReplayUrl(game.replayUrl) : "";
+      return `
+        <tr>
+          <td class="stats-date">
+            ${escapeHtml(formatMatchDate(game.endDate))}
+            <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
+          </td>
+          <td>
+            ${escapeHtml(game.mapName)}
+            ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
+          </td>
+          <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span></td>
+          <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
+          <td>
+            ${replayUrl
+              ? `<a class="stats-replay-link" href="${escapeHtml(replayUrl)}" target="_blank" rel="noreferrer">Replay</a>`
+              : `<span class="stats-note">Unavailable</span>`}
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
 function renderMatchup(game) {
   const teams = game.teams.filter((team) => team.players.length);
   if (!teams.length) {
@@ -499,7 +582,7 @@ function renderSummary(accountList, gameList) {
 
 function renderRanks(accountList) {
   if (!ranksElement) {
-    return;
+    return [];
   }
 
   const eligibleAccounts = filterVisibleAccounts(accountList);
@@ -516,7 +599,7 @@ function renderRanks(accountList) {
       </tr>
     `;
     renderRankActions(eligibleAccounts.length, 0, searchQuery);
-    return;
+    return [];
   }
 
   ranksElement.innerHTML = rows
@@ -623,8 +706,10 @@ function renderRanks(accountList) {
 
       if (expandedAccounts.has(expandAccount)) {
         expandedAccounts.delete(expandAccount);
+        activeExpandedAccountKey = null;
       } else {
-        expandedAccounts.add(expandAccount);
+        expandedAccounts = new Set([expandAccount]);
+        activeExpandedAccountKey = expandAccount;
       }
 
       render();
@@ -632,6 +717,7 @@ function renderRanks(accountList) {
   });
 
   renderRankActions(eligibleAccounts.length, matchingRows.length, searchQuery);
+  return rows.map(({ account }) => account);
 }
 
 function renderRankActions(totalPlayers, matchingPlayers = totalPlayers, searchQuery = "") {
@@ -752,7 +838,7 @@ function render() {
     leaderboardGameCounts = new Map();
     renderButtons();
     renderSummary([], []);
-    renderRanks([]);
+    renderPlayerGames(renderRanks([]));
     renderMatches([]);
     return;
   }
@@ -788,7 +874,7 @@ function render() {
   updateStatusText(resultsData.results);
   renderButtons();
   renderSummary(accountList, gameList);
-  renderRanks(accountList);
+  renderPlayerGames(renderRanks(accountList));
   renderMatches(gameList);
 }
 

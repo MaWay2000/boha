@@ -90,6 +90,35 @@
             </div>
             <div class="stats-panel-actions" id="statsRanksActions"></div>
           </section>
+
+          <section class="stats-panel stats-player-games-panel">
+            <div class="stats-panel-head">
+              <div>
+                <p class="panel-kicker">Player Games</p>
+                <h4 id="statsPlayerGamesTitle">Expand a player to inspect recent games</h4>
+              </div>
+              <span class="stats-panel-note" id="statsPlayerGamesMeta">The selected player's latest matches will appear here.</span>
+            </div>
+
+            <div class="stats-table-wrap">
+              <table class="stats-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Map</th>
+                    <th>Result</th>
+                    <th>Duration</th>
+                    <th>Replay</th>
+                  </tr>
+                </thead>
+                <tbody id="statsPlayerGames">
+                  <tr class="stats-empty-row">
+                    <td colspan="5">Use + on a player to show their latest games here.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
         </div>
       </section>
     </main>

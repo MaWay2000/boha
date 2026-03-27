@@ -1500,6 +1500,25 @@ main {
   font-size: 0.82rem;
 }
 
+.stats-player-games-panel .stats-panel-head {
+  align-items: start;
+}
+
+.stats-player-game-result.is-win {
+  color: #dffae0;
+  background: rgba(141, 233, 142, 0.12);
+}
+
+.stats-player-game-result.is-loss {
+  color: #ffd3ce;
+  background: rgba(255, 114, 98, 0.12);
+}
+
+.stats-player-game-result.is-draw {
+  color: #fff0c2;
+  background: rgba(255, 198, 96, 0.12);
+}
+
 .stats-replay-link {
   color: var(--cyan);
 }

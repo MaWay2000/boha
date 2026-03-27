@@ -414,29 +414,8 @@ function getPlayerGameKey(game) {
 }
 
 function renderPlayerGameDetails(game, outcome) {
-  const detailItems = [
-    ["Played", formatDate(game.endDate)],
-    ["Map", game.mapName || "Unknown"],
-    ["Mode", formatAlliance(game)],
-    ["Result", outcome.label]
-  ];
-
-  if (game.mods) {
-    detailItems.push(["Rules", game.mods]);
-  }
-
   return `
     <div class="stats-player-game-detail-panel">
-      <div class="stats-player-game-meta">
-        ${detailItems
-          .map(([label, value]) => `
-            <div class="stats-player-game-meta-item">
-              <span class="stats-player-game-meta-label">${escapeHtml(label)}</span>
-              <strong class="stats-player-game-meta-value">${escapeHtml(value)}</strong>
-            </div>
-          `)
-          .join("")}
-      </div>
       <div class="stats-detail-group">
         <span class="stats-detail-label">Players</span>
         <div class="stats-matchup">

@@ -1533,7 +1533,7 @@ main {
 .stats-player-game-detail-panel {
   display: grid;
   gap: 10px;
-  padding: 0 12px 18px;
+  padding: 0 12px 12px;
 }
 
 .stats-player-game-detail-panel .stats-matchup {

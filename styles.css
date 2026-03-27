@@ -1583,7 +1583,12 @@ main {
 
 .stats-team-tile.is-current-player {
   font-weight: 800;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+  color: #f7feff;
+  background: linear-gradient(135deg, rgba(109, 232, 255, 0.34), rgba(109, 232, 255, 0.18));
+  border-color: rgba(109, 232, 255, 0.5);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(109, 232, 255, 0.14);
 }
 
 .stats-player-game-result.is-win {

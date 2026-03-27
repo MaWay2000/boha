@@ -1513,6 +1513,16 @@ main {
   align-items: start;
 }
 
+.stats-player-games-panel .stats-date {
+  white-space: nowrap;
+}
+
+.stats-player-games-panel .stats-date-time {
+  display: inline;
+  margin-top: 0;
+  margin-left: 6px;
+}
+
 .stats-player-game-row {
   cursor: pointer;
 }

@@ -44,6 +44,7 @@ let playerSearchQuery = "";
 let leaderboardGameCounts = new Map();
 let statusRefreshTimer = null;
 let lastStatsUpdateAt = 0;
+let expandedAccounts = new Set();
 
 function createRuntime() {
   return {
@@ -331,6 +332,19 @@ function getSortedAccountNames(account) {
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
 }
 
+function getAccountExpandKey(account) {
+  if (account.mainPublicKey) {
+    return `main:${account.mainPublicKey}`;
+  }
+
+  const publicKeys = [...account.publicKeys].sort();
+  if (publicKeys.length) {
+    return `keys:${publicKeys.join("|")}`;
+  }
+
+  return `name:${account.name || "unknown"}:${account.games.length}:${account.winCount}:${account.loseCount}:${account.drawCount}`;
+}
+
 function renderMatchup(game) {
   const teams = game.teams.filter((team) => team.players.length);
   if (!teams.length) {
@@ -477,6 +491,13 @@ function renderRanks(accountList) {
       const keyCountLabel = `${publicKeys.length} key(s) tracked`;
       const playerLine = escapeHtml(account.name || "Unknown");
       const hasDetails = Boolean(publicKeys.length || accountNames.length > 1);
+      const expandKey = getAccountExpandKey(account);
+      const isExpanded = hasDetails && expandedAccounts.has(expandKey);
+      const expandLabel = isExpanded
+        ? "Hide player names and keys"
+        : accountNames.length > 1
+          ? "Show player names and keys"
+          : keyCountLabel;
       const nameDetails = accountNames.length > 1
         ? `
             <div class="stats-detail-group">
@@ -508,17 +529,18 @@ function renderRanks(accountList) {
         : "";
       const playerDetails = hasDetails
         ? `
-            <details class="stats-key-details">
-              <summary class="stats-player-line stats-key-summary">
-                <span class="stats-player-label">${playerLine}</span>
-                <span class="stats-key-toggle" aria-hidden="true"></span>
-                <span class="visually-hidden">${escapeHtml(accountNames.length ? "Show player names and keys" : keyCountLabel)}</span>
-              </summary>
-              <div class="stats-key-panel">
-                ${nameDetails}
-                ${keyDetails}
-              </div>
-            </details>
+            <div class="stats-player-line">
+              <span class="stats-player-label">${playerLine}</span>
+              <button
+                class="stats-expand-toggle"
+                type="button"
+                data-expand-account="${escapeHtml(expandKey)}"
+                aria-expanded="${isExpanded ? "true" : "false"}"
+              >
+                <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
+                <span class="visually-hidden">${escapeHtml(expandLabel)}</span>
+              </button>
+            </div>
           `
         : `
             <div class="stats-player-line">
@@ -526,8 +548,22 @@ function renderRanks(accountList) {
               <span class="stats-player-note">${escapeHtml(note)}</span>
             </div>
           `;
+      const detailRow = hasDetails && isExpanded
+        ? `
+            <tr class="stats-detail-row">
+              <td colspan="5">
+                <div class="stats-detail-panel">
+                  <div class="stats-key-panel">
+                    ${nameDetails}
+                    ${keyDetails}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          `
+        : "";
       return `
-        <tr>
+        <tr class="stats-rank-row${isExpanded ? " is-expanded" : ""}">
           <td class="stats-rank">${rank}</td>
           <td class="stats-player-name">
             ${playerDetails}
@@ -536,9 +572,27 @@ function renderRanks(accountList) {
           <td>${account.games.length}</td>
           <td class="stats-record">${account.winCount}/${account.loseCount}/${account.drawCount}</td>
         </tr>
+        ${detailRow}
       `;
     })
     .join("");
+
+  ranksElement.querySelectorAll(".stats-expand-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const { expandAccount } = button.dataset;
+      if (!expandAccount) {
+        return;
+      }
+
+      if (expandedAccounts.has(expandAccount)) {
+        expandedAccounts.delete(expandAccount);
+      } else {
+        expandedAccounts.add(expandAccount);
+      }
+
+      render();
+    });
+  });
 
   renderRankActions(eligibleAccounts.length, matchingRows.length, searchQuery);
 }

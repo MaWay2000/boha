@@ -1561,10 +1561,36 @@ main {
   min-height: 32px;
   padding: 6px 10px;
   border-radius: 10px;
-  border: 1px dashed currentColor;
+  border: 1px dashed rgba(149, 205, 255, 0.24);
+  color: var(--steel);
+  background: rgba(109, 232, 255, 0.06);
   font-size: 0.78rem;
   line-height: 1.2;
   opacity: 0.9;
+}
+
+.stats-team-strength-stronger {
+  color: #e7ffe7;
+  border-color: rgba(141, 233, 142, 0.4);
+  background: rgba(141, 233, 142, 0.18);
+}
+
+.stats-team-strength-lower {
+  color: #ffd6d0;
+  border-color: rgba(255, 114, 98, 0.38);
+  background: rgba(255, 114, 98, 0.16);
+}
+
+.stats-team-strength-middle {
+  color: #fff0c2;
+  border-color: rgba(255, 198, 96, 0.34);
+  background: rgba(255, 198, 96, 0.14);
+}
+
+.stats-team-strength-neutral {
+  color: var(--steel);
+  border-color: rgba(149, 205, 255, 0.24);
+  background: rgba(109, 232, 255, 0.06);
 }
 
 .stats-team-tile {

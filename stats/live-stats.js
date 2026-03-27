@@ -413,10 +413,10 @@ function getNumericGlobalRank(account) {
   return Number.isFinite(rank) ? rank : null;
 }
 
-function getTeamStrengthLabel(team) {
+function getTeamStrengthPercent(team) {
   const totalRankedPlayers = globalRankMap.size;
   if (!totalRankedPlayers || !team.players.length) {
-    return "N/A";
+    return null;
   }
 
   const strengthScore = team.players.reduce((total, player) => {
@@ -428,7 +428,34 @@ function getTeamStrengthLabel(team) {
     return total + ((totalRankedPlayers - rank + 1) / totalRankedPlayers);
   }, 0);
 
-  return `${Math.round((strengthScore / team.players.length) * 100)}%`;
+  return Math.round((strengthScore / team.players.length) * 100);
+}
+
+function getTeamStrengthToneClass(strengthPercent, allStrengths) {
+  if (!Number.isFinite(strengthPercent)) {
+    return "stats-team-strength-neutral";
+  }
+
+  const validStrengths = allStrengths.filter((value) => Number.isFinite(value));
+  if (!validStrengths.length) {
+    return "stats-team-strength-neutral";
+  }
+
+  const strongest = Math.max(...validStrengths);
+  const weakest = Math.min(...validStrengths);
+  if (strongest === weakest) {
+    return "stats-team-strength-neutral";
+  }
+
+  if (strengthPercent === strongest) {
+    return "stats-team-strength-stronger";
+  }
+
+  if (strengthPercent === weakest) {
+    return "stats-team-strength-lower";
+  }
+
+  return "stats-team-strength-middle";
 }
 
 function getPlayerGameOutcome(game, account) {
@@ -582,6 +609,7 @@ function renderMatchup(game, options = {}) {
   if (!teams.length) {
     return `<span class="stats-note">Player list unavailable.</span>`;
   }
+  const teamStrengths = teams.map((team) => getTeamStrengthPercent(team));
 
   const renderPlayerLabel = (player) => {
     const playerName = player.account?.name || "Unknown";
@@ -592,7 +620,9 @@ function renderMatchup(game, options = {}) {
   if (variant === "tiles") {
     return `
       <div class="stats-matchup-list stats-matchup-list-tiles">
-        ${teams.map((team) => `
+        ${teams.map((team, index) => {
+          const strengthPercent = teamStrengths[index];
+          return `
           <div class="stats-team-grid">
             ${team.players
               .map((player) => {
@@ -606,11 +636,12 @@ function renderMatchup(game, options = {}) {
               `;
               })
               .join("")}
-            <span class="stats-team-strength ${getTeamToneClass(team.userType)}">
-              Team strength: ${escapeHtml(getTeamStrengthLabel(team))}
+            <span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
+              Team strength: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>
           </div>
-        `).join("")}
+        `;
+        }).join("")}
       </div>
     `;
   }

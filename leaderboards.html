@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warzone 2100 Leaderboards</title>
+  <meta
+    name="description"
+    content="Warzone 2100 leaderboard snapshot with top players, live mirror updates, and recent match history."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="embedded-page">
+  <div class="page-shell">
+    <main id="top">
+      <section class="landing-stats stats-shell section-frame" id="leaderboards">
+        <div class="stats-shell-head">
+          <div>
+            <p class="panel-kicker">Embedded Stats</p>
+            <h3>Leaderboard snapshot and match history</h3>
+          </div>
+          <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
+        </div>
+
+        <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+
+        <div class="stats-summary" id="statsSummary">
+          <article class="stats-card">
+            <span class="stats-card-label">Ranked Players</span>
+            <strong class="stats-card-value">--</strong>
+          </article>
+          <article class="stats-card">
+            <span class="stats-card-label">Matches</span>
+            <strong class="stats-card-value">--</strong>
+          </article>
+          <article class="stats-card">
+            <span class="stats-card-label">Top Elo</span>
+            <strong class="stats-card-value">--</strong>
+          </article>
+          <article class="stats-card">
+            <span class="stats-card-label">Latest Match</span>
+            <strong class="stats-card-value">--</strong>
+          </article>
+        </div>
+
+        <div class="stats-grid">
+          <section class="stats-panel">
+            <div class="stats-panel-head">
+              <div class="stats-panel-copy">
+                <p class="panel-kicker">Top Players</p>
+                <h4>Current leaderboard slice</h4>
+              </div>
+              <label class="stats-search-field" for="statsPlayerSearch">
+                <span class="visually-hidden">Search top players by nickname or key</span>
+                <input
+                  id="statsPlayerSearch"
+                  class="stats-search-input"
+                  type="search"
+                  placeholder="Nickname / key"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+              </label>
+            </div>
+
+            <div class="stats-table-wrap">
+              <table class="stats-table stats-table-ranks">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Elo</th>
+                    <th>Matches</th>
+                    <th>W/L/D</th>
+                  </tr>
+                </thead>
+                <tbody id="statsRanks">
+                  <tr class="stats-empty-row">
+                    <td colspan="5">Stats are still loading.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="stats-panel-actions" id="statsRanksActions"></div>
+          </section>
+
+          <section class="stats-panel">
+            <div class="stats-panel-head">
+              <div>
+                <p class="panel-kicker">Recent Matches</p>
+                <h4>Latest games in the selected slice</h4>
+              </div>
+            </div>
+
+            <div class="stats-table-wrap">
+              <table class="stats-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Map</th>
+                    <th>Players</th>
+                    <th>Duration</th>
+                    <th>Replay</th>
+                  </tr>
+                </thead>
+                <tbody id="statsMatches">
+                  <tr class="stats-empty-row">
+                    <td colspan="5">Waiting for match history.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="embedded-page.js"></script>
+  <script type="module" src="stats/live-stats.js"></script>
+</body>
+</html>

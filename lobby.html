@@ -17,37 +17,8 @@
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="embedded-page">
   <div class="page-shell">
-    <div class="page-noise" aria-hidden="true"></div>
-
-    <div class="masthead-band">
-      <header class="topbar">
-        <a class="brand" href="index.html#top" aria-label="Warzone 2100 Game Hub">
-          <img src="assets/warzone2100-gamehub-logo.png" alt="Warzone 2100 logo">
-        </a>
-
-        <nav class="topnav" aria-label="Primary">
-          <a href="index.html#leaderboards">Leaderboards</a>
-          <a href="recent-matches.html">Recent Matches</a>
-          <a href="lobby.html" aria-current="page">Lobby</a>
-          <a href="index.html#opendata">Open Data</a>
-        </nav>
-
-        <a class="discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer">
-          Discord Server
-        </a>
-
-        <div class="topbar-radio" aria-label="Warzone Radio">
-          <iframe
-            src="https://maway2000.github.io/warzone2100-radio/"
-            title="Warzone Radio"
-            loading="lazy"
-          ></iframe>
-        </div>
-      </header>
-    </div>
-
     <main id="top">
       <section class="section-grid lobby-page">
         <div class="live-board section-frame" data-reveal>
@@ -84,12 +55,9 @@
         </div>
       </section>
     </main>
-
-    <footer class="site-footer">
-      <p><a href="https://mit-license.org/" target="_blank" rel="noreferrer">MIT License</a>. Warzone 2100 - webstats viewer by Maway2000</p>
-    </footer>
   </div>
 
+  <script src="embedded-page.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

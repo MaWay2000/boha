@@ -243,6 +243,42 @@ code {
   color: var(--text);
 }
 
+.frame-shell-main {
+  display: block;
+}
+
+.content-frame {
+  display: block;
+  width: 100%;
+  min-height: 720px;
+  border: 0;
+  background: transparent;
+}
+
+.embedded-page {
+  min-height: auto;
+  background: transparent;
+  overflow-x: hidden;
+}
+
+.embedded-page::before {
+  display: none;
+}
+
+.embedded-page .page-shell {
+  padding: 0 0 12px;
+}
+
+.embedded-page .page-noise,
+.embedded-page .masthead-band,
+.embedded-page .site-footer {
+  display: none;
+}
+
+.embedded-page main {
+  gap: 24px;
+}
+
 .discord-link {
   justify-self: start;
   padding: 13px 22px;
@@ -1614,6 +1650,10 @@ main {
 
   .landing-stats .stats-shell-head {
     grid-template-columns: 1fr;
+  }
+
+  .content-frame {
+    min-height: 640px;
   }
 }
 

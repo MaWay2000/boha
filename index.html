@@ -6,7 +6,7 @@
   <title>Warzone 2100 Game Hub</title>
   <meta
     name="description"
-    content="A remade Warzone 2100 webstats viewer with leaderboard snapshots, open data access, and the Warzone Radio player."
+    content="A remade Warzone 2100 webstats viewer with leaderboard snapshots, recent matches, open data access, and the Warzone Radio player."
   >
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,15 +23,15 @@
 
     <div class="masthead-band">
       <header class="topbar">
-        <a class="brand" href="#top" aria-label="Warzone 2100 Game Hub">
+        <a class="brand" href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-label="Warzone 2100 Game Hub">
           <img src="assets/warzone2100-gamehub-logo.png" alt="Warzone 2100 logo">
         </a>
 
         <nav class="topnav" aria-label="Primary">
-          <a href="#leaderboards">Leaderboards</a>
-          <a href="recent-matches.html">Recent Matches</a>
-          <a href="lobby.html">Lobby</a>
-          <a href="#opendata">Open Data</a>
+          <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
+          <a href="recent-matches.html" target="contentFrame" data-tab="recent-matches">Recent Matches</a>
+          <a href="lobby.html" target="contentFrame" data-tab="lobby">Lobby</a>
+          <a href="open-data.html" target="contentFrame" data-tab="open-data">Open Data</a>
         </nav>
 
         <a class="discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer">
@@ -48,150 +48,15 @@
       </header>
     </div>
 
-    <main id="top">
-      <section class="landing-stats stats-shell section-frame" id="leaderboards">
-        <div class="stats-shell-head">
-          <div>
-            <p class="panel-kicker">Embedded Stats</p>
-            <h3>Leaderboard snapshot and match history</h3>
-          </div>
-          <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
-        </div>
-
-        <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
-
-        <div class="stats-summary" id="statsSummary">
-          <article class="stats-card">
-            <span class="stats-card-label">Ranked Players</span>
-            <strong class="stats-card-value">--</strong>
-          </article>
-          <article class="stats-card">
-            <span class="stats-card-label">Matches</span>
-            <strong class="stats-card-value">--</strong>
-          </article>
-          <article class="stats-card">
-            <span class="stats-card-label">Top Elo</span>
-            <strong class="stats-card-value">--</strong>
-          </article>
-          <article class="stats-card">
-            <span class="stats-card-label">Latest Match</span>
-            <strong class="stats-card-value">--</strong>
-          </article>
-        </div>
-
-        <div class="stats-grid">
-          <section class="stats-panel">
-            <div class="stats-panel-head">
-              <div class="stats-panel-copy">
-                <p class="panel-kicker">Top Players</p>
-                <h4>Current leaderboard slice</h4>
-              </div>
-              <label class="stats-search-field" for="statsPlayerSearch">
-                <span class="visually-hidden">Search top players by nickname or key</span>
-                <input
-                  id="statsPlayerSearch"
-                  class="stats-search-input"
-                  type="search"
-                  placeholder="Nickname / key"
-                  autocomplete="off"
-                  spellcheck="false"
-                >
-              </label>
-            </div>
-
-            <div class="stats-table-wrap">
-              <table class="stats-table stats-table-ranks">
-                <thead>
-                  <tr>
-                    <th>Rank</th>
-                    <th>Player</th>
-                    <th>Elo</th>
-                    <th>Matches</th>
-                    <th>W/L/D</th>
-                  </tr>
-                </thead>
-                <tbody id="statsRanks">
-                  <tr class="stats-empty-row">
-                    <td colspan="5">Stats are still loading.</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="stats-panel-actions" id="statsRanksActions"></div>
-          </section>
-
-          <section class="stats-panel">
-            <div class="stats-panel-head">
-              <div>
-                <p class="panel-kicker">Recent Matches</p>
-                <h4>Latest games in the selected slice</h4>
-              </div>
-            </div>
-
-            <div class="stats-table-wrap">
-              <table class="stats-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Map</th>
-                      <th>Players</th>
-                      <th>Duration</th>
-                      <th>Replay</th>
-                    </tr>
-                  </thead>
-                  <tbody id="statsMatches">
-                    <tr class="stats-empty-row">
-                      <td colspan="5">Waiting for match history.</td>
-                    </tr>
-                  </tbody>
-                </table>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section class="section-grid" id="opendata">
-        <div class="section-head" data-reveal>
-          <p class="eyebrow">Open Data</p>
-          <h2>The raw material stays public.</h2>
-          <p>
-            The original hub was explicit about open access to data, replays, and reproducible
-            rankings. That principle stays intact here.
-          </p>
-        </div>
-
-        <div class="open-data-grid" data-reveal>
-          <article class="data-card">
-            <h3>What is published</h3>
-            <ul class="stack-list">
-              <li>Replay files for independent verification.</li>
-              <li>Leaderboard categories derived from the public dataset.</li>
-              <li>Live lobby state as browser, text, JSON, and stream views.</li>
-            </ul>
-          </article>
-
-          <article class="data-card">
-            <h3>Data source notes</h3>
-            <ul class="stack-list">
-              <li>This site's own collected results and replays remain the baseline source.</li>
-              <li>The legacy page noted that other external result sources became unavailable or blocked.</li>
-              <li>The direct <code>results.json</code> route is currently unstable, so the remake favors working entry points.</li>
-              <li>The remake keeps those constraints visible without burying them in long paragraphs.</li>
-            </ul>
-          </article>
-
-          <article class="data-card">
-            <h3>Direct routes</h3>
-            <div class="link-stack">
-              <a href="https://warzone2100.retropaganda.info/lobby.html">lobby.html</a>
-              <a href="https://warzone2100.retropaganda.info/replays/">replays/</a>
-              <a href="https://warzone2100.retropaganda.info/lobby.json">lobby.json</a>
-              <a href="https://warzone2100.retropaganda.info/lobby.http-event-stream.json">lobby.http-event-stream.json</a>
-            </div>
-          </article>
-        </div>
-      </section>
-
+    <main class="frame-shell-main" id="top">
+      <iframe
+        class="content-frame"
+        id="contentFrame"
+        name="contentFrame"
+        title="Warzone 2100 content"
+        src="leaderboards.html"
+        loading="eager"
+      ></iframe>
     </main>
 
     <footer class="site-footer">
@@ -199,6 +64,6 @@
     </footer>
   </div>
 
-  <script type="module" src="stats/live-stats.js"></script>
+  <script src="shell-frame.js"></script>
 </body>
 </html>

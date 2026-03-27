@@ -659,7 +659,7 @@ function renderMatches(gameList) {
   if (!rows.length) {
     matchesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="6">No matches found for this slice.</td>
+        <td colspan="5">No matches found for this slice.</td>
       </tr>
     `;
     return;
@@ -678,7 +678,6 @@ function renderMatches(gameList) {
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
           </td>
           <td class="stats-matchup">${renderMatchup(game)}</td>
-          <td><span class="stats-tag">${escapeHtml(formatAlliance(game))}</span></td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td><a class="stats-replay-link" href="${escapeHtml(normalizeReplayUrl(game.replayUrl))}" target="_blank" rel="noreferrer">Replay</a></td>
         </tr>

@@ -491,7 +491,9 @@ function renderPlayerGameDetails(game, activeAccount) {
           variant: "tiles",
           includeGlobalRank: true,
           showVersus: false,
-          highlightedAccountKey: activeAccount ? getAccountExpandKey(activeAccount) : ""
+          highlightedAccountKey: activeAccount ? getAccountExpandKey(activeAccount) : "",
+          clickablePlayerTiles: true,
+          currentGameKey: getPlayerGameKey(game)
         })}
       </div>
     </div>
@@ -518,9 +520,20 @@ function renderPlayerGames(accounts) {
     return;
   }
 
-  const latestGames = [...activeAccount.games]
-    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0))
-    .slice(0, PLAYER_GAME_LIMIT);
+  const sortedGames = [...activeAccount.games]
+    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0));
+  let latestGames = sortedGames.slice(0, PLAYER_GAME_LIMIT);
+
+  if (activeExpandedPlayerGameKey) {
+    const expandedGame = sortedGames.find((game) => getPlayerGameKey(game) === activeExpandedPlayerGameKey);
+    if (expandedGame && !latestGames.some((game) => getPlayerGameKey(game) === activeExpandedPlayerGameKey)) {
+      latestGames = [
+        expandedGame,
+        ...latestGames.filter((game) => getPlayerGameKey(game) !== activeExpandedPlayerGameKey)
+      ].slice(0, PLAYER_GAME_LIMIT);
+    }
+  }
+
   const latestGameKeys = new Set(latestGames.map(getPlayerGameKey));
 
   if (activeExpandedPlayerGameKey && !latestGameKeys.has(activeExpandedPlayerGameKey)) {
@@ -596,6 +609,42 @@ function renderPlayerGames(accounts) {
       renderPlayerGames(accounts);
     });
   });
+
+  playerGamesElement.querySelectorAll(".stats-team-tile[data-jump-account]").forEach((tile) => {
+    tile.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const { jumpAccount, jumpGame } = tile.dataset;
+      if (!jumpAccount) {
+        return;
+      }
+
+      const targetAccount = accounts.find((account) => getAccountExpandKey(account) === jumpAccount);
+      if (!targetAccount) {
+        return;
+      }
+
+      const searchQuery = normalizeSearchQuery(playerSearchQuery);
+      if (searchQuery && !matchesPlayerSearch(targetAccount, searchQuery)) {
+        playerSearchQuery = "";
+        if (playerSearchElement) {
+          playerSearchElement.value = "";
+        }
+      }
+
+      const eligibleAccounts = filterVisibleAccounts(accounts);
+      const targetIndex = eligibleAccounts.findIndex((account) => getAccountExpandKey(account) === jumpAccount);
+      if (targetIndex >= 0) {
+        visiblePlayerCount = Math.max(visiblePlayerCount, targetIndex + 1);
+      }
+
+      activeExpandedAccountKey = jumpAccount;
+      expandedAccounts = new Set([jumpAccount]);
+      activeExpandedPlayerGameKey = jumpGame || null;
+      render();
+    });
+  });
 }
 
 function renderMatchup(game, options = {}) {
@@ -603,7 +652,9 @@ function renderMatchup(game, options = {}) {
     variant = "chips",
     includeGlobalRank = false,
     showVersus = true,
-    highlightedAccountKey = ""
+    highlightedAccountKey = "",
+    clickablePlayerTiles = false,
+    currentGameKey = ""
   } = options;
   const teams = game.teams.filter((team) => team.players.length);
   if (!teams.length) {
@@ -629,10 +680,17 @@ function renderMatchup(game, options = {}) {
                 const isHighlighted = highlightedAccountKey
                   && player.account
                   && getAccountExpandKey(player.account) === highlightedAccountKey;
+                const jumpAccount = clickablePlayerTiles && player.account
+                  ? getAccountExpandKey(player.account)
+                  : "";
+                const tileTag = jumpAccount ? "button" : "span";
+                const tileAttrs = jumpAccount
+                  ? `type="button" data-jump-account="${escapeHtml(jumpAccount)}" data-jump-game="${escapeHtml(currentGameKey)}"`
+                  : "";
                 return `
-                <span class="stats-team-tile ${getTeamToneClass(team.userType)}${isHighlighted ? " is-current-player" : ""}">
+                <${tileTag} class="stats-team-tile ${getTeamToneClass(team.userType)}${isHighlighted ? " is-current-player" : ""}${jumpAccount ? " is-clickable-player" : ""}" ${tileAttrs}>
                   ${renderPlayerLabel(player)}
-                </span>
+                </${tileTag}>
               `;
               })
               .join("")}
@@ -1064,7 +1122,8 @@ function render() {
   updateStatusText(resultsData.results);
   renderButtons();
   renderSummary(accountList, gameList);
-  renderPlayerGames(renderRanks(accountList));
+  renderRanks(accountList);
+  renderPlayerGames(accountList);
   renderMatches(gameList);
 }
 

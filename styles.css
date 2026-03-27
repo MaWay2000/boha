@@ -1623,6 +1623,7 @@ main {
 }
 
 .stats-team-tile {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1630,10 +1631,20 @@ main {
   padding: 8px 12px;
   border-radius: 12px;
   border: 1px solid transparent;
+  font-family: inherit;
   font-size: 0.84rem;
   line-height: 1.1;
   text-align: center;
   overflow-wrap: anywhere;
+}
+
+.stats-team-tile.is-clickable-player {
+  cursor: pointer;
+}
+
+.stats-team-tile.is-clickable-player:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .stats-team-tile.is-current-player {

@@ -625,12 +625,9 @@ function renderPlayerGames(accounts) {
         return;
       }
 
-      const searchQuery = normalizeSearchQuery(playerSearchQuery);
-      if (searchQuery && !matchesPlayerSearch(targetAccount, searchQuery)) {
-        playerSearchQuery = "";
-        if (playerSearchElement) {
-          playerSearchElement.value = "";
-        }
+      playerSearchQuery = String(targetAccount.name || "");
+      if (playerSearchElement) {
+        playerSearchElement.value = playerSearchQuery;
       }
 
       const eligibleAccounts = filterVisibleAccounts(accounts);

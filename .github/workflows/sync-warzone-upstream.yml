@@ -40,6 +40,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add stats/calculate.js stats/leaderboards.js stats/upstream-results.js stats/player-public-keys.json stats/results-snapshot.json stats/lobby-snapshot.json stats/upstream-manifest.json
+          git add stats/calculate.js stats/leaderboards.js stats/upstream-results.js stats/player-public-keys.json stats/results-snapshot.json stats/upstream-manifest.json
           git commit -m "Sync upstream Warzone stats"
           git push

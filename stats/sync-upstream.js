@@ -6,7 +6,6 @@ const zlib = require("zlib");
 const STATS_DIR = __dirname;
 const UPSTREAM_ORIGIN = "https://warzone2100.retropaganda.info";
 const UPSTREAM_RESULTS_URL = `${UPSTREAM_ORIGIN}/results.json`;
-const UPSTREAM_LOBBY_URL = `${UPSTREAM_ORIGIN}/lobby.json`;
 const STATIC_SOURCES = [
   {
     sourceUrl: `${UPSTREAM_ORIGIN}/calculate.js`,
@@ -101,92 +100,6 @@ async function fetchResultsSnapshot() {
     : upstreamPayload;
 
   return `${JSON.stringify(normalizedPayload)}\n`;
-}
-
-function getStatusPriority(status) {
-  switch (String(status || "").toLowerCase()) {
-    case "started":
-      return 4;
-    case "waiting":
-      return 3;
-    case "empty":
-      return 2;
-    case "completed":
-      return 1;
-    default:
-      return 0;
-  }
-}
-
-function normalizeLobbyGames(games) {
-  const gamesByKey = new Map();
-  for (const game of Array.isArray(games) ? games : []) {
-    const status = String(game?.status || "").toLowerCase();
-    const hostAddress = String(game?.host_address || game?.host2 || "");
-    const hostPort = Number(game?.host_port || game?.game_id || 0);
-    const dedupeKey = `${hostAddress}:${hostPort}`;
-    const nextGame = {
-      ...game,
-      game_id: Number(game?.game_id || hostPort || 0),
-      host_address: hostAddress,
-      host_port: hostPort,
-      host_name: String(game?.host_name || game?.host2 || hostAddress),
-      host2: String(game?.host2 || hostAddress),
-      current_spectators: Number(game?.current_spectators || 0),
-      max_spectators: Number(game?.max_spectators || 0),
-      current_players: Number(game?.current_players || 0),
-      max_players: Number(game?.max_players || 0),
-      status,
-      map_name: String(game?.map_name || "-"),
-      name: String(game?.name || game?.host_name || hostAddress || "-")
-    };
-
-    const existingGame = gamesByKey.get(dedupeKey);
-    if (!existingGame || getStatusPriority(status) >= getStatusPriority(existingGame.status)) {
-      gamesByKey.set(dedupeKey, nextGame);
-    }
-  }
-
-  return [...gamesByKey.values()].filter(
-    (game) => !game.private_game && game.status !== "completed"
-  );
-}
-
-function normalizeLobbySnapshot(payload, syncedAt, sourceLastModified = "") {
-  const motd = String(payload?.motd || "Warzone 2100 lobby");
-  const motdLines = motd
-    .replace(/\r/g, "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  const games = normalizeLobbyGames(payload?.games);
-
-  return `${JSON.stringify({
-    sourceUrl: UPSTREAM_LOBBY_URL,
-    syncedAt,
-    sourceLastModified,
-    motd: motdLines[0] || "Warzone 2100 lobby",
-    motdLines,
-    gameCount: games.length,
-    games
-  })}\n`;
-}
-
-async function fetchLobbySnapshot() {
-  const response = await fetch(UPSTREAM_LOBBY_URL, {
-    headers: buildUpstreamHeaders("application/json, text/plain, */*")
-  });
-
-  if (!response.ok) {
-    throw new Error(`Unable to fetch lobby.json snapshot: HTTP ${response.status}`);
-  }
-
-  const syncedAt = new Date().toISOString();
-  return normalizeLobbySnapshot(
-    JSON.parse(await response.text()),
-    syncedAt,
-    String(response.headers.get("last-modified") || "")
-  );
 }
 
 function getSnapshotMetadata(snapshotText) {
@@ -303,26 +216,6 @@ async function main() {
     content: snapshotText
   };
 
-  let lobbySnapshotText = null;
-  try {
-    lobbySnapshotText = await fetchLobbySnapshot();
-  } catch (error) {
-    const existingLobbySnapshotPath = path.join(STATS_DIR, "lobby-snapshot.json");
-    const existingLobbySnapshot = readTextIfExists(existingLobbySnapshotPath);
-    if (!existingLobbySnapshot) {
-      throw error;
-    }
-
-    console.warn(`Unable to refresh lobby-snapshot.json, keeping existing copy. ${error.message}`);
-    lobbySnapshotText = existingLobbySnapshot;
-  }
-
-  rawFiles["lobby-snapshot.json"] = {
-    outputName: "lobby-snapshot.json",
-    sourceUrl: UPSTREAM_LOBBY_URL,
-    content: lobbySnapshotText
-  };
-
   const filesMetadata = {};
   for (const file of Object.values(rawFiles)) {
     const filePath = path.join(STATS_DIR, file.outputName);
@@ -335,12 +228,6 @@ async function main() {
 
     if (file.outputName === "results-snapshot.json") {
       Object.assign(filesMetadata[file.outputName], getSnapshotMetadata(file.content));
-    }
-    if (file.outputName === "lobby-snapshot.json") {
-      const lobbySnapshot = JSON.parse(file.content);
-      Object.assign(filesMetadata[file.outputName], {
-        gameCount: lobbySnapshot.games.length
-      });
     }
 
     writeTextIfChanged(filePath, file.content);

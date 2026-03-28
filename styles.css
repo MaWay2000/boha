@@ -1053,13 +1053,13 @@ main {
 .stats-record-sort-group {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .stats-record-sort-pair {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
 }
 
 .stats-record-sort-divider {
@@ -1069,7 +1069,7 @@ main {
 
 .stats-sort-button-percent {
   min-width: 0;
-  font-size: 0.82em;
+  font-size: 0.74em;
 }
 
 .stats-table tbody tr:hover {
@@ -1088,22 +1088,24 @@ main {
 
 .stats-table-ranks th:nth-child(2),
 .stats-table-ranks td:nth-child(2) {
+  width: 24ch;
+  max-width: 24ch;
   padding-left: 6px;
 }
 
 .stats-table-ranks th:nth-child(3),
 .stats-table-ranks td:nth-child(3) {
-  width: 150px;
+  width: 134px;
 }
 
 .stats-table-ranks th:nth-child(4),
 .stats-table-ranks td:nth-child(4) {
-  width: 120px;
+  width: 106px;
 }
 
 .stats-table-ranks th:nth-child(5),
 .stats-table-ranks td:nth-child(5) {
-  width: 126px;
+  width: 182px;
 }
 
 .stats-rank {
@@ -1188,6 +1190,8 @@ main {
 
 .stats-player-label {
   display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .stats-player-note,

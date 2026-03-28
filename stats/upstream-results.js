@@ -1,4 +1,4 @@
-import playerPublicKeys from './player-public-keys.json?v=f0b5d2277ab6ccaf' with {type: 'json'};
+import playerPublicKeys from './player-public-keys.json?v=83fc1ec4f4013499' with {type: 'json'};
 import {gather, calculate} from './calculate.js?v=f722ac7f80b811c5';
 import {leaderboards, filterGame, present} from './leaderboards.js?v=720abed466e988a2';
 
@@ -133,9 +133,9 @@ createEventSource();
 addEventListener('beforeunload', event => { eventSource.close(); });
 setInterval(
 	() => {
-		if (eventSource.readyState !== EventSource.CLOSED) return;
-		eventSource.close();
-		createEventSource();
+		try { if (eventSource.readyState !== EventSource.CLOSED) return; } catch (e) { console.error(e); }
+		try { eventSource.close(); } catch (e) { console.error(e); }
+		try { createEventSource(); } catch (e) { console.error(e); }
 	},
 	60_000
 );

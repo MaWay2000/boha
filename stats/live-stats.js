@@ -105,6 +105,8 @@ let showingAllPlayerGames = false;
 let rankSortState = cloneSortState(SORT_DEFAULTS.ranks);
 let playerGamesSortState = cloneSortState(SORT_DEFAULTS["player-games"]);
 let matchesSortState = cloneSortState(SORT_DEFAULTS.matches);
+const allTeamsLostDrawCache = new WeakMap();
+const accountDisplayStatsCache = new WeakMap();
 
 function createRuntime() {
   return {
@@ -773,11 +775,88 @@ function getTeamStrengthToneClass(strengthPercent, allStrengths) {
   return "stats-team-strength-middle";
 }
 
+function hasBalancedTeams(game) {
+  const teams = Array.isArray(game?.teams) ? game.teams : [];
+  if (!teams.length) {
+    return false;
+  }
+
+  let smallestTeam = null;
+  let biggestTeam = null;
+  for (const team of teams) {
+    if (!smallestTeam || team.players.length < smallestTeam.players.length) {
+      smallestTeam = team;
+    }
+    if (!biggestTeam || team.players.length > biggestTeam.players.length) {
+      biggestTeam = team;
+    }
+  }
+
+  return Boolean(smallestTeam && biggestTeam)
+    && smallestTeam.players.length === biggestTeam.players.length;
+}
+
+function shouldTreatAllTeamsLostAsDraw(game) {
+  if (!game || typeof game !== "object") {
+    return false;
+  }
+
+  if (allTeamsLostDrawCache.has(game)) {
+    return allTeamsLostDrawCache.get(game);
+  }
+
+  const teams = Array.isArray(game.teams)
+    ? game.teams.filter((team) => Array.isArray(team.players) && team.players.length)
+    : [];
+  const shouldTreatAsDraw = teams.length > 1
+    && !game.cheated
+    && Number(game.duration || 0) >= 3 * 60 * 1000
+    && hasBalancedTeams(game)
+    && teams.every((team) => team.userType === "loser");
+
+  allTeamsLostDrawCache.set(game, shouldTreatAsDraw);
+  return shouldTreatAsDraw;
+}
+
+function getNormalizedTeamUserType(game, team) {
+  if (shouldTreatAllTeamsLostAsDraw(game) && Array.isArray(team?.players) && team.players.length) {
+    return "contender";
+  }
+
+  return team?.userType || null;
+}
+
+function getAccountDisplayStats(account) {
+  if (!account || typeof account !== "object") {
+    return { wins: 0, losses: 0, draws: 0 };
+  }
+
+  if (accountDisplayStatsCache.has(account)) {
+    return accountDisplayStatsCache.get(account);
+  }
+
+  const extraDraws = (account.games || []).reduce(
+    (count, game) => count + (shouldTreatAllTeamsLostAsDraw(game) ? 1 : 0),
+    0
+  );
+  const displayStats = {
+    wins: account.winCount || 0,
+    losses: account.loseCount || 0,
+    draws: (account.drawCount || 0) + extraDraws
+  };
+
+  accountDisplayStatsCache.set(account, displayStats);
+  return displayStats;
+}
+
 function getPlayerGameOutcome(game, account) {
   const slot = game.players.find((playerSlot) => playerSlot.account === account)
     || (game.slots || []).find((playerSlot) => playerSlot.account === account);
+  const userType = shouldTreatAllTeamsLostAsDraw(game) && slot?.userType === "loser"
+    ? "contender"
+    : slot?.userType;
 
-  switch (slot?.userType) {
+  switch (userType) {
     case "winner":
       return { label: "Won", className: "is-win" };
     case "loser":
@@ -811,11 +890,13 @@ function getPlayerCount(game) {
 }
 
 function getRankRecordScore(account) {
+  const displayStats = getAccountDisplayStats(account);
   const totalGames = account.games.length || 1;
-  return ((account.winCount * 3) + account.drawCount) / totalGames;
+  return ((displayStats.wins * 3) + displayStats.draws) / totalGames;
 }
 
 function getRankResultRate(account, type) {
+  const displayStats = getAccountDisplayStats(account);
   const totalGames = account.games.length || 0;
   if (totalGames <= 0) {
     return 0;
@@ -823,11 +904,11 @@ function getRankResultRate(account, type) {
 
   switch (type) {
     case "winRate":
-      return account.winCount / totalGames;
+      return displayStats.wins / totalGames;
     case "lossRate":
-      return account.loseCount / totalGames;
+      return displayStats.losses / totalGames;
     case "drawRate":
-      return account.drawCount / totalGames;
+      return displayStats.draws / totalGames;
     default:
       return 0;
   }
@@ -838,6 +919,8 @@ function compareRankRateRows(left, right, type, direction) {
   const rightGames = right.account.games.length || 0;
   const leftEligible = leftGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
   const rightEligible = rightGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
+  const leftStats = getAccountDisplayStats(left.account);
+  const rightStats = getAccountDisplayStats(right.account);
 
   return compareNumberValues(rightEligible, leftEligible)
     || applySortDirection(
@@ -848,13 +931,15 @@ function compareRankRateRows(left, right, type, direction) {
       direction
     )
     || compareNumberValues(leftGames, rightGames)
-    || compareNumberValues(left.account.winCount, right.account.winCount)
-    || compareNumberValues(right.account.loseCount, left.account.loseCount)
-    || compareNumberValues(left.account.drawCount, right.account.drawCount)
+    || compareNumberValues(leftStats.wins, rightStats.wins)
+    || compareNumberValues(rightStats.losses, leftStats.losses)
+    || compareNumberValues(leftStats.draws, rightStats.draws)
     || compareNumberValues(left.rank, right.rank);
 }
 
 function compareRankRows(left, right) {
+  const leftStats = getAccountDisplayStats(left.account);
+  const rightStats = getAccountDisplayStats(right.account);
   let result = 0;
 
   switch (rankSortState.key) {
@@ -873,22 +958,22 @@ function compareRankRows(left, right) {
         || compareNumberValues(left.rank, right.rank);
       break;
     case "wins":
-      result = compareNumberValues(left.account.winCount, right.account.winCount)
+      result = compareNumberValues(leftStats.wins, rightStats.wins)
         || compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
-        || compareNumberValues(right.account.loseCount, left.account.loseCount)
-        || compareNumberValues(left.account.drawCount, right.account.drawCount)
+        || compareNumberValues(rightStats.losses, leftStats.losses)
+        || compareNumberValues(leftStats.draws, rightStats.draws)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "losses":
-      result = compareNumberValues(left.account.loseCount, right.account.loseCount)
-        || compareNumberValues(right.account.winCount, left.account.winCount)
-        || compareNumberValues(left.account.drawCount, right.account.drawCount)
+      result = compareNumberValues(leftStats.losses, rightStats.losses)
+        || compareNumberValues(rightStats.wins, leftStats.wins)
+        || compareNumberValues(leftStats.draws, rightStats.draws)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "draws":
-      result = compareNumberValues(left.account.drawCount, right.account.drawCount)
-        || compareNumberValues(left.account.winCount, right.account.winCount)
-        || compareNumberValues(right.account.loseCount, left.account.loseCount)
+      result = compareNumberValues(leftStats.draws, rightStats.draws)
+        || compareNumberValues(leftStats.wins, rightStats.wins)
+        || compareNumberValues(rightStats.losses, leftStats.losses)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "winRate":
@@ -899,9 +984,9 @@ function compareRankRows(left, right) {
       return compareRankRateRows(left, right, "drawRate", rankSortState.direction);
     case "record":
       result = compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
-        || compareNumberValues(left.account.winCount, right.account.winCount)
-        || compareNumberValues(right.account.loseCount, left.account.loseCount)
-        || compareNumberValues(left.account.drawCount, right.account.drawCount)
+        || compareNumberValues(leftStats.wins, rightStats.wins)
+        || compareNumberValues(rightStats.losses, leftStats.losses)
+        || compareNumberValues(leftStats.draws, rightStats.draws)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "rank":
@@ -1307,7 +1392,7 @@ function renderMatchup(game, options = {}) {
                   ? `type="button" data-jump-account="${escapeHtml(jumpAccount)}" data-jump-game="${escapeHtml(currentGameKey)}"`
                   : "";
                 return `
-                <${tileTag} class="stats-team-tile ${getTeamToneClass(team.userType)}${isHighlighted ? " is-current-player" : ""}${jumpAccount ? " is-clickable-player" : ""}" ${tileAttrs}>
+                <${tileTag} class="stats-team-tile ${getTeamToneClass(getNormalizedTeamUserType(game, team))}${isHighlighted ? " is-current-player" : ""}${jumpAccount ? " is-clickable-player" : ""}" ${tileAttrs}>
                   ${renderPlayerLabel(player)}
                 </${tileTag}>
               `;
@@ -1328,7 +1413,7 @@ function renderMatchup(game, options = {}) {
       ${teams.map((team, index) => {
         const vsLabel = showVersus && index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
         return `
-          <span class="stats-team ${getTeamToneClass(team.userType)}">
+          <span class="stats-team ${getTeamToneClass(getNormalizedTeamUserType(game, team))}">
             ${team.players
               .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
               .join("")}
@@ -1457,6 +1542,7 @@ function renderRanks(accountList) {
 
   ranksElement.innerHTML = rows
     .map(({ account, rank }) => {
+      const displayStats = getAccountDisplayStats(account);
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
       const accountNames = getSortedAccountNames(account);
@@ -1563,7 +1649,7 @@ function renderRanks(accountList) {
           </td>
           <td class="stats-elo">${eloLabel}</td>
           <td>${account.games.length}</td>
-          <td class="stats-record">${account.winCount}/${account.loseCount}/${account.drawCount}</td>
+          <td class="stats-record">${displayStats.wins}/${displayStats.losses}/${displayStats.draws}</td>
         </tr>
         ${detailRow}
       `;

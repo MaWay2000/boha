@@ -277,14 +277,20 @@ function setupSortHeaders() {
       }
 
       const currentSort = getSortState(table);
+      const defaultDirection = getDefaultSortDirection(table, key);
+      const defaultSort = cloneSortState(SORT_DEFAULTS[table] || SORT_DEFAULTS.ranks);
       const nextSort = currentSort.key === key
-        ? {
-            key,
-            direction: currentSort.direction === "asc" ? "desc" : "asc"
-          }
+        ? (
+            currentSort.direction === defaultDirection
+              ? {
+                  key,
+                  direction: currentSort.direction === "asc" ? "desc" : "asc"
+                }
+              : defaultSort
+          )
         : {
             key,
-            direction: getDefaultSortDirection(table, key)
+            direction: defaultDirection
           };
 
       setSortState(table, nextSort);

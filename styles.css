@@ -1056,9 +1056,20 @@ main {
   gap: 4px;
 }
 
+.stats-record-sort-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 .stats-record-sort-divider {
   color: rgba(143, 167, 188, 0.58);
   line-height: 1;
+}
+
+.stats-sort-button-percent {
+  min-width: 0;
+  font-size: 0.82em;
 }
 
 .stats-table tbody tr:hover {

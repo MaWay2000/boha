@@ -18,6 +18,7 @@ const MATCH_LIMIT = 12;
 const PLAYER_GAME_LIMIT = 20;
 const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
+const RATE_SORT_MIN_GAMES = 10;
 const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
 const SORT_DEFAULTS = {
   ranks: { key: "rank", direction: "asc" },
@@ -25,7 +26,7 @@ const SORT_DEFAULTS = {
   matches: { key: "date", direction: "desc" }
 };
 const SORT_ALLOWED_KEYS = {
-  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws"]),
+  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "winRate", "lossRate", "drawRate"]),
   "player-games": new Set(["date", "map", "result", "duration", "replay"]),
   matches: new Set(["date", "map", "players", "duration", "replay"])
 };
@@ -37,7 +38,10 @@ const SORT_DEFAULT_DIRECTIONS = {
     matches: "desc",
     wins: "desc",
     losses: "desc",
-    draws: "desc"
+    draws: "desc",
+    winRate: "desc",
+    lossRate: "desc",
+    drawRate: "desc"
   },
   "player-games": {
     date: "desc",
@@ -805,6 +809,45 @@ function getRankRecordScore(account) {
   return ((account.winCount * 3) + account.drawCount) / totalGames;
 }
 
+function getRankResultRate(account, type) {
+  const totalGames = account.games.length || 0;
+  if (totalGames <= 0) {
+    return 0;
+  }
+
+  switch (type) {
+    case "winRate":
+      return account.winCount / totalGames;
+    case "lossRate":
+      return account.loseCount / totalGames;
+    case "drawRate":
+      return account.drawCount / totalGames;
+    default:
+      return 0;
+  }
+}
+
+function compareRankRateRows(left, right, type, direction) {
+  const leftGames = left.account.games.length || 0;
+  const rightGames = right.account.games.length || 0;
+  const leftEligible = leftGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
+  const rightEligible = rightGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
+
+  return compareNumberValues(rightEligible, leftEligible)
+    || applySortDirection(
+      compareNumberValues(
+        getRankResultRate(left.account, type),
+        getRankResultRate(right.account, type)
+      ),
+      direction
+    )
+    || compareNumberValues(leftGames, rightGames)
+    || compareNumberValues(left.account.winCount, right.account.winCount)
+    || compareNumberValues(right.account.loseCount, left.account.loseCount)
+    || compareNumberValues(left.account.drawCount, right.account.drawCount)
+    || compareNumberValues(left.rank, right.rank);
+}
+
 function compareRankRows(left, right) {
   let result = 0;
 
@@ -842,6 +885,12 @@ function compareRankRows(left, right) {
         || compareNumberValues(right.account.loseCount, left.account.loseCount)
         || compareNumberValues(left.rank, right.rank);
       break;
+    case "winRate":
+      return compareRankRateRows(left, right, "winRate", rankSortState.direction);
+    case "lossRate":
+      return compareRankRateRows(left, right, "lossRate", rankSortState.direction);
+    case "drawRate":
+      return compareRankRateRows(left, right, "drawRate", rankSortState.direction);
     case "record":
       result = compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
         || compareNumberValues(left.account.winCount, right.account.winCount)

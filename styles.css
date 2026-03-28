@@ -961,6 +961,14 @@ main {
   background: rgba(4, 9, 14, 0.72);
 }
 
+.stats-table-wrap-ranks {
+  padding-top: 28px;
+}
+
+.stats-table-wrap-ranks > .stats-table {
+  margin-top: -28px;
+}
+
 .stats-table {
   width: 100%;
   min-width: 720px;
@@ -1096,6 +1104,10 @@ main {
     opacity 180ms ease,
     transform 180ms ease;
   transform: translateX(-50%) translateY(4px);
+}
+
+.stats-table-wrap-ranks .stats-sort-hint {
+  bottom: calc(100% + 12px);
 }
 
 .stats-sort-hint::before {

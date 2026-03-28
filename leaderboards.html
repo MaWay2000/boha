@@ -79,7 +79,7 @@
                     <th data-sort-table="ranks" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
                     <th data-sort-table="ranks" data-sort-key="matches" aria-sort="none"><button class="stats-sort-button" type="button">Matches</button></th>
                     <th class="stats-record-sort-head">
-                      <div class="stats-record-sort-group" aria-label="Sort by wins, losses, draws, or percentages">
+                      <div class="stats-record-sort-group" aria-label="Sort by wins, losses, draws, crashes, or percentages">
                         <span class="stats-record-sort-pair">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="wins" aria-label="Sort by wins">W</button>
                           <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="winRate" aria-label="Sort by win percentage (minimum 10 games)">%</button>
@@ -93,6 +93,10 @@
                         <span class="stats-record-sort-pair">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="draws" aria-label="Sort by draws">D</button>
                           <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="drawRate" aria-label="Sort by draw percentage (minimum 10 games)">%</button>
+                        </span>
+                        <span class="stats-record-sort-divider">/</span>
+                        <span class="stats-record-sort-pair">
+                          <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="crashes" aria-label="Sort by crashed all-loser games">X</button>
                         </span>
                       </div>
                     </th>

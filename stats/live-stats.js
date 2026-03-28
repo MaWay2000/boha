@@ -26,7 +26,7 @@ const SORT_DEFAULTS = {
   matches: { key: "date", direction: "desc" }
 };
 const SORT_ALLOWED_KEYS = {
-  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "winRate", "lossRate", "drawRate"]),
+  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "crashes", "winRate", "lossRate", "drawRate"]),
   "player-games": new Set(["date", "map", "result", "duration", "replay"]),
   matches: new Set(["date", "map", "players", "duration", "replay"])
 };
@@ -39,6 +39,7 @@ const SORT_DEFAULT_DIRECTIONS = {
     wins: "desc",
     losses: "desc",
     draws: "desc",
+    crashes: "desc",
     winRate: "desc",
     lossRate: "desc",
     drawRate: "desc"
@@ -61,8 +62,9 @@ const SORT_DEFAULT_DIRECTIONS = {
 const PLAYER_GAME_RESULT_ORDER = {
   Lost: 0,
   Played: 1,
-  Draw: 2,
-  Won: 3
+  Crash: 2,
+  Draw: 3,
+  Won: 4
 };
 
 const statusElement = document.getElementById("resultsStatus");
@@ -694,6 +696,7 @@ function matchesRecentGameSearch(game, searchQuery) {
 }
 
 function getAccountExpandKey(account) {
+  const displayStats = getAccountDisplayStats(account);
   if (account.mainPublicKey) {
     return `main:${account.mainPublicKey}`;
   }
@@ -703,7 +706,7 @@ function getAccountExpandKey(account) {
     return `keys:${publicKeys.join("|")}`;
   }
 
-  return `name:${account.name || "unknown"}:${account.games.length}:${account.winCount}:${account.loseCount}:${account.drawCount}`;
+  return `name:${account.name || "unknown"}:${account.games.length}:${displayStats.wins}:${displayStats.losses}:${displayStats.draws}:${displayStats.crashes}`;
 }
 
 function buildGlobalRankMap(accountList) {
@@ -820,7 +823,7 @@ function shouldTreatAllTeamsLostAsDraw(game) {
 
 function getNormalizedTeamUserType(game, team) {
   if (shouldTreatAllTeamsLostAsDraw(game) && Array.isArray(team?.players) && team.players.length) {
-    return "contender";
+    return "neutral";
   }
 
   return team?.userType || null;
@@ -828,21 +831,22 @@ function getNormalizedTeamUserType(game, team) {
 
 function getAccountDisplayStats(account) {
   if (!account || typeof account !== "object") {
-    return { wins: 0, losses: 0, draws: 0 };
+    return { wins: 0, losses: 0, draws: 0, crashes: 0 };
   }
 
   if (accountDisplayStatsCache.has(account)) {
     return accountDisplayStatsCache.get(account);
   }
 
-  const extraDraws = (account.games || []).reduce(
+  const crashCount = (account.games || []).reduce(
     (count, game) => count + (shouldTreatAllTeamsLostAsDraw(game) ? 1 : 0),
     0
   );
   const displayStats = {
     wins: account.winCount || 0,
     losses: account.loseCount || 0,
-    draws: (account.drawCount || 0) + extraDraws
+    draws: account.drawCount || 0,
+    crashes: crashCount
   };
 
   accountDisplayStatsCache.set(account, displayStats);
@@ -852,9 +856,11 @@ function getAccountDisplayStats(account) {
 function getPlayerGameOutcome(game, account) {
   const slot = game.players.find((playerSlot) => playerSlot.account === account)
     || (game.slots || []).find((playerSlot) => playerSlot.account === account);
-  const userType = shouldTreatAllTeamsLostAsDraw(game) && slot?.userType === "loser"
-    ? "contender"
-    : slot?.userType;
+  if (shouldTreatAllTeamsLostAsDraw(game) && slot?.userType === "loser") {
+    return { label: "Crash", className: "is-crash" };
+  }
+
+  const userType = slot?.userType;
 
   switch (userType) {
     case "winner":
@@ -934,6 +940,7 @@ function compareRankRateRows(left, right, type, direction) {
     || compareNumberValues(leftStats.wins, rightStats.wins)
     || compareNumberValues(rightStats.losses, leftStats.losses)
     || compareNumberValues(leftStats.draws, rightStats.draws)
+    || compareNumberValues(rightStats.crashes, leftStats.crashes)
     || compareNumberValues(left.rank, right.rank);
 }
 
@@ -962,16 +969,26 @@ function compareRankRows(left, right) {
         || compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
         || compareNumberValues(rightStats.losses, leftStats.losses)
         || compareNumberValues(leftStats.draws, rightStats.draws)
+        || compareNumberValues(rightStats.crashes, leftStats.crashes)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "losses":
       result = compareNumberValues(leftStats.losses, rightStats.losses)
         || compareNumberValues(rightStats.wins, leftStats.wins)
         || compareNumberValues(leftStats.draws, rightStats.draws)
+        || compareNumberValues(rightStats.crashes, leftStats.crashes)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "draws":
       result = compareNumberValues(leftStats.draws, rightStats.draws)
+        || compareNumberValues(leftStats.wins, rightStats.wins)
+        || compareNumberValues(rightStats.losses, leftStats.losses)
+        || compareNumberValues(rightStats.crashes, leftStats.crashes)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "crashes":
+      result = compareNumberValues(leftStats.crashes, rightStats.crashes)
+        || compareNumberValues(leftStats.draws, rightStats.draws)
         || compareNumberValues(leftStats.wins, rightStats.wins)
         || compareNumberValues(rightStats.losses, leftStats.losses)
         || compareNumberValues(left.rank, right.rank);
@@ -987,6 +1004,7 @@ function compareRankRows(left, right) {
         || compareNumberValues(leftStats.wins, rightStats.wins)
         || compareNumberValues(rightStats.losses, leftStats.losses)
         || compareNumberValues(leftStats.draws, rightStats.draws)
+        || compareNumberValues(rightStats.crashes, leftStats.crashes)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "rank":
@@ -1649,7 +1667,7 @@ function renderRanks(accountList) {
           </td>
           <td class="stats-elo">${eloLabel}</td>
           <td>${account.games.length}</td>
-          <td class="stats-record">${displayStats.wins}/${displayStats.losses}/${displayStats.draws}</td>
+          <td class="stats-record">${displayStats.wins}/${displayStats.losses}/${displayStats.draws}/${displayStats.crashes}</td>
         </tr>
         ${detailRow}
       `;

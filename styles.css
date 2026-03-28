@@ -1105,7 +1105,7 @@ main {
 
 .stats-table-ranks th:nth-child(5),
 .stats-table-ranks td:nth-child(5) {
-  width: 182px;
+  width: 228px;
 }
 
 .stats-rank {
@@ -1747,6 +1747,11 @@ main {
 .stats-player-game-result.is-draw {
   color: #fff0c2;
   background: rgba(255, 198, 96, 0.12);
+}
+
+.stats-player-game-result.is-crash {
+  color: #d4f2ff;
+  background: rgba(109, 232, 255, 0.12);
 }
 
 .stats-replay-link {

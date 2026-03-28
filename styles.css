@@ -998,6 +998,7 @@ main {
 .stats-sort-button {
   display: inline-flex;
   align-items: center;
+  position: relative;
   gap: 8px;
   padding: 0;
   border: 0;
@@ -1070,6 +1071,50 @@ main {
 .stats-sort-button-percent {
   min-width: 0;
   font-size: 0.74em;
+}
+
+.stats-sort-hint {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  z-index: 8;
+  padding: 6px 9px;
+  border: 1px solid rgba(149, 205, 255, 0.22);
+  border-radius: 10px;
+  color: #e7f1fb;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+  background: rgba(8, 14, 22, 0.98);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.32),
+    0 0 0 1px rgba(255, 255, 255, 0.04);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  transform: translateX(-50%) translateY(4px);
+}
+
+.stats-sort-hint::before {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid rgba(149, 205, 255, 0.22);
+  border-bottom: 1px solid rgba(149, 205, 255, 0.22);
+  background: rgba(8, 14, 22, 0.96);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.stats-sort-button:hover .stats-sort-hint,
+.stats-sort-button:focus-visible .stats-sort-hint {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .stats-table tbody tr:hover {

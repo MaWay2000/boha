@@ -1010,11 +1010,25 @@ main {
   transition: color 180ms ease;
 }
 
+.stats-sort-button-compact {
+  gap: 4px;
+}
+
 .stats-sort-button::after {
   content: "↕";
   color: rgba(143, 167, 188, 0.5);
   font-size: 0.8em;
   line-height: 1;
+}
+
+.stats-sort-button[data-direction="asc"]::after {
+  content: "↑";
+  color: var(--cyan);
+}
+
+.stats-sort-button[data-direction="desc"]::after {
+  content: "↓";
+  color: var(--cyan);
 }
 
 [data-sort-table][aria-sort="ascending"] .stats-sort-button::after {
@@ -1030,6 +1044,21 @@ main {
 .stats-sort-button:hover,
 .stats-sort-button.is-active {
   color: var(--text);
+}
+
+.stats-record-sort-head {
+  white-space: nowrap;
+}
+
+.stats-record-sort-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stats-record-sort-divider {
+  color: rgba(143, 167, 188, 0.58);
+  line-height: 1;
 }
 
 .stats-table tbody tr:hover {

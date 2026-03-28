@@ -78,7 +78,15 @@
                     <th data-sort-table="ranks" data-sort-key="player" aria-sort="none"><button class="stats-sort-button" type="button">Player</button></th>
                     <th data-sort-table="ranks" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
                     <th data-sort-table="ranks" data-sort-key="matches" aria-sort="none"><button class="stats-sort-button" type="button">Matches</button></th>
-                    <th data-sort-table="ranks" data-sort-key="record" aria-sort="none"><button class="stats-sort-button" type="button">W/L/D</button></th>
+                    <th class="stats-record-sort-head">
+                      <div class="stats-record-sort-group" aria-label="Sort by wins, losses, or draws">
+                        <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="wins" aria-label="Sort by wins">W</button>
+                        <span class="stats-record-sort-divider">/</span>
+                        <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="losses" aria-label="Sort by losses">L</button>
+                        <span class="stats-record-sort-divider">/</span>
+                        <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="draws" aria-label="Sort by draws">D</button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="statsRanks">

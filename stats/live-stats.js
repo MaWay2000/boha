@@ -25,7 +25,7 @@ const SORT_DEFAULTS = {
   matches: { key: "date", direction: "desc" }
 };
 const SORT_ALLOWED_KEYS = {
-  ranks: new Set(["rank", "player", "elo", "matches", "record"]),
+  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws"]),
   "player-games": new Set(["date", "map", "result", "duration", "replay"]),
   matches: new Set(["date", "map", "players", "duration", "replay"])
 };
@@ -35,7 +35,9 @@ const SORT_DEFAULT_DIRECTIONS = {
     player: "asc",
     elo: "desc",
     matches: "desc",
-    record: "desc"
+    wins: "desc",
+    losses: "desc",
+    draws: "desc"
   },
   "player-games": {
     date: "desc",
@@ -166,6 +168,12 @@ function parseSortState(value, table) {
   }
 
   const [key, direction] = String(value).split(":");
+  if (table === "ranks" && key === "record") {
+    return {
+      key: "wins",
+      direction: direction === "asc" ? "asc" : "desc"
+    };
+  }
   if (!SORT_ALLOWED_KEYS[table]?.has(key)) {
     return cloneSortState(fallback);
   }
@@ -210,39 +218,56 @@ function parsePositiveInteger(value, fallback) {
 }
 
 function updateSortIndicators() {
-  sortHeaderElements.forEach((header) => {
-    const table = header.dataset.sortTable;
-    const key = header.dataset.sortKey;
+  sortHeaderElements.forEach((sortTarget) => {
+    const table = sortTarget.dataset.sortTable;
+    const key = sortTarget.dataset.sortKey;
     const sortState = getSortState(table);
     const isActive = sortState.key === key;
-    header.setAttribute(
-      "aria-sort",
-      isActive
-        ? (sortState.direction === "asc" ? "ascending" : "descending")
-        : "none"
-    );
+    const button = sortTarget.matches(".stats-sort-button")
+      ? sortTarget
+      : sortTarget.querySelector(".stats-sort-button");
+    const header = sortTarget.matches("th") ? sortTarget : sortTarget.closest("th");
 
-    const button = header.querySelector(".stats-sort-button");
+    if (sortTarget.matches("th")) {
+      sortTarget.setAttribute(
+        "aria-sort",
+        isActive
+          ? (sortState.direction === "asc" ? "ascending" : "descending")
+          : "none"
+      );
+    } else if (button) {
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    }
+
     if (!button) {
       return;
     }
 
     button.classList.toggle("is-active", isActive);
     button.dataset.direction = isActive ? sortState.direction : "";
+    if (!sortTarget.matches("th") && header && !header.hasAttribute("data-sort-key")) {
+      if (isActive) {
+        header.setAttribute("aria-sort", sortState.direction === "asc" ? "ascending" : "descending");
+      } else if (![...header.querySelectorAll(".stats-sort-button[data-direction]")].some((item) => item.dataset.direction)) {
+        header.setAttribute("aria-sort", "none");
+      }
+    }
   });
 }
 
 function setupSortHeaders() {
-  sortHeaderElements.forEach((header) => {
-    const button = header.querySelector(".stats-sort-button");
+  sortHeaderElements.forEach((sortTarget) => {
+    const button = sortTarget.matches(".stats-sort-button")
+      ? sortTarget
+      : sortTarget.querySelector(".stats-sort-button");
     if (!button || button.dataset.sortBound === "true") {
       return;
     }
 
     button.dataset.sortBound = "true";
     button.addEventListener("click", () => {
-      const table = header.dataset.sortTable;
-      const key = header.dataset.sortKey;
+      const table = sortTarget.dataset.sortTable;
+      const key = sortTarget.dataset.sortKey;
       if (!table || !key) {
         return;
       }
@@ -796,6 +821,25 @@ function compareRankRows(left, right) {
       break;
     case "matches":
       result = compareNumberValues(left.account.games.length, right.account.games.length)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "wins":
+      result = compareNumberValues(left.account.winCount, right.account.winCount)
+        || compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
+        || compareNumberValues(right.account.loseCount, left.account.loseCount)
+        || compareNumberValues(left.account.drawCount, right.account.drawCount)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "losses":
+      result = compareNumberValues(left.account.loseCount, right.account.loseCount)
+        || compareNumberValues(right.account.winCount, left.account.winCount)
+        || compareNumberValues(left.account.drawCount, right.account.drawCount)
+        || compareNumberValues(left.rank, right.rank);
+      break;
+    case "draws":
+      result = compareNumberValues(left.account.drawCount, right.account.drawCount)
+        || compareNumberValues(left.account.winCount, right.account.winCount)
+        || compareNumberValues(right.account.loseCount, left.account.loseCount)
         || compareNumberValues(left.rank, right.rank);
       break;
     case "record":

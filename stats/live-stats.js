@@ -880,19 +880,34 @@ async function copyValueToClipboard(button) {
     return;
   }
 
-  const previousText = button.textContent;
-  try {
-    await navigator.clipboard.writeText(value);
-    button.textContent = "Copied";
-    button.classList.add("is-copied");
-  } catch (error) {
-    button.textContent = "Failed";
-    button.classList.add("is-failed");
+  const hintElement = button.querySelector(".stats-copy-hint");
+  const defaultText = button.dataset.copyDefault || "Click to copy";
+  if (hintElement) {
+    hintElement.textContent = defaultText;
   }
 
-  window.setTimeout(() => {
-    button.textContent = previousText;
-    button.classList.remove("is-copied", "is-failed");
+  try {
+    await navigator.clipboard.writeText(value);
+    button.classList.add("is-copied");
+    button.classList.remove("is-failed");
+    if (hintElement) {
+      hintElement.textContent = "Copied";
+    }
+  } catch (error) {
+    button.classList.add("is-failed");
+    button.classList.remove("is-copied");
+    if (hintElement) {
+      hintElement.textContent = "Copy failed";
+    }
+  }
+
+  window.clearTimeout(button.copyResetTimer);
+  button.classList.add("is-feedback-visible");
+  button.copyResetTimer = window.setTimeout(() => {
+    button.classList.remove("is-copied", "is-failed", "is-feedback-visible");
+    if (hintElement) {
+      hintElement.textContent = defaultText;
+    }
   }, 1400);
 }
 
@@ -1347,20 +1362,19 @@ function renderRanks(accountList) {
               <div class="stats-name-list">
                 ${accountNames
                   .map(([name, count]) => `
-                    <span class="stats-name-chip${name === account.name ? " is-primary" : ""}">
+                    <button
+                      class="stats-name-chip stats-copy-chip${name === account.name ? " is-primary" : ""}"
+                      type="button"
+                      data-copy-value="${escapeHtml(name)}"
+                      data-copy-default="Click to copy"
+                      aria-label="Copy alias ${escapeHtml(name)}"
+                    >
                       <span class="stats-name-copy">
                         <span class="stats-name-text">${escapeHtml(name)}</span>
                         <sup class="stats-name-count">${count}</sup>
                       </span>
-                      <button
-                        class="stats-copy-action"
-                        type="button"
-                        data-copy-value="${escapeHtml(name)}"
-                        aria-label="Copy alias ${escapeHtml(name)}"
-                      >
-                        Copy
-                      </button>
-                    </span>
+                      <span class="stats-copy-hint" aria-hidden="true">Click to copy</span>
+                    </button>
                   `)
                   .join("")}
               </div>
@@ -1374,17 +1388,16 @@ function renderRanks(accountList) {
               <div class="stats-key-list">
                 ${publicKeys
                   .map((publicKey) => `
-                    <div class="stats-key-item">
+                    <button
+                      class="stats-key-item stats-copy-chip"
+                      type="button"
+                      data-copy-value="${escapeHtml(publicKey)}"
+                      data-copy-default="Click to copy"
+                      aria-label="Copy public key"
+                    >
                       <code class="stats-key-value">${escapeHtml(publicKey)}</code>
-                      <button
-                        class="stats-copy-action"
-                        type="button"
-                        data-copy-value="${escapeHtml(publicKey)}"
-                        aria-label="Copy public key"
-                      >
-                        Copy
-                      </button>
-                    </div>
+                      <span class="stats-copy-hint" aria-hidden="true">Click to copy</span>
+                    </button>
                   `)
                   .join("")}
               </div>

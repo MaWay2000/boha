@@ -1056,6 +1056,8 @@ main {
 }
 
 .stats-record-sort-head {
+  position: relative;
+  z-index: 4;
   white-space: nowrap;
 }
 
@@ -1107,7 +1109,16 @@ main {
 }
 
 .stats-table-wrap-ranks .stats-sort-hint {
+  right: 0;
+  left: auto;
   bottom: calc(100% + 12px);
+  transform: translateY(4px);
+}
+
+.stats-table-wrap-ranks .stats-sort-hint::before {
+  left: auto;
+  right: 12px;
+  transform: rotate(45deg);
 }
 
 .stats-sort-hint::before {
@@ -1127,6 +1138,11 @@ main {
 .stats-sort-button:focus-visible .stats-sort-hint {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+.stats-table-wrap-ranks .stats-sort-button:hover .stats-sort-hint,
+.stats-table-wrap-ranks .stats-sort-button:focus-visible .stats-sort-hint {
+  transform: translateY(0);
 }
 
 .stats-table tbody tr:hover {

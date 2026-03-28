@@ -1430,6 +1430,8 @@ main {
 
 .stats-copy-chip {
   appearance: none;
+  position: relative;
+  overflow: visible;
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -1472,23 +1474,44 @@ main {
 }
 
 .stats-copy-hint {
-  max-width: 0;
-  overflow: hidden;
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 8;
+  padding: 6px 9px;
+  border: 1px solid rgba(149, 205, 255, 0.22);
+  border-radius: 10px;
   color: var(--muted);
   font-size: 0.72rem;
   white-space: nowrap;
+  line-height: 1;
+  pointer-events: none;
   opacity: 0;
+  background: rgba(8, 14, 22, 0.96);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
   transition:
-    max-width 180ms ease,
-    margin-left 180ms ease,
-    opacity 180ms ease;
+    opacity 180ms ease,
+    transform 180ms ease;
+  transform: translateY(-50%) translateX(-4px);
+}
+
+.stats-copy-hint::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  border-left: 1px solid rgba(149, 205, 255, 0.22);
+  border-bottom: 1px solid rgba(149, 205, 255, 0.22);
+  background: rgba(8, 14, 22, 0.96);
+  transform: translateY(-50%) rotate(45deg);
 }
 
 .stats-copy-chip:hover .stats-copy-hint,
 .stats-copy-chip.is-feedback-visible .stats-copy-hint {
-  max-width: 110px;
-  margin-left: 4px;
   opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 .stats-name-count {

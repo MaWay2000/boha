@@ -1118,7 +1118,23 @@ function renderPlayerGames(accounts) {
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>
-            ${escapeHtml(game.mapName)}
+            <span class="stats-player-game-map">
+              <span>${escapeHtml(game.mapName)}</span>
+              ${game.mods
+                ? `
+                  <button
+                    class="stats-map-mod stats-copy-chip"
+                    type="button"
+                    data-copy-value="${escapeHtml(game.mods)}"
+                    data-copy-default="Click to copy"
+                    aria-label="Copy mod data"
+                  >
+                    mod
+                    <span class="stats-copy-hint" aria-hidden="true">Click to copy</span>
+                  </button>
+                `
+                : ""}
+            </span>
           </td>
           <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span></td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
@@ -1151,6 +1167,8 @@ function renderPlayerGames(accounts) {
       renderPlayerGames(accounts);
     });
   });
+
+  bindCopyButtons(playerGamesElement);
 
   playerGamesElement.querySelectorAll(".stats-team-tile[data-jump-account]").forEach((tile) => {
     tile.addEventListener("click", (event) => {

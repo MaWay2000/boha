@@ -1577,6 +1577,29 @@ main {
   margin-left: 6px;
 }
 
+.stats-player-game-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stats-map-mod {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(109, 232, 255, 0.16);
+  background: rgba(109, 232, 255, 0.08);
+  color: var(--steel);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .stats-player-games-panel .stats-team-grid {
   gap: 6px;
 }

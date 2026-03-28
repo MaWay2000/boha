@@ -1119,7 +1119,6 @@ function renderPlayerGames(accounts) {
           </td>
           <td>
             ${escapeHtml(game.mapName)}
-            ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
           </td>
           <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span></td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>

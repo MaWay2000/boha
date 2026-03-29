@@ -1,6 +1,6 @@
 {
   "upstreamOrigin": "https://warzone2100.retropaganda.info",
-  "syncedAt": "2026-03-29T20:45:56.178Z",
+  "syncedAt": "2026-03-29T21:16:34.982Z",
   "files": {
     "calculate.js": {
       "sourceUrl": "https://warzone2100.retropaganda.info/calculate.js",
@@ -24,11 +24,11 @@
     },
     "results-snapshot.json": {
       "sourceUrl": "https://warzone2100.retropaganda.info/results.json",
-      "sha256": "791ec28e951ad6fd548abee15075b59842ab4ef2d77cf2b410d0f257e782864c",
-      "sizeBytes": 55484366,
-      "resultsCount": 2550,
-      "latestEndDate": 1774815540509
+      "sha256": "a454c79992790d9d415b6a1541bdd30c887949c0e9b2ef489187d9f68260abf0",
+      "sizeBytes": 55552374,
+      "resultsCount": 2552,
+      "latestEndDate": 1774818483114
     }
   },
-  "version": "96d4f51e56fa8c30"
+  "version": "73d89f04272120b1"
 }

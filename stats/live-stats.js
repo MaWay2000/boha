@@ -1672,7 +1672,17 @@ function renderRanks(accountList) {
           </td>
           <td class="stats-elo">${eloLabel}</td>
           <td>${account.games.length}</td>
-          <td class="stats-record">${displayStats.wins}/${displayStats.losses}/${displayStats.draws}/${displayStats.crashes}</td>
+          <td class="stats-record">
+            <span class="stats-record-grid">
+              <span class="stats-record-value">${displayStats.wins}</span>
+              <span class="stats-record-sort-divider">/</span>
+              <span class="stats-record-value">${displayStats.losses}</span>
+              <span class="stats-record-sort-divider">/</span>
+              <span class="stats-record-value">${displayStats.draws}</span>
+              <span class="stats-record-sort-divider">/</span>
+              <span class="stats-record-value">${displayStats.crashes}</span>
+            </span>
+          </td>
         </tr>
         ${detailRow}
       `;

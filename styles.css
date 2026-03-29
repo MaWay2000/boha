@@ -1059,26 +1059,33 @@ main {
   position: relative;
   z-index: 4;
   white-space: nowrap;
-  text-align: right;
 }
 
 .stats-record-sort-group {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 3px;
+  display: inline-grid;
   width: 100%;
 }
 
-.stats-record-sort-pair {
+.stats-record-grid {
+  display: inline-grid;
+  grid-template-columns: 5.2ch 0.8ch 5.2ch 0.8ch 5.2ch 0.8ch 3.8ch;
+  align-items: center;
+  justify-content: end;
+  justify-items: end;
+  width: 100%;
+}
+
+.stats-record-metric {
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  justify-self: end;
 }
 
 .stats-record-sort-divider {
   color: rgba(143, 167, 188, 0.58);
   line-height: 1;
+  justify-self: center;
 }
 
 .stats-sort-button-percent {
@@ -1181,9 +1188,8 @@ main {
 
 .stats-table-ranks th:nth-child(5),
 .stats-table-ranks td:nth-child(5) {
-  width: 19ch;
-  max-width: 19ch;
-  text-align: right;
+  width: 25ch;
+  max-width: 25ch;
 }
 
 .stats-rank {
@@ -1201,6 +1207,12 @@ main {
 
 .stats-record {
   white-space: nowrap;
+  text-align: right;
+}
+
+.stats-record-value {
+  min-width: 0;
+  text-align: right;
 }
 
 .stats-date-time {

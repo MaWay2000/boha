@@ -1059,12 +1059,15 @@ main {
   position: relative;
   z-index: 4;
   white-space: nowrap;
+  text-align: right;
 }
 
 .stats-record-sort-group {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 3px;
+  width: 100%;
 }
 
 .stats-record-sort-pair {
@@ -1178,7 +1181,9 @@ main {
 
 .stats-table-ranks th:nth-child(5),
 .stats-table-ranks td:nth-child(5) {
-  width: 228px;
+  width: 19ch;
+  max-width: 19ch;
+  text-align: right;
 }
 
 .stats-rank {
@@ -1192,6 +1197,10 @@ main {
 .stats-date,
 .stats-duration {
   font-variant-numeric: tabular-nums;
+}
+
+.stats-record {
+  white-space: nowrap;
 }
 
 .stats-date-time {

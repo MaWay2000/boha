@@ -897,13 +897,18 @@ function getPlayerCount(game) {
 
 function getRankRecordScore(account) {
   const displayStats = getAccountDisplayStats(account);
-  const totalGames = account.games.length || 1;
+  const totalGames = getAccountRankedGameCount(account) || 1;
   return ((displayStats.wins * 3) + displayStats.draws) / totalGames;
+}
+
+function getAccountRankedGameCount(account) {
+  const displayStats = getAccountDisplayStats(account);
+  return displayStats.wins + displayStats.losses + displayStats.draws;
 }
 
 function getRankResultRate(account, type) {
   const displayStats = getAccountDisplayStats(account);
-  const totalGames = account.games.length || 0;
+  const totalGames = getAccountRankedGameCount(account);
   if (totalGames <= 0) {
     return 0;
   }
@@ -921,8 +926,8 @@ function getRankResultRate(account, type) {
 }
 
 function compareRankRateRows(left, right, type, direction) {
-  const leftGames = left.account.games.length || 0;
-  const rightGames = right.account.games.length || 0;
+  const leftGames = getAccountRankedGameCount(left.account);
+  const rightGames = getAccountRankedGameCount(right.account);
   const leftEligible = leftGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
   const rightEligible = rightGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
   const leftStats = getAccountDisplayStats(left.account);

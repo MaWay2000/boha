@@ -948,10 +948,11 @@ main {
 .stats-panel-head-ranks .stats-search-field {
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
   flex: 0 0 auto;
-  width: min(100%, 210px);
+  width: min(100%, 420px);
+  margin-inline: auto 0;
 }
 
 .stats-search-label {

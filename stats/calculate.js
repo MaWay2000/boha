@@ -58,7 +58,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 				id = name;
 			}
 
-			let account = accounts.get(id);
+			let account = accounts.get(id); // getOrInsert only appeared in 2026 and is not yet portable
 			if (!account) {
 				account = {
 					mainPublicKey: publicKey ? id : null,
@@ -78,7 +78,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 			account.names.set(name, nameCount ? nameCount + 1 : 1);
 
 			const teamIndex = game.alliancesType ? player.team : index
-			let team = game.teams.get(teamIndex);
+			let team = game.teams.get(teamIndex); // getOrInsert only appeared in 2026 and is not yet portable
 			if (!team) {
 				team = {
 					name: String.fromCharCode('A'.charCodeAt(0) + player.team),

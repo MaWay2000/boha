@@ -1068,7 +1068,7 @@ main {
 
 .stats-record-grid {
   display: inline-grid;
-  grid-template-columns: 10.8ch 0.8ch 10.8ch 0.8ch 10.8ch 0.8ch 10.8ch;
+  grid-template-columns: 8.2ch 0.8ch 8.2ch 0.8ch 8.2ch 0.8ch 8.2ch;
   align-items: center;
   justify-content: end;
   justify-items: end;
@@ -1188,8 +1188,8 @@ main {
 
 .stats-table-ranks th:nth-child(5),
 .stats-table-ranks td:nth-child(5) {
-  width: 46ch;
-  max-width: 46ch;
+  width: 36ch;
+  max-width: 36ch;
 }
 
 .stats-rank {
@@ -1212,11 +1212,13 @@ main {
 
 .stats-record-value {
   display: inline-flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: flex-end;
   justify-content: flex-end;
-  gap: 0.35ch;
+  gap: 2px;
   min-width: 0;
   text-align: right;
+  line-height: 1;
 }
 
 .stats-record-count {
@@ -1224,12 +1226,12 @@ main {
 }
 
 .stats-record-value-divider {
-  color: rgba(143, 167, 188, 0.58);
+  display: none;
 }
 
 .stats-record-percent {
   color: var(--muted);
-  font-size: 0.86em;
+  font-size: 0.78em;
 }
 
 .stats-date-time {

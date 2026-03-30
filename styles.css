@@ -1116,6 +1116,17 @@ main {
   justify-self: end;
 }
 
+.stats-record-sort-head .stats-record-metric {
+  align-items: flex-end;
+}
+
+.stats-record-sort-head .stats-sort-button-compact {
+  display: inline-grid;
+  grid-template-rows: auto auto;
+  justify-items: center;
+  gap: 2px;
+}
+
 .stats-record-sort-divider {
   color: transparent;
   visibility: hidden;
@@ -1153,6 +1164,26 @@ main {
   transform: translateX(-50%) translateY(4px);
 }
 
+.stats-record-sort-head .stats-sort-hint {
+  position: static;
+  opacity: 1;
+  transform: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  color: rgba(143, 167, 188, 0.86);
+  font-size: 0.54rem;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.stats-record-sort-head .stats-sort-hint::before {
+  display: none;
+}
+
 .stats-table-wrap-ranks .stats-sort-hint {
   right: 0;
   left: auto;
@@ -1188,6 +1219,12 @@ main {
 .stats-table-wrap-ranks .stats-sort-button:hover .stats-sort-hint,
 .stats-table-wrap-ranks .stats-sort-button:focus-visible .stats-sort-hint {
   transform: translateY(0);
+}
+
+.stats-record-sort-head .stats-sort-button:hover .stats-sort-hint,
+.stats-record-sort-head .stats-sort-button:focus-visible .stats-sort-hint {
+  opacity: 1;
+  transform: none;
 }
 
 .stats-table tbody tr:hover {

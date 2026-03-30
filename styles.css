@@ -1083,7 +1083,8 @@ main {
 }
 
 .stats-record-sort-divider {
-  color: rgba(143, 167, 188, 0.58);
+  color: transparent;
+  visibility: hidden;
   line-height: 1;
   justify-self: center;
 }

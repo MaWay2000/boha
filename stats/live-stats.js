@@ -906,6 +906,11 @@ function getAccountRankedGameCount(account) {
   return displayStats.wins + displayStats.losses + displayStats.draws;
 }
 
+function getAccountDisplayGameCount(account) {
+  const displayStats = getAccountDisplayStats(account);
+  return displayStats.wins + displayStats.losses + displayStats.draws + displayStats.crashes;
+}
+
 function getRankResultRate(account, type) {
   const displayStats = getAccountDisplayStats(account);
   const totalGames = getAccountRankedGameCount(account);
@@ -923,6 +928,14 @@ function getRankResultRate(account, type) {
     default:
       return 0;
   }
+}
+
+function formatRecordPercentage(value, totalGames) {
+  if (!Number.isFinite(totalGames) || totalGames <= 0) {
+    return "0%";
+  }
+
+  return `${Math.round((value / totalGames) * 100)}%`;
 }
 
 function compareRankRateRows(left, right, type, direction) {
@@ -1566,6 +1579,7 @@ function renderRanks(accountList) {
   ranksElement.innerHTML = rows
     .map(({ account, rank }) => {
       const displayStats = getAccountDisplayStats(account);
+      const displayGameCount = getAccountDisplayGameCount(account);
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
       const accountNames = getSortedAccountNames(account);
@@ -1674,13 +1688,29 @@ function renderRanks(accountList) {
           <td>${account.games.length}</td>
           <td class="stats-record">
             <span class="stats-record-grid">
-              <span class="stats-record-value">${displayStats.wins}</span>
+              <span class="stats-record-value">
+                <span class="stats-record-count">${displayStats.wins}</span>
+                <span class="stats-record-value-divider">/</span>
+                <span class="stats-record-percent">${formatRecordPercentage(displayStats.wins, displayGameCount)}</span>
+              </span>
               <span class="stats-record-sort-divider">/</span>
-              <span class="stats-record-value">${displayStats.losses}</span>
+              <span class="stats-record-value">
+                <span class="stats-record-count">${displayStats.losses}</span>
+                <span class="stats-record-value-divider">/</span>
+                <span class="stats-record-percent">${formatRecordPercentage(displayStats.losses, displayGameCount)}</span>
+              </span>
               <span class="stats-record-sort-divider">/</span>
-              <span class="stats-record-value">${displayStats.draws}</span>
+              <span class="stats-record-value">
+                <span class="stats-record-count">${displayStats.draws}</span>
+                <span class="stats-record-value-divider">/</span>
+                <span class="stats-record-percent">${formatRecordPercentage(displayStats.draws, displayGameCount)}</span>
+              </span>
               <span class="stats-record-sort-divider">/</span>
-              <span class="stats-record-value">${displayStats.crashes}</span>
+              <span class="stats-record-value">
+                <span class="stats-record-count">${displayStats.crashes}</span>
+                <span class="stats-record-value-divider">/</span>
+                <span class="stats-record-percent">${formatRecordPercentage(displayStats.crashes, displayGameCount)}</span>
+              </span>
             </span>
           </td>
         </tr>

@@ -923,6 +923,12 @@ main {
   min-width: 0;
 }
 
+.stats-panel-title-main {
+  margin: 0;
+  font-size: 1.08rem;
+  letter-spacing: 0.2em;
+}
+
 .stats-search-field {
   flex: 1 1 280px;
   width: min(100%, 420px);

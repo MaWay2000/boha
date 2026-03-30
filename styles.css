@@ -929,10 +929,37 @@ main {
   letter-spacing: 0.2em;
 }
 
+.stats-panel-head-ranks {
+  align-items: center;
+}
+
+.stats-panel-head-ranks .stats-panel-copy {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+}
+
 .stats-search-field {
   flex: 1 1 280px;
   width: min(100%, 420px);
   margin-left: auto;
+}
+
+.stats-panel-head-ranks .stats-search-field {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  width: min(100%, 210px);
+}
+
+.stats-search-label {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .stats-search-input {
@@ -2001,6 +2028,11 @@ main {
 
   .stats-status {
     text-align: left;
+  }
+
+  .stats-panel-head-ranks .stats-search-field {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .stats-detail-panel {

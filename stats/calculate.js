@@ -167,14 +167,11 @@ export function calculate(games) {
 		if (game.cheated || game.duration < 3 * 60 * 1000 || game.teams.every(team => team.userType === 'loser')) continue;
 
 		let smallestTeam = null, biggestTeam = null;
-		for (const team of game.teams) {
+		for (const team of game.teams) if (team.players.length) {
 			if (!smallestTeam || team.players.length < smallestTeam.players.length) smallestTeam = team;
 			if (!biggestTeam || team.players.length > biggestTeam.players.length) biggestTeam = team;
 		}
-		if (smallestTeam.players.length !== biggestTeam.players.length)
-			if (false) {
-				if (!biggestTeam.players.every(player => player.account.bot)) continue;
-			} else continue;
+		if (smallestTeam && biggestTeam && smallestTeam.players.length !== biggestTeam.players.length) continue;
 
 		const teams = []
 		for (const team of game.teams) {

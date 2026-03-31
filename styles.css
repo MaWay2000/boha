@@ -1000,11 +1000,12 @@ main {
 }
 
 .stats-table-wrap-ranks {
-  padding-top: 28px;
+  position: relative;
+  padding-top: 52px;
 }
 
 .stats-table-wrap-ranks > .stats-table {
-  margin-top: -28px;
+  margin-top: -52px;
 }
 
 .stats-table {

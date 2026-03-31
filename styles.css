@@ -786,6 +786,10 @@ main {
   gap: 16px;
 }
 
+.stats-shell-head-status-only {
+  justify-content: flex-end;
+}
+
 .stats-shell-head h3,
 .stats-panel-head h4 {
   margin: 8px 0 0;

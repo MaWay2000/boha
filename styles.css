@@ -1097,6 +1097,7 @@ main {
   position: relative;
   z-index: 4;
   white-space: nowrap;
+  text-align: center;
 }
 
 .stats-record-sort-group {
@@ -1108,8 +1109,8 @@ main {
   display: inline-grid;
   grid-template-columns: 8.2ch 0.8ch 8.2ch 0.8ch 8.2ch 0.8ch 8.2ch;
   align-items: center;
-  justify-content: end;
-  justify-items: end;
+  justify-content: center;
+  justify-items: center;
   width: 100%;
 }
 
@@ -1117,7 +1118,7 @@ main {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  justify-self: end;
+  justify-self: center;
 }
 
 .stats-record-sort-divider {
@@ -1246,17 +1247,17 @@ main {
 
 .stats-record {
   white-space: nowrap;
-  text-align: right;
+  text-align: center;
 }
 
 .stats-record-value {
   display: inline-flex;
   flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
   min-width: 0;
-  text-align: right;
+  text-align: center;
   line-height: 1;
 }
 

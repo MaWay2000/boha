@@ -829,6 +829,22 @@ main {
   gap: 10px;
 }
 
+.stats-toolbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stats-toolbar-row .stats-toolbar {
+  flex: 1 1 540px;
+}
+
+.stats-toolbar-row .stats-status {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 .stats-filter-button {
   min-height: 42px;
   padding: 0 14px;
@@ -2031,6 +2047,15 @@ main {
 
   .stats-shell-head {
     flex-direction: column;
+  }
+
+  .stats-toolbar-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stats-toolbar-row .stats-status {
+    margin-left: 0;
   }
 
   .stats-status {

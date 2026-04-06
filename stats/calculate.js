@@ -127,7 +127,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 
 	for (const account of accounts.values()) {
 		let mostFrequentName = null, highestCount = 0;
-		for (const [name, count] of account.names.entries())
+		for (const [name, count] of account.names)
 			if (count > highestCount) {
 				mostFrequentName = name;
 				highestCount = count;
@@ -155,7 +155,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 			account.games = account.games.filter(game => gameSet.has(game.startDate));
 	}
 	{ const accountsWithoutGames = [];
-		for (const [id, account] of accounts.entries()) if (!account.games.length) accountsWithoutGames.push(id);
+		for (const [id, account] of accounts) if (!account.games.length) accountsWithoutGames.push(id);
 		for (const id of accountsWithoutGames) accounts.delete(id);
 	}
 

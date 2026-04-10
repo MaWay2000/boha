@@ -195,7 +195,7 @@ export function calculate(games) {
 			case 'contender': contenders.push(team); break;
 		}
 
-		function calcEloDelta(actual, elo1, elo2) { return 20 * (actual - 1 / (1 + Math.pow(10, (elo2 - elo1) / 400))); }
+		function calcEloDelta(actual, elo1, elo2) { return 20 * (actual - 1 / (1 + 10 ** ((elo2 - elo1) / 400))); }
 
 		const survivors = winners.length ? winners : contenders;
 		if (survivors.length) {

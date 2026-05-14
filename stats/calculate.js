@@ -137,7 +137,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 		for (const name of account.names.keys()) {
 			if (name === account.name) continue;
 			let boring = false;
-			switch (name) { case 'Player': case 'Alpha': case 'Beta': boring = true; }
+			switch (name) { case 'Player': case 'Player_2': case 'Alpha': case 'Beta': boring = true; }
 			boring |= name.toLowerCase().includes('test');
 			if (boring) boringNames.push(name);
 		}

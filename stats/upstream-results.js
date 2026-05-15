@@ -1,4 +1,4 @@
-import playerPublicKeys from './player-public-keys.json?v=1cbd407258f01666' with {type: 'json'};
+import playerPublicKeys from './player-public-keys.json?v=a86dcd1171c1b83f' with {type: 'json'};
 import {gather, calculate} from './calculate.js?v=39ce442f1dcc2cab';
 import {leaderboards, filterGame, present} from './leaderboards.js?v=640d41c186d52005';
 

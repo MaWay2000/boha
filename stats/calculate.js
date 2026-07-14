@@ -25,7 +25,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 		for(const [index, player] of result.playerData.entries()) {
 			let {publicKey, name} = player, id, bot;
 
-			if (name.length > 2 && (name.endsWith('_2') || name.endsWith('_3') || name.endsWith('_4')))
+			if (name.length > 2 && (name.endsWith('_2') || name.endsWith('_3') || name.endsWith('_4') || name.endsWith('_5')))
 				name = name.substring(0, name.length - 2);
 
 			if (publicKey) {

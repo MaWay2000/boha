@@ -1,4 +1,4 @@
-import { eloThreshold } from './calculate.js?v=39ce442f1dcc2cab';
+import { eloThreshold } from './calculate.js?v=198700c6b02c28d9';
 
 export const leaderboards = [
 	'Global',

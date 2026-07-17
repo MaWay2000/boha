@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warzone 2100 Replay Analyzer</title>
+  <meta name="description" content="Inspect metadata and network records stored in Warzone 2100 replay files.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .replay-analyzer-grid,
+    .replay-summary-grid {
+      display: grid;
+      gap: 18px;
+    }
+
+    .replay-analyzer-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .replay-summary-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 18px;
+    }
+
+    .replay-field {
+      display: grid;
+      gap: 8px;
+    }
+
+    .replay-field label,
+    .replay-summary-label {
+      color: var(--muted);
+      font-family: "Oxanium", sans-serif;
+      font-size: 0.76rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .replay-field input,
+    .replay-field select {
+      width: 100%;
+      min-height: 46px;
+      padding: 10px 14px;
+      color: var(--text);
+      background: rgba(4, 12, 20, 0.72);
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      border-radius: 16px;
+      font: inherit;
+    }
+
+    .replay-field input:focus-visible,
+    .replay-field select:focus-visible {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+
+    .replay-analyzer-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      margin-top: 18px;
+    }
+
+    .replay-action {
+      min-height: 42px;
+      padding: 9px 18px;
+      color: #07131b;
+      background: var(--cyan);
+      border: 0;
+      border-radius: 999px;
+      font: 700 0.83rem "Oxanium", sans-serif;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+    }
+
+    .replay-action-secondary {
+      color: var(--text);
+      background: rgba(6, 18, 29, 0.78);
+      border: 1px solid rgba(109, 232, 255, 0.22);
+    }
+
+    .replay-action:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .replay-status {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .replay-status-error {
+      color: #ff9a90;
+    }
+
+    .replay-results[hidden] {
+      display: none;
+    }
+
+    .replay-summary-card {
+      min-width: 0;
+    }
+
+    .replay-summary-value {
+      display: block;
+      margin-top: 7px;
+      overflow-wrap: anywhere;
+      font: 700 1.15rem "Oxanium", sans-serif;
+    }
+
+    .replay-results-section {
+      margin-top: 18px;
+    }
+
+    .replay-event-filters {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      margin: 16px 0;
+    }
+
+    .replay-results-section h3 {
+      margin-top: 0;
+    }
+
+    .replay-table-wrap {
+      overflow: auto;
+    }
+
+    .replay-table td,
+    .replay-table th {
+      white-space: nowrap;
+    }
+
+    .replay-raw {
+      max-height: 420px;
+      overflow: auto;
+      margin: 14px 0 0;
+      padding: 16px;
+      color: #b9d9ee;
+      background: rgba(2, 8, 14, 0.72);
+      border: 1px solid rgba(109, 232, 255, 0.12);
+      border-radius: 14px;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (max-width: 900px) {
+      .replay-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 680px) {
+      .replay-analyzer-grid,
+      .replay-event-filters,
+      .replay-summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <main id="top">
+      <section class="section-grid">
+        <div class="section-head">
+          <p class="eyebrow">Replay Analyzer</p>
+          <h2>See what a replay contains.</h2>
+          <p>
+            Load a Warzone 2100 <code>.wzrp</code> file to inspect its match metadata,
+            players, embedded map, duration, and recorded network messages.
+          </p>
+        </div>
+
+        <article class="data-card">
+          <div class="replay-analyzer-grid">
+            <div class="replay-field">
+              <label for="replayFile">Replay file</label>
+              <input id="replayFile" type="file" accept=".wzrp,application/octet-stream">
+            </div>
+            <div class="replay-field">
+              <label for="replayUrl">Or replay URL</label>
+              <input id="replayUrl" type="url" inputmode="url" placeholder="https://.../replay.wzrp">
+            </div>
+          </div>
+          <div class="replay-analyzer-actions">
+            <button class="replay-action" id="analyzeReplay" type="button">Analyze replay</button>
+            <button class="replay-action replay-action-secondary" id="downloadReplayJson" type="button" disabled>
+              Download JSON
+            </button>
+            <p class="replay-status" id="replayStatus" role="status" aria-live="polite">
+              Choose a local replay or paste its direct URL.
+            </p>
+          </div>
+        </article>
+
+        <div class="replay-results" id="replayResults" hidden>
+          <div class="replay-summary-grid" id="replaySummary"></div>
+
+          <article class="data-card replay-results-section">
+            <h3>Players</h3>
+            <div class="stats-table-wrap replay-table-wrap">
+              <table class="stats-table replay-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Team</th>
+                    <th>Colour</th>
+                    <th>Role</th>
+                    <th>Faction</th>
+                  </tr>
+                </thead>
+                <tbody id="replayPlayers"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="data-card replay-results-section">
+            <h3>Network message inventory</h3>
+            <p>Official message names are shown alongside their numeric replay IDs.</p>
+            <div class="stats-table-wrap replay-table-wrap">
+              <table class="stats-table replay-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Name</th>
+                    <th>Messages</th>
+                    <th>Payload bytes</th>
+                    <th>Players</th>
+                  </tr>
+                </thead>
+                <tbody id="replayMessages"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="data-card replay-results-section">
+            <h3>Decoded event timeline</h3>
+            <div class="replay-event-filters">
+              <div class="replay-field">
+                <label for="replayEventCategory">Event category</label>
+                <select id="replayEventCategory">
+                  <option value="">All categories</option>
+                </select>
+              </div>
+              <div class="replay-field">
+                <label for="replayEventPlayer">Player</label>
+                <select id="replayEventPlayer">
+                  <option value="">All players</option>
+                </select>
+              </div>
+              <div class="replay-field">
+                <label for="replayEventSearch">Search events</label>
+                <input id="replayEventSearch" type="search" placeholder="Research, manufacture, attack…">
+              </div>
+            </div>
+            <p id="replayEventsNote"></p>
+            <div class="stats-table-wrap replay-table-wrap">
+              <table class="stats-table replay-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Player</th>
+                    <th>Event</th>
+                    <th>Details</th>
+                  </tr>
+                </thead>
+                <tbody id="replayEvents"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="data-card replay-results-section">
+            <details>
+              <summary>Raw extracted JSON</summary>
+              <pre class="replay-raw" id="replayRawJson"></pre>
+            </details>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="replay-analyzer.js"></script>
+  <script src="embedded-page.js"></script>
+</body>
+</html>

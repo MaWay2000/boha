@@ -108,10 +108,49 @@ function getSnapshotMetadata(snapshotText) {
     (max, result) => Math.max(max, Number(result.endDate || 0)),
     0
   );
+  const resultsMarker = '"results":[';
+  let characterOffset = snapshotText.indexOf(resultsMarker);
+  if (characterOffset < 0) {
+    throw new Error("Unable to locate results array in snapshot.");
+  }
+
+  characterOffset += resultsMarker.length;
+  let byteOffset = Buffer.byteLength(snapshotText.slice(0, characterOffset), "utf8");
+  const replayOffsets = {};
+
+  snapshot.results.forEach((result, index) => {
+    if (index > 0) {
+      if (snapshotText[characterOffset] !== ",") {
+        throw new Error(`Unexpected results snapshot separator at result ${index}.`);
+      }
+      characterOffset += 1;
+      byteOffset += 1;
+    }
+
+    const serializedResult = JSON.stringify(result);
+    if (!snapshotText.startsWith(serializedResult, characterOffset)) {
+      throw new Error(`Unable to map byte offset for result ${index}.`);
+    }
+
+    const replayUrl = String(result.replayUrl || "");
+    const replayIdMatch = replayUrl.match(/(\d{10,})(?:\.wzrp)?(?:[?#].*)?$/i);
+    const replayId = replayIdMatch
+      ? replayIdMatch[1]
+      : String(result.game && result.game.startDate || "");
+    const resultByteLength = Buffer.byteLength(serializedResult, "utf8");
+
+    if (replayId) {
+      replayOffsets[replayId] = [byteOffset, resultByteLength];
+    }
+
+    characterOffset += serializedResult.length;
+    byteOffset += resultByteLength;
+  });
 
   return {
     resultsCount: snapshot.results.length,
-    latestEndDate
+    latestEndDate,
+    replayOffsets
   };
 }
 
@@ -253,7 +292,33 @@ async function main() {
   console.log(`Synced upstream files with manifest version ${nextManifest.version}.`);
 }
 
-main().catch((error) => {
+function refreshCurrentManifest() {
+  const currentManifest = loadCurrentManifest();
+  if (!currentManifest || !currentManifest.files || !currentManifest.files["results-snapshot.json"]) {
+    throw new Error("Current upstream manifest is missing results-snapshot.json metadata.");
+  }
+
+  const snapshotText = readTextIfExists(path.join(STATS_DIR, "results-snapshot.json"));
+  if (!snapshotText) {
+    throw new Error("Current results-snapshot.json is missing.");
+  }
+
+  Object.assign(
+    currentManifest.files["results-snapshot.json"],
+    getSnapshotMetadata(snapshotText)
+  );
+  writeTextIfChanged(
+    path.join(STATS_DIR, "upstream-manifest.json"),
+    `${JSON.stringify(currentManifest, null, 2)}\n`
+  );
+  console.log("Refreshed current replay byte offsets.");
+}
+
+const operation = process.argv.includes("--refresh-manifest")
+  ? Promise.resolve().then(refreshCurrentManifest)
+  : main();
+
+operation.catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

@@ -29,6 +29,34 @@
       margin-top: 18px;
     }
 
+    .replay-analyzer-intro {
+      max-width: none;
+    }
+
+    .replay-analyzer-heading {
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      white-space: nowrap;
+    }
+
+    .replay-analyzer-intro .replay-analyzer-title {
+      margin: 0;
+      color: var(--text);
+      font: 700 clamp(2.15rem, 4vw, 3.35rem)/0.96 "Oxanium", sans-serif;
+    }
+
+    .replay-analyzer-intro .replay-analyzer-subtitle {
+      margin: 0;
+      color: var(--text);
+      font-size: clamp(0.95rem, 1.4vw, 1.2rem);
+      line-height: 1.1;
+    }
+
+    .replay-analyzer-description {
+      white-space: nowrap;
+    }
+
     .replay-field {
       display: grid;
       gap: 8px;
@@ -152,6 +180,18 @@
       text-align: center;
     }
 
+    .replay-table .replay-stat-details th:first-child,
+    .replay-table .replay-stat-details th:nth-child(5),
+    .replay-table tbody td:nth-child(5),
+    .replay-table tbody td:nth-child(9) {
+      border-left: 1px solid rgba(109, 232, 255, 0.16);
+    }
+
+    .replay-table .replay-stat-details th:last-child,
+    .replay-table tbody td:nth-child(12) {
+      border-right: 1px solid rgba(109, 232, 255, 0.16);
+    }
+
     .replay-table tbody tr.replay-player-won {
       background: rgba(35, 154, 91, 0.12);
     }
@@ -176,13 +216,14 @@
     }
 
     .replay-player-awards {
-      display: inline-flex;
-      max-width: 190px;
-      flex-wrap: wrap;
+      display: inline-grid;
+      width: 181px;
+      grid-template-columns: repeat(6, 26px);
       gap: 5px;
     }
 
     .replay-player-award {
+      position: relative;
       display: inline-grid;
       width: 26px;
       height: 26px;
@@ -196,11 +237,71 @@
       line-height: 1;
     }
 
+    .replay-tooltip::before,
+    .replay-tooltip::after {
+      position: absolute;
+      z-index: 20;
+      visibility: hidden;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .replay-tooltip::before {
+      content: "";
+      bottom: calc(100% + 5px);
+      left: 50%;
+      border: 5px solid transparent;
+      border-top-color: rgba(109, 232, 255, 0.7);
+      transform: translateX(-50%);
+    }
+
+    .replay-tooltip::after {
+      content: attr(data-tooltip);
+      bottom: calc(100% + 15px);
+      left: 50%;
+      width: max-content;
+      max-width: min(360px, 70vw);
+      padding: 8px 11px;
+      color: var(--text);
+      background: #07131d;
+      border: 1px solid rgba(109, 232, 255, 0.7);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 14px rgba(109, 232, 255, 0.12);
+      font: 600 0.78rem/1.35 "Space Grotesk", sans-serif;
+      letter-spacing: normal;
+      text-align: left;
+      text-transform: none;
+      white-space: normal;
+      transform: translateX(-50%);
+    }
+
+    .replay-tooltip:hover::before,
+    .replay-tooltip:hover::after,
+    .replay-tooltip:focus::before,
+    .replay-tooltip:focus::after {
+      visibility: visible;
+      opacity: 1;
+    }
+
     .replay-player-award:hover,
     .replay-player-award:focus-visible {
       border-color: rgba(109, 232, 255, 0.65);
       background: rgba(109, 232, 255, 0.16);
       outline: none;
+    }
+
+    .replay-research-stat {
+      display: inline-flex;
+      gap: 7px;
+      align-items: baseline;
+    }
+
+    .replay-research-idle {
+      position: relative;
+      color: #83dff2;
+      border-bottom: 1px dotted rgba(131, 223, 242, 0.65);
+      cursor: help;
+      font-size: inherit;
     }
 
     .replay-raw {
@@ -229,6 +330,16 @@
       .replay-summary-grid {
         grid-template-columns: 1fr;
       }
+
+      .replay-analyzer-description {
+        white-space: normal;
+      }
+
+      .replay-analyzer-heading {
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        white-space: normal;
+      }
     }
   </style>
 </head>
@@ -236,12 +347,13 @@
   <div class="page-shell">
     <main id="top">
       <section class="section-grid">
-        <div class="section-head">
-          <p class="eyebrow">Replay Analyzer</p>
-          <h2>See what a replay contains.</h2>
-          <p>
-            Load a Warzone 2100 <code>.wzrp</code> file to inspect its match metadata,
-            players, embedded map, duration, and recorded network messages.
+        <div class="section-head replay-analyzer-intro">
+          <div class="replay-analyzer-heading">
+            <p class="replay-analyzer-title">Replay Analyzer</p>
+            <h2 class="replay-analyzer-subtitle">See what a replay contains.</h2>
+          </div>
+          <p class="replay-analyzer-description">
+            Load a Warzone 2100 <code>.wzrp</code> file to inspect its match metadata, players, embedded map, duration, and recorded network messages.
           </p>
         </div>
 

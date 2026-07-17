@@ -115,6 +115,7 @@
   let latestExtraction = null;
   let latestFileName = "replay-analysis.json";
   let latestReplayId = "";
+  let playerSortState = { key: "position", direction: "asc" };
 
   class ReplayMessageReader {
     constructor(bytes) {
@@ -825,7 +826,7 @@
     return Number.isFinite(number) ? number : null;
   }
 
-  function calculatePlayerAwards(players) {
+  function calculatePlayerAwards(players, events = []) {
     const awardsByPlayer = new Map(players.map((player) => [player, []]));
     const competitors = players.filter((player) => !player.spectator && player.summary);
     const number = (value) => Number(value).toLocaleString();
@@ -835,6 +836,11 @@
     const totalBuilt = (player) => stat(player, "droidsBuilt") + stat(player, "structuresBuilt");
     const totalRemaining = (player) => stat(player, "remainingDroids") + stat(player, "remainingStructures");
     const totalDestruction = (player) => stat(player, "kills") + stat(player, "structuresDestroyed");
+    const totalLost = (player) => stat(player, "droidsLost") + stat(player, "structuresLost");
+
+    const giveAward = (player, icon, label, details) => {
+      awardsByPlayer.get(player).push({ icon, label, details });
+    };
 
     const addTopAward = ({ icon, label, candidates = competitors, value, details }) => {
       const scored = candidates
@@ -858,6 +864,20 @@
             details: details(entry.player, entry.value)
           });
         });
+    };
+
+    const addBottomAward = ({ icon, label, candidates = competitors, value, details }) => {
+      const scored = candidates
+        .map((player) => ({ player, value: Number(value(player)) }))
+        .filter((entry) => Number.isFinite(entry.value) && entry.value >= 0);
+      if (!scored.length) {
+        return;
+      }
+
+      const bestValue = Math.min(...scored.map((entry) => entry.value));
+      scored
+        .filter((entry) => entry.value === bestValue)
+        .forEach((entry) => giveAward(entry.player, icon, label, details(entry.player, entry.value)));
     };
 
     addTopAward({
@@ -979,6 +999,110 @@
       value: (player) => totalDestruction(player) / totalRemaining(player),
       details: (player, value) => `Best destruction per remaining asset among losing survivors: ${value.toFixed(2)}`
     });
+    competitors
+      .filter((player) => isWinner(player) && stat(player, "structuresLost") === 0)
+      .forEach((player) => giveAward(player, "🧹", "Clean Sweep", "Won without losing a structure"));
+    addTopAward({
+      icon: "🩹",
+      label: "Army Preservation",
+      candidates: competitors.filter((player) => stat(player, "remainingDroids") + stat(player, "droidsLost") >= 25),
+      value: (player) => stat(player, "remainingDroids") / (
+        stat(player, "remainingDroids") + stat(player, "droidsLost")
+      ),
+      details: (player, value) => `Best unit survival share: ${(value * 100).toFixed(1)}%`
+    });
+    addTopAward({
+      icon: "🏯",
+      label: "Perfect Defense",
+      candidates: competitors.filter((player) => stat(player, "remainingStructures") + stat(player, "structuresLost") >= 25),
+      value: (player) => stat(player, "remainingStructures") / (
+        stat(player, "remainingStructures") + stat(player, "structuresLost")
+      ),
+      details: (player, value) => `Best structure survival share: ${(value * 100).toFixed(1)}%`
+    });
+    addTopAward({
+      icon: "🔨",
+      label: "Rebuild Master",
+      value: (player) => stat(player, "structuresBuilt") * stat(player, "structuresLost"),
+      details: (player) => `${number(stat(player, "structuresBuilt"))} structures built despite ${number(stat(player, "structuresLost"))} lost`
+    });
+    addTopAward({
+      icon: "🗡️",
+      label: "Siege Efficiency",
+      candidates: competitors.filter((player) => stat(player, "droidsLost") >= 25),
+      value: (player) => stat(player, "structuresDestroyed") / stat(player, "droidsLost"),
+      details: (player, value) => `Best structures-destroyed-to-units-lost ratio: ${value.toFixed(2)}`
+    });
+    addTopAward({
+      icon: "📈",
+      label: "Score Efficiency",
+      candidates: competitors.filter((player) => totalBuilt(player) >= 50 && stat(player, "score") > 0),
+      value: (player) => stat(player, "score") / totalBuilt(player),
+      details: (player, value) => `Best score per produced asset: ${number(Math.round(value))}`
+    });
+
+    const balancedMaxima = {
+      kills: Math.max(...competitors.map((player) => stat(player, "kills")), 1),
+      production: Math.max(...competitors.map(totalBuilt), 1),
+      research: Math.max(...competitors.map((player) => stat(player, "researchComplete")), 1),
+      survival: Math.max(...competitors.map(totalRemaining), 1)
+    };
+    addTopAward({
+      icon: "⚖️",
+      label: "Balanced Commander",
+      value: (player) => Math.min(
+        stat(player, "kills") / balancedMaxima.kills,
+        totalBuilt(player) / balancedMaxima.production,
+        stat(player, "researchComplete") / balancedMaxima.research,
+        totalRemaining(player) / balancedMaxima.survival
+      ),
+      details: (player, value) => `Strongest balanced combat, production, research, and survival rating: ${(value * 100).toFixed(1)}%`
+    });
+    addBottomAward({
+      icon: "🐺",
+      label: "Underdog Victor",
+      candidates: competitors.filter((player) => isWinner(player) && stat(player, "score") >= 0),
+      value: (player) => stat(player, "score"),
+      details: (player) => `Victory with the lowest winning score: ${number(stat(player, "score"))}`
+    });
+    addTopAward({
+      icon: "🧨",
+      label: "All-Out Assault",
+      candidates: competitors.filter(isWinner),
+      value: totalLost,
+      details: (player) => `Winner with most combined losses: ${number(totalLost(player))}`
+    });
+
+    const meaningfulKillThreshold = Math.max(
+      50,
+      Math.ceil(Math.max(...competitors.map((player) => stat(player, "kills")), 0) * 0.25)
+    );
+    addBottomAward({
+      icon: "💎",
+      label: "Untouchable",
+      candidates: competitors.filter((player) => stat(player, "kills") >= meaningfulKillThreshold),
+      value: (player) => stat(player, "droidsLost"),
+      details: (player) => `Fewest unit losses among major combatants: ${number(stat(player, "droidsLost"))}`
+    });
+    addTopAward({
+      icon: "🛠️",
+      label: "Industrial Recovery",
+      value: (player) => totalRemaining(player) * totalLost(player),
+      details: (player) => `${number(totalRemaining(player))} assets remained after ${number(totalLost(player))} losses`
+    });
+    addTopAward({
+      icon: "🚀",
+      label: "Overproducer",
+      value: (player) => Math.max(0, totalBuilt(player) - totalRemaining(player)),
+      details: (player) => `Production exceeded remaining assets by ${number(Math.max(0, totalBuilt(player) - totalRemaining(player)))}`
+    });
+    addTopAward({
+      icon: "🧠",
+      label: "Research Efficiency",
+      candidates: competitors.filter((player) => stat(player, "structuresBuilt") >= 25),
+      value: (player) => stat(player, "researchComplete") / stat(player, "structuresBuilt"),
+      details: (player, value) => `Best research-to-structures-built ratio: ${value.toFixed(2)}`
+    });
 
     const teams = new Map();
     competitors.forEach((player) => {
@@ -989,6 +1113,8 @@
       teams.get(team).push(player);
     });
     teams.forEach((teamPlayers, team) => {
+      const teamScore = teamPlayers.reduce((sum, player) => sum + Math.max(0, stat(player, "score")), 0);
+      const teamKills = teamPlayers.reduce((sum, player) => sum + stat(player, "kills"), 0);
       addTopAward({
         icon: "⭐",
         label: "Team MVP",
@@ -996,7 +1122,142 @@
         value: (player) => stat(player, "score"),
         details: (player) => `Highest score on team ${team}: ${number(stat(player, "score"))}`
       });
+      addTopAward({
+        icon: "👑",
+        label: "Team Carry",
+        candidates: teamPlayers,
+        value: (player) => teamScore > 0 ? Math.max(0, stat(player, "score")) / teamScore : 0,
+        details: (player, value) => `Largest share of team ${team}'s score: ${(value * 100).toFixed(1)}%`
+      });
+      addTopAward({
+        icon: "🦅",
+        label: "Team Slayer",
+        candidates: teamPlayers,
+        value: (player) => teamKills > 0 ? stat(player, "kills") / teamKills : 0,
+        details: (player, value) => `Largest share of team ${team}'s kills: ${(value * 100).toFixed(1)}%`
+      });
     });
+
+    const competitorsByPosition = new Map(
+      competitors.map((player) => [Number(player.position), player])
+    );
+    const timelineEvents = events.filter((event) => (
+      competitorsByPosition.has(Number(event.player))
+      && event.time != null
+      && Number.isFinite(Number(event.time))
+    ));
+    const playerForEvent = (event) => competitorsByPosition.get(Number(event.player));
+    const countEvents = (predicate) => {
+      const counts = new Map(competitors.map((player) => [player, 0]));
+      timelineEvents.filter(predicate).forEach((event) => {
+        const player = playerForEvent(event);
+        counts.set(player, counts.get(player) + 1);
+      });
+      return counts;
+    };
+    const addCountAward = (icon, label, predicate, details) => {
+      const counts = countEvents(predicate);
+      addTopAward({
+        icon,
+        label,
+        value: (player) => counts.get(player) || 0,
+        details: (player, value) => details(player, value)
+      });
+    };
+    const addEarliestEventAward = (icon, label, predicate, details) => {
+      const matching = timelineEvents.filter(predicate);
+      if (!matching.length) {
+        return;
+      }
+      const earliestTime = Math.min(...matching.map((event) => Number(event.time)));
+      const awarded = new Set();
+      matching
+        .filter((event) => Number(event.time) === earliestTime)
+        .forEach((event) => {
+          const player = playerForEvent(event);
+          if (!awarded.has(player)) {
+            awarded.add(player);
+            giveAward(player, icon, label, details(event, earliestTime));
+          }
+        });
+    };
+
+    const gifts = timelineEvents.filter((event) => event.category === "Gift");
+    addCountAward(
+      "🎁",
+      "Generous Ally",
+      (event) => event.category === "Gift",
+      (player, value) => `Most gifts sent: ${number(value)}`
+    );
+    const giftRecipients = new Map(competitors.map((player) => [player, new Set()]));
+    gifts.forEach((event) => {
+      giftRecipients.get(playerForEvent(event)).add(Number(event.data && event.data.to));
+    });
+    addTopAward({
+      icon: "🤝",
+      label: "Team Support",
+      value: (player) => giftRecipients.get(player).size,
+      details: (player, value) => `Helped the most distinct players: ${number(value)}`
+    });
+    addEarliestEventAward(
+      "🔬",
+      "Research Sprinter",
+      (event) => event.category === "Research" && event.action === "Research started",
+      (event, time) => `Started the match's first recorded research at ${formatDuration(time)}`
+    );
+    addEarliestEventAward(
+      "🏭",
+      "Early Industrialist",
+      (event) => event.category === "Production" && event.action === "Manufacture",
+      (event, time) => `Issued the first manufacturing order at ${formatDuration(time)}`
+    );
+    const attackActions = new Set(["Attack", "Attack target"]);
+    addEarliestEventAward(
+      "⚔️",
+      "First Mobilization",
+      (event) => event.category === "Droid order" && attackActions.has(event.action),
+      (event, time) => `Issued the first attack order at ${formatDuration(time)}`
+    );
+    addCountAward(
+      "🗺️",
+      "Most Aggressive",
+      (event) => event.category === "Droid order" && attackActions.has(event.action),
+      (player, value) => `Most attack orders issued: ${number(value)}`
+    );
+    const defensiveActions = new Set([
+      "Guard",
+      "Hold",
+      "Patrol",
+      "Repair droid",
+      "Repair structure",
+      "Return to repair",
+      "Return to specified repair"
+    ]);
+    addCountAward(
+      "🧱",
+      "Defensive Commander",
+      (event) => event.category === "Droid order" && defensiveActions.has(event.action),
+      (player, value) => `Most defensive orders issued: ${number(value)}`
+    );
+    competitors
+      .filter((player) => playerStat(player, "playerLeftGameTime") == null)
+      .forEach((player) => giveAward(player, "⏱️", "Endurance Award", "Remained active through the end of the match"));
+    addTopAward({
+      icon: "🚪",
+      label: "Last to Leave",
+      candidates: competitors.filter((player) => playerStat(player, "playerLeftGameTime") != null),
+      value: (player) => stat(player, "playerLeftGameTime"),
+      details: (player, value) => `Latest recorded departure: ${formatDuration(value)}`
+    });
+    const coordinationActions = new Set(["Help build", "Fire support", "Commander support", "Guard"]);
+    addCountAward(
+      "📡",
+      "Field Coordinator",
+      (event) => event.category === "Gift" || (
+        event.category === "Droid order" && coordinationActions.has(event.action)
+      ),
+      (player, value) => `Most support gifts and coordination orders: ${number(value)}`
+    );
 
     return awardsByPlayer;
   }
@@ -1012,15 +1273,168 @@
     list.className = "replay-player-awards";
     awards.forEach((award) => {
       const icon = document.createElement("span");
-      icon.className = "replay-player-award";
+      icon.className = "replay-player-award replay-tooltip";
       icon.textContent = award.icon;
-      icon.title = `${award.label} — ${award.details}`;
-      icon.setAttribute("aria-label", icon.title);
+      icon.dataset.tooltip = `${award.label} — ${award.details}`;
+      icon.setAttribute("aria-label", icon.dataset.tooltip);
       icon.tabIndex = 0;
       list.append(icon);
     });
     cell.append(list);
     return cell;
+  }
+
+  function calculateResearchIdle(players, matchDuration) {
+    const rates = new Map();
+    players.forEach((player) => {
+      const completed = playerStat(player, "researchComplete");
+      const leftTime = playerStat(player, "playerLeftGameTime");
+      const activeTime = Number.isFinite(leftTime) ? leftTime : Number(matchDuration);
+      if (!player.spectator && completed != null && Number.isFinite(activeTime) && activeTime > 0) {
+        rates.set(player, completed / activeTime);
+      }
+    });
+
+    const fastestRate = Math.max(...rates.values(), 0);
+    return new Map(players.map((player) => {
+      const rate = rates.get(player);
+      if (!Number.isFinite(rate) || fastestRate <= 0) {
+        return [player, null];
+      }
+      return [player, Math.round((1 - (rate / fastestRate)) * 100)];
+    }));
+  }
+
+  function createResearchCell(player, idlePercent) {
+    const cell = document.createElement("td");
+    const count = formatStat(player.summary && player.summary.researchComplete);
+    if (count == null) {
+      cell.textContent = "—";
+      return cell;
+    }
+
+    const content = document.createElement("span");
+    content.className = "replay-research-stat";
+    const countElement = document.createElement("span");
+    countElement.textContent = count;
+    content.append(countElement);
+
+    if (idlePercent != null) {
+      const idle = document.createElement("span");
+      idle.className = "replay-research-idle replay-tooltip";
+      idle.textContent = `- ${idlePercent}% idle`;
+      idle.dataset.tooltip = "Estimated research idle gap based on completed research per active match minute versus the fastest player in this replay.";
+      idle.setAttribute("aria-label", idle.dataset.tooltip);
+      idle.tabIndex = 0;
+      content.append(idle);
+    }
+
+    cell.append(content);
+    return cell;
+  }
+
+  function playerSortValue(player, key, awardsByPlayer) {
+    if (key === "position") {
+      return Number(player.position);
+    }
+    if (key === "name") {
+      return String(player.name || "").toLocaleLowerCase();
+    }
+    if (key === "awards") {
+      return (awardsByPlayer.get(player) || []).length;
+    }
+    return playerStat(player, key);
+  }
+
+  function sortPlayers(players, awardsByPlayer) {
+    return [...players].sort((left, right) => {
+      if (left.spectator !== right.spectator) {
+        return left.spectator ? 1 : -1;
+      }
+
+      const leftValue = playerSortValue(left, playerSortState.key, awardsByPlayer);
+      const rightValue = playerSortValue(right, playerSortState.key, awardsByPlayer);
+      const leftMissing = leftValue == null || (typeof leftValue === "number" && !Number.isFinite(leftValue));
+      const rightMissing = rightValue == null || (typeof rightValue === "number" && !Number.isFinite(rightValue));
+      if (leftMissing !== rightMissing) {
+        return leftMissing ? 1 : -1;
+      }
+
+      let comparison = 0;
+      if (typeof leftValue === "string" || typeof rightValue === "string") {
+        comparison = String(leftValue).localeCompare(String(rightValue), undefined, { sensitivity: "base" });
+      } else {
+        comparison = Number(leftValue) - Number(rightValue);
+      }
+      if (comparison !== 0) {
+        return playerSortState.direction === "asc" ? comparison : -comparison;
+      }
+      return Number(left.position) - Number(right.position);
+    });
+  }
+
+  function updatePlayerSortIndicators() {
+    playersHead.querySelectorAll(".stats-sort-button[data-player-sort-key]").forEach((button) => {
+      const active = button.dataset.playerSortKey === playerSortState.key;
+      button.dataset.direction = active ? playerSortState.direction : "";
+      button.classList.toggle("is-active", active);
+      button.closest("th").setAttribute(
+        "aria-sort",
+        active ? (playerSortState.direction === "asc" ? "ascending" : "descending") : "none"
+      );
+    });
+  }
+
+  function createPlayerSortHeader(label, key, options, renderRows) {
+    const cell = createHeaderCell("", options);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "stats-sort-button stats-sort-button-compact";
+    button.dataset.playerSortKey = key;
+    button.textContent = label;
+    button.title = `Sort players by ${label}`;
+    button.addEventListener("click", () => {
+      if (playerSortState.key === key) {
+        playerSortState.direction = playerSortState.direction === "asc" ? "desc" : "asc";
+      } else {
+        playerSortState = {
+          key,
+          direction: key === "position" || key === "name" ? "asc" : "desc"
+        };
+      }
+      updatePlayerSortIndicators();
+      renderRows();
+    });
+    cell.append(button);
+    return cell;
+  }
+
+  function createPlayerRow(player, awards, researchIdle) {
+    const row = document.createElement("tr");
+    const result = formatPlayerResult(player);
+    if (result === "Won") {
+      row.className = "replay-player-won";
+    } else if (result === "Lost") {
+      row.className = "replay-player-lost";
+    }
+
+    const stats = player.summary || {};
+    row.append(
+      createPlayerSlotCell(player),
+      createCell(player.name),
+      createPlayerAwardsCell(awards),
+      createCell(formatStat(stats.score)),
+      createCell(formatStat(stats.droidsBuilt)),
+      createCell(formatStat(stats.droidsLost)),
+      createCell(formatStat(stats.kills)),
+      createCell(formatStat(stats.remainingDroids)),
+      createCell(formatStat(stats.structuresBuilt)),
+      createCell(formatStat(stats.structuresLost)),
+      createCell(formatStat(stats.structuresDestroyed)),
+      createCell(formatStat(stats.remainingStructures)),
+      createResearchCell(player, researchIdle)
+    );
+    return row;
   }
 
   function renderSummaryItem(label, value) {
@@ -1131,15 +1545,28 @@
       renderSummaryItem("Embedded map", formatBytes(extraction.file.embeddedMapBytes))
     ]);
 
+    const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
+    const researchIdleByPlayer = calculateResearchIdle(
+      extraction.players,
+      extraction.match.elapsedMilliseconds
+    );
+    const renderPlayerRows = () => {
+      replaceChildren(
+        playersBody,
+        sortPlayers(extraction.players, awardsByPlayer).map((player) => (
+          createPlayerRow(player, awardsByPlayer.get(player), researchIdleByPlayer.get(player))
+        ))
+      );
+    };
+
     const playerHeaderGroups = document.createElement("tr");
     playerHeaderGroups.append(
-      createHeaderCell("Slot", { rowSpan: 2 }),
-      createHeaderCell("Name", { rowSpan: 2 }),
-      createHeaderCell("Awards", { rowSpan: 2 }),
-      createHeaderCell("Score", { rowSpan: 2 }),
-      createHeaderCell("Kills", { rowSpan: 2 }),
+      createPlayerSortHeader("Slot", "position", { rowSpan: 2 }, renderPlayerRows),
+      createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
+      createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, renderPlayerRows),
+      createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
       createHeaderCell("Units", {
-        colSpan: 3,
+        colSpan: 4,
         scope: "colgroup",
         className: "replay-stat-group"
       }),
@@ -1148,54 +1575,24 @@
         scope: "colgroup",
         className: "replay-stat-group"
       }),
-      createHeaderCell("Research", { rowSpan: 2 }),
-      createHeaderCell("Power", { rowSpan: 2 })
+      createPlayerSortHeader("Research", "researchComplete", { rowSpan: 2 }, renderPlayerRows)
     );
 
     const playerHeaderDetails = document.createElement("tr");
     playerHeaderDetails.className = "replay-stat-details";
     playerHeaderDetails.append(
-      createHeaderCell("Built"),
-      createHeaderCell("Lost"),
-      createHeaderCell("Remaining"),
-      createHeaderCell("Destroyed"),
-      createHeaderCell("Built"),
-      createHeaderCell("Lost"),
-      createHeaderCell("Remaining")
+      createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
+      createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
+      createPlayerSortHeader("Destroyed", "kills", {}, renderPlayerRows),
+      createPlayerSortHeader("Alive", "remainingDroids", {}, renderPlayerRows),
+      createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
+      createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
+      createPlayerSortHeader("Destroyed", "structuresDestroyed", {}, renderPlayerRows),
+      createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows)
     );
     replaceChildren(playersHead, [playerHeaderGroups, playerHeaderDetails]);
-
-    const playersByPosition = [...extraction.players].sort(
-      (left, right) => Number(left.position) - Number(right.position)
-    );
-    const awardsByPlayer = calculatePlayerAwards(playersByPosition);
-    replaceChildren(playersBody, playersByPosition.map((player) => {
-      const row = document.createElement("tr");
-      const result = formatPlayerResult(player);
-      if (result === "Won") {
-        row.className = "replay-player-won";
-      } else if (result === "Lost") {
-        row.className = "replay-player-lost";
-      }
-      const stats = player.summary || {};
-      row.append(
-        createPlayerSlotCell(player),
-        createCell(player.name),
-        createPlayerAwardsCell(awardsByPlayer.get(player)),
-        createCell(formatStat(stats.score)),
-        createCell(formatStat(stats.kills)),
-        createCell(formatStat(stats.droidsBuilt)),
-        createCell(formatStat(stats.droidsLost)),
-        createCell(formatStat(stats.remainingDroids)),
-        createCell(formatStat(stats.structuresDestroyed)),
-        createCell(formatStat(stats.structuresBuilt)),
-        createCell(formatStat(stats.structuresLost)),
-        createCell(formatStat(stats.remainingStructures)),
-        createCell(formatStat(stats.researchComplete)),
-        createCell(formatStat(stats.power))
-      );
-      return row;
-    }));
+    updatePlayerSortIndicators();
+    renderPlayerRows();
 
     replaceChildren(messagesBody, extraction.messages.types.map((message) => {
       const row = document.createElement("tr");
@@ -1262,7 +1659,11 @@
     return response.arrayBuffer();
   }
 
-  analyzeButton.addEventListener("click", async () => {
+  async function analyzeReplay() {
+    if (analyzeButton.disabled) {
+      return;
+    }
+
     analyzeButton.disabled = true;
     downloadButton.disabled = true;
     results.hidden = true;
@@ -1284,8 +1685,7 @@
       }
       attachPublishedPlayerStats(latestExtraction, publishedResult);
       renderExtraction(latestExtraction);
-      const summaryStatus = publishedResult ? " Player summary loaded." : " Player summary unavailable.";
-      setStatus(`Analysis complete: ${latestExtraction.messages.count.toLocaleString()} messages found.${summaryStatus}`);
+      setStatus("");
     } catch (error) {
       const corsHint = error instanceof TypeError
         ? " The server may block browser downloads; download the replay and choose the local file instead."
@@ -1293,6 +1693,15 @@
       setStatus(`${error.message || "Replay analysis failed."}${corsHint}`, true);
     } finally {
       analyzeButton.disabled = false;
+    }
+  }
+
+  analyzeButton.addEventListener("click", analyzeReplay);
+
+  replayFile.addEventListener("change", () => {
+    if (replayFile.files.length) {
+      replayUrl.value = "";
+      analyzeReplay();
     }
   });
 

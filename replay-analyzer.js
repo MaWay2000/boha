@@ -7,7 +7,7 @@
   const results = document.getElementById("replayResults");
   const summary = document.getElementById("replaySummary");
   const playersBody = document.getElementById("replayPlayers");
-  const playersHeadRow = playersBody.closest("table").querySelector("thead tr");
+  const playersHead = playersBody.closest("table").querySelector("thead");
   const messagesBody = document.getElementById("replayMessages");
   const eventsBody = document.getElementById("replayEvents");
   const eventsNote = document.getElementById("replayEventsNote");
@@ -94,6 +94,24 @@
   });
   const varUintFactors = Object.freeze([78, 95, 32, 70, 0]);
   const varUintMultipliers = Object.freeze([1, 78, 7410, 237120, 16598400]);
+  const playerColours = Object.freeze([
+    { name: "Green", value: "#107010" },
+    { name: "Orange", value: "#ffb035" },
+    { name: "Grey", value: "#909090" },
+    { name: "Black", value: "#202020" },
+    { name: "Red", value: "#9b0f0f" },
+    { name: "Blue", value: "#2731b9" },
+    { name: "Pink", value: "#d010b0" },
+    { name: "Cyan", value: "#20d0d0" },
+    { name: "Yellow", value: "#f0e810" },
+    { name: "Purple", value: "#700074" },
+    { name: "White", value: "#e0e0e0" },
+    { name: "Bright blue", value: "#2020ff" },
+    { name: "Neon green", value: "#00a000" },
+    { name: "Infrared", value: "#400000" },
+    { name: "Ultraviolet", value: "#100040" },
+    { name: "Brown", value: "#406000" }
+  ]);
   let latestExtraction = null;
   let latestFileName = "replay-analysis.json";
   let latestReplayId = "";
@@ -737,10 +755,38 @@
     return cell;
   }
 
-  function createHeaderCell(label) {
+  function createHeaderCell(label, options = {}) {
     const cell = document.createElement("th");
-    cell.scope = "col";
+    cell.scope = options.scope || "col";
+    cell.rowSpan = options.rowSpan || 1;
+    cell.colSpan = options.colSpan || 1;
+    if (options.className) {
+      cell.className = options.className;
+    }
     cell.textContent = label;
+    return cell;
+  }
+
+  function createPlayerSlotCell(player) {
+    const cell = document.createElement("td");
+    const identity = document.createElement("span");
+    identity.className = "replay-player-identity";
+
+    const colourId = player.spectator ? 10 : Number(player.colour);
+    const colour = playerColours[colourId];
+    if (colour) {
+      const marker = document.createElement("span");
+      marker.className = "replay-player-colour";
+      marker.style.backgroundColor = colour.value;
+      marker.title = player.spectator ? "Spectator" : `${colour.name} (colour ${colourId})`;
+      marker.setAttribute("aria-label", player.spectator ? "Spectator" : colour.name);
+      identity.append(marker);
+    }
+
+    const slotNumber = document.createElement("span");
+    slotNumber.textContent = player.position == null ? "—" : String(player.position);
+    identity.append(slotNumber);
+    cell.append(identity);
     return cell;
   }
 
@@ -768,6 +814,213 @@
       return "Draw";
     }
     return null;
+  }
+
+  function playerStat(player, key) {
+    const value = player.summary && player.summary[key];
+    if (value == null || value === "") {
+      return null;
+    }
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function calculatePlayerAwards(players) {
+    const awardsByPlayer = new Map(players.map((player) => [player, []]));
+    const competitors = players.filter((player) => !player.spectator && player.summary);
+    const number = (value) => Number(value).toLocaleString();
+    const stat = (player, key) => playerStat(player, key) || 0;
+    const isWinner = (player) => formatPlayerResult(player) === "Won";
+    const isLoser = (player) => formatPlayerResult(player) === "Lost";
+    const totalBuilt = (player) => stat(player, "droidsBuilt") + stat(player, "structuresBuilt");
+    const totalRemaining = (player) => stat(player, "remainingDroids") + stat(player, "remainingStructures");
+    const totalDestruction = (player) => stat(player, "kills") + stat(player, "structuresDestroyed");
+
+    const addTopAward = ({ icon, label, candidates = competitors, value, details }) => {
+      const scored = candidates
+        .map((player) => ({ player, value: Number(value(player)) }))
+        .filter((entry) => Number.isFinite(entry.value));
+      if (!scored.length) {
+        return;
+      }
+
+      const bestValue = Math.max(...scored.map((entry) => entry.value));
+      if (bestValue <= 0) {
+        return;
+      }
+
+      scored
+        .filter((entry) => entry.value === bestValue)
+        .forEach((entry) => {
+          awardsByPlayer.get(entry.player).push({
+            icon,
+            label,
+            details: details(entry.player, entry.value)
+          });
+        });
+    };
+
+    addTopAward({
+      icon: "🏆",
+      label: "Match MVP",
+      value: (player) => stat(player, "score"),
+      details: (player) => `Highest score: ${number(stat(player, "score"))}`
+    });
+    addTopAward({
+      icon: "🎯",
+      label: "Top Fragger",
+      value: (player) => stat(player, "kills"),
+      details: (player) => `Most kills: ${number(stat(player, "kills"))}`
+    });
+    addTopAward({
+      icon: "💥",
+      label: "Demolition Expert",
+      value: (player) => stat(player, "structuresDestroyed"),
+      details: (player) => `Most structures destroyed: ${number(stat(player, "structuresDestroyed"))}`
+    });
+    addTopAward({
+      icon: "⚙️",
+      label: "War Machine",
+      value: (player) => stat(player, "droidsBuilt"),
+      details: (player) => `Most units built: ${number(stat(player, "droidsBuilt"))}`
+    });
+    addTopAward({
+      icon: "🏗️",
+      label: "Master Builder",
+      value: (player) => stat(player, "structuresBuilt"),
+      details: (player) => `Most structures built: ${number(stat(player, "structuresBuilt"))}`
+    });
+    addTopAward({
+      icon: "🧪",
+      label: "Research Pioneer",
+      value: (player) => stat(player, "researchComplete"),
+      details: (player) => `Most research completed: ${number(stat(player, "researchComplete"))}`
+    });
+    addTopAward({
+      icon: "⚔️",
+      label: "Combat Efficiency",
+      candidates: competitors.filter((player) => stat(player, "droidsLost") >= 25),
+      value: (player) => stat(player, "kills") / stat(player, "droidsLost"),
+      details: (player, value) => `Best kills-to-units-lost ratio: ${value.toFixed(2)}`
+    });
+    addTopAward({
+      icon: "🛡️",
+      label: "Last Army Standing",
+      value: (player) => stat(player, "remainingDroids"),
+      details: (player) => `Most units remaining: ${number(stat(player, "remainingDroids"))}`
+    });
+    addTopAward({
+      icon: "🏰",
+      label: "Fortress Keeper",
+      value: (player) => stat(player, "remainingStructures"),
+      details: (player) => `Most structures remaining: ${number(stat(player, "remainingStructures"))}`
+    });
+    addTopAward({
+      icon: "🏭",
+      label: "Production Powerhouse",
+      value: totalBuilt,
+      details: (player) => `Most total production: ${number(totalBuilt(player))}`
+    });
+    addTopAward({
+      icon: "☄️",
+      label: "Total Destruction",
+      value: totalDestruction,
+      details: (player) => `Kills plus structures destroyed: ${number(totalDestruction(player))}`
+    });
+    addTopAward({
+      icon: "⚡",
+      label: "Power Hoarder",
+      value: (player) => stat(player, "power"),
+      details: (player) => `Most power remaining: ${number(stat(player, "power"))}`
+    });
+    addTopAward({
+      icon: "🩸",
+      label: "Costly Victory",
+      candidates: competitors.filter(isWinner),
+      value: (player) => stat(player, "droidsLost"),
+      details: (player) => `Winner with most units lost: ${number(stat(player, "droidsLost"))}`
+    });
+    addTopAward({
+      icon: "🔥",
+      label: "Last Stand",
+      candidates: competitors.filter(isLoser),
+      value: totalRemaining,
+      details: (player) => `Losing player with most assets remaining: ${number(totalRemaining(player))}`
+    });
+    addTopAward({
+      icon: "💀",
+      label: "Glass Cannon",
+      value: (player) => stat(player, "kills") * stat(player, "droidsLost"),
+      details: (player) => `${number(stat(player, "kills"))} kills with ${number(stat(player, "droidsLost"))} units lost`
+    });
+    addTopAward({
+      icon: "🪦",
+      label: "Army Grinder",
+      value: (player) => stat(player, "droidsLost"),
+      details: (player) => `Most units lost: ${number(stat(player, "droidsLost"))}`
+    });
+    addTopAward({
+      icon: "🧱",
+      label: "Structure Casualty",
+      value: (player) => stat(player, "structuresLost"),
+      details: (player) => `Most structures lost: ${number(stat(player, "structuresLost"))}`
+    });
+    addTopAward({
+      icon: "♻️",
+      label: "Efficient Builder",
+      candidates: competitors.filter((player) => totalBuilt(player) >= 50),
+      value: (player) => totalRemaining(player) / totalBuilt(player),
+      details: (player, value) => `Best remaining-assets-to-production ratio: ${(value * 100).toFixed(1)}%`
+    });
+    addTopAward({
+      icon: "🌅",
+      label: "Comeback Survivor",
+      candidates: competitors.filter((player) => isLoser(player) && totalRemaining(player) > 0),
+      value: (player) => totalDestruction(player) / totalRemaining(player),
+      details: (player, value) => `Best destruction per remaining asset among losing survivors: ${value.toFixed(2)}`
+    });
+
+    const teams = new Map();
+    competitors.forEach((player) => {
+      const team = Number(player.team);
+      if (!teams.has(team)) {
+        teams.set(team, []);
+      }
+      teams.get(team).push(player);
+    });
+    teams.forEach((teamPlayers, team) => {
+      addTopAward({
+        icon: "⭐",
+        label: "Team MVP",
+        candidates: teamPlayers,
+        value: (player) => stat(player, "score"),
+        details: (player) => `Highest score on team ${team}: ${number(stat(player, "score"))}`
+      });
+    });
+
+    return awardsByPlayer;
+  }
+
+  function createPlayerAwardsCell(awards) {
+    const cell = document.createElement("td");
+    if (!awards || !awards.length) {
+      cell.textContent = "—";
+      return cell;
+    }
+
+    const list = document.createElement("span");
+    list.className = "replay-player-awards";
+    awards.forEach((award) => {
+      const icon = document.createElement("span");
+      icon.className = "replay-player-award";
+      icon.textContent = award.icon;
+      icon.title = `${award.label} — ${award.details}`;
+      icon.setAttribute("aria-label", icon.title);
+      icon.tabIndex = 0;
+      list.append(icon);
+    });
+    cell.append(list);
+    return cell;
   }
 
   function renderSummaryItem(label, value) {
@@ -878,58 +1131,68 @@
       renderSummaryItem("Embedded map", formatBytes(extraction.file.embeddedMapBytes))
     ]);
 
-    replaceChildren(playersHeadRow, [
-      "Position",
-      "Name",
-      "Result",
-      "Kills",
-      "Units built",
-      "Units lost",
-      "Structures destroyed",
-      "Structures built",
-      "Structures lost",
-      "Research",
-      "Score",
-      "Power",
-      "Oil rigs",
-      "Units remaining",
-      "Structures remaining",
-      "Team",
-      "Colour",
-      "Role",
-      "Faction"
-    ].map(createHeaderCell));
+    const playerHeaderGroups = document.createElement("tr");
+    playerHeaderGroups.append(
+      createHeaderCell("Slot", { rowSpan: 2 }),
+      createHeaderCell("Name", { rowSpan: 2 }),
+      createHeaderCell("Awards", { rowSpan: 2 }),
+      createHeaderCell("Score", { rowSpan: 2 }),
+      createHeaderCell("Kills", { rowSpan: 2 }),
+      createHeaderCell("Units", {
+        colSpan: 3,
+        scope: "colgroup",
+        className: "replay-stat-group"
+      }),
+      createHeaderCell("Structures", {
+        colSpan: 4,
+        scope: "colgroup",
+        className: "replay-stat-group"
+      }),
+      createHeaderCell("Research", { rowSpan: 2 }),
+      createHeaderCell("Power", { rowSpan: 2 })
+    );
 
-    replaceChildren(playersBody, extraction.players.map((player) => {
+    const playerHeaderDetails = document.createElement("tr");
+    playerHeaderDetails.className = "replay-stat-details";
+    playerHeaderDetails.append(
+      createHeaderCell("Built"),
+      createHeaderCell("Lost"),
+      createHeaderCell("Remaining"),
+      createHeaderCell("Destroyed"),
+      createHeaderCell("Built"),
+      createHeaderCell("Lost"),
+      createHeaderCell("Remaining")
+    );
+    replaceChildren(playersHead, [playerHeaderGroups, playerHeaderDetails]);
+
+    const playersByPosition = [...extraction.players].sort(
+      (left, right) => Number(left.position) - Number(right.position)
+    );
+    const awardsByPlayer = calculatePlayerAwards(playersByPosition);
+    replaceChildren(playersBody, playersByPosition.map((player) => {
       const row = document.createElement("tr");
-      let role = "Player";
-      if (player.spectator) {
-        role = player.admin ? "Admin spectator" : "Spectator";
-      } else if (player.ai >= 0) {
-        role = "Bot";
+      const result = formatPlayerResult(player);
+      if (result === "Won") {
+        row.className = "replay-player-won";
+      } else if (result === "Lost") {
+        row.className = "replay-player-lost";
       }
-
       const stats = player.summary || {};
       row.append(
-        createCell(player.position),
+        createPlayerSlotCell(player),
         createCell(player.name),
-        createCell(formatPlayerResult(player)),
+        createPlayerAwardsCell(awardsByPlayer.get(player)),
+        createCell(formatStat(stats.score)),
         createCell(formatStat(stats.kills)),
         createCell(formatStat(stats.droidsBuilt)),
         createCell(formatStat(stats.droidsLost)),
+        createCell(formatStat(stats.remainingDroids)),
         createCell(formatStat(stats.structuresDestroyed)),
         createCell(formatStat(stats.structuresBuilt)),
         createCell(formatStat(stats.structuresLost)),
-        createCell(formatStat(stats.researchComplete)),
-        createCell(formatStat(stats.score)),
-        createCell(formatStat(stats.power)),
-        createCell(formatStat(stats.oilRigs)),
-        createCell(formatStat(stats.remainingDroids)),
         createCell(formatStat(stats.remainingStructures)),
-        createCell(player.team),
-        createCell(player.colour),
-        createCell(role),
-        createCell(player.faction)
+        createCell(formatStat(stats.researchComplete)),
+        createCell(formatStat(stats.power))
       );
       return row;
     }));

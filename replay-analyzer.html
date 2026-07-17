@@ -140,6 +140,69 @@
       white-space: nowrap;
     }
 
+    .replay-table th.replay-stat-group {
+      text-align: center;
+      border-left: 1px solid rgba(109, 232, 255, 0.16);
+      border-right: 1px solid rgba(109, 232, 255, 0.16);
+    }
+
+    .replay-table .replay-stat-details th {
+      padding-top: 8px;
+      padding-bottom: 8px;
+      text-align: center;
+    }
+
+    .replay-table tbody tr.replay-player-won {
+      background: rgba(35, 154, 91, 0.12);
+    }
+
+    .replay-table tbody tr.replay-player-lost {
+      background: rgba(205, 67, 72, 0.12);
+    }
+
+    .replay-player-identity {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .replay-player-colour {
+      width: 12px;
+      height: 12px;
+      flex: 0 0 12px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(109, 232, 255, 0.18);
+    }
+
+    .replay-player-awards {
+      display: inline-flex;
+      max-width: 190px;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .replay-player-award {
+      display: inline-grid;
+      width: 26px;
+      height: 26px;
+      place-items: center;
+      border: 1px solid rgba(109, 232, 255, 0.2);
+      border-radius: 7px;
+      background: rgba(109, 232, 255, 0.07);
+      box-shadow: inset 0 0 10px rgba(109, 232, 255, 0.04);
+      cursor: help;
+      font-size: 0.94rem;
+      line-height: 1;
+    }
+
+    .replay-player-award:hover,
+    .replay-player-award:focus-visible {
+      border-color: rgba(109, 232, 255, 0.65);
+      background: rgba(109, 232, 255, 0.16);
+      outline: none;
+    }
+
     .replay-raw {
       max-height: 420px;
       overflow: auto;

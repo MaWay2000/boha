@@ -56,6 +56,7 @@ const eqGlow = document.getElementById("eqGlow");
 const vol = document.getElementById("vol");
 const tube = document.querySelector(".tube");
 const radioWrap = document.getElementById("radioWrap");
+const playerBar = document.getElementById("playerBar");
 const settingsPanel = document.getElementById("settingsPanel");
 const settingsButton = document.getElementById("settingsButton");
 const settingsTitle = document.getElementById("settingsTitle");
@@ -70,6 +71,8 @@ const timeDuration = document.getElementById("timeDuration");
 const versionedAsset = window.versionedAsset || ((path) => path);
 const logo = document.querySelector(".logo");
 const logoToggle = document.getElementById("logoToggle");
+
+playerBar.classList.add("is-awaiting-play");
 
 const TUBE_PAD = 6;
 const BAR_MIN_WIDTH = 3;
@@ -379,6 +382,13 @@ function setSettingsOpen(nextState) {
   settingsButton.classList.toggle("is-open", settingsOpen);
   settingsPanel.setAttribute("aria-hidden", String(!settingsOpen));
 
+  if (window !== window.parent) {
+    window.parent.postMessage(
+      { type: "boha:radio-playlist", open: settingsOpen },
+      window.location.origin
+    );
+  }
+
   if (settingsOpen) {
     syncPlaylistSelection();
   }
@@ -391,6 +401,23 @@ function toggleSettingsPanel() {
 function closeSettingsPanel() {
   setSettingsOpen(false);
 }
+
+window.addEventListener("message", (event) => {
+  if (event.origin !== window.location.origin || event.source !== window.parent) {
+    return;
+  }
+
+  if (event.data?.type === "boha:radio-close-playlist" && settingsOpen) {
+    closeSettingsPanel();
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && settingsOpen) {
+    event.preventDefault();
+    closeSettingsPanel();
+  }
+});
 
 function persistWrapPosition(left, top) {
   try {
@@ -445,6 +472,12 @@ function setPlayerBarVisible(visible) {
 
   const restoreLogoPosition = keepLogoFixedAfterLayoutChange();
   radioWrap.classList.toggle("is-player-hidden", !visible);
+  if (window !== window.parent) {
+    window.parent.postMessage(
+      { type: "boha:radio-player", open: visible },
+      window.location.origin
+    );
+  }
   if (restoreLogoPosition) {
     restoreLogoPosition();
   }
@@ -840,7 +873,7 @@ function initYouTubePlayer() {
   player = new YT.Player("player", {
     videoId: TRACKS[Math.max(0, currentTrackIndex)].id,
     playerVars: {
-      autoplay: 1,
+      autoplay: 0,
       mute: 1,
       controls: 0,
       rel: 0,
@@ -849,12 +882,13 @@ function initYouTubePlayer() {
     events: {
       onReady: () => {
         setVol(vol.value);
-        loadTrack(currentTrackIndex);
+        cueTrack(currentTrackIndex);
         updateTimebar();
       },
       onStateChange: (event) => {
         if (event.data === YT.PlayerState.PLAYING) {
           playing = true;
+          playerBar.classList.remove("is-awaiting-play");
           updateIcon();
           syncPlaylistSelection();
           updateTimebar();
@@ -928,6 +962,7 @@ function playPause() {
   } else {
     player.playVideo();
     playing = true;
+    playerBar.classList.remove("is-awaiting-play");
   }
 
   updateIcon();
@@ -1222,6 +1257,20 @@ document.addEventListener("keydown", unlockAudio);
 renderPlaylist();
 vol.value = String(readStoredVolume());
 setVol(vol.value);
+const showPlayerOnLoad = window.innerWidth >= 500;
+radioWrap.classList.toggle("is-player-hidden", !showPlayerOnLoad);
+logoToggle.setAttribute("aria-expanded", String(showPlayerOnLoad));
+if (showPlayerOnLoad) {
+  radioWrap.style.left = "16px";
+  radioWrap.style.top = "37.8px";
+  radioWrap.style.right = "auto";
+}
+if (window !== window.parent) {
+  window.parent.postMessage(
+    { type: "boha:radio-player", open: showPlayerOnLoad },
+    window.location.origin
+  );
+}
 animateBars();
 updateTimebar();
 startRandomLogoPulseLoop();

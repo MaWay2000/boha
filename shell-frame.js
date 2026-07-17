@@ -1,6 +1,7 @@
 const contentFrame = document.getElementById("contentFrame");
 const navLinks = [...document.querySelectorAll(".topnav a[data-tab]")];
 const tabControls = [...document.querySelectorAll("[data-tab]")];
+let frameIsLoading = false;
 
 const tabs = Object.fromEntries(
   navLinks.map((link) => [
@@ -103,6 +104,8 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false } = {}) {
   const nextSrc = buildFrameUrl(normalizedTab);
   const currentSrc = contentFrame.getAttribute("src") || "";
   if (contentFrame.dataset.currentTab !== normalizedTab || currentSrc !== nextSrc) {
+    frameIsLoading = true;
+    contentFrame.style.height = "480px";
     contentFrame.dataset.currentTab = normalizedTab;
     contentFrame.src = nextSrc;
   }
@@ -128,7 +131,10 @@ tabControls.forEach((control) => {
   });
 });
 
-contentFrame.addEventListener("load", syncFrameHeightFromDocument);
+contentFrame.addEventListener("load", () => {
+  frameIsLoading = false;
+  syncFrameHeightFromDocument();
+});
 
 window.addEventListener("message", (event) => {
   if (event.origin !== window.location.origin) {
@@ -140,6 +146,10 @@ window.addEventListener("message", (event) => {
   }
 
   if (event.data?.type === "boha:frame-height") {
+    if (frameIsLoading) {
+      return;
+    }
+
     const height = Number(event.data.height);
     if (Number.isFinite(height) && height > 0) {
       contentFrame.style.height = `${Math.max(480, height)}px`;

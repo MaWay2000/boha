@@ -136,6 +136,37 @@
     0 2px 0 rgba(255, 255, 255, 0.04);
 }
 
+.player.is-awaiting-play::before {
+  content: "PRESS PLAY";
+  position: absolute;
+  left: 24px;
+  top: -22px;
+  padding: 4px 12px;
+  border: 1px solid rgba(126, 230, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(9, 20, 30, 0.94);
+  color: #e8faff;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: radio-press-play-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes radio-press-play-pulse {
+  0%,
+  100% {
+    opacity: 0.58;
+    box-shadow: 0 0 4px rgba(83, 220, 255, 0.08);
+  }
+
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 14px rgba(83, 220, 255, 0.34);
+  }
+}
+
 .player-main {
   display: flex;
   align-items: center;

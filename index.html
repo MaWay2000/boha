@@ -16,6 +16,53 @@
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    body.radio-playlist-open {
+      overflow: hidden;
+    }
+
+    body.radio-playlist-open .topbar {
+      backdrop-filter: none;
+    }
+
+    .topbar-radio.is-playlist-overlay::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      background: rgba(2, 7, 12, 0.78);
+      backdrop-filter: blur(4px);
+    }
+
+    .topbar-radio.is-player-overlay {
+      overflow: visible;
+      min-height: 168px;
+      z-index: 40;
+    }
+
+    .topbar-radio iframe.is-player-overlay:not(.is-playlist-overlay) {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      width: min(560px, calc(100vw - 32px));
+      transform: translateY(-50%);
+    }
+
+    .topbar-radio iframe.is-playlist-overlay {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      z-index: 1000;
+      width: min(520px, calc(100vw - 32px));
+      height: min(620px, calc(100vh - 32px));
+      min-height: 0;
+      transform: translate(-50%, -50%);
+      border: 1px solid rgba(122, 192, 255, 0.32);
+      border-radius: 24px;
+      background: rgba(5, 10, 16, 0.98);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72);
+    }
+  </style>
 </head>
 <body>
   <div class="page-shell">
@@ -39,7 +86,7 @@
 
         <div class="topbar-radio" aria-label="Warzone Radio">
           <iframe
-            src="https://maway2000.github.io/warzone2100-radio/"
+            src="radio/"
             title="Warzone Radio"
             loading="eager"
           ></iframe>
@@ -64,5 +111,61 @@
   </div>
 
   <script src="shell-frame.js"></script>
+  <script>
+    (function () {
+      const radioContainer = document.querySelector(".topbar-radio");
+      const radioFrame = radioContainer ? radioContainer.querySelector("iframe") : null;
+
+      if (!radioContainer || !radioFrame) {
+        return;
+      }
+
+      function setPlaylistOverlayOpen(open) {
+        document.body.classList.toggle("radio-playlist-open", open);
+        radioContainer.classList.toggle("is-playlist-overlay", open);
+        radioFrame.classList.toggle("is-playlist-overlay", open);
+      }
+
+      function setPlayerOverlayOpen(open) {
+        const needsExtraWidth = open && radioContainer.getBoundingClientRect().width < 500;
+        radioContainer.classList.toggle("is-player-overlay", needsExtraWidth);
+        radioFrame.classList.toggle("is-player-overlay", needsExtraWidth);
+      }
+
+      function requestPlaylistClose() {
+        radioFrame.contentWindow.postMessage(
+          { type: "boha:radio-close-playlist" },
+          window.location.origin
+        );
+      }
+
+      window.addEventListener("message", (event) => {
+        if (event.origin !== window.location.origin || event.source !== radioFrame.contentWindow) {
+          return;
+        }
+
+        if (event.data?.type === "boha:radio-playlist") {
+          setPlaylistOverlayOpen(Boolean(event.data.open));
+          return;
+        }
+
+        if (event.data?.type === "boha:radio-player") {
+          setPlayerOverlayOpen(Boolean(event.data.open));
+        }
+      });
+
+      radioContainer.addEventListener("click", (event) => {
+        if (event.target === radioContainer && radioContainer.classList.contains("is-playlist-overlay")) {
+          requestPlaylistClose();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && radioContainer.classList.contains("is-playlist-overlay")) {
+          requestPlaylistClose();
+        }
+      });
+    }());
+  </script>
 </body>
 </html>

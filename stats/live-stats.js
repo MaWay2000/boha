@@ -26,7 +26,7 @@ const SORT_DEFAULTS = {
   matches: { key: "date", direction: "desc" }
 };
 const SORT_ALLOWED_KEYS = {
-  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "crashes", "winRate", "lossRate", "drawRate"]),
+  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "crashes", "winRate", "lossRate", "drawRate", "crashRate"]),
   "player-games": new Set(["date", "map", "result", "duration", "replay"]),
   matches: new Set(["date", "map", "players", "duration", "replay"])
 };
@@ -42,7 +42,8 @@ const SORT_DEFAULT_DIRECTIONS = {
     crashes: "desc",
     winRate: "desc",
     lossRate: "desc",
-    drawRate: "desc"
+    drawRate: "desc",
+    crashRate: "desc"
   },
   "player-games": {
     date: "desc",
@@ -913,7 +914,7 @@ function getAccountDisplayGameCount(account) {
 
 function getRankResultRate(account, type) {
   const displayStats = getAccountDisplayStats(account);
-  const totalGames = getAccountRankedGameCount(account);
+  const totalGames = getAccountDisplayGameCount(account);
   if (totalGames <= 0) {
     return 0;
   }
@@ -925,6 +926,8 @@ function getRankResultRate(account, type) {
       return displayStats.losses / totalGames;
     case "drawRate":
       return displayStats.draws / totalGames;
+    case "crashRate":
+      return displayStats.crashes / totalGames;
     default:
       return 0;
   }
@@ -939,8 +942,8 @@ function formatRecordPercentage(value, totalGames) {
 }
 
 function compareRankRateRows(left, right, type, direction) {
-  const leftGames = getAccountRankedGameCount(left.account);
-  const rightGames = getAccountRankedGameCount(right.account);
+  const leftGames = getAccountDisplayGameCount(left.account);
+  const rightGames = getAccountDisplayGameCount(right.account);
   const leftEligible = leftGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
   const rightEligible = rightGames >= RATE_SORT_MIN_GAMES ? 1 : 0;
   const leftStats = getAccountDisplayStats(left.account);
@@ -1017,6 +1020,8 @@ function compareRankRows(left, right) {
       return compareRankRateRows(left, right, "lossRate", rankSortState.direction);
     case "drawRate":
       return compareRankRateRows(left, right, "drawRate", rankSortState.direction);
+    case "crashRate":
+      return compareRankRateRows(left, right, "crashRate", rankSortState.direction);
     case "record":
       result = compareNumberValues(getRankRecordScore(left.account), getRankRecordScore(right.account))
         || compareNumberValues(leftStats.wins, rightStats.wins)
@@ -1586,6 +1591,9 @@ function renderRanks(accountList) {
       const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
       const keyCountLabel = `${publicKeys.length} key(s) tracked`;
       const playerLine = escapeHtml(account.name || "Unknown");
+      const botBadge = Boolean(account.bot) === true
+        ? '<span class="stats-player-bot">bot</span>'
+        : "";
       const hasDetails = Boolean(publicKeys.length || accountNames.length > 1);
       const expandKey = getAccountExpandKey(account);
       const isExpanded = hasDetails && expandedAccounts.has(expandKey);
@@ -1647,6 +1655,7 @@ function renderRanks(accountList) {
         ? `
             <div class="stats-player-line">
               <span class="stats-player-label">${playerLine}</span>
+              ${botBadge}
               <button
                 class="stats-expand-toggle"
                 type="button"
@@ -1661,6 +1670,7 @@ function renderRanks(accountList) {
         : `
             <div class="stats-player-line">
               <span class="stats-player-label">${playerLine}</span>
+              ${botBadge}
               <span class="stats-player-note">${escapeHtml(note)}</span>
             </div>
           `;

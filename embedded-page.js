@@ -8,6 +8,11 @@
   let animationFrame = 0;
 
   function readHeight() {
+    const pageShell = document.querySelector(".page-shell");
+    if (pageShell) {
+      return Math.ceil(pageShell.getBoundingClientRect().bottom + window.scrollY);
+    }
+
     return Math.max(
       document.documentElement ? document.documentElement.scrollHeight : 0,
       document.body ? document.body.scrollHeight : 0,
@@ -54,20 +59,35 @@
   }
 
   const resizeObserver = new ResizeObserver(scheduleHeightPost);
-  if (document.documentElement) {
-    resizeObserver.observe(document.documentElement);
-  }
-  if (document.body) {
-    resizeObserver.observe(document.body);
+  const mutationObserver = new MutationObserver(scheduleHeightPost);
+
+  function observeDocument() {
+    const documentElement = document.documentElement;
+    const body = document.body;
+    if (!documentElement || !body) {
+      return;
+    }
+
+    const pageShell = document.querySelector(".page-shell");
+    if (pageShell) {
+      resizeObserver.observe(pageShell);
+    }
+    resizeObserver.observe(documentElement);
+    resizeObserver.observe(body);
+
+    mutationObserver.observe(documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true
+    });
   }
 
-  const mutationObserver = new MutationObserver(scheduleHeightPost);
-  mutationObserver.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    characterData: true
-  });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", observeDocument, { once: true });
+  } else {
+    observeDocument();
+  }
 
   document.addEventListener("DOMContentLoaded", scheduleHeightPost);
   window.addEventListener("load", scheduleHeightPost);

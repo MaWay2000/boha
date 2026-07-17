@@ -16,6 +16,29 @@
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .stats-reset-filters {
+      flex: 0 0 auto;
+      color: var(--text);
+      border-color: rgba(109, 232, 255, 0.28);
+    }
+
+    .stats-table-wrap-ranks {
+      max-height: min(72vh, 780px);
+      padding-top: 0;
+    }
+
+    .stats-table-wrap-ranks > .stats-table {
+      margin-top: 0;
+    }
+
+    .stats-table-ranks thead th {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      box-shadow: 0 1px 0 rgba(149, 205, 255, 0.12);
+    }
+  </style>
 </head>
 <body class="embedded-page">
   <div class="page-shell">
@@ -23,6 +46,7 @@
       <section class="landing-stats stats-shell section-frame" id="leaderboards">
         <div class="stats-toolbar-row">
           <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+          <button class="stats-filter-button stats-reset-filters" id="statsResetFilters" type="button">Reset filters</button>
           <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
         </div>
 
@@ -80,7 +104,10 @@
                             W
                             <span class="stats-sort-hint" aria-hidden="true">Wins</span>
                           </button>
-                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="winRate" aria-label="Sort by win percentage (minimum 10 games)">%</button>
+                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="winRate" aria-label="Sort by win percentage (minimum 10 games)">
+                            %
+                            <span class="stats-sort-hint" aria-hidden="true">Win percentage</span>
+                          </button>
                         </span>
                         <span class="stats-record-sort-divider">/</span>
                         <span class="stats-record-metric">
@@ -88,7 +115,10 @@
                             L
                             <span class="stats-sort-hint" aria-hidden="true">Losses</span>
                           </button>
-                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="lossRate" aria-label="Sort by loss percentage (minimum 10 games)">%</button>
+                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="lossRate" aria-label="Sort by loss percentage (minimum 10 games)">
+                            %
+                            <span class="stats-sort-hint" aria-hidden="true">Loss percentage</span>
+                          </button>
                         </span>
                         <span class="stats-record-sort-divider">/</span>
                         <span class="stats-record-metric">
@@ -96,13 +126,20 @@
                             D
                             <span class="stats-sort-hint" aria-hidden="true">Draws</span>
                           </button>
-                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="drawRate" aria-label="Sort by draw percentage (minimum 10 games)">%</button>
+                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="drawRate" aria-label="Sort by draw percentage (minimum 10 games)">
+                            %
+                            <span class="stats-sort-hint" aria-hidden="true">Draw percentage</span>
+                          </button>
                         </span>
                         <span class="stats-record-sort-divider">/</span>
                         <span class="stats-record-metric">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="crashes" aria-label="Sort by crashed all-loser games">
                             X
                             <span class="stats-sort-hint" aria-hidden="true">Crashes</span>
+                          </button>
+                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="crashRate" aria-label="Sort by crash percentage (minimum 10 games)">
+                            %
+                            <span class="stats-sort-hint" aria-hidden="true">Crash percentage</span>
                           </button>
                         </span>
                       </div>
@@ -198,5 +235,10 @@
 
   <script src="embedded-page.js"></script>
   <script type="module" src="stats/live-stats.js"></script>
+  <script>
+    document.getElementById("statsResetFilters").addEventListener("click", () => {
+      window.location.assign(window.location.pathname);
+    });
+  </script>
 </body>
 </html>

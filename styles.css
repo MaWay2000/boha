@@ -1124,7 +1124,7 @@ main {
 
 .stats-record-grid {
   display: inline-grid;
-  grid-template-columns: 8.2ch 0.8ch 8.2ch 0.8ch 8.2ch 0.8ch 8.2ch;
+  grid-template-columns: repeat(3, minmax(0, 1fr) 8px) minmax(0, 1fr);
   align-items: center;
   justify-content: center;
   justify-items: center;
@@ -1133,9 +1133,17 @@ main {
 
 .stats-record-metric {
   display: inline-flex;
+  position: relative;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   justify-self: center;
+  width: 100%;
+}
+
+.stats-record-metric .stats-sort-button-percent {
+  position: absolute;
+  left: calc(50% + 13px);
 }
 
 .stats-record-sort-divider {
@@ -1178,13 +1186,20 @@ main {
 .stats-table-wrap-ranks .stats-sort-hint {
   right: 0;
   left: auto;
-  bottom: calc(100% + 12px);
+  top: calc(100% + 12px);
+  bottom: auto;
   transform: translateY(4px);
 }
 
 .stats-table-wrap-ranks .stats-sort-hint::before {
+  top: -5px;
+  bottom: auto;
   left: auto;
   right: 12px;
+  border-top: 1px solid rgba(149, 205, 255, 0.22);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 1px solid rgba(149, 205, 255, 0.22);
   transform: rotate(45deg);
 }
 
@@ -1362,6 +1377,22 @@ main {
   display: inline-block;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+
+.stats-player-bot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(109, 232, 255, 0.16);
+  border-radius: 999px;
+  color: var(--steel);
+  background: rgba(109, 232, 255, 0.08);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .stats-player-note,

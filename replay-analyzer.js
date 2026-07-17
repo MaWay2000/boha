@@ -879,6 +879,7 @@
     ]);
 
     replaceChildren(playersHeadRow, [
+      "Position",
       "Name",
       "Result",
       "Kills",
@@ -893,7 +894,6 @@
       "Oil rigs",
       "Units remaining",
       "Structures remaining",
-      "Position",
       "Team",
       "Colour",
       "Role",
@@ -911,6 +911,7 @@
 
       const stats = player.summary || {};
       row.append(
+        createCell(player.position),
         createCell(player.name),
         createCell(formatPlayerResult(player)),
         createCell(formatStat(stats.kills)),
@@ -925,7 +926,6 @@
         createCell(formatStat(stats.oilRigs)),
         createCell(formatStat(stats.remainingDroids)),
         createCell(formatStat(stats.remainingStructures)),
-        createCell(player.position),
         createCell(player.team),
         createCell(player.colour),
         createCell(role),

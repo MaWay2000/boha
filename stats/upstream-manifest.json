@@ -1,33 +1,33 @@
 {
   "upstreamOrigin": "https://warzone2100.retropaganda.info",
-  "syncedAt": "2026-07-16T21:11:50.206Z",
+  "syncedAt": "2026-07-17T15:48:17.211Z",
   "files": {
     "calculate.js": {
       "sourceUrl": "https://warzone2100.retropaganda.info/calculate.js",
-      "sha256": "198700c6b02c28d93e7cd25169a977d7dd7afa27363e31c2f12de4d6ed027d14",
-      "sizeBytes": 8475
+      "sha256": "405a155f3c2fe6ccdadc10efc78ed310f922e09f7c428b3ec6fde80a08191a65",
+      "sizeBytes": 8474
     },
     "leaderboards.js": {
       "sourceUrl": "https://warzone2100.retropaganda.info/leaderboards.js",
-      "sha256": "a9625bac486dc10272db413c869b59db20bf339be07f5e922682c36f56716180",
-      "sizeBytes": 11191
+      "sha256": "ceb0e19fe8ff915824882577a42898ab5ffd018fcc94836f44ba32e00f0588bb",
+      "sizeBytes": 11192
     },
     "upstream-results.js": {
       "sourceUrl": "https://warzone2100.retropaganda.info/results.js",
-      "sha256": "ec0d684a535d408d11857c2df8b87d30e22aa1377f705a0ee1c1ce0d05900725",
+      "sha256": "8aefe912a4bc2a846c792c3be33a53dfca5d55e85ff63ca8b558ec73432f3528",
       "sizeBytes": 5202
     },
     "player-public-keys.json": {
       "sourceUrl": "https://warzone2100.retropaganda.info/player-public-keys.json",
-      "sha256": "b06ba4eff2186fb3fea799252c64f927790ec481b96065b624d2d03e18420539",
-      "sizeBytes": 21073
+      "sha256": "0008e585ec1583af91261afd5e19d68c71092bb28cc6894f20772d875d9edb71",
+      "sizeBytes": 21759
     },
     "results-snapshot.json": {
       "sourceUrl": "https://warzone2100.retropaganda.info/results.json",
-      "sha256": "7ed2529d272e61a6b222cfe209ff6535720fa253639da824535378f981d971fa",
-      "sizeBytes": 79501199,
-      "resultsCount": 3246,
-      "latestEndDate": 1784232275727,
+      "sha256": "698ff91e0872a1e3ee057357b5373cde2d148d9ee95a285100538c1c23363103",
+      "sizeBytes": 79523415,
+      "resultsCount": 3247,
+      "latestEndDate": 1784299202994,
       "replayOffsets": {
         "1767001487157": [
           23,
@@ -13012,9 +13012,13 @@
         "1784228315284": [
           79420168,
           81028
+        ],
+        "1784298421107": [
+          79501197,
+          22215
         ]
       }
     }
   },
-  "version": "b8cd538051dbf6be"
+  "version": "04875a2c63ede21e"
 }

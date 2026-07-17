@@ -1,4 +1,4 @@
-import { eloThreshold } from './calculate.js?v=198700c6b02c28d9';
+import { eloThreshold } from './calculate.js?v=405a155f3c2fe6cc';
 
 export const leaderboards = [
 	'Global',
@@ -54,7 +54,7 @@ export function present(accounts, games, out, playerLimit = +Infinity, gameLimit
 									<th title='Invalid either because players agreed to enable debug mode (Cheated),
 or because the setup was invalid, e.g.:
 - teams are unevenly sized,
-- all winners/contenders or losers have less than the threshold of matches ${eloThreshold}) so their Elo is not counted yet,
+- all winners/contenders or losers have less than the threshold of matches (${eloThreshold}) so their Elo is not counted yet,
 - all players lose after idling for too long, host quit, or recording spectator kicked,
 - there&apos;s a winner but no loser (e.g. everyone joined the same alliance, or a player is alone against an empty-slot),
 - a spectator wins (wrong game setup).

@@ -1,5 +1,5 @@
 export const eloBase = 1500;
-export const eloThreshold = 10;
+export const eloThreshold = 5;
 
 export function gather(results, playerPublicKeys, filterGames) {
 	const accounts = new Map();

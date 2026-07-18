@@ -1315,6 +1315,117 @@
     return cell;
   }
 
+  function createPlayerStory(player, players, events, idlePercent) {
+    if (player.spectator) {
+      return `${player.name} observed the match from slot ${player.position} and did not participate in the recorded combat.`;
+    }
+
+    const stats = player.summary || {};
+    const result = formatPlayerResult(player);
+    const score = formatStat(stats.score) || "an unrecorded score";
+    const variants = {
+      Won: ["secured victory", "emerged victorious", "finished on the winning side"],
+      Lost: ["fought on the defeated side", "continued the campaign despite defeat", "saw the campaign end in defeat"],
+      Draw: ["finished the match in a draw"]
+    };
+    const outcomeOptions = variants[result] || ["completed the match"];
+    const outcome = outcomeOptions[Math.abs(Number(player.position) || 0) % outcomeOptions.length];
+    const kills = playerStat(player, "kills") || 0;
+    const unitsBuilt = playerStat(player, "droidsBuilt") || 0;
+    const unitsLost = playerStat(player, "droidsLost") || 0;
+    const unitsAlive = playerStat(player, "remainingDroids") || 0;
+    const structuresBuilt = playerStat(player, "structuresBuilt") || 0;
+    const structuresLost = playerStat(player, "structuresLost") || 0;
+    const structuresDestroyed = playerStat(player, "structuresDestroyed") || 0;
+    const structuresAlive = playerStat(player, "remainingStructures") || 0;
+    const research = playerStat(player, "researchComplete");
+    const number = (value) => Number(value).toLocaleString();
+    const competitors = players.filter((item) => !item.spectator && item.summary);
+    const highestKills = Math.max(...competitors.map((item) => playerStat(item, "kills") || 0), 0);
+    const highestProduction = Math.max(...competitors.map((item) => playerStat(item, "droidsBuilt") || 0), 0);
+    const highestConstruction = Math.max(...competitors.map((item) => playerStat(item, "structuresBuilt") || 0), 0);
+    const highestDemolition = Math.max(...competitors.map((item) => playerStat(item, "structuresDestroyed") || 0), 0);
+    const story = [`${player.name} ${outcome} with a final score of ${score}.`];
+
+    if (kills === highestKills && kills > 0) {
+      story.push(
+        `They led the battlefield with ${number(kills)} kills after building ${number(unitsBuilt)} units and losing ${number(unitsLost)}.`
+      );
+    } else if (unitsBuilt === highestProduction && unitsBuilt > 0) {
+      story.push(
+        `Their war machine produced a match-leading ${number(unitsBuilt)} units, converting them into ${number(kills)} kills at the cost of ${number(unitsLost)} losses.`
+      );
+    } else if (unitsLost > 0 && kills / unitsLost >= 2) {
+      story.push(
+        `They fought efficiently, recording ${number(kills)} kills from ${number(unitsBuilt)} produced units while losing ${number(unitsLost)}.`
+      );
+    } else if (unitsLost > 0) {
+      story.push(
+        `They fought a costly war of attrition, building ${number(unitsBuilt)} units, recording ${number(kills)} kills, and losing ${number(unitsLost)}.`
+      );
+    } else {
+      story.push(`They built ${number(unitsBuilt)} units and recorded ${number(kills)} kills without a recorded unit loss.`);
+    }
+
+    if (structuresBuilt === highestConstruction && structuresBuilt > 0) {
+      story.push(
+        `Industrial expansion defined their campaign: ${number(structuresBuilt)} structures were built, ${number(structuresDestroyed)} were destroyed, and ${number(structuresAlive)} remained.`
+      );
+    } else if (structuresDestroyed === highestDemolition && structuresDestroyed > 0) {
+      story.push(
+        `Their siege campaign destroyed a match-leading ${number(structuresDestroyed)} structures; ${number(unitsAlive)} units and ${number(structuresAlive)} structures survived.`
+      );
+    } else if (structuresLost === 0 && structuresBuilt > 0) {
+      story.push(
+        `Their base remained intact, with all ${number(structuresAlive)} surviving structures supporting an army of ${number(unitsAlive)} units at the end.`
+      );
+    } else {
+      story.push(
+        `Their forces destroyed ${number(structuresDestroyed)} structures while their industry built ${number(structuresBuilt)}; ${number(unitsAlive)} units and ${number(structuresAlive)} structures remained at the end.`
+      );
+    }
+
+    const attackActions = new Set(["Attack", "Attack target"]);
+    const playerEvents = events.filter((event) => Number(event.player) === Number(player.position));
+    const attackEvents = playerEvents.filter((event) => (
+      event.category === "Droid order" && attackActions.has(event.action)
+    ));
+    const giftCount = playerEvents.filter((event) => event.category === "Gift").length;
+    const activity = [];
+    if (attackEvents.length) {
+      const firstAttack = Math.min(...attackEvents.map((event) => Number(event.time)).filter(Number.isFinite));
+      activity.push(
+        Number.isFinite(firstAttack)
+          ? `${number(attackEvents.length)} attack orders beginning at ${formatDuration(firstAttack)}`
+          : `${number(attackEvents.length)} attack orders`
+      );
+    }
+    if (giftCount) {
+      activity.push(`${number(giftCount)} gifts to other players`);
+    }
+    if (activity.length) {
+      story.push(`The replay records ${activity.join(" and ")}.`);
+    }
+
+    if (research != null && idlePercent != null) {
+      story.push(`They completed ${number(research)} research topics at an estimated ${100 - idlePercent}% research-lab utilization.`);
+    }
+
+    return story.join(" ");
+  }
+
+  function createPlayerNameCell(player, story) {
+    const cell = document.createElement("td");
+    const name = document.createElement("span");
+    name.className = "replay-player-story replay-tooltip";
+    name.textContent = player.name;
+    name.dataset.tooltip = story;
+    name.setAttribute("aria-label", `${player.name}. ${story}`);
+    name.tabIndex = 0;
+    cell.append(name);
+    return cell;
+  }
+
   function calculateResearchIdle(players, matchDuration) {
     const rates = new Map();
     players.forEach((player) => {
@@ -1440,7 +1551,7 @@
     return cell;
   }
 
-  function createPlayerRow(player, awards, researchIdle) {
+  function createPlayerRow(player, players, events, awards, researchIdle) {
     const row = document.createElement("tr");
     const result = formatPlayerResult(player);
     if (result === "Won") {
@@ -1452,7 +1563,7 @@
     const stats = player.summary || {};
     row.append(
       createPlayerSlotCell(player),
-      createCell(player.name),
+      createPlayerNameCell(player, createPlayerStory(player, players, events, researchIdle)),
       createPlayerAwardsCell(awards),
       createCell(formatStat(stats.score)),
       createCell(formatStat(stats.droidsBuilt)),
@@ -1581,7 +1692,13 @@
       replaceChildren(
         playersBody,
         sortPlayers(extraction.players, awardsByPlayer).map((player) => (
-          createPlayerRow(player, awardsByPlayer.get(player), researchIdleByPlayer.get(player))
+          createPlayerRow(
+            player,
+            extraction.players,
+            extraction.events.records,
+            awardsByPlayer.get(player),
+            researchIdleByPlayer.get(player)
+          )
         ))
       );
     };

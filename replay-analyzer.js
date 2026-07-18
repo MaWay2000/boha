@@ -4,6 +4,16 @@
   const replayUrl = document.getElementById("replayUrl");
   const status = document.getElementById("replayStatus");
   const demoButton = document.getElementById("replayDemo");
+  const demoButtons = document.createElement("span");
+  demoButtons.style.display = "inline-flex";
+  demoButtons.style.gap = "8px";
+  demoButtons.style.alignItems = "center";
+  demoButton.before(demoButtons);
+  demoButtons.append(demoButton);
+  const demoButton2 = demoButton.cloneNode(true);
+  demoButton2.id = "replayDemo2";
+  demoButton2.textContent = "Test demo 2";
+  demoButtons.append(demoButton2);
   const results = document.getElementById("replayResults");
   const summary = document.getElementById("replaySummary");
   const playersBody = document.getElementById("replayPlayers");
@@ -1847,6 +1857,13 @@
     replayFile.value = "";
     replayFileName.textContent = "Demo replay";
     replayUrl.value = new URL("assets/demo-1784228315284.wzrp", document.baseURI).href;
+    analyzeReplay();
+  });
+
+  demoButton2.addEventListener("click", () => {
+    replayFile.value = "";
+    replayFileName.textContent = "Demo replay 2";
+    replayUrl.value = new URL("assets/demo-1784409240892.wzrp", document.baseURI).href;
     analyzeReplay();
   });
 

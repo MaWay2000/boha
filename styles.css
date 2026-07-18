@@ -2013,6 +2013,17 @@ main {
   }
 }
 
+@media (min-width: 821px) and (max-width: 1400px) {
+  .topnav {
+    gap: 8px;
+  }
+
+  .topnav a {
+    font-size: 0.85rem;
+    letter-spacing: 0.03em;
+  }
+}
+
 @media (max-width: 820px) {
   .page-shell {
     width: 100%;

@@ -3,6 +3,7 @@
   const replayFileName = document.getElementById("replayFileName");
   const replayUrl = document.getElementById("replayUrl");
   const status = document.getElementById("replayStatus");
+  const demoButton = document.getElementById("replayDemo");
   const results = document.getElementById("replayResults");
   const summary = document.getElementById("replaySummary");
   const playersBody = document.getElementById("replayPlayers");
@@ -745,6 +746,18 @@
       : `${minutes}:${String(seconds).padStart(2, "0")}`;
   }
 
+  function formatReplayDate(replayId) {
+    const timestamp = Number(replayId);
+    if (!Number.isFinite(timestamp)) {
+      return "Unknown";
+    }
+
+    const date = new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp);
+    return Number.isNaN(date.getTime())
+      ? "Unknown"
+      : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  }
+
   function replaceChildren(element, children) {
     element.replaceChildren(...children);
   }
@@ -1340,8 +1353,8 @@
     if (idlePercent != null) {
       const idle = document.createElement("span");
       idle.className = "replay-research-idle replay-tooltip";
-      idle.textContent = `- ${idlePercent}% idle`;
-      idle.dataset.tooltip = "Estimated research idle gap based on completed research per active match minute versus the fastest player in this replay.";
+      idle.textContent = `- ${100 - idlePercent}%`;
+      idle.dataset.tooltip = "Estimated research-lab utilization based on completed research per active match minute versus the fastest player in this replay.";
       idle.setAttribute("aria-label", idle.dataset.tooltip);
       idle.tabIndex = 0;
       content.append(idle);
@@ -1556,7 +1569,7 @@
       renderSummaryItem("Map", extraction.match.map),
       renderSummaryItem("Duration", formatDuration(extraction.match.elapsedMilliseconds)),
       renderSummaryItem("Players / observers", `${playerCount} / ${observerCount}`),
-      renderSummaryItem("Messages", extraction.messages.count.toLocaleString())
+      renderSummaryItem("Date", formatReplayDate(latestReplayId))
     ]);
 
     const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
@@ -1711,6 +1724,13 @@
       replayUrl.value = "";
       analyzeReplay();
     }
+  });
+
+  demoButton.addEventListener("click", () => {
+    replayFile.value = "";
+    replayFileName.textContent = "Demo replay";
+    replayUrl.value = new URL("assets/demo-1784228315284.wzrp", document.baseURI).href;
+    analyzeReplay();
   });
 
   replayUrl.addEventListener("change", () => {

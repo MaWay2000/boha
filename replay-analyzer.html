@@ -21,7 +21,14 @@
     }
 
     .replay-analyzer-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr) auto auto auto minmax(0, 1fr);
+      align-items: center;
+    }
+
+    .replay-choice-separator {
+      color: var(--muted);
+      font: 700 0.78rem "Oxanium", sans-serif;
+      letter-spacing: 0.08em;
     }
 
     .replay-summary-grid {
@@ -186,18 +193,24 @@
     }
 
     .replay-summary-card {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
       min-width: 0;
     }
 
     .replay-summary-value {
-      display: block;
-      margin-top: 7px;
+      margin: 0;
       overflow-wrap: anywhere;
       font: 700 1.15rem "Oxanium", sans-serif;
     }
 
     .replay-results-section {
       margin-top: 18px;
+    }
+
+    .replay-results-section[hidden] {
+      display: none;
     }
 
     .replay-event-filters {
@@ -217,7 +230,24 @@
 
     .replay-table td,
     .replay-table th {
+      padding-left: 6px;
+      padding-right: 6px;
       white-space: nowrap;
+    }
+
+    .replay-table td {
+      font-size: 0.875rem;
+    }
+
+    .replay-table thead tr:first-child th:first-child,
+    .replay-table tbody td:first-child {
+      width: 1%;
+      padding-right: 0;
+    }
+
+    .replay-table thead tr:first-child th:nth-child(2),
+    .replay-table tbody td:nth-child(2) {
+      padding-left: 0;
     }
 
     .replay-table th.replay-stat-group {
@@ -229,7 +259,7 @@
     .replay-table .replay-stat-details th {
       padding-top: 8px;
       padding-bottom: 8px;
-      text-align: center;
+      text-align: left;
     }
 
     .replay-table .replay-stat-details th:first-child,
@@ -242,6 +272,13 @@
     .replay-table .replay-stat-details th:last-child,
     .replay-table tbody td:nth-child(12) {
       border-right: 1px solid rgba(109, 232, 255, 0.16);
+    }
+
+    .replay-table thead tr:first-child th:nth-child(4),
+    .replay-table thead tr:first-child th:nth-child(7),
+    .replay-table tbody td:nth-child(4),
+    .replay-table tbody td:nth-child(13) {
+      text-align: center;
     }
 
     .replay-table tbody tr.replay-player-won {
@@ -293,6 +330,7 @@
     .replay-tooltip::after {
       position: absolute;
       z-index: 20;
+      display: none;
       visibility: hidden;
       opacity: 0;
       pointer-events: none;
@@ -331,6 +369,7 @@
     .replay-tooltip:hover::after,
     .replay-tooltip:focus::before,
     .replay-tooltip:focus::after {
+      display: block;
       visibility: visible;
       opacity: 1;
     }
@@ -354,6 +393,13 @@
       border-bottom: 1px dotted rgba(131, 223, 242, 0.65);
       cursor: help;
       font-size: inherit;
+    }
+
+    .replay-research-idle::before,
+    .replay-research-idle::after {
+      right: 0;
+      left: auto;
+      transform: none;
     }
 
     .replay-raw {
@@ -392,6 +438,10 @@
         gap: 8px 12px;
         white-space: normal;
       }
+
+      .replay-choice-separator {
+        display: none;
+      }
     }
   </style>
 </head>
@@ -423,6 +473,9 @@
                 <span class="replay-file-name" id="replayFileName">No file selected</span>
               </div>
             </div>
+            <span class="replay-choice-separator">OR</span>
+            <button class="replay-action replay-action-secondary" id="replayDemo" type="button">Test demo</button>
+            <span class="replay-choice-separator">OR</span>
             <div class="replay-field">
               <input
                 id="replayUrl"
@@ -462,7 +515,7 @@
             </div>
           </article>
 
-          <article class="data-card replay-results-section">
+          <article class="data-card replay-results-section" hidden>
             <h3>Network message inventory</h3>
             <p>Official message names are shown alongside their numeric replay IDs.</p>
             <div class="stats-table-wrap replay-table-wrap">
@@ -481,7 +534,7 @@
             </div>
           </article>
 
-          <article class="data-card replay-results-section">
+          <article class="data-card replay-results-section" hidden>
             <h3>Decoded event timeline</h3>
             <div class="replay-event-filters">
               <div class="replay-field">
@@ -517,7 +570,7 @@
             </div>
           </article>
 
-          <article class="data-card replay-results-section">
+          <article class="data-card replay-results-section" hidden>
             <details>
               <summary>Raw extracted JSON</summary>
               <pre class="replay-raw" id="replayRawJson"></pre>

@@ -1,8 +1,7 @@
 (function () {
   const replayFile = document.getElementById("replayFile");
+  const replayFileName = document.getElementById("replayFileName");
   const replayUrl = document.getElementById("replayUrl");
-  const analyzeButton = document.getElementById("analyzeReplay");
-  const downloadButton = document.getElementById("downloadReplayJson");
   const status = document.getElementById("replayStatus");
   const results = document.getElementById("replayResults");
   const summary = document.getElementById("replaySummary");
@@ -113,7 +112,7 @@
     { name: "Brown", value: "#406000" }
   ]);
   let latestExtraction = null;
-  let latestFileName = "replay-analysis.json";
+  let analysisRunning = false;
   let latestReplayId = "";
   let playerSortState = { key: "position", direction: "asc" };
 
@@ -893,6 +892,15 @@
       details: (player) => `Most kills: ${number(stat(player, "kills"))}`
     });
     addTopAward({
+      icon: "🔥",
+      label: "Killing Streak",
+      candidates: competitors.filter((player) => (
+        stat(player, "kills") > 0 && stat(player, "droidsLost") === 0
+      )),
+      value: (player) => stat(player, "kills"),
+      details: (player) => `${number(stat(player, "kills"))} kills without losing a unit`
+    });
+    addTopAward({
       icon: "💥",
       label: "Demolition Expert",
       value: (player) => stat(player, "structuresDestroyed"),
@@ -1212,6 +1220,16 @@
       (event, time) => `Issued the first manufacturing order at ${formatDuration(time)}`
     );
     const attackActions = new Set(["Attack", "Attack target"]);
+    addEarliestEventAward(
+      "🩸",
+      "First Blood",
+      (event) => (
+        event.category === "Droid order"
+        && attackActions.has(event.action)
+        && stat(playerForEvent(event), "kills") > 0
+      ),
+      (event, time) => `Earliest recorded attack by a player who finished with kills, at ${formatDuration(time)}`
+    );
     addEarliestEventAward(
       "⚔️",
       "First Mobilization",
@@ -1537,12 +1555,8 @@
     replaceChildren(summary, [
       renderSummaryItem("Map", extraction.match.map),
       renderSummaryItem("Duration", formatDuration(extraction.match.elapsedMilliseconds)),
-      renderSummaryItem("Game version", extraction.format.gameVersion),
-      renderSummaryItem("Replay format", String(extraction.format.replayFormat)),
       renderSummaryItem("Players / observers", `${playerCount} / ${observerCount}`),
-      renderSummaryItem("Messages", extraction.messages.count.toLocaleString()),
-      renderSummaryItem("Replay size", formatBytes(extraction.file.bytes)),
-      renderSummaryItem("Embedded map", formatBytes(extraction.file.embeddedMapBytes))
+      renderSummaryItem("Messages", extraction.messages.count.toLocaleString())
     ]);
 
     const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
@@ -1619,7 +1633,6 @@
     };
     rawJson.textContent = JSON.stringify(rawPreview, null, 2);
     results.hidden = false;
-    downloadButton.disabled = false;
   }
 
   function setStatus(message, isError = false) {
@@ -1638,7 +1651,6 @@
 
     if (file) {
       latestReplayId = extractReplayId(file.name);
-      latestFileName = `${file.name.replace(/\.wzrp$/i, "") || "replay"}-analysis.json`;
       return file.arrayBuffer();
     }
 
@@ -1654,18 +1666,15 @@
       throw new Error(`Replay download failed with HTTP ${response.status}.`);
     }
 
-    const urlName = url.pathname.split("/").pop() || "replay";
-    latestFileName = `${urlName.replace(/\.wzrp$/i, "")}-analysis.json`;
     return response.arrayBuffer();
   }
 
   async function analyzeReplay() {
-    if (analyzeButton.disabled) {
+    if (analysisRunning) {
       return;
     }
 
-    analyzeButton.disabled = true;
-    downloadButton.disabled = true;
+    analysisRunning = true;
     results.hidden = true;
     latestExtraction = null;
     setStatus("Reading replay…");
@@ -1692,31 +1701,34 @@
         : "";
       setStatus(`${error.message || "Replay analysis failed."}${corsHint}`, true);
     } finally {
-      analyzeButton.disabled = false;
+      analysisRunning = false;
     }
   }
 
-  analyzeButton.addEventListener("click", analyzeReplay);
-
   replayFile.addEventListener("change", () => {
     if (replayFile.files.length) {
+      replayFileName.textContent = replayFile.files[0].name;
       replayUrl.value = "";
       analyzeReplay();
     }
   });
 
-  downloadButton.addEventListener("click", () => {
-    if (!latestExtraction) {
-      return;
+  replayUrl.addEventListener("change", () => {
+    if (replayUrl.value.trim()) {
+      replayFile.value = "";
+      replayFileName.textContent = "No file selected";
+      analyzeReplay();
     }
+  });
 
-    const blob = new Blob([JSON.stringify(latestExtraction, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = latestFileName;
-    link.click();
-    URL.revokeObjectURL(url);
+  replayUrl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      replayFile.value = "";
+      replayFileName.textContent = "No file selected";
+      replayUrl.blur();
+      analyzeReplay();
+    }
   });
 
   eventCategory.addEventListener("change", () => {

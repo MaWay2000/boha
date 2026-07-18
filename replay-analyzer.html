@@ -89,6 +89,58 @@
       outline-offset: 2px;
     }
 
+    .replay-file-picker {
+      display: flex;
+      min-height: 46px;
+      gap: 12px;
+      align-items: center;
+      padding: 6px 8px;
+      color: var(--text);
+      background: rgba(4, 12, 20, 0.72);
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      border-radius: 16px;
+    }
+
+    .replay-field .replay-file-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      min-height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .replay-field .replay-file-button {
+      flex: 0 0 auto;
+      padding: 7px 12px;
+      color: #061209;
+      background: var(--success);
+      border-radius: 10px;
+      box-shadow: 0 0 14px rgba(141, 233, 142, 0.16);
+      cursor: pointer;
+      font: 700 0.82rem "Oxanium", sans-serif;
+    }
+
+    .replay-field .replay-file-button:hover {
+      background: #a5f3a6;
+    }
+
+    .replay-file-input:focus-visible + .replay-file-button {
+      outline: 2px solid var(--cyan);
+      outline-offset: 2px;
+    }
+
+    .replay-file-name {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--muted);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .replay-analyzer-actions {
       display: flex;
       flex-wrap: wrap;
@@ -360,19 +412,28 @@
         <article class="data-card">
           <div class="replay-analyzer-grid">
             <div class="replay-field">
-              <label for="replayFile">Replay file</label>
-              <input id="replayFile" type="file" accept=".wzrp,application/octet-stream">
+              <div class="replay-file-picker">
+                <input
+                  class="replay-file-input"
+                  id="replayFile"
+                  type="file"
+                  accept=".wzrp,application/octet-stream"
+                >
+                <label class="replay-file-button" for="replayFile">Select reply file</label>
+                <span class="replay-file-name" id="replayFileName">No file selected</span>
+              </div>
             </div>
             <div class="replay-field">
-              <label for="replayUrl">Or replay URL</label>
-              <input id="replayUrl" type="url" inputmode="url" placeholder="https://.../replay.wzrp">
+              <input
+                id="replayUrl"
+                type="url"
+                inputmode="url"
+                aria-label="Replay URL"
+                placeholder="https://.../replay.wzrp"
+              >
             </div>
           </div>
           <div class="replay-analyzer-actions">
-            <button class="replay-action" id="analyzeReplay" type="button">Analyze replay</button>
-            <button class="replay-action replay-action-secondary" id="downloadReplayJson" type="button" disabled>
-              Download JSON
-            </button>
             <p class="replay-status" id="replayStatus" role="status" aria-live="polite">
               Choose a local replay or paste its direct URL.
             </p>

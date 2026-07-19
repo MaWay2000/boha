@@ -2,6 +2,7 @@
   const replayFile = document.getElementById("replayFile");
   const replayFileName = document.getElementById("replayFileName");
   const replayUrl = document.getElementById("replayUrl");
+  const replayUrlGo = document.getElementById("replayUrlGo");
   const status = document.getElementById("replayStatus");
   const demoButton = document.getElementById("replayDemo");
   const demoButtons = document.createElement("span");
@@ -25,6 +26,10 @@
   const eventPlayer = document.getElementById("replayEventPlayer");
   const eventSearch = document.getElementById("replayEventSearch");
   const rawJson = document.getElementById("replayRawJson");
+  const playerStoryPopup = document.createElement("div");
+  playerStoryPopup.className = "replay-player-story-popup";
+  playerStoryPopup.hidden = true;
+  document.body.append(playerStoryPopup);
 
   const textDecoder = new TextDecoder("utf-8", { fatal: true });
   const displayedEventLimit = 500;
@@ -1432,9 +1437,46 @@
     name.dataset.tooltip = story;
     name.setAttribute("aria-label", `${player.name}. ${story}`);
     name.tabIndex = 0;
+    name.addEventListener("mouseenter", () => showPlayerStory(name));
+    name.addEventListener("mouseleave", hidePlayerStory);
+    name.addEventListener("focus", () => showPlayerStory(name));
+    name.addEventListener("blur", hidePlayerStory);
     cell.append(name);
     return cell;
   }
+
+  function showPlayerStory(target) {
+    const row = target.closest("tr");
+    const statsCell = row && row.cells[2];
+    if (!row || !statsCell) {
+      return;
+    }
+
+    playerStoryPopup.textContent = target.dataset.tooltip;
+    playerStoryPopup.hidden = false;
+
+    const rowRect = row.getBoundingClientRect();
+    const statsRect = statsCell.getBoundingClientRect();
+    const popupRect = playerStoryPopup.getBoundingClientRect();
+    const left = Math.min(
+      Math.max(16, statsRect.left),
+      window.innerWidth - popupRect.width - 16
+    );
+    const top = Math.min(
+      Math.max(16, rowRect.top + ((rowRect.height - popupRect.height) / 2)),
+      window.innerHeight - popupRect.height - 16
+    );
+
+    playerStoryPopup.style.left = `${left}px`;
+    playerStoryPopup.style.top = `${top}px`;
+  }
+
+  function hidePlayerStory() {
+    playerStoryPopup.hidden = true;
+  }
+
+  window.addEventListener("scroll", hidePlayerStory, true);
+  window.addEventListener("resize", hidePlayerStory);
 
   function calculateResearchIdle(players, matchDuration) {
     const rates = new Map();
@@ -1867,21 +1909,25 @@
     analyzeReplay();
   });
 
-  replayUrl.addEventListener("change", () => {
-    if (replayUrl.value.trim()) {
-      replayFile.value = "";
-      replayFileName.textContent = "No file selected";
-      analyzeReplay();
+  function analyzeReplayUrl() {
+    if (!replayUrl.value.trim()) {
+      setStatus("Paste a direct replay URL first.", true);
+      replayUrl.focus();
+      return;
     }
-  });
+
+    replayFile.value = "";
+    replayFileName.textContent = "No file selected";
+    analyzeReplay();
+  }
+
+  replayUrlGo.addEventListener("click", analyzeReplayUrl);
 
   replayUrl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      replayFile.value = "";
-      replayFileName.textContent = "No file selected";
       replayUrl.blur();
-      analyzeReplay();
+      analyzeReplayUrl();
     }
   });
 

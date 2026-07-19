@@ -62,6 +62,46 @@
       background: rgba(5, 10, 16, 0.98);
       box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72);
     }
+
+    body.replay-analyzer-modal-open {
+      overflow: hidden;
+    }
+
+    .replay-analyzer-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: grid;
+      padding: 14px;
+      background: rgba(2, 7, 12, 0.88);
+      backdrop-filter: blur(6px);
+    }
+
+    .replay-analyzer-modal[hidden] {
+      display: none;
+    }
+
+    .replay-analyzer-modal-panel {
+      position: relative;
+      width: min(1600px, 94vw);
+      height: min(900px, 92vh);
+      min-width: 0;
+      min-height: 0;
+      place-self: center;
+      overflow: hidden;
+      border: 1px solid rgba(109, 232, 255, 0.32);
+      border-radius: 22px;
+      background: #07131d;
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.78);
+    }
+
+    .replay-analyzer-modal-frame {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #07131d;
+    }
+
   </style>
 </head>
 <body>
@@ -111,6 +151,24 @@
     <footer class="site-footer">
       <p><a href="https://mit-license.org/" target="_blank" rel="noreferrer">MIT License</a>. Warzone 2100 - webstats viewer by Maway2000</p>
     </footer>
+  </div>
+
+  <div
+    class="replay-analyzer-modal"
+    id="replayAnalyzerModal"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Replay analysis"
+    hidden
+  >
+    <div class="replay-analyzer-modal-panel">
+      <iframe
+        class="replay-analyzer-modal-frame"
+        id="replayAnalyzerModalFrame"
+        title="Replay Analyzer"
+        src="about:blank"
+      ></iframe>
+    </div>
   </div>
 
   <script src="shell-frame.js"></script>
@@ -166,6 +224,193 @@
       document.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && radioContainer.classList.contains("is-playlist-overlay")) {
           requestPlaylistClose();
+        }
+      });
+    }());
+  </script>
+  <script>
+    (function () {
+      const contentFrame = document.getElementById("contentFrame");
+      const modal = document.getElementById("replayAnalyzerModal");
+      const modalFrame = document.getElementById("replayAnalyzerModalFrame");
+      let pendingReplayUrl = "";
+      let previousFocus = null;
+
+      function closeReplayAnalyzer() {
+        modal.hidden = true;
+        document.body.classList.remove("replay-analyzer-modal-open");
+        pendingReplayUrl = "";
+        modalFrame.src = "about:blank";
+        if (previousFocus) {
+          previousFocus.focus();
+        }
+      }
+
+      function openReplayAnalyzer(value) {
+        let replayUrl;
+        try {
+          replayUrl = new URL(value);
+        } catch (error) {
+          return;
+        }
+
+        if (replayUrl.protocol !== "http:" && replayUrl.protocol !== "https:") {
+          return;
+        }
+
+        previousFocus = document.activeElement;
+        pendingReplayUrl = replayUrl.href;
+        modal.hidden = false;
+        document.body.classList.add("replay-analyzer-modal-open");
+        modalFrame.src = "replay-analyzer.html";
+        modalFrame.focus();
+      }
+
+      modalFrame.addEventListener("load", () => {
+        if (!pendingReplayUrl || modalFrame.src === "about:blank") {
+          return;
+        }
+
+        const frameDocument = modalFrame.contentDocument;
+        const replayUrlInput = frameDocument?.getElementById("replayUrl");
+        const replayUrlGo = frameDocument?.getElementById("replayUrlGo");
+        if (!replayUrlInput || !replayUrlGo) {
+          return;
+        }
+
+        const modalStyles = frameDocument.createElement("style");
+        modalStyles.textContent = `
+          .replay-analyzer-intro,
+          .replay-analyzer-intro + .data-card {
+            display: none;
+          }
+
+          .replay-summary-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+            align-items: stretch;
+            margin-top: 0;
+          }
+
+          .replay-summary-grid > .replay-summary-card {
+            height: 44px;
+            gap: 8px;
+            align-items: center;
+            padding: 6px 14px;
+          }
+
+          .replay-summary-grid .replay-summary-label,
+          .replay-summary-grid .replay-summary-value {
+            white-space: nowrap;
+          }
+
+          .replay-summary-grid .replay-summary-label {
+            font-size: 0.68rem;
+          }
+
+          .replay-summary-grid .replay-summary-value {
+            font-size: 1rem;
+            overflow-wrap: normal;
+          }
+
+          .replay-results-section:first-of-type > h3 {
+            display: none;
+          }
+
+          .replay-summary-grid > .replay-analyzer-modal-close {
+            align-self: center;
+            height: 44px;
+            min-width: 82px;
+            padding: 8px 16px;
+            color: #061209;
+            background: var(--success);
+            border: 1px solid rgba(165, 243, 166, 0.72);
+            border-radius: 999px;
+            box-shadow: 0 0 16px rgba(141, 233, 142, 0.2);
+            cursor: pointer;
+            font: 700 0.85rem/1 "Oxanium", sans-serif;
+          }
+
+          .replay-summary-grid > .replay-analyzer-modal-close:hover,
+          .replay-summary-grid > .replay-analyzer-modal-close:focus-visible {
+            background: #a5f3a6;
+            outline: none;
+          }
+
+          @media (max-width: 900px) {
+            .replay-summary-grid {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .replay-summary-grid > .replay-analyzer-modal-close {
+              grid-column: 2;
+              justify-self: end;
+            }
+          }
+
+          @media (max-width: 680px) {
+            .replay-summary-grid {
+              grid-template-columns: 1fr;
+            }
+
+            .replay-summary-grid > .replay-analyzer-modal-close {
+              grid-column: 1;
+            }
+          }
+        `;
+        frameDocument.head.append(modalStyles);
+
+        const summaryGrid = frameDocument.getElementById("replaySummary");
+        if (summaryGrid) {
+          const embeddedCloseButton = frameDocument.createElement("button");
+          embeddedCloseButton.className = "replay-analyzer-modal-close";
+          embeddedCloseButton.type = "button";
+          embeddedCloseButton.setAttribute("aria-label", "Close replay analysis");
+          embeddedCloseButton.textContent = "Close";
+          embeddedCloseButton.addEventListener("click", closeReplayAnalyzer);
+
+          const placeCloseButton = () => {
+            if (summaryGrid.children.length < 4) {
+              return false;
+            }
+
+            summaryGrid.append(embeddedCloseButton);
+            return true;
+          };
+
+          if (!placeCloseButton()) {
+            const summaryObserver = new modalFrame.contentWindow.MutationObserver(() => {
+              if (placeCloseButton()) {
+                summaryObserver.disconnect();
+              }
+            });
+            summaryObserver.observe(summaryGrid, { childList: true });
+          }
+        }
+
+        replayUrlInput.value = pendingReplayUrl;
+        replayUrlGo.click();
+      });
+
+      window.addEventListener("message", (event) => {
+        if (
+          event.origin !== window.location.origin
+          || event.source !== contentFrame.contentWindow
+          || event.data?.type !== "boha:open-replay-analyzer"
+        ) {
+          return;
+        }
+
+        openReplayAnalyzer(event.data.replayUrl);
+      });
+
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          closeReplayAnalyzer();
+        }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.hidden) {
+          closeReplayAnalyzer();
         }
       });
     }());

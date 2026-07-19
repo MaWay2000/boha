@@ -96,6 +96,23 @@
       outline-offset: 2px;
     }
 
+    .replay-url-field {
+      position: relative;
+    }
+
+    .replay-url-field input {
+      padding-right: 66px;
+    }
+
+    .replay-url-go {
+      position: absolute;
+      top: 50%;
+      right: 6px;
+      min-height: 34px;
+      padding: 7px 15px;
+      transform: translateY(-50%);
+    }
+
     .replay-file-picker {
       display: flex;
       min-height: 46px;
@@ -307,16 +324,28 @@
       cursor: help;
     }
 
-    .replay-player-story::before,
-    .replay-player-story::after {
-      right: auto;
-      left: 0;
-      transform: none;
+    .replay-player-story.replay-tooltip::before,
+    .replay-player-story.replay-tooltip::after {
+      content: none;
     }
 
-    .replay-player-story::after {
-      width: 420px;
-      max-width: min(420px, 75vw);
+    .replay-player-story-popup {
+      position: fixed;
+      z-index: 1000;
+      width: min(520px, calc(100vw - 32px));
+      padding: 11px 14px;
+      color: var(--text);
+      background: #07131d;
+      border: 1px solid rgba(109, 232, 255, 0.7);
+      border-radius: 9px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 18px rgba(109, 232, 255, 0.14);
+      font: 600 0.82rem/1.45 "Space Grotesk", sans-serif;
+      pointer-events: none;
+      white-space: normal;
+    }
+
+    .replay-player-story-popup[hidden] {
+      display: none;
     }
 
     .replay-player-colour {
@@ -387,6 +416,11 @@
       text-transform: none;
       white-space: normal;
       transform: translateX(-50%);
+    }
+
+    .replay-player-award.replay-tooltip::after {
+      max-width: none;
+      white-space: nowrap;
     }
 
     .replay-tooltip:hover::before,
@@ -500,7 +534,7 @@
             <span class="replay-choice-separator">OR</span>
             <button class="replay-action replay-action-secondary" id="replayDemo" type="button">Test demo</button>
             <span class="replay-choice-separator">OR</span>
-            <div class="replay-field">
+            <div class="replay-field replay-url-field">
               <input
                 id="replayUrl"
                 type="url"
@@ -508,6 +542,7 @@
                 aria-label="Replay URL"
                 placeholder="https://.../replay.wzrp"
               >
+              <button class="replay-action replay-url-go" id="replayUrlGo" type="button">Go</button>
             </div>
           </div>
           <div class="replay-analyzer-actions">

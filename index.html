@@ -316,22 +316,49 @@
             display: none;
           }
 
-          .replay-summary-grid > .replay-analyzer-modal-close {
+          .replay-summary-grid > .replay-analyzer-modal-actions {
+            display: flex;
+            gap: 8px;
             align-self: center;
+          }
+
+          .replay-analyzer-modal-actions > button {
             height: 44px;
-            min-width: 82px;
             padding: 8px 16px;
-            color: #061209;
-            background: var(--success);
-            border: 1px solid rgba(165, 243, 166, 0.72);
             border-radius: 999px;
-            box-shadow: 0 0 16px rgba(141, 233, 142, 0.2);
             cursor: pointer;
             font: 700 0.85rem/1 "Oxanium", sans-serif;
           }
 
-          .replay-summary-grid > .replay-analyzer-modal-close:hover,
-          .replay-summary-grid > .replay-analyzer-modal-close:focus-visible {
+          .replay-analyzer-modal-download {
+            min-width: 104px;
+            color: #06131b;
+            background: var(--cyan);
+            border: 1px solid rgba(162, 244, 255, 0.72);
+            box-shadow: 0 0 16px rgba(109, 232, 255, 0.2);
+          }
+
+          .replay-analyzer-modal-download:hover,
+          .replay-analyzer-modal-download:focus-visible {
+            background: #a2f4ff;
+            outline: none;
+          }
+
+          .replay-analyzer-modal-download:disabled {
+            cursor: wait;
+            opacity: 0.72;
+          }
+
+          .replay-analyzer-modal-close {
+            min-width: 82px;
+            color: #061209;
+            background: var(--success);
+            border: 1px solid rgba(165, 243, 166, 0.72);
+            box-shadow: 0 0 16px rgba(141, 233, 142, 0.2);
+          }
+
+          .replay-analyzer-modal-close:hover,
+          .replay-analyzer-modal-close:focus-visible {
             background: #a5f3a6;
             outline: none;
           }
@@ -341,7 +368,7 @@
               grid-template-columns: repeat(2, minmax(0, 1fr));
             }
 
-            .replay-summary-grid > .replay-analyzer-modal-close {
+            .replay-summary-grid > .replay-analyzer-modal-actions {
               grid-column: 2;
               justify-self: end;
             }
@@ -352,7 +379,7 @@
               grid-template-columns: 1fr;
             }
 
-            .replay-summary-grid > .replay-analyzer-modal-close {
+            .replay-summary-grid > .replay-analyzer-modal-actions {
               grid-column: 1;
             }
           }
@@ -361,25 +388,63 @@
 
         const summaryGrid = frameDocument.getElementById("replaySummary");
         if (summaryGrid) {
+          const modalActions = frameDocument.createElement("div");
+          modalActions.className = "replay-analyzer-modal-actions";
+
+          const downloadButton = frameDocument.createElement("button");
+          downloadButton.className = "replay-analyzer-modal-download";
+          downloadButton.type = "button";
+          downloadButton.textContent = "Download";
+          downloadButton.addEventListener("click", async () => {
+            const replayUrlToDownload = pendingReplayUrl;
+            downloadButton.disabled = true;
+            downloadButton.textContent = "Downloading";
+
+            try {
+              const response = await fetch(replayUrlToDownload);
+              if (!response.ok) {
+                throw new Error(`Replay download failed with HTTP ${response.status}.`);
+              }
+
+              const replayBlob = await response.blob();
+              const blobUrl = URL.createObjectURL(replayBlob);
+              const replayPath = new URL(replayUrlToDownload).pathname;
+              const downloadLink = frameDocument.createElement("a");
+              downloadLink.href = blobUrl;
+              downloadLink.download = replayPath.slice(replayPath.lastIndexOf("/") + 1) || "replay.wzrp";
+              frameDocument.body.append(downloadLink);
+              downloadLink.click();
+              downloadLink.remove();
+              setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
+              downloadButton.textContent = "Downloaded";
+            } catch (error) {
+              downloadButton.textContent = "Retry";
+              downloadButton.title = error.message;
+            } finally {
+              downloadButton.disabled = false;
+            }
+          });
+
           const embeddedCloseButton = frameDocument.createElement("button");
           embeddedCloseButton.className = "replay-analyzer-modal-close";
           embeddedCloseButton.type = "button";
           embeddedCloseButton.setAttribute("aria-label", "Close replay analysis");
           embeddedCloseButton.textContent = "Close";
           embeddedCloseButton.addEventListener("click", closeReplayAnalyzer);
+          modalActions.append(downloadButton, embeddedCloseButton);
 
-          const placeCloseButton = () => {
+          const placeModalActions = () => {
             if (summaryGrid.children.length < 4) {
               return false;
             }
 
-            summaryGrid.append(embeddedCloseButton);
+            summaryGrid.append(modalActions);
             return true;
           };
 
-          if (!placeCloseButton()) {
+          if (!placeModalActions()) {
             const summaryObserver = new modalFrame.contentWindow.MutationObserver(() => {
-              if (placeCloseButton()) {
+              if (placeModalActions()) {
                 summaryObserver.disconnect();
               }
             });

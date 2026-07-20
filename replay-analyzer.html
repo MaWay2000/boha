@@ -267,6 +267,16 @@
       padding-left: 0;
     }
 
+    .replay-table thead tr:first-child th:nth-child(3),
+    .replay-table tbody td:nth-child(3) {
+      width: 100%;
+    }
+
+    .replay-table thead tr:first-child th:nth-child(n + 4),
+    .replay-table tbody td:nth-child(n + 4) {
+      width: 1%;
+    }
+
     .replay-table th.replay-stat-group {
       text-align: center;
       border-left: 1px solid rgba(109, 232, 255, 0.16);
@@ -279,27 +289,32 @@
       text-align: center;
     }
 
-    .replay-table tbody td:nth-child(n + 5):nth-child(-n + 12) {
+    .replay-table tbody td:nth-child(n + 5):nth-child(-n + 13) {
       text-align: center;
     }
 
     .replay-table .replay-stat-details th:first-child,
-    .replay-table .replay-stat-details th:nth-child(5),
+    .replay-table .replay-stat-details th:nth-child(6),
     .replay-table tbody td:nth-child(5),
-    .replay-table tbody td:nth-child(9) {
+    .replay-table tbody td:nth-child(10) {
       border-left: 1px solid rgba(109, 232, 255, 0.16);
     }
 
     .replay-table .replay-stat-details th:last-child,
-    .replay-table tbody td:nth-child(12) {
+    .replay-table tbody td:nth-child(13) {
       border-right: 1px solid rgba(109, 232, 255, 0.16);
     }
 
     .replay-table thead tr:first-child th:nth-child(4),
     .replay-table thead tr:first-child th:nth-child(7),
     .replay-table tbody td:nth-child(4),
-    .replay-table tbody td:nth-child(13) {
+    .replay-table tbody td:nth-child(14) {
       text-align: center;
+    }
+
+    .replay-table thead tr:first-child th:nth-child(4),
+    .replay-table tbody td:nth-child(4) {
+      border-left: 1px solid rgba(109, 232, 255, 0.16);
     }
 
     .replay-table tbody tr.replay-player-won {
@@ -359,8 +374,8 @@
 
     .replay-player-awards {
       display: inline-grid;
-      width: 181px;
-      grid-template-columns: repeat(6, 26px);
+      width: 100%;
+      grid-template-columns: repeat(auto-fit, 26px);
       gap: 5px;
     }
 
@@ -555,7 +570,7 @@
         <div class="replay-results" id="replayResults" hidden>
           <div class="replay-summary-grid" id="replaySummary"></div>
 
-          <article class="data-card replay-results-section">
+          <article class="replay-results-section">
             <h3>Players</h3>
             <div class="stats-table-wrap replay-table-wrap">
               <table class="stats-table replay-table">

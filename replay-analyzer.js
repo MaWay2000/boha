@@ -299,6 +299,8 @@
         oilRigs: published.oilRigs,
         remainingDroids: published.droids,
         remainingStructures: published.structs,
+        labResearchPerformance: published.labResearchPerformance ?? published.recentResearchPerformance,
+        labResearchPotential: published.labResearchPotential ?? published.recentResearchPotential,
         playerLeftGameTime: published.playerLeftGameTime
       };
     });
@@ -1330,7 +1332,7 @@
     return cell;
   }
 
-  function createPlayerStory(player, players, events, idlePercent) {
+  function createPlayerStory(player, players, events, researchActivity) {
     if (player.spectator) {
       return `${player.name} observed the match from slot ${player.position} and did not participate in the recorded combat.`;
     }
@@ -1422,8 +1424,8 @@
       story.push(`The replay records ${activity.join(" and ")}.`);
     }
 
-    if (research != null && idlePercent != null) {
-      story.push(`They completed ${number(research)} research topics at an estimated ${100 - idlePercent}% research-lab utilization.`);
+    if (research != null && researchActivity != null) {
+      story.push(`They completed ${number(research)} research topics with an estimated ${researchActivity.toFixed(2)}% research-lab activity.`);
     }
 
     return story.join(" ");
@@ -1478,53 +1480,124 @@
   window.addEventListener("scroll", hidePlayerStory, true);
   window.addEventListener("resize", hidePlayerStory);
 
-  function calculateResearchIdle(players, matchDuration) {
-    const rates = new Map();
-    players.forEach((player) => {
-      const completed = playerStat(player, "researchComplete");
-      const leftTime = playerStat(player, "playerLeftGameTime");
-      const activeTime = Number.isFinite(leftTime) ? leftTime : Number(matchDuration);
-      if (!player.spectator && completed != null && Number.isFinite(activeTime) && activeTime > 0) {
-        rates.set(player, completed / activeTime);
-      }
-    });
-
-    const fastestRate = Math.max(...rates.values(), 0);
+  function calculateResearchActivity(players, events, matchDuration) {
     return new Map(players.map((player) => {
-      const rate = rates.get(player);
-      if (!Number.isFinite(rate) || fastestRate <= 0) {
+      const performance = playerStat(player, "labResearchPerformance");
+      const potential = playerStat(player, "labResearchPotential");
+      if (player.spectator) {
         return [player, null];
       }
-      return [player, Math.round((1 - (rate / fastestRate)) * 100)];
+      if (performance != null && potential != null && potential > 0) {
+        return [player, Math.max(0, Math.min(1, performance / potential)) * 100];
+      }
+
+      const leftTime = playerStat(player, "playerLeftGameTime");
+      const activeEnd = Number.isFinite(leftTime) && leftTime > 0
+        ? Math.min(leftTime, Number(matchDuration))
+        : Number(matchDuration);
+      if (!Number.isFinite(activeEnd) || activeEnd <= 0) {
+        return [player, null];
+      }
+
+      const labs = new Map();
+      events
+        .filter((event) => (
+          (event.category === "Research"
+            || (event.category === "Production"
+              && (event.action === "Hold research" || event.action === "Release research")))
+          && Number(event.player) === Number(player.position)
+          && Number.isFinite(Number(event.time))
+          && Number(event.time) <= activeEnd
+        ))
+        .sort((left, right) => Number(left.time) - Number(right.time))
+        .forEach((event) => {
+          const labId = Number(event.data && event.data.structureId);
+          if (!Number.isFinite(labId) || labId <= 0) {
+            return;
+          }
+
+          const time = Math.max(0, Number(event.time));
+          const lab = labs.get(labId) || { firstStart: null, activeSince: null, busyTime: 0 };
+          const started = event.category === "Research"
+            ? event.data.started
+            : event.action === "Release research";
+          if (started) {
+            if (lab.firstStart == null) {
+              lab.firstStart = time;
+            }
+            if (lab.activeSince == null) {
+              lab.activeSince = time;
+            }
+          } else if (lab.activeSince != null) {
+            lab.busyTime += Math.max(0, time - lab.activeSince);
+            lab.activeSince = null;
+          }
+          labs.set(labId, lab);
+        });
+
+      let availableTime = 0;
+      let busyTime = 0;
+      labs.forEach((lab) => {
+        if (lab.firstStart == null || lab.firstStart >= activeEnd) {
+          return;
+        }
+        availableTime += activeEnd - lab.firstStart;
+        busyTime += lab.busyTime;
+        if (lab.activeSince != null) {
+          busyTime += activeEnd - lab.activeSince;
+        }
+      });
+
+      return [
+        player,
+        availableTime > 0 ? Math.min(1, busyTime / availableTime) * 100 : null
+      ];
     }));
   }
 
-  function createResearchCell(player, idlePercent) {
+  function createResearchCell(researchActivity) {
     const cell = document.createElement("td");
-    const count = formatStat(player.summary && player.summary.researchComplete);
-    if (count == null) {
+    if (researchActivity == null) {
       cell.textContent = "—";
       return cell;
     }
 
     const content = document.createElement("span");
     content.className = "replay-research-stat";
-    const countElement = document.createElement("span");
-    countElement.textContent = count;
-    content.append(countElement);
-
-    if (idlePercent != null) {
-      const idle = document.createElement("span");
-      idle.className = "replay-research-idle replay-tooltip";
-      idle.textContent = `- ${100 - idlePercent}%`;
-      idle.dataset.tooltip = "Estimated research-lab utilization based on completed research per active match minute versus the fastest player in this replay.";
-      idle.setAttribute("aria-label", idle.dataset.tooltip);
-      idle.tabIndex = 0;
-      content.append(idle);
-    }
+    const activity = document.createElement("span");
+    activity.className = "replay-research-idle replay-tooltip";
+    activity.textContent = `${researchActivity.toFixed(2)}%`;
+    activity.dataset.tooltip = "Research-lab activity based only on recorded lab performance and busy time; it is not compared with other players.";
+    activity.setAttribute("aria-label", activity.dataset.tooltip);
+    activity.tabIndex = 0;
+    content.append(activity);
 
     cell.append(content);
     return cell;
+  }
+
+  function playerKdValue(player) {
+    if (player.spectator) {
+      return null;
+    }
+
+    const kills = playerStat(player, "kills");
+    const unitsLost = playerStat(player, "droidsLost");
+    if (kills == null || unitsLost == null) {
+      return null;
+    }
+    if (unitsLost === 0) {
+      return kills > 0 ? Number.MAX_SAFE_INTEGER : 0;
+    }
+    return kills / unitsLost;
+  }
+
+  function formatPlayerKd(player) {
+    const value = playerKdValue(player);
+    if (value == null) {
+      return "\u2014";
+    }
+    return value === Number.MAX_SAFE_INTEGER ? "\u221e" : value.toFixed(2);
   }
 
   function playerSortValue(player, key, awardsByPlayer) {
@@ -1536,6 +1609,12 @@
     }
     if (key === "awards") {
       return (awardsByPlayer.get(player) || []).length;
+    }
+    if (key === "kd") {
+      return playerKdValue(player);
+    }
+    if (key === "researchActivity") {
+      return player.researchActivity;
     }
     return playerStat(player, key);
   }
@@ -1603,7 +1682,7 @@
     return cell;
   }
 
-  function createPlayerRow(player, players, events, awards, researchIdle) {
+  function createPlayerRow(player, players, events, awards, researchActivity) {
     const row = document.createElement("tr");
     const result = formatPlayerResult(player);
     if (result === "Won") {
@@ -1615,18 +1694,19 @@
     const stats = player.summary || {};
     row.append(
       createPlayerSlotCell(player),
-      createPlayerNameCell(player, createPlayerStory(player, players, events, researchIdle)),
+      createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
       createPlayerAwardsCell(awards),
       createCell(formatStat(stats.score)),
       createCell(formatStat(stats.droidsBuilt)),
       createCell(formatStat(stats.droidsLost)),
       createCell(formatStat(stats.kills)),
       createCell(formatStat(stats.remainingDroids)),
+      createCell(formatPlayerKd(player)),
       createCell(formatStat(stats.structuresBuilt)),
       createCell(formatStat(stats.structuresLost)),
       createCell(formatStat(stats.structuresDestroyed)),
       createCell(formatStat(stats.remainingStructures)),
-      createResearchCell(player, researchIdle)
+      createResearchCell(researchActivity)
     );
     return row;
   }
@@ -1736,10 +1816,14 @@
     ]);
 
     const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
-    const researchIdleByPlayer = calculateResearchIdle(
+    const researchActivityByPlayer = calculateResearchActivity(
       extraction.players,
+      extraction.events.records,
       extraction.match.elapsedMilliseconds
     );
+    extraction.players.forEach((player) => {
+      player.researchActivity = researchActivityByPlayer.get(player);
+    });
     const renderPlayerRows = () => {
       replaceChildren(
         playersBody,
@@ -1749,7 +1833,7 @@
             extraction.players,
             extraction.events.records,
             awardsByPlayer.get(player),
-            researchIdleByPlayer.get(player)
+            researchActivityByPlayer.get(player)
           )
         ))
       );
@@ -1762,7 +1846,7 @@
       createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, renderPlayerRows),
       createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
       createHeaderCell("Units", {
-        colSpan: 4,
+        colSpan: 5,
         scope: "colgroup",
         className: "replay-stat-group"
       }),
@@ -1771,7 +1855,7 @@
         scope: "colgroup",
         className: "replay-stat-group"
       }),
-      createPlayerSortHeader("Research", "researchComplete", { rowSpan: 2 }, renderPlayerRows)
+      createPlayerSortHeader("Research", "researchActivity", { rowSpan: 2 }, renderPlayerRows)
     );
 
     const playerHeaderDetails = document.createElement("tr");
@@ -1781,6 +1865,7 @@
       createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
       createPlayerSortHeader("Destroyed", "kills", {}, renderPlayerRows),
       createPlayerSortHeader("Alive", "remainingDroids", {}, renderPlayerRows),
+      createPlayerSortHeader("KD", "kd", {}, renderPlayerRows),
       createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
       createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
       createPlayerSortHeader("Destroyed", "structuresDestroyed", {}, renderPlayerRows),

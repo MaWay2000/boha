@@ -1600,6 +1600,59 @@
     return value === Number.MAX_SAFE_INTEGER ? "\u221e" : value.toFixed(2);
   }
 
+  function totalKdValue(player) {
+    if (player.spectator) {
+      return null;
+    }
+
+    const unitKills = playerStat(player, "kills");
+    const structureKills = playerStat(player, "structuresDestroyed");
+    const unitsLost = playerStat(player, "droidsLost");
+    const structuresLost = playerStat(player, "structuresLost");
+    if ([unitKills, structureKills, unitsLost, structuresLost].some((value) => value == null)) {
+      return null;
+    }
+
+    const totalKills = unitKills + structureKills;
+    const totalLost = unitsLost + structuresLost;
+    if (totalLost === 0) {
+      return totalKills > 0 ? Number.MAX_SAFE_INTEGER : 0;
+    }
+    return totalKills / totalLost;
+  }
+
+  function formatTotalKd(player) {
+    const value = totalKdValue(player);
+    if (value == null) {
+      return "\u2014";
+    }
+    return value === Number.MAX_SAFE_INTEGER ? "\u221e" : value.toFixed(2);
+  }
+
+  function structureKdValue(player) {
+    if (player.spectator) {
+      return null;
+    }
+
+    const kills = playerStat(player, "structuresDestroyed");
+    const structuresLost = playerStat(player, "structuresLost");
+    if (kills == null || structuresLost == null) {
+      return null;
+    }
+    if (structuresLost === 0) {
+      return kills > 0 ? Number.MAX_SAFE_INTEGER : 0;
+    }
+    return kills / structuresLost;
+  }
+
+  function formatStructureKd(player) {
+    const value = structureKdValue(player);
+    if (value == null) {
+      return "\u2014";
+    }
+    return value === Number.MAX_SAFE_INTEGER ? "\u221e" : value.toFixed(2);
+  }
+
   function playerSortValue(player, key, awardsByPlayer) {
     if (key === "position") {
       return Number(player.position);
@@ -1612,6 +1665,12 @@
     }
     if (key === "kd") {
       return playerKdValue(player);
+    }
+    if (key === "totalKd") {
+      return totalKdValue(player);
+    }
+    if (key === "structureKd") {
+      return structureKdValue(player);
     }
     if (key === "researchActivity") {
       return player.researchActivity;
@@ -1697,6 +1756,8 @@
       createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
       createPlayerAwardsCell(awards),
       createCell(formatStat(stats.score)),
+      createCell(formatTotalKd(player)),
+      createResearchCell(researchActivity),
       createCell(formatStat(stats.droidsBuilt)),
       createCell(formatStat(stats.droidsLost)),
       createCell(formatStat(stats.kills)),
@@ -1706,7 +1767,7 @@
       createCell(formatStat(stats.structuresLost)),
       createCell(formatStat(stats.structuresDestroyed)),
       createCell(formatStat(stats.remainingStructures)),
-      createResearchCell(researchActivity)
+      createCell(formatStructureKd(player))
     );
     return row;
   }
@@ -1845,17 +1906,18 @@
       createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
       createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, renderPlayerRows),
       createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
+      createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
+      createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
       createHeaderCell("Units", {
         colSpan: 5,
         scope: "colgroup",
         className: "replay-stat-group"
       }),
       createHeaderCell("Structures", {
-        colSpan: 4,
+        colSpan: 5,
         scope: "colgroup",
         className: "replay-stat-group"
-      }),
-      createPlayerSortHeader("Research", "researchActivity", { rowSpan: 2 }, renderPlayerRows)
+      })
     );
 
     const playerHeaderDetails = document.createElement("tr");
@@ -1869,7 +1931,8 @@
       createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
       createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
       createPlayerSortHeader("Kills", "structuresDestroyed", {}, renderPlayerRows),
-      createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows)
+      createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows),
+      createPlayerSortHeader("KD", "structureKd", {}, renderPlayerRows)
     );
     replaceChildren(playersHead, [playerHeaderGroups, playerHeaderDetails]);
     updatePlayerSortIndicators();

@@ -1287,7 +1287,7 @@ function renderPlayerGames(accounts) {
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td>
             ${replayUrl
-              ? `<a class="stats-replay-link" href="${escapeHtml(replayUrl)}" data-replay-analyzer-url="${escapeHtml(replayUrl)}">Replay</a>`
+              ? `<a class="stats-replay-link" href="${escapeHtml(replayUrl)}" data-replay-analyzer-url="${escapeHtml(replayUrl)}">Analyze</a>`
               : `<span class="stats-note">Unavailable</span>`}
           </td>
         </tr>
@@ -1883,7 +1883,7 @@ function renderMatches(gameList) {
           </td>
           <td class="stats-matchup">${renderMatchup(game, { includePlayerPower: true, linkToLeaderboard: true, showVersus: false })}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
-          <td><a class="stats-replay-link" href="${escapeHtml(normalizeReplayUrl(game.replayUrl))}" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Replay</a></td>
+          <td><a class="stats-replay-link" href="${escapeHtml(normalizeReplayUrl(game.replayUrl))}" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Analyze</a></td>
         </tr>
       `;
     })

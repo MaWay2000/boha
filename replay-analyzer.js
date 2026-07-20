@@ -2016,6 +2016,12 @@
     }
   });
 
+  const linkedReplayUrl = new URLSearchParams(window.location.search).get("replay");
+  if (linkedReplayUrl) {
+    replayUrl.value = linkedReplayUrl;
+    analyzeReplayUrl();
+  }
+
   eventCategory.addEventListener("change", () => {
     if (latestExtraction) {
       renderEventTimeline(latestExtraction);

@@ -739,6 +739,16 @@ function getNumericGlobalRank(account) {
   return Number.isFinite(rank) ? rank : null;
 }
 
+function getPlayerPowerLabel(account) {
+  const totalRankedPlayers = globalRankMap.size;
+  const rank = getNumericGlobalRank(account);
+  if (!totalRankedPlayers || !rank) {
+    return "N/A";
+  }
+
+  return `${Math.round(((totalRankedPlayers - rank + 1) / totalRankedPlayers) * 100)}%`;
+}
+
 function getTeamStrengthPercent(team) {
   const totalRankedPlayers = globalRankMap.size;
   if (!totalRankedPlayers || !team.players.length) {
@@ -1162,7 +1172,7 @@ function renderPlayerGameDetails(game, activeAccount) {
       <div class="stats-matchup stats-matchup-tiles">
         ${renderMatchup(game, {
           variant: "tiles",
-          includeGlobalRank: true,
+          includePlayerPower: true,
           showVersus: false,
           highlightedAccountKey: activeAccount ? getAccountExpandKey(activeAccount) : "",
           clickablePlayerTiles: true,
@@ -1400,7 +1410,8 @@ function renderPlayerGameActions(totalGames) {
 function renderMatchup(game, options = {}) {
   const {
     variant = "chips",
-    includeGlobalRank = false,
+    includePlayerPower = false,
+    linkToLeaderboard = false,
     showVersus = true,
     highlightedAccountKey = "",
     clickablePlayerTiles = false,
@@ -1414,8 +1425,17 @@ function renderMatchup(game, options = {}) {
 
   const renderPlayerLabel = (player) => {
     const playerName = player.account?.name || "Unknown";
-    const rankSuffix = includeGlobalRank ? ` [${getGlobalRankLabel(player.account)}]` : "";
-    return `${escapeHtml(playerName)}${escapeHtml(rankSuffix)}`;
+    const powerSuffix = includePlayerPower ? ` [${getPlayerPowerLabel(player.account)}]` : "";
+    const playerLabel = `${escapeHtml(playerName)}${escapeHtml(powerSuffix)}`;
+    if (!linkToLeaderboard || !player.account) {
+      return playerLabel;
+    }
+
+    const playerParams = new URLSearchParams({
+      playerSearch: playerName,
+      player: getAccountExpandKey(player.account)
+    });
+    return `<a class="stats-team-player-link" href="index.html?${escapeHtml(playerParams.toString())}" target="_parent" aria-label="Open ${escapeHtml(playerName)} on Leaderboards">${playerLabel}</a>`;
   };
 
   if (variant === "tiles") {
@@ -1861,7 +1881,7 @@ function renderMatches(gameList) {
             ${escapeHtml(game.mapName)}
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
           </td>
-          <td class="stats-matchup">${renderMatchup(game, { showVersus: false })}</td>
+          <td class="stats-matchup">${renderMatchup(game, { includePlayerPower: true, linkToLeaderboard: true, showVersus: false })}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td><a class="stats-replay-link" href="${escapeHtml(normalizeReplayUrl(game.replayUrl))}" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Replay</a></td>
         </tr>

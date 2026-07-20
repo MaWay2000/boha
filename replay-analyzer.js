@@ -1863,12 +1863,12 @@
     playerHeaderDetails.append(
       createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
       createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
-      createPlayerSortHeader("Destroyed", "kills", {}, renderPlayerRows),
+      createPlayerSortHeader("Kills", "kills", {}, renderPlayerRows),
       createPlayerSortHeader("Alive", "remainingDroids", {}, renderPlayerRows),
       createPlayerSortHeader("KD", "kd", {}, renderPlayerRows),
       createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
       createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
-      createPlayerSortHeader("Destroyed", "structuresDestroyed", {}, renderPlayerRows),
+      createPlayerSortHeader("Kills", "structuresDestroyed", {}, renderPlayerRows),
       createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows)
     );
     replaceChildren(playersHead, [playerHeaderGroups, playerHeaderDetails]);

@@ -45,6 +45,19 @@
       flex: 0 0 auto;
       white-space: nowrap;
     }
+
+    .stats-team-player-link {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: rgba(109, 232, 255, 0.34);
+      text-underline-offset: 3px;
+    }
+
+    .stats-team-player-link:hover,
+    .stats-team-player-link:focus-visible {
+      color: var(--cyan);
+      text-decoration-color: currentColor;
+    }
   </style>
 </head>
 <body class="embedded-page">
@@ -125,7 +138,7 @@
   </div>
 
   <script src="embedded-page.js"></script>
-  <script type="module" src="stats/live-stats.js?v=20260720-3"></script>
+  <script type="module" src="stats/live-stats.js?v=20260720-6"></script>
   <script>
     document.getElementById("statsResetFilters").addEventListener("click", () => {
       window.location.assign(window.location.pathname);

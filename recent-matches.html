@@ -16,26 +16,51 @@
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .stats-reset-filters {
+      flex: 0 0 auto;
+      color: var(--text);
+      border-color: rgba(109, 232, 255, 0.28);
+    }
+
+    .stats-table-wrap-matches {
+      height: min(68vh, 680px);
+    }
+
+    .stats-table-wrap-matches .stats-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      box-shadow: 0 1px 0 rgba(149, 205, 255, 0.12);
+    }
+
+    .stats-matchup-team-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .stats-matchup-team-row .stats-team-strength {
+      flex: 0 0 auto;
+      white-space: nowrap;
+    }
+  </style>
 </head>
 <body class="embedded-page">
   <div class="page-shell">
     <main id="top">
       <section class="landing-stats stats-shell section-frame">
-        <div class="stats-shell-head">
-          <div>
-            <p class="panel-kicker">Recent Matches</p>
-            <h3>Replay-ready match list by leaderboard slice</h3>
-          </div>
+        <div class="stats-toolbar-row">
+          <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+          <button class="stats-filter-button stats-reset-filters" id="statsResetFilters" type="button">Reset filters</button>
           <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
         </div>
-
-        <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
 
         <section class="stats-panel">
           <div class="stats-panel-head">
             <div>
-              <p class="panel-kicker">Recent Matches</p>
-              <h4>Latest games in the selected slice</h4>
+              <p class="panel-kicker stats-panel-title-main">Recent Matches</p>
             </div>
             <label class="stats-search-field" for="statsMatchesSearch">
               <span class="visually-hidden">Search recent matches by nickname, key, or map</span>
@@ -50,7 +75,7 @@
             </label>
           </div>
 
-            <div class="stats-table-wrap">
+            <div class="stats-table-wrap stats-table-wrap-matches">
               <table class="stats-table">
                 <thead>
                   <tr>
@@ -61,7 +86,7 @@
                     <th data-sort-table="matches" data-sort-key="replay" aria-sort="none"><button class="stats-sort-button" type="button">Replay</button></th>
                   </tr>
                 </thead>
-                <tbody id="statsMatches" data-match-limit="60">
+                <tbody id="statsMatches">
                   <tr class="stats-skeleton-row" aria-hidden="true">
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
@@ -93,12 +118,18 @@
                 </tbody>
               </table>
             </div>
+            <div class="stats-panel-actions" id="statsMatchesActions"></div>
         </section>
       </section>
     </main>
   </div>
 
   <script src="embedded-page.js"></script>
-  <script type="module" src="stats/live-stats.js"></script>
+  <script type="module" src="stats/live-stats.js?v=20260720-3"></script>
+  <script>
+    document.getElementById("statsResetFilters").addEventListener("click", () => {
+      window.location.assign(window.location.pathname);
+    });
+  </script>
 </body>
 </html>

@@ -14,7 +14,8 @@ const PLAYER_KEYS_URL = USE_REMOTE_MIRROR_JSON
 const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
-const MATCH_LIMIT = 12;
+const INITIAL_MATCH_LIMIT = 30;
+const MATCH_LIMIT_STEP = 30;
 const PLAYER_GAME_LIMIT = 20;
 const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
@@ -80,6 +81,7 @@ const playerGamesActionsElement = document.getElementById("statsPlayerGamesActio
 const playerSearchElement = document.getElementById("statsPlayerSearch");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
+const matchesActionsElement = document.getElementById("statsMatchesActions");
 const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data-sort-key]")];
 
 let selectedLeaderboard = "Global";
@@ -95,6 +97,7 @@ let eventSource = null;
 let refreshTimer = null;
 let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+let visibleMatchCount = INITIAL_MATCH_LIMIT;
 let playerSearchQuery = "";
 let matchesSearchQuery = "";
 let leaderboardGameCounts = new Map();
@@ -393,6 +396,7 @@ function ensureSelectedLeaderboard() {
   }
   if (selectedLeaderboard !== previousLeaderboard) {
     visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+    visibleMatchCount = INITIAL_MATCH_LIMIT;
   }
 }
 
@@ -423,6 +427,7 @@ function normalizeSearchQuery(value) {
 function applyStateFromUrl() {
   const url = new URL(window.location.href);
   selectedLeaderboard = url.searchParams.get("leaderboard") || "Global";
+  visibleMatchCount = INITIAL_MATCH_LIMIT;
   visiblePlayerCount = Math.max(
     INITIAL_PLAYER_LIMIT,
     parsePositiveInteger(url.searchParams.get("players"), INITIAL_PLAYER_LIMIT)
@@ -1452,13 +1457,19 @@ function renderMatchup(game, options = {}) {
   return `
     <div class="stats-matchup-list">
       ${teams.map((team, index) => {
+        const strengthPercent = teamStrengths[index];
         const vsLabel = showVersus && index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
         return `
-          <span class="stats-team ${getTeamToneClass(getNormalizedTeamUserType(game, team))}">
-            ${team.players
-              .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
-              .join("")}
-          </span>
+          <div class="stats-matchup-team-row">
+            <span class="stats-team ${getTeamToneClass(getNormalizedTeamUserType(game, team))}">
+              ${team.players
+                .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
+                .join("")}
+            </span>
+            <span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
+              Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
+            </span>
+          </div>
           ${vsLabel}
         `;
       }).join("")}
@@ -1822,14 +1833,12 @@ function renderMatches(gameList) {
   }
 
   const searchQuery = normalizeSearchQuery(matchesSearchQuery);
-  const configuredMatchLimit = Number(matchesElement.dataset.matchLimit || MATCH_LIMIT);
-  const matchLimit = Number.isFinite(configuredMatchLimit) && configuredMatchLimit > 0
-    ? configuredMatchLimit
-    : MATCH_LIMIT;
   const filteredGames = gameList
     .filter((game) => matchesRecentGameSearch(game, searchQuery))
     .sort(compareMatches);
-  const rows = filteredGames.slice(0, matchLimit);
+  const rows = filteredGames.slice(0, visibleMatchCount);
+
+  renderMatchActions(filteredGames.length, rows.length);
 
   if (!rows.length) {
     matchesElement.innerHTML = `
@@ -1852,13 +1861,34 @@ function renderMatches(gameList) {
             ${escapeHtml(game.mapName)}
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
           </td>
-          <td class="stats-matchup">${renderMatchup(game)}</td>
+          <td class="stats-matchup">${renderMatchup(game, { showVersus: false })}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td><a class="stats-replay-link" href="${escapeHtml(normalizeReplayUrl(game.replayUrl))}" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Replay</a></td>
         </tr>
       `;
     })
     .join("");
+}
+
+function renderMatchActions(totalMatches, shownMatches) {
+  if (!matchesActionsElement) {
+    return;
+  }
+
+  matchesActionsElement.innerHTML = `
+    <span class="stats-panel-note">Showing ${shownMatches} of ${totalMatches} matches.</span>
+    ${shownMatches < totalMatches ? '<button class="stats-load-more" id="statsMatchesLoadMore" type="button">Load more</button>' : ""}
+  `;
+
+  const loadMoreButton = matchesActionsElement.querySelector("#statsMatchesLoadMore");
+  if (!loadMoreButton) {
+    return;
+  }
+
+  loadMoreButton.addEventListener("click", () => {
+    visibleMatchCount = Math.min(visibleMatchCount + MATCH_LIMIT_STEP, totalMatches);
+    render();
+  });
 }
 
 function render() {
@@ -1988,6 +2018,7 @@ function renderButtons() {
     button.addEventListener("click", () => {
       if (selectedLeaderboard !== leaderboard) {
         visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+        visibleMatchCount = INITIAL_MATCH_LIMIT;
         resetPlayerGamesView();
       }
       selectedLeaderboard = leaderboard;
@@ -2010,6 +2041,7 @@ if (playerSearchElement) {
 if (matchesSearchElement) {
   matchesSearchElement.addEventListener("input", (event) => {
     matchesSearchQuery = event.currentTarget.value;
+    visibleMatchCount = INITIAL_MATCH_LIMIT;
     render();
   });
 }

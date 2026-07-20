@@ -59,12 +59,15 @@
   }
 
   const resizeObserver = new ResizeObserver(scheduleHeightPost);
-  const mutationObserver = new MutationObserver(scheduleHeightPost);
+  let mutationObserver = null;
 
   function observeDocument() {
     const documentElement = document.documentElement;
     const body = document.body;
-    if (!documentElement || !body) {
+    if (
+      !(documentElement instanceof window.Node)
+      || !(body instanceof window.Node)
+    ) {
       return;
     }
 
@@ -75,6 +78,7 @@
     resizeObserver.observe(documentElement);
     resizeObserver.observe(body);
 
+    mutationObserver = mutationObserver || new MutationObserver(scheduleHeightPost);
     mutationObserver.observe(documentElement, {
       childList: true,
       subtree: true,

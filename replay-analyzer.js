@@ -17,6 +17,7 @@
   demoButtons.append(demoButton2);
   const results = document.getElementById("replayResults");
   const summary = document.getElementById("replaySummary");
+  const matchSummary = document.getElementById("replayMatchSummary");
   const playersBody = document.getElementById("replayPlayers");
   const playersHead = playersBody.closest("table").querySelector("thead");
   const messagesBody = document.getElementById("replayMessages");
@@ -1788,6 +1789,104 @@
     return card;
   }
 
+  function getBestPlayer(players, value) {
+    return players.reduce((best, player) => {
+      const playerValue = Number(value(player));
+      if (!Number.isFinite(playerValue)) {
+        return best;
+      }
+      return !best || playerValue > best.value ? { player, value: playerValue } : best;
+    }, null);
+  }
+
+  function renderCompactMatchSummary(extraction) {
+    if (!matchSummary) {
+      return;
+    }
+
+    const competitors = extraction.players.filter((player) => !player.spectator && player.summary);
+    if (!competitors.length) {
+      matchSummary.hidden = true;
+      matchSummary.replaceChildren();
+      return;
+    }
+
+    const winners = competitors.filter((player) => formatPlayerResult(player) === "Won");
+    const mvpPool = winners.length ? winners : competitors;
+    const mvp = getBestPlayer(mvpPool, (player) => playerStat(player, "score"));
+    const mostKills = getBestPlayer(competitors, (player) => playerStat(player, "kills"));
+    const bestKd = getBestPlayer(competitors, totalKdValue);
+    const bestResearch = getBestPlayer(competitors, (player) => player.researchActivity);
+    const winningTeamKey = winners.length ? String(winners[0].team ?? winners[0].position) : null;
+    const winningTeam = winningTeamKey == null
+      ? []
+      : winners.filter((player) => String(player.team ?? player.position) === winningTeamKey);
+    const teamScores = new Map();
+    competitors.forEach((player) => {
+      const key = String(player.team ?? player.position);
+      const team = teamScores.get(key) || { players: [], score: 0 };
+      team.players.push(player);
+      team.score += Math.max(0, playerStat(player, "score") || 0);
+      teamScores.set(key, team);
+    });
+    const winningPower = winningTeamKey == null ? null : teamScores.get(winningTeamKey)?.score;
+    const strongestOpponent = [...teamScores.entries()]
+      .filter(([key]) => key !== winningTeamKey)
+      .sort((left, right) => right[1].score - left[1].score)[0]?.[1] || null;
+    const comparisonMaximum = Math.max(Number(winningPower || 0), Number(strongestOpponent?.score || 0));
+    const teamPowerGap = strongestOpponent && Number.isFinite(winningPower) && comparisonMaximum > 0
+      ? (Math.abs(winningPower - strongestOpponent.score) / comparisonMaximum) * 100
+      : null;
+    const upsetVictory = Number.isFinite(winningPower)
+      && strongestOpponent
+      && winningPower < strongestOpponent.score;
+    const winningTeamNames = winningTeam.map((player) => player.name);
+    const winningTeamLabel = winningTeam.length
+      ? `${winningTeamNames.slice(0, 2).join(" · ")}${winningTeamNames.length > 2 ? ` · +${winningTeamNames.length - 2}` : ""}`
+      : "Draw / unresolved";
+
+    const heading = document.createElement("div");
+    heading.className = "replay-match-summary-heading";
+    const title = document.createElement("h3");
+    title.textContent = "Match summary";
+    heading.append(title);
+    if (upsetVictory) {
+      const badge = document.createElement("span");
+      badge.className = "replay-upset-badge";
+      badge.textContent = "Upset victory";
+      badge.title = "The winning team finished with a lower combined replay score than the strongest opposing team.";
+      heading.append(badge);
+    }
+
+    const grid = document.createElement("div");
+    grid.className = "replay-match-summary-grid";
+    const items = [
+      ["Winning team", winningTeamLabel],
+      ["MVP", mvp ? `${mvp.player.name} · ${mvp.value.toLocaleString()}` : "--"],
+      ["Most kills", mostKills ? `${mostKills.player.name} · ${mostKills.value.toLocaleString()}` : "--"],
+      ["Best KD", bestKd ? `${bestKd.player.name} · ${bestKd.value === Number.MAX_SAFE_INTEGER ? "∞" : bestKd.value.toFixed(2)}` : "--"],
+      ["Best research", bestResearch ? `${bestResearch.player.name} · ${bestResearch.value.toFixed(2)}%` : "--"],
+      ["Team power difference", teamPowerGap == null ? "--" : `${teamPowerGap.toFixed(1)}%`]
+    ];
+    items.forEach(([label, value]) => {
+      const item = document.createElement("article");
+      const itemLabel = document.createElement("span");
+      const itemValue = document.createElement("strong");
+      itemLabel.textContent = label;
+      itemValue.textContent = value;
+      if (label === "Winning team" && winningTeamNames.length) {
+        item.title = winningTeamNames.join(" · ");
+      } else if (label === "Team power difference") {
+        item.title = "Difference between the winning team and strongest opposing team by combined replay score.";
+      }
+      item.append(itemLabel, itemValue);
+      grid.append(item);
+    });
+
+    matchSummary.hidden = false;
+    matchSummary.replaceChildren(heading, grid);
+  }
+
   function playerNameForPosition(extraction, position) {
     if (position == null) {
       return "—";
@@ -1885,6 +1984,7 @@
     extraction.players.forEach((player) => {
       player.researchActivity = researchActivityByPlayer.get(player);
     });
+    renderCompactMatchSummary(extraction);
     const renderPlayerRows = () => {
       replaceChildren(
         playersBody,

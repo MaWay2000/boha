@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warzone 2100 Player Comparison</title>
+  <meta
+    name="description"
+    content="Compare two Warzone 2100 players by ELO, win rate, recent form, maps, opponents, and head-to-head results."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css?v=20260720-2">
+  <style>
+    .stats-reset-filters {
+      flex: 0 0 auto;
+      color: var(--text);
+      border-color: rgba(109, 232, 255, 0.28);
+    }
+
+    .stats-comparison-page-panel {
+      max-width: 1180px;
+      margin-inline: auto;
+    }
+  </style>
+</head>
+<body class="embedded-page">
+  <div class="page-shell">
+    <main id="top">
+      <section class="landing-stats stats-shell section-frame">
+        <div class="stats-toolbar-row">
+          <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+          <button class="stats-filter-button stats-reset-filters" id="statsResetFilters" type="button">Reset comparison</button>
+          <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
+        </div>
+
+        <section class="stats-panel stats-comparison-page-panel">
+          <section class="stats-player-comparison" id="statsPlayerComparison">
+            <p class="stats-comparison-empty">Loading players...</p>
+          </section>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="embedded-page.js?v=20260720-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20260720-8"></script>
+  <script>
+    document.getElementById("statsResetFilters").addEventListener("click", () => {
+      window.location.assign(window.location.pathname);
+    });
+  </script>
+</body>
+</html>

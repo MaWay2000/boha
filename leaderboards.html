@@ -15,7 +15,7 @@
     rel="stylesheet"
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260720-2">
   <style>
     .stats-reset-filters {
       flex: 0 0 auto;
@@ -184,12 +184,15 @@
           <section class="stats-panel stats-player-games-panel">
             <div class="stats-panel-head">
               <div>
-                <p class="panel-kicker">Player Games</p>
-                <h4 id="statsPlayerGamesTitle">Expand a player to inspect recent games</h4>
+                <p class="panel-kicker">Player Profile</p>
+                <h4 id="statsPlayerGamesTitle">Select a player to open their profile</h4>
               </div>
               <span class="stats-panel-note" id="statsPlayerGamesMeta">The selected player's latest matches will appear here.</span>
             </div>
 
+            <section class="stats-player-profile" id="statsPlayerProfile" hidden></section>
+
+            <p class="stats-detail-label stats-profile-recent-label">Recent matches</p>
             <div class="stats-table-wrap">
               <table class="stats-table">
                 <thead>
@@ -233,8 +236,8 @@
     </main>
   </div>
 
-  <script src="embedded-page.js"></script>
-  <script type="module" src="stats/live-stats.js?v=20260720-4"></script>
+  <script src="embedded-page.js?v=20260720-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20260720-8"></script>
   <script>
     document.getElementById("statsResetFilters").addEventListener("click", () => {
       window.location.assign(window.location.pathname);

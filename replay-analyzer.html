@@ -222,6 +222,76 @@
       font: 700 1.15rem "Oxanium", sans-serif;
     }
 
+    .replay-match-summary {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(109, 232, 255, 0.07), rgba(141, 233, 142, 0.035));
+    }
+
+    .replay-match-summary[hidden] {
+      display: none;
+    }
+
+    .replay-match-summary-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .replay-match-summary-heading h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+
+    .replay-upset-badge {
+      padding: 5px 10px;
+      color: #fff0c2;
+      border: 1px solid rgba(255, 198, 96, 0.32);
+      border-radius: 999px;
+      background: rgba(255, 198, 96, 0.12);
+      font: 700 0.72rem "Oxanium", sans-serif;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .replay-match-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .replay-match-summary-grid article {
+      min-width: 0;
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(3, 11, 18, 0.58);
+    }
+
+    .replay-match-summary-grid span,
+    .replay-match-summary-grid strong {
+      display: block;
+    }
+
+    .replay-match-summary-grid span {
+      color: var(--muted);
+      font-size: 0.68rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .replay-match-summary-grid strong {
+      margin-top: 5px;
+      overflow: hidden;
+      color: var(--text);
+      font: 700 0.8rem "Oxanium", sans-serif;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
     .replay-results-section {
       margin-top: 18px;
     }
@@ -502,6 +572,10 @@
       .replay-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
+      .replay-match-summary-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
     }
 
     @media (max-width: 680px) {
@@ -509,6 +583,10 @@
       .replay-event-filters,
       .replay-summary-grid {
         grid-template-columns: 1fr;
+      }
+
+      .replay-match-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .replay-analyzer-description {
@@ -578,6 +656,7 @@
 
         <div class="replay-results" id="replayResults" hidden>
           <div class="replay-summary-grid" id="replaySummary"></div>
+          <section class="replay-match-summary" id="replayMatchSummary" hidden></section>
 
           <article class="replay-results-section">
             <h3>Players</h3>
@@ -664,7 +743,7 @@
     </main>
   </div>
 
-  <script src="replay-analyzer.js?v=20260720-5"></script>
-  <script src="embedded-page.js"></script>
+  <script src="replay-analyzer.js?v=20260720-7"></script>
+  <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

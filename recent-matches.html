@@ -15,7 +15,7 @@
     rel="stylesheet"
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20260720-2">
   <style>
     .stats-reset-filters {
       flex: 0 0 auto;
@@ -88,6 +88,49 @@
             </label>
           </div>
 
+          <details class="stats-match-filters" id="statsMatchFilters">
+            <summary>
+              <span>Match filters</span>
+              <small id="statsMatchFilterCount">No advanced filters</small>
+            </summary>
+            <div class="stats-match-filter-grid">
+              <label>
+                <span>From date</span>
+                <input id="statsMatchesDateFrom" type="date">
+              </label>
+              <label>
+                <span>To date</span>
+                <input id="statsMatchesDateTo" type="date">
+              </label>
+              <label>
+                <span>Map</span>
+                <select id="statsMatchesMap">
+                  <option value="">All maps</option>
+                </select>
+              </label>
+              <label>
+                <span>Min duration</span>
+                <span class="stats-filter-input-unit"><input id="statsMatchesMinDuration" type="number" min="0" step="1" inputmode="numeric" placeholder="0"><small>min</small></span>
+              </label>
+              <label>
+                <span>Max duration</span>
+                <span class="stats-filter-input-unit"><input id="statsMatchesMaxDuration" type="number" min="0" step="1" inputmode="numeric" placeholder="Any"><small>min</small></span>
+              </label>
+              <label>
+                <span>Players</span>
+                <span class="stats-filter-range"><input id="statsMatchesMinPlayers" type="number" min="1" step="1" inputmode="numeric" placeholder="Min"><b>to</b><input id="statsMatchesMaxPlayers" type="number" min="1" step="1" inputmode="numeric" placeholder="Max"></span>
+              </label>
+              <label>
+                <span>Min power gap</span>
+                <span class="stats-filter-input-unit"><input id="statsMatchesMinPowerGap" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="0"><small>%</small></span>
+              </label>
+              <label class="stats-filter-check">
+                <input id="statsMatchesUpsetsOnly" type="checkbox">
+                <span>Upsets only</span>
+              </label>
+            </div>
+          </details>
+
             <div class="stats-table-wrap stats-table-wrap-matches">
               <table class="stats-table">
                 <thead>
@@ -137,8 +180,8 @@
     </main>
   </div>
 
-  <script src="embedded-page.js"></script>
-  <script type="module" src="stats/live-stats.js?v=20260720-6"></script>
+  <script src="embedded-page.js?v=20260720-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20260720-8"></script>
   <script>
     document.getElementById("statsResetFilters").addEventListener("click", () => {
       window.location.assign(window.location.pathname);

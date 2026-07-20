@@ -76,12 +76,25 @@ const ranksElement = document.getElementById("statsRanks");
 const rankActionsElement = document.getElementById("statsRanksActions");
 const playerGamesTitleElement = document.getElementById("statsPlayerGamesTitle");
 const playerGamesMetaElement = document.getElementById("statsPlayerGamesMeta");
+const playerProfileElement = document.getElementById("statsPlayerProfile");
+const playerComparisonElement = document.getElementById("statsPlayerComparison");
 const playerGamesElement = document.getElementById("statsPlayerGames");
 const playerGamesActionsElement = document.getElementById("statsPlayerGamesActions");
 const playerSearchElement = document.getElementById("statsPlayerSearch");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
 const matchesActionsElement = document.getElementById("statsMatchesActions");
+const matchFiltersElement = document.getElementById("statsMatchFilters");
+const matchFilterCountElement = document.getElementById("statsMatchFilterCount");
+const matchesDateFromElement = document.getElementById("statsMatchesDateFrom");
+const matchesDateToElement = document.getElementById("statsMatchesDateTo");
+const matchesMapElement = document.getElementById("statsMatchesMap");
+const matchesMinDurationElement = document.getElementById("statsMatchesMinDuration");
+const matchesMaxDurationElement = document.getElementById("statsMatchesMaxDuration");
+const matchesMinPlayersElement = document.getElementById("statsMatchesMinPlayers");
+const matchesMaxPlayersElement = document.getElementById("statsMatchesMaxPlayers");
+const matchesMinPowerGapElement = document.getElementById("statsMatchesMinPowerGap");
+const matchesUpsetsOnlyElement = document.getElementById("statsMatchesUpsetsOnly");
 const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data-sort-key]")];
 
 let selectedLeaderboard = "Global";
@@ -100,6 +113,18 @@ let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 let visibleMatchCount = INITIAL_MATCH_LIMIT;
 let playerSearchQuery = "";
 let matchesSearchQuery = "";
+let matchesDateFrom = "";
+let matchesDateTo = "";
+let matchesMap = "";
+let matchesMinDuration = "";
+let matchesMaxDuration = "";
+let matchesMinPlayers = "";
+let matchesMaxPlayers = "";
+let matchesMinPowerGap = "";
+let matchesUpsetsOnly = false;
+let comparePlayerAKey = null;
+let comparePlayerBKey = null;
+let matchMapOptionsSignature = "";
 let leaderboardGameCounts = new Map();
 let globalRankMap = new Map();
 let statusRefreshTimer = null;
@@ -434,6 +459,17 @@ function applyStateFromUrl() {
   );
   playerSearchQuery = url.searchParams.get("playerSearch") || "";
   matchesSearchQuery = url.searchParams.get("matchesSearch") || "";
+  matchesDateFrom = url.searchParams.get("matchesFrom") || "";
+  matchesDateTo = url.searchParams.get("matchesTo") || "";
+  matchesMap = url.searchParams.get("matchesMap") || "";
+  matchesMinDuration = url.searchParams.get("matchesMinMinutes") || "";
+  matchesMaxDuration = url.searchParams.get("matchesMaxMinutes") || "";
+  matchesMinPlayers = url.searchParams.get("matchesMinPlayers") || "";
+  matchesMaxPlayers = url.searchParams.get("matchesMaxPlayers") || "";
+  matchesMinPowerGap = url.searchParams.get("matchesMinPowerGap") || "";
+  matchesUpsetsOnly = url.searchParams.get("matchesUpsets") === "1";
+  comparePlayerAKey = url.searchParams.get("compareA") || null;
+  comparePlayerBKey = url.searchParams.get("compareB") || null;
   activeExpandedAccountKey = url.searchParams.get("player") || null;
   activeExpandedPlayerGameKey = url.searchParams.get("game") || null;
   showingAllPlayerGames = url.searchParams.get("playerGames") === "all";
@@ -448,6 +484,29 @@ function applyStateFromUrl() {
 
   if (matchesSearchElement) {
     matchesSearchElement.value = matchesSearchQuery;
+  }
+
+  [
+    [matchesDateFromElement, matchesDateFrom],
+    [matchesDateToElement, matchesDateTo],
+    [matchesMapElement, matchesMap],
+    [matchesMinDurationElement, matchesMinDuration],
+    [matchesMaxDurationElement, matchesMaxDuration],
+    [matchesMinPlayersElement, matchesMinPlayers],
+    [matchesMaxPlayersElement, matchesMaxPlayers],
+    [matchesMinPowerGapElement, matchesMinPowerGap]
+  ].forEach(([element, value]) => {
+    if (element) {
+      element.value = value;
+    }
+  });
+
+  if (matchesUpsetsOnlyElement) {
+    matchesUpsetsOnlyElement.checked = matchesUpsetsOnly;
+  }
+
+  if (matchFiltersElement && getActiveMatchFilterCount()) {
+    matchFiltersElement.open = true;
   }
 
   updateSortIndicators();
@@ -472,8 +531,35 @@ function buildStateParams() {
     params.set("matchesSearch", matchesSearchQuery.trim());
   }
 
+  [
+    ["matchesFrom", matchesDateFrom],
+    ["matchesTo", matchesDateTo],
+    ["matchesMap", matchesMap],
+    ["matchesMinMinutes", matchesMinDuration],
+    ["matchesMaxMinutes", matchesMaxDuration],
+    ["matchesMinPlayers", matchesMinPlayers],
+    ["matchesMaxPlayers", matchesMaxPlayers],
+    ["matchesMinPowerGap", matchesMinPowerGap]
+  ].forEach(([key, value]) => {
+    if (matchesElement && String(value || "").trim()) {
+      params.set(key, String(value).trim());
+    }
+  });
+
+  if (matchesElement && matchesUpsetsOnly) {
+    params.set("matchesUpsets", "1");
+  }
+
   if (ranksElement && activeExpandedAccountKey) {
     params.set("player", activeExpandedAccountKey);
+  }
+
+  if (playerComparisonElement && comparePlayerAKey) {
+    params.set("compareA", comparePlayerAKey);
+  }
+
+  if (playerComparisonElement && comparePlayerBKey) {
+    params.set("compareB", comparePlayerBKey);
   }
 
   if (playerGamesElement && activeExpandedPlayerGameKey) {
@@ -1183,6 +1269,459 @@ function renderPlayerGameDetails(game, activeAccount) {
   `;
 }
 
+function getAccountGameSlot(game, account) {
+  return (game.players || []).find((slot) => slot.account === account)
+    || (game.slots || []).find((slot) => slot.account === account)
+    || null;
+}
+
+function getCountedFavorites(values, limit = 3) {
+  const counts = new Map();
+  values.filter(Boolean).forEach((value) => counts.set(value, (counts.get(value) || 0) + 1));
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, limit);
+}
+
+function formatPlayerMode(game) {
+  const teamSizes = (game.teams || [])
+    .map((team) => (team.players || []).length)
+    .filter((size) => size > 0);
+  if (teamSizes.length > 1 && teamSizes.every((size) => size === 1)) {
+    return "FFA";
+  }
+  if (teamSizes.length > 1 && teamSizes.every((size) => size === teamSizes[0])) {
+    return teamSizes.join("v");
+  }
+  return formatAlliance(game);
+}
+
+function getAccountEloHistory(account) {
+  const points = [...account.games]
+    .sort((left, right) => Number(left.endDate || 0) - Number(right.endDate || 0))
+    .map((game) => {
+      const slot = getAccountGameSlot(game, account);
+      if (!Number.isFinite(slot?.elo)) {
+        return null;
+      }
+      const delta = Number.isFinite(slot.eloDelta) ? slot.eloDelta : 0;
+      return {
+        date: Number(game.endDate || 0),
+        value: slot.elo + delta
+      };
+    })
+    .filter(Boolean);
+
+  if (!account.discounted && Number.isFinite(account.elo)) {
+    const lastPoint = points.at(-1);
+    if (!lastPoint || Math.abs(lastPoint.value - account.elo) > 0.005) {
+      points.push({ date: Number(lastPoint?.date || Date.now()), value: account.elo });
+    }
+  }
+
+  return points;
+}
+
+function renderEloSparkline(points) {
+  if (!points.length) {
+    return '<p class="stats-profile-empty">ELO history begins after five ranked matches.</p>';
+  }
+
+  const width = 360;
+  const height = 92;
+  const inset = 7;
+  const values = points.map((point) => point.value);
+  const minimum = Math.min(...values);
+  const maximum = Math.max(...values);
+  const range = Math.max(1, maximum - minimum);
+  const denominator = Math.max(1, points.length - 1);
+  const coordinates = points.map((point, index) => {
+    const x = inset + (index / denominator) * (width - inset * 2);
+    const y = height - inset - ((point.value - minimum) / range) * (height - inset * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const latest = points.at(-1);
+
+  return `
+    <svg class="stats-profile-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="ELO history from ${minimum.toFixed(0)} to ${maximum.toFixed(0)}">
+      <polyline points="${coordinates}" vector-effect="non-scaling-stroke"></polyline>
+    </svg>
+    <div class="stats-profile-chart-scale">
+      <span>${minimum.toFixed(0)}</span>
+      <span>${formatShortDate(latest.date)}</span>
+      <span>${maximum.toFixed(0)}</span>
+    </div>
+  `;
+}
+
+function getAccountOpponents(account) {
+  const counts = new Map();
+  account.games.forEach((game) => {
+    const ownTeam = (game.teams || []).find((team) => (
+      (team.players || []).some((slot) => slot.account === account)
+    ));
+    const opponents = ownTeam
+      ? (game.teams || []).filter((team) => team !== ownTeam).flatMap((team) => team.players || [])
+      : (game.players || []).filter((slot) => slot.account !== account);
+
+    opponents.forEach((slot) => {
+      if (!slot.account || slot.account === account) {
+        return;
+      }
+      const key = getAccountExpandKey(slot.account);
+      const current = counts.get(key) || { name: slot.account.name || "Unknown", count: 0 };
+      current.count += 1;
+      counts.set(key, current);
+    });
+  });
+
+  return [...counts.values()]
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name))
+    .slice(0, 5);
+}
+
+function getAccountTeammates(account) {
+  const counts = new Map();
+  account.games.forEach((game) => {
+    const ownTeam = (game.teams || []).find((team) => (
+      (team.players || []).some((slot) => slot.account === account)
+    ));
+
+    (ownTeam?.players || []).forEach((slot) => {
+      if (!slot.account || slot.account === account) {
+        return;
+      }
+      const key = getAccountExpandKey(slot.account);
+      const current = counts.get(key) || { name: slot.account.name || "Unknown", count: 0 };
+      current.count += 1;
+      counts.set(key, current);
+    });
+  });
+
+  return [...counts.values()]
+    .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name))
+    .slice(0, 5);
+}
+
+function renderProfileList(items, emptyLabel) {
+  if (!items.length) {
+    return `<span class="stats-profile-empty">${escapeHtml(emptyLabel)}</span>`;
+  }
+  return items.map(([label, count]) => (
+    `<span class="stats-profile-chip">${escapeHtml(label)} <small>${count}</small></span>`
+  )).join("");
+}
+
+function renderComparisonForm(account, limit = 8) {
+  const outcomes = [...account.games]
+    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0))
+    .slice(0, limit)
+    .map((game) => getPlayerGameOutcome(game, account));
+
+  if (!outcomes.length) {
+    return '<span class="stats-profile-empty">No recent form</span>';
+  }
+
+  return `<span class="stats-comparison-form">${outcomes.map((outcome) => (
+    `<i class="${outcome.className}" title="${escapeHtml(outcome.label)}">${escapeHtml(outcome.label.charAt(0))}</i>`
+  )).join("")}</span>`;
+}
+
+function getComparisonAccountData(account) {
+  const stats = getAccountDisplayStats(account);
+  const gameCount = getAccountDisplayGameCount(account);
+  return {
+    elo: account.discounted ? "Provisional" : account.elo.toFixed(2),
+    winRate: formatRecordPercentage(stats.wins, gameCount),
+    form: renderComparisonForm(account),
+    maps: getCountedFavorites(account.games.map((game) => game.mapName)),
+    opponents: getAccountOpponents(account).map((opponent) => [opponent.name, opponent.count])
+  };
+}
+
+function areAccountsOpponents(game, accountA, accountB) {
+  const teamA = (game.teams || []).find((team) => (
+    (team.players || []).some((slot) => slot.account === accountA)
+  ));
+  const teamB = (game.teams || []).find((team) => (
+    (team.players || []).some((slot) => slot.account === accountB)
+  ));
+
+  return Boolean(teamA && teamB && teamA !== teamB);
+}
+
+function renderPlayerComparison(accounts) {
+  if (!playerComparisonElement) {
+    return;
+  }
+
+  const selectableAccounts = filterVisibleAccounts(accounts);
+  const accountByKey = new Map(selectableAccounts.map((account) => [getAccountExpandKey(account), account]));
+  const activeAccount = accountByKey.get(activeExpandedAccountKey);
+
+  if (!accountByKey.has(comparePlayerAKey)) {
+    comparePlayerAKey = activeAccount ? getAccountExpandKey(activeAccount) : null;
+  }
+  if (!accountByKey.has(comparePlayerBKey)) {
+    comparePlayerBKey = null;
+  }
+
+  const accountA = accountByKey.get(comparePlayerAKey);
+  const accountB = accountByKey.get(comparePlayerBKey);
+  const renderOptions = (selectedKey, excludedKey) => `
+    <option value="">Select player</option>
+    ${selectableAccounts.map((account) => {
+      const key = getAccountExpandKey(account);
+      const elo = account.discounted ? "provisional" : account.elo.toFixed(0);
+      return `<option value="${escapeHtml(key)}"${key === selectedKey ? " selected" : ""}${key === excludedKey ? " disabled" : ""}>${escapeHtml(account.name || "Unknown")} · ${elo} ELO</option>`;
+    }).join("")}
+  `;
+
+  let comparisonBody = '<p class="stats-comparison-empty">Select two players to compare their performance in this leaderboard slice.</p>';
+  if (accountA && accountB && accountA !== accountB) {
+    const dataA = getComparisonAccountData(accountA);
+    const dataB = getComparisonAccountData(accountB);
+    const headToHeadGames = accountA.games.filter((game) => areAccountsOpponents(game, accountA, accountB));
+    const winsA = headToHeadGames.filter((game) => getPlayerGameOutcome(game, accountA).label === "Won").length;
+    const winsB = headToHeadGames.filter((game) => getPlayerGameOutcome(game, accountB).label === "Won").length;
+    const otherResults = Math.max(0, headToHeadGames.length - winsA - winsB);
+    const winsAPercentage = headToHeadGames.length ? (winsA / headToHeadGames.length) * 100 : 0;
+    const winsBPercentage = headToHeadGames.length ? (winsB / headToHeadGames.length) * 100 : 0;
+    const otherPercentage = headToHeadGames.length ? (otherResults / headToHeadGames.length) * 100 : 0;
+
+    comparisonBody = `
+      <div class="stats-comparison-grid">
+        <strong>${escapeHtml(accountA.name || "Unknown")}</strong>
+        <span class="stats-comparison-metric">Metric</span>
+        <strong>${escapeHtml(accountB.name || "Unknown")}</strong>
+        <span>${escapeHtml(dataA.elo)}</span><b>Current ELO</b><span>${escapeHtml(dataB.elo)}</span>
+        <span>${escapeHtml(dataA.winRate)}</span><b>Win rate</b><span>${escapeHtml(dataB.winRate)}</span>
+        <span>${dataA.form}</span><b>Recent form</b><span>${dataB.form}</span>
+        <span class="stats-comparison-list">${renderProfileList(dataA.maps, "No map history")}</span><b>Favorite maps</b><span class="stats-comparison-list">${renderProfileList(dataB.maps, "No map history")}</span>
+        <span class="stats-comparison-list">${renderProfileList(dataA.opponents, "No opponents")}</span><b>Top opponents</b><span class="stats-comparison-list">${renderProfileList(dataB.opponents, "No opponents")}</span>
+      </div>
+      <div class="stats-comparison-head-to-head">
+        <span>Head to head</span>
+        <div class="stats-comparison-head-to-head-result">
+          <strong>${winsA} wins (${winsAPercentage.toFixed(0)}%) · ${otherResults} other (${otherPercentage.toFixed(0)}%) · ${winsB} wins (${winsBPercentage.toFixed(0)}%)</strong>
+          <span class="stats-comparison-percentage-bar" role="img" aria-label="${escapeHtml(accountA.name || "Player one")} ${winsAPercentage.toFixed(0)} percent, other results ${otherPercentage.toFixed(0)} percent, ${escapeHtml(accountB.name || "Player two")} ${winsBPercentage.toFixed(0)} percent">
+            <i class="is-player-one" style="width: ${winsAPercentage}%"></i>
+            <i class="is-other" style="width: ${otherPercentage}%"></i>
+            <i class="is-player-two" style="width: ${winsBPercentage}%"></i>
+          </span>
+        </div>
+        <small>${headToHeadGames.length} shared matches</small>
+      </div>
+    `;
+  }
+
+  playerComparisonElement.innerHTML = `
+    <div class="stats-comparison-heading">
+      <div><span class="stats-detail-label">Player comparison</span><strong>Compare two players</strong></div>
+      <small>Shareable in the page URL</small>
+    </div>
+    <div class="stats-comparison-selects">
+      <label><span>Player one</span><select id="statsComparePlayerA">${renderOptions(comparePlayerAKey, comparePlayerBKey)}</select></label>
+      <span aria-hidden="true">VS</span>
+      <label><span>Player two</span><select id="statsComparePlayerB">${renderOptions(comparePlayerBKey, comparePlayerAKey)}</select></label>
+    </div>
+    ${comparisonBody}
+  `;
+
+  playerComparisonElement.querySelector("#statsComparePlayerA")?.addEventListener("change", (event) => {
+    comparePlayerAKey = event.currentTarget.value || null;
+    render();
+  });
+  playerComparisonElement.querySelector("#statsComparePlayerB")?.addEventListener("change", (event) => {
+    comparePlayerBKey = event.currentTarget.value || null;
+    render();
+  });
+}
+
+function renderPlayerProfile(account) {
+  if (!playerProfileElement || !account) {
+    if (playerProfileElement) {
+      playerProfileElement.hidden = true;
+      playerProfileElement.innerHTML = "";
+    }
+    return;
+  }
+
+  const displayStats = getAccountDisplayStats(account);
+  const gameCount = getAccountDisplayGameCount(account);
+  const eloHistory = getAccountEloHistory(account);
+  const peakElo = eloHistory.length ? Math.max(...eloHistory.map((point) => point.value)) : null;
+  const recentOutcomes = [...account.games]
+    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0))
+    .slice(0, 10)
+    .map((game) => getPlayerGameOutcome(game, account));
+  const favoriteMaps = getCountedFavorites(account.games.map((game) => game.mapName));
+  const favoriteModes = getCountedFavorites(account.games.map(formatPlayerMode));
+  const opponents = getAccountOpponents(account).map((opponent) => [opponent.name, opponent.count]);
+  const teammates = getAccountTeammates(account).map((teammate) => [teammate.name, teammate.count]);
+  const profileUrl = new URL("index.html", window.location.href);
+  profileUrl.search = buildStateParams().toString();
+
+  playerProfileElement.hidden = false;
+  playerProfileElement.innerHTML = `
+    <div class="stats-profile-heading">
+      <div>
+        <span class="stats-detail-label">Player profile</span>
+        <strong>${escapeHtml(account.name || "Unknown")}</strong>
+      </div>
+      <button class="stats-profile-share" type="button" data-profile-url="${escapeHtml(profileUrl.href)}">Copy profile link</button>
+    </div>
+    <div class="stats-profile-metrics">
+      <article><span>Current ELO</span><strong>${account.discounted ? "Provisional" : account.elo.toFixed(2)}</strong></article>
+      <article><span>Peak ELO</span><strong>${peakElo == null ? "--" : peakElo.toFixed(2)}</strong></article>
+      <article><span>Win / loss</span><strong>${formatRecordPercentage(displayStats.wins, gameCount)} / ${formatRecordPercentage(displayStats.losses, gameCount)}</strong></article>
+      <article class="stats-profile-form"><span>Recent form</span><strong>${recentOutcomes.map((outcome) => `<i class="${outcome.className}" title="${escapeHtml(outcome.label)}">${escapeHtml(outcome.label.charAt(0))}</i>`).join("") || "--"}</strong></article>
+    </div>
+    <div class="stats-profile-details">
+      <article class="stats-profile-history">
+        <span class="stats-detail-label">ELO history</span>
+        ${renderEloSparkline(eloHistory)}
+      </article>
+      <article><span class="stats-detail-label">Favorite maps</span><div>${renderProfileList(favoriteMaps, "No map history")}</div></article>
+      <article><span class="stats-detail-label">Favorite modes</span><div>${renderProfileList(favoriteModes, "No mode history")}</div></article>
+      <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileList(opponents, "No opponents")}</div></article>
+      <article><span class="stats-detail-label">Most-played teammates</span><div>${renderProfileList(teammates, "No teammates")}</div></article>
+    </div>
+  `;
+
+  const shareButton = playerProfileElement.querySelector("[data-profile-url]");
+  shareButton?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(shareButton.dataset.profileUrl);
+      shareButton.textContent = "Link copied";
+    } catch {
+      shareButton.textContent = "Copy failed";
+    }
+    window.setTimeout(() => { shareButton.textContent = "Copy profile link"; }, 1400);
+  });
+}
+
+function parseOptionalNumber(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+}
+
+function getMatchTeamStrengths(game) {
+  return (game.teams || [])
+    .filter((team) => Array.isArray(team.players) && team.players.length)
+    .map((team) => ({
+      team,
+      strength: getTeamStrengthPercent(team),
+      userType: getNormalizedTeamUserType(game, team)
+    }));
+}
+
+function getMatchTeamPowerDifference(game) {
+  const strengths = getMatchTeamStrengths(game)
+    .map(({ strength }) => strength)
+    .filter((strength) => Number.isFinite(strength));
+  if (strengths.length < 2) {
+    return null;
+  }
+
+  return Math.max(...strengths) - Math.min(...strengths);
+}
+
+function isUpsetMatch(game) {
+  const strengths = getMatchTeamStrengths(game);
+  const winnerStrengths = strengths
+    .filter(({ userType, strength }) => userType === "winner" && Number.isFinite(strength))
+    .map(({ strength }) => strength);
+  const opponentStrengths = strengths
+    .filter(({ userType, strength }) => userType !== "winner" && Number.isFinite(strength))
+    .map(({ strength }) => strength);
+
+  return winnerStrengths.length > 0
+    && opponentStrengths.length > 0
+    && Math.max(...winnerStrengths) < Math.max(...opponentStrengths);
+}
+
+function parseFilterDate(value, includeWholeDay = false) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  if (includeWholeDay) {
+    date.setDate(date.getDate() + 1);
+  }
+  return date.getTime();
+}
+
+function matchesAdvancedFilters(game) {
+  const fromTime = parseFilterDate(matchesDateFrom);
+  const toTime = parseFilterDate(matchesDateTo, true);
+  const gameTime = Number(game.endDate || 0);
+  const durationMinutes = Number(game.duration || 0) / 60_000;
+  const playerCount = getPlayerCount(game);
+  const minDuration = parseOptionalNumber(matchesMinDuration);
+  const maxDuration = parseOptionalNumber(matchesMaxDuration);
+  const minPlayers = parseOptionalNumber(matchesMinPlayers);
+  const maxPlayers = parseOptionalNumber(matchesMaxPlayers);
+  const minPowerGap = parseOptionalNumber(matchesMinPowerGap);
+
+  if (fromTime != null && gameTime < fromTime) {
+    return false;
+  }
+  if (toTime != null && gameTime >= toTime) {
+    return false;
+  }
+  if (matchesMap && game.mapName !== matchesMap) {
+    return false;
+  }
+  if (minDuration != null && durationMinutes < minDuration) {
+    return false;
+  }
+  if (maxDuration != null && durationMinutes > maxDuration) {
+    return false;
+  }
+  if (minPlayers != null && playerCount < minPlayers) {
+    return false;
+  }
+  if (maxPlayers != null && playerCount > maxPlayers) {
+    return false;
+  }
+  if (minPowerGap != null) {
+    const powerDifference = getMatchTeamPowerDifference(game);
+    if (!Number.isFinite(powerDifference) || powerDifference < minPowerGap) {
+      return false;
+    }
+  }
+  if (matchesUpsetsOnly && !isUpsetMatch(game)) {
+    return false;
+  }
+
+  return true;
+}
+
+function getActiveMatchFilterCount() {
+  return [
+    matchesDateFrom,
+    matchesDateTo,
+    matchesMap,
+    matchesMinDuration,
+    matchesMaxDuration,
+    matchesMinPlayers,
+    matchesMaxPlayers,
+    matchesMinPowerGap,
+    matchesUpsetsOnly
+  ].filter(Boolean).length;
+}
+
 function renderPlayerGames(accounts) {
   if (!playerGamesElement || !playerGamesTitleElement || !playerGamesMetaElement) {
     return;
@@ -1193,11 +1732,12 @@ function renderPlayerGames(accounts) {
     activeExpandedAccountKey = null;
     resetPlayerGamesView();
     expandedAccounts.clear();
-    playerGamesTitleElement.textContent = "Expand a player to inspect recent games";
+    playerGamesTitleElement.textContent = "Select a player to open their profile";
     playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
     if (playerGamesActionsElement) {
       playerGamesActionsElement.innerHTML = "";
     }
+    renderPlayerProfile(null);
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
         <td colspan="5">Use + on a player to show their latest games here.</td>
@@ -1205,6 +1745,8 @@ function renderPlayerGames(accounts) {
     `;
     return;
   }
+
+  renderPlayerProfile(activeAccount);
 
   const sortedGames = [...activeAccount.games].sort((left, right) => comparePlayerGames(left, right, activeAccount));
   let latestGames = showingAllPlayerGames
@@ -1227,7 +1769,7 @@ function renderPlayerGames(accounts) {
     activeExpandedPlayerGameKey = null;
   }
 
-  playerGamesTitleElement.textContent = `${activeAccount.name || "Player"} recent games`;
+  playerGamesTitleElement.textContent = `${activeAccount.name || "Player"} profile`;
   playerGamesMetaElement.textContent = showingAllPlayerGames
     ? `All ${latestGames.length} matches in the ${selectedLeaderboard} slice.`
     : `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
@@ -1619,7 +2161,6 @@ function renderRanks(accountList) {
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
       const publicKeys = [...account.publicKeys].sort();
       const accountNames = getSortedAccountNames(account);
-      const note = account.discounted ? "Provisional" : `${publicKeys.length} key(s) tracked`;
       const keyCountLabel = `${publicKeys.length} key(s) tracked`;
       const playerLine = escapeHtml(account.name || "Unknown");
       const botBadge = Boolean(account.bot) === true
@@ -1627,12 +2168,12 @@ function renderRanks(accountList) {
         : "";
       const hasDetails = Boolean(publicKeys.length || accountNames.length > 1);
       const expandKey = getAccountExpandKey(account);
-      const isExpanded = hasDetails && expandedAccounts.has(expandKey);
+      const isExpanded = expandedAccounts.has(expandKey);
       const expandLabel = isExpanded
-        ? "Hide player names and keys"
+        ? "Close player profile"
         : accountNames.length > 1
-          ? "Show player names and keys"
-          : keyCountLabel;
+          ? "Open profile, player names, and keys"
+          : "Open player profile";
       const nameDetails = accountNames.length > 1
         ? `
             <div class="stats-detail-group">
@@ -1682,29 +2223,21 @@ function renderRanks(accountList) {
             </div>
           `
         : "";
-      const playerDetails = hasDetails
-        ? `
-            <div class="stats-player-line">
-              <span class="stats-player-label">${playerLine}</span>
-              ${botBadge}
-              <button
-                class="stats-expand-toggle"
-                type="button"
-                data-expand-account="${escapeHtml(expandKey)}"
-                aria-expanded="${isExpanded ? "true" : "false"}"
-              >
-                <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
-                <span class="visually-hidden">${escapeHtml(expandLabel)}</span>
-              </button>
-            </div>
-          `
-        : `
-            <div class="stats-player-line">
-              <span class="stats-player-label">${playerLine}</span>
-              ${botBadge}
-              <span class="stats-player-note">${escapeHtml(note)}</span>
-            </div>
-          `;
+      const playerDetails = `
+        <div class="stats-player-line">
+          <span class="stats-player-label">${playerLine}</span>
+          ${botBadge}
+          <button
+            class="stats-expand-toggle"
+            type="button"
+            data-expand-account="${escapeHtml(expandKey)}"
+            aria-expanded="${isExpanded ? "true" : "false"}"
+          >
+            <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
+            <span class="visually-hidden">${escapeHtml(expandLabel)}</span>
+          </button>
+        </div>
+      `;
       const detailRow = hasDetails && isExpanded
         ? `
             <tr class="stats-detail-row">
@@ -1720,7 +2253,7 @@ function renderRanks(accountList) {
           `
         : "";
       return `
-        <tr class="stats-rank-row${isExpanded ? " is-expanded" : ""}${hasDetails ? " is-clickable" : ""}"${hasDetails ? ` data-expand-account="${escapeHtml(expandKey)}"` : ""}>
+        <tr class="stats-rank-row${isExpanded ? " is-expanded" : ""} is-clickable" data-expand-account="${escapeHtml(expandKey)}">
           <td class="stats-rank">${rank}</td>
           <td class="stats-player-name">
             ${playerDetails}
@@ -1852,9 +2385,18 @@ function renderMatches(gameList) {
     return;
   }
 
+  renderMatchMapOptions(gameList);
+  const activeFilterCount = getActiveMatchFilterCount();
+  if (matchFilterCountElement) {
+    matchFilterCountElement.textContent = activeFilterCount
+      ? `${activeFilterCount} active ${activeFilterCount === 1 ? "filter" : "filters"}`
+      : "No advanced filters";
+  }
+
   const searchQuery = normalizeSearchQuery(matchesSearchQuery);
   const filteredGames = gameList
     .filter((game) => matchesRecentGameSearch(game, searchQuery))
+    .filter(matchesAdvancedFilters)
     .sort(compareMatches);
   const rows = filteredGames.slice(0, visibleMatchCount);
 
@@ -1863,7 +2405,7 @@ function renderMatches(gameList) {
   if (!rows.length) {
     matchesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">${searchQuery ? "No matches matched that nickname, key, or map." : "No matches found for this slice."}</td>
+        <td colspan="5">${searchQuery || activeFilterCount ? "No matches matched the current filters." : "No matches found for this slice."}</td>
       </tr>
     `;
     return;
@@ -1888,6 +2430,29 @@ function renderMatches(gameList) {
       `;
     })
     .join("");
+}
+
+function renderMatchMapOptions(gameList) {
+  if (!matchesMapElement) {
+    return;
+  }
+
+  const mapNames = [...new Set(gameList.map((game) => game.mapName).filter(Boolean))]
+    .sort((left, right) => left.localeCompare(right));
+  if (matchesMap && !mapNames.includes(matchesMap)) {
+    mapNames.unshift(matchesMap);
+  }
+  const signature = mapNames.join("\u0000");
+  if (signature === matchMapOptionsSignature && matchesMapElement.value === matchesMap) {
+    return;
+  }
+
+  matchMapOptionsSignature = signature;
+  matchesMapElement.innerHTML = `
+    <option value="">All maps</option>
+    ${mapNames.map((mapName) => `<option value="${escapeHtml(mapName)}">${escapeHtml(mapName)}</option>`).join("")}
+  `;
+  matchesMapElement.value = matchesMap;
 }
 
 function renderMatchActions(totalMatches, shownMatches) {
@@ -1925,6 +2490,7 @@ function render() {
     globalRankMap = new Map();
     renderButtons();
     renderSummary([], []);
+    renderPlayerComparison([]);
     renderPlayerGames(renderRanks([]));
     renderMatches([]);
     updateSortIndicators();
@@ -1980,6 +2546,7 @@ function render() {
   renderButtons();
   renderSummary(accountList, gameList);
   renderRanks(accountList);
+  renderPlayerComparison(accountList);
   renderPlayerGames(accountList);
   renderMatches(gameList);
   updateSortIndicators();
@@ -2065,6 +2632,24 @@ if (matchesSearchElement) {
     render();
   });
 }
+
+function bindMatchFilter(element, eventName, updateValue) {
+  element?.addEventListener(eventName, (event) => {
+    updateValue(event.currentTarget);
+    visibleMatchCount = INITIAL_MATCH_LIMIT;
+    render();
+  });
+}
+
+bindMatchFilter(matchesDateFromElement, "change", (element) => { matchesDateFrom = element.value; });
+bindMatchFilter(matchesDateToElement, "change", (element) => { matchesDateTo = element.value; });
+bindMatchFilter(matchesMapElement, "change", (element) => { matchesMap = element.value; });
+bindMatchFilter(matchesMinDurationElement, "input", (element) => { matchesMinDuration = element.value; });
+bindMatchFilter(matchesMaxDurationElement, "input", (element) => { matchesMaxDuration = element.value; });
+bindMatchFilter(matchesMinPlayersElement, "input", (element) => { matchesMinPlayers = element.value; });
+bindMatchFilter(matchesMaxPlayersElement, "input", (element) => { matchesMaxPlayers = element.value; });
+bindMatchFilter(matchesMinPowerGapElement, "input", (element) => { matchesMinPowerGap = element.value; });
+bindMatchFilter(matchesUpsetsOnlyElement, "change", (element) => { matchesUpsetsOnly = element.checked; });
 
 window.addEventListener("popstate", () => {
   applyStateFromUrl();

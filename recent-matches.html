@@ -35,14 +35,22 @@
     }
 
     .stats-matchup-team-row {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 112px 130px;
       align-items: center;
       gap: 8px;
       width: 100%;
     }
 
+    .stats-matchup-team-row .stats-upset-victory {
+      grid-column: 2;
+      justify-self: center;
+    }
+
     .stats-matchup-team-row .stats-team-strength {
+      grid-column: 3;
       flex: 0 0 auto;
+      margin-left: 0;
       white-space: nowrap;
     }
 

@@ -934,7 +934,7 @@ main {
 
 .stats-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -1132,6 +1132,7 @@ main {
 
 .stats-match-filter-grid input,
 .stats-match-filter-grid select,
+.stats-player-comparison input[type="search"],
 .stats-player-comparison select {
   width: 100%;
   min-width: 0;
@@ -1146,6 +1147,7 @@ main {
 
 .stats-match-filter-grid input:focus,
 .stats-match-filter-grid select:focus,
+.stats-player-comparison input[type="search"]:focus,
 .stats-player-comparison select:focus {
   border-color: rgba(109, 232, 255, 0.54);
   outline: none;
@@ -1586,6 +1588,19 @@ main {
   font-size: 0.85rem;
 }
 
+.stats-summary-player-link {
+  color: var(--cyan);
+  text-decoration: underline;
+  text-decoration-color: rgba(109, 232, 255, 0.35);
+  text-underline-offset: 3px;
+}
+
+.stats-summary-player-link:hover,
+.stats-summary-player-link:focus-visible {
+  color: #b8f7ff;
+  text-decoration-color: currentColor;
+}
+
 .stats-key-details {
   display: block;
   margin-top: 0;
@@ -2006,7 +2021,8 @@ main {
   font-size: 0.7rem;
 }
 
-.stats-comparison-selects > label {
+.stats-comparison-selects > label,
+.stats-comparison-picker {
   display: flex;
   min-width: 0;
   flex: 1 1 0;
@@ -2016,6 +2032,18 @@ main {
   font-size: 0.66rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.stats-comparison-picker-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.55fr) minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  text-transform: none;
+}
+
+.stats-comparison-picker input[type="search"]::placeholder {
+  color: rgba(143, 167, 188, 0.78);
 }
 
 .stats-comparison-selects > span {
@@ -2216,7 +2244,7 @@ main {
 }
 
 .stats-profile-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(230px, 1.2fr);
 }
 
 .stats-profile-metrics article {
@@ -2331,6 +2359,29 @@ main {
 .stats-profile-chip small {
   color: var(--steel);
   font-size: inherit;
+}
+
+.stats-profile-compare-link {
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.stats-profile-compare-link:hover,
+.stats-profile-compare-link:focus-visible {
+  color: #ffffff;
+  border-color: rgba(109, 232, 255, 0.55);
+  background: rgba(109, 232, 255, 0.13);
+  box-shadow: 0 0 14px rgba(109, 232, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.stats-profile-compare-link:focus-visible {
+  outline: 2px solid rgba(109, 232, 255, 0.45);
+  outline-offset: 2px;
 }
 
 .stats-profile-empty {
@@ -2462,6 +2513,22 @@ main {
   color: var(--steel);
   border-color: rgba(149, 205, 255, 0.24);
   background: rgba(109, 232, 255, 0.06);
+}
+
+.stats-upset-victory {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 198, 96, 0.5);
+  border-radius: 10px;
+  color: #fff0c2;
+  background: rgba(255, 198, 96, 0.16);
+  box-shadow: 0 0 14px rgba(255, 198, 96, 0.1);
+  font: 700 0.72rem "Oxanium", sans-serif;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .stats-team-tile {
@@ -2722,6 +2789,10 @@ main {
 
   .stats-comparison-selects > span {
     align-self: center;
+  }
+
+  .stats-comparison-picker-controls {
+    grid-template-columns: 1fr;
   }
 
   .stats-comparison-grid {

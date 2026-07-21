@@ -1322,6 +1322,19 @@ function getAccountEloHistory(account) {
   return points;
 }
 
+function getCurrentWinStreak(account) {
+  const games = [...(account?.games || [])]
+    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0));
+  let streak = 0;
+  for (const game of games) {
+    if (getPlayerGameOutcome(game, account).label !== "Won") {
+      break;
+    }
+    streak += 1;
+  }
+  return streak;
+}
+
 function renderEloSparkline(points) {
   if (!points.length) {
     return '<p class="stats-profile-empty">ELO history begins after five ranked matches.</p>';
@@ -1369,7 +1382,7 @@ function getAccountOpponents(account) {
         return;
       }
       const key = getAccountExpandKey(slot.account);
-      const current = counts.get(key) || { name: slot.account.name || "Unknown", count: 0 };
+      const current = counts.get(key) || { key, name: slot.account.name || "Unknown", count: 0 };
       current.count += 1;
       counts.set(key, current);
     });
@@ -1392,7 +1405,7 @@ function getAccountTeammates(account) {
         return;
       }
       const key = getAccountExpandKey(slot.account);
-      const current = counts.get(key) || { name: slot.account.name || "Unknown", count: 0 };
+      const current = counts.get(key) || { key, name: slot.account.name || "Unknown", count: 0 };
       current.count += 1;
       counts.set(key, current);
     });
@@ -1410,6 +1423,27 @@ function renderProfileList(items, emptyLabel) {
   return items.map(([label, count]) => (
     `<span class="stats-profile-chip">${escapeHtml(label)} <small>${count}</small></span>`
   )).join("");
+}
+
+function renderProfileComparisonLinks(account, items, emptyLabel) {
+  if (!items.length) {
+    return `<span class="stats-profile-empty">${escapeHtml(emptyLabel)}</span>`;
+  }
+
+  const accountKey = getAccountExpandKey(account);
+  return items.map((item) => {
+    const comparisonUrl = new URL("index.html", window.location.href);
+    const params = new URLSearchParams();
+    if (selectedLeaderboard !== "Global") {
+      params.set("leaderboard", selectedLeaderboard);
+    }
+    params.set("compareA", accountKey);
+    params.set("compareB", item.key);
+    params.set("tab", "compare");
+    comparisonUrl.search = params.toString();
+    const comparisonLabel = `Compare ${account.name || "Unknown"} with ${item.name}`;
+    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}" title="${escapeHtml(comparisonLabel)}">${escapeHtml(item.name)} <small>${item.count}</small></a>`;
+  }).join("");
 }
 
 function renderComparisonForm(account, limit = 8) {
@@ -1435,8 +1469,30 @@ function getComparisonAccountData(account) {
     winRate: formatRecordPercentage(stats.wins, gameCount),
     form: renderComparisonForm(account),
     maps: getCountedFavorites(account.games.map((game) => game.mapName)),
-    opponents: getAccountOpponents(account).map((opponent) => [opponent.name, opponent.count])
+    opponents: getAccountOpponents(account)
   };
+}
+
+function renderComparisonOpponentLinks(account, opponents, side) {
+  if (!opponents.length) {
+    return '<span class="stats-profile-empty">No opponents</span>';
+  }
+
+  const accountKey = getAccountExpandKey(account);
+  return opponents.map((opponent) => {
+    const comparisonUrl = new URL("index.html", window.location.href);
+    const params = new URLSearchParams({
+      compareA: side === "A" ? accountKey : opponent.key,
+      compareB: side === "A" ? opponent.key : accountKey,
+      tab: "compare"
+    });
+    if (selectedLeaderboard !== "Global") {
+      params.set("leaderboard", selectedLeaderboard);
+    }
+    comparisonUrl.search = params.toString();
+    const comparisonLabel = `Compare ${account.name || "Unknown"} with ${opponent.name}`;
+    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}" title="${escapeHtml(comparisonLabel)}">${escapeHtml(opponent.name)} <small>${opponent.count}</small></a>`;
+  }).join("");
 }
 
 function areAccountsOpponents(game, accountA, accountB) {
@@ -1468,14 +1524,35 @@ function renderPlayerComparison(accounts) {
 
   const accountA = accountByKey.get(comparePlayerAKey);
   const accountB = accountByKey.get(comparePlayerBKey);
-  const renderOptions = (selectedKey, excludedKey) => `
-    <option value="">Select player</option>
-    ${selectableAccounts.map((account) => {
+  const renderOptions = (selectedKey, excludedKey, searchValue = "") => {
+    const searchQuery = normalizeSearchQuery(searchValue);
+    const getPrimaryNamePriority = (account) => {
+      const name = String(account.name || "").toLowerCase();
+      if (!searchQuery || name === searchQuery) {
+        return 0;
+      }
+      if (name.startsWith(searchQuery)) {
+        return 1;
+      }
+      return name.includes(searchQuery) ? 2 : 3;
+    };
+    const matchingAccounts = selectableAccounts.filter((account) => {
+      const key = getAccountExpandKey(account);
+      return key === selectedKey || matchesPlayerSearch(account, searchQuery);
+    }).sort((left, right) => getPrimaryNamePriority(left) - getPrimaryNamePriority(right));
+    const hasSearchMatches = matchingAccounts.some((account) => (
+      matchesPlayerSearch(account, searchQuery)
+    ));
+    return `
+    <option value="">${searchQuery && !hasSearchMatches ? "No matching players" : "Select player"}</option>
+    ${matchingAccounts.map((account) => {
       const key = getAccountExpandKey(account);
       const elo = account.discounted ? "provisional" : account.elo.toFixed(0);
-      return `<option value="${escapeHtml(key)}"${key === selectedKey ? " selected" : ""}${key === excludedKey ? " disabled" : ""}>${escapeHtml(account.name || "Unknown")} · ${elo} ELO</option>`;
+      const isSearchMatch = matchesPlayerSearch(account, searchQuery);
+      return `<option value="${escapeHtml(key)}" data-search-match="${isSearchMatch ? "true" : "false"}"${key === selectedKey ? " selected" : ""}${key === excludedKey ? " disabled" : ""}>${escapeHtml(account.name || "Unknown")} · ${elo} ELO</option>`;
     }).join("")}
   `;
+  };
 
   let comparisonBody = '<p class="stats-comparison-empty">Select two players to compare their performance in this leaderboard slice.</p>';
   if (accountA && accountB && accountA !== accountB) {
@@ -1500,7 +1577,7 @@ function renderPlayerComparison(accounts) {
         <span>${escapeHtml(dataA.winRate)}</span><b>Win rate</b><span>${escapeHtml(dataB.winRate)}</span>
         <span>${dataA.form}</span><b>Recent form</b><span>${dataB.form}</span>
         <span class="stats-comparison-list">${renderProfileList(dataA.maps, "No map history")}</span><b>Favorite maps</b><span class="stats-comparison-list">${renderProfileList(dataB.maps, "No map history")}</span>
-        <span class="stats-comparison-list">${renderProfileList(dataA.opponents, "No opponents")}</span><b>Top opponents</b><span class="stats-comparison-list">${renderProfileList(dataB.opponents, "No opponents")}</span>
+        <span class="stats-comparison-list">${renderComparisonOpponentLinks(accountA, dataA.opponents, "A")}</span><b>Top opponents</b><span class="stats-comparison-list">${renderComparisonOpponentLinks(accountB, dataB.opponents, "B")}</span>
       </div>
       <div class="stats-comparison-head-to-head">
         <span>Head to head</span>
@@ -1523,12 +1600,49 @@ function renderPlayerComparison(accounts) {
       <small>Shareable in the page URL</small>
     </div>
     <div class="stats-comparison-selects">
-      <label><span>Player one</span><select id="statsComparePlayerA">${renderOptions(comparePlayerAKey, comparePlayerBKey)}</select></label>
+      <div class="stats-comparison-picker">
+        <span>Player one</span>
+        <div class="stats-comparison-picker-controls">
+          <input id="statsCompareSearchA" type="search" placeholder="Search nickname or key" autocomplete="off" aria-label="Search player one">
+          <select id="statsComparePlayerA" aria-label="Player one">${renderOptions(comparePlayerAKey, comparePlayerBKey)}</select>
+        </div>
+      </div>
       <span aria-hidden="true">VS</span>
-      <label><span>Player two</span><select id="statsComparePlayerB">${renderOptions(comparePlayerBKey, comparePlayerAKey)}</select></label>
+      <div class="stats-comparison-picker">
+        <span>Player two</span>
+        <div class="stats-comparison-picker-controls">
+          <input id="statsCompareSearchB" type="search" placeholder="Search nickname or key" autocomplete="off" aria-label="Search player two">
+          <select id="statsComparePlayerB" aria-label="Player two">${renderOptions(comparePlayerBKey, comparePlayerAKey)}</select>
+        </div>
+      </div>
     </div>
     ${comparisonBody}
   `;
+
+  const bindComparisonSearch = (inputId, selectId, selectedKey, excludedKey) => {
+    const input = playerComparisonElement.querySelector(inputId);
+    const select = playerComparisonElement.querySelector(selectId);
+    input?.addEventListener("input", (event) => {
+      select.innerHTML = renderOptions(select.value || selectedKey, excludedKey, event.currentTarget.value);
+    });
+    input?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") {
+        return;
+      }
+      const firstMatch = [...select.options].find((option) => (
+        option.dataset.searchMatch === "true" && !option.disabled
+      ));
+      if (!firstMatch) {
+        return;
+      }
+      event.preventDefault();
+      select.value = firstMatch.value;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  };
+
+  bindComparisonSearch("#statsCompareSearchA", "#statsComparePlayerA", comparePlayerAKey, comparePlayerBKey);
+  bindComparisonSearch("#statsCompareSearchB", "#statsComparePlayerB", comparePlayerBKey, comparePlayerAKey);
 
   playerComparisonElement.querySelector("#statsComparePlayerA")?.addEventListener("change", (event) => {
     comparePlayerAKey = event.currentTarget.value || null;
@@ -1553,14 +1667,16 @@ function renderPlayerProfile(account) {
   const gameCount = getAccountDisplayGameCount(account);
   const eloHistory = getAccountEloHistory(account);
   const peakElo = eloHistory.length ? Math.max(...eloHistory.map((point) => point.value)) : null;
-  const recentOutcomes = [...account.games]
-    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0))
+  const recentGames = [...account.games]
+    .sort((left, right) => Number(right.endDate || 0) - Number(left.endDate || 0));
+  const currentWinStreak = getCurrentWinStreak(account);
+  const recentOutcomes = recentGames
     .slice(0, 10)
     .map((game) => getPlayerGameOutcome(game, account));
   const favoriteMaps = getCountedFavorites(account.games.map((game) => game.mapName));
   const favoriteModes = getCountedFavorites(account.games.map(formatPlayerMode));
-  const opponents = getAccountOpponents(account).map((opponent) => [opponent.name, opponent.count]);
-  const teammates = getAccountTeammates(account).map((teammate) => [teammate.name, teammate.count]);
+  const opponents = getAccountOpponents(account);
+  const teammates = getAccountTeammates(account);
   const profileUrl = new URL("index.html", window.location.href);
   profileUrl.search = buildStateParams().toString();
 
@@ -1577,6 +1693,7 @@ function renderPlayerProfile(account) {
       <article><span>Current ELO</span><strong>${account.discounted ? "Provisional" : account.elo.toFixed(2)}</strong></article>
       <article><span>Peak ELO</span><strong>${peakElo == null ? "--" : peakElo.toFixed(2)}</strong></article>
       <article><span>Win / loss</span><strong>${formatRecordPercentage(displayStats.wins, gameCount)} / ${formatRecordPercentage(displayStats.losses, gameCount)}</strong></article>
+      <article><span>Win streak</span><strong>${currentWinStreak} ${currentWinStreak === 1 ? "win" : "wins"}</strong></article>
       <article class="stats-profile-form"><span>Recent form</span><strong>${recentOutcomes.map((outcome) => `<i class="${outcome.className}" title="${escapeHtml(outcome.label)}">${escapeHtml(outcome.label.charAt(0))}</i>`).join("") || "--"}</strong></article>
     </div>
     <div class="stats-profile-details">
@@ -1586,8 +1703,8 @@ function renderPlayerProfile(account) {
       </article>
       <article><span class="stats-detail-label">Favorite maps</span><div>${renderProfileList(favoriteMaps, "No map history")}</div></article>
       <article><span class="stats-detail-label">Favorite modes</span><div>${renderProfileList(favoriteModes, "No mode history")}</div></article>
-      <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileList(opponents, "No opponents")}</div></article>
-      <article><span class="stats-detail-label">Most-played teammates</span><div>${renderProfileList(teammates, "No teammates")}</div></article>
+      <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileComparisonLinks(account, opponents, "No opponents")}</div></article>
+      <article><span class="stats-detail-label">Most-played teammates</span><div>${renderProfileComparisonLinks(account, teammates, "No teammates")}</div></article>
     </div>
   `;
 
@@ -1966,6 +2083,19 @@ function renderMatchup(game, options = {}) {
     return `<span class="stats-note">Player list unavailable.</span>`;
   }
   const teamStrengths = teams.map((team) => getTeamStrengthPercent(team));
+  const validTeamStrengths = teamStrengths.filter((value) => Number.isFinite(value));
+  const weakestTeamStrength = validTeamStrengths.length ? Math.min(...validTeamStrengths) : null;
+  const strongestTeamStrength = validTeamStrengths.length ? Math.max(...validTeamStrengths) : null;
+
+  const renderUpsetBadge = (team, strengthPercent) => {
+    const isUpsetWinner = getNormalizedTeamUserType(game, team) === "winner"
+      && Number.isFinite(strengthPercent)
+      && strengthPercent === weakestTeamStrength
+      && weakestTeamStrength < strongestTeamStrength;
+    return isUpsetWinner
+      ? '<span class="stats-upset-victory" title="Upset victory: the lower-powered team won." aria-label="Upset victory">★ Upset win</span>'
+      : "";
+  };
 
   const renderPlayerLabel = (player) => {
     const playerName = player.account?.name || "Unknown";
@@ -2008,6 +2138,7 @@ function renderMatchup(game, options = {}) {
               `;
               })
               .join("")}
+            ${renderUpsetBadge(team, strengthPercent)}
             <span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>
@@ -2030,6 +2161,7 @@ function renderMatchup(game, options = {}) {
                 .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
                 .join("")}
             </span>
+            ${renderUpsetBadge(team, strengthPercent)}
             <span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>
@@ -2107,7 +2239,33 @@ function renderSummary(accountList, gameList) {
 
   const rankedPlayers = accountList.filter((account) => !account.discounted);
   const topPlayer = rankedPlayers[0] || accountList[0];
+  const topPlayerProfileUrl = new URL("index.html", window.location.href);
+  if (topPlayer) {
+    const topPlayerProfileParams = new URLSearchParams({
+      playerSearch: topPlayer.name || "",
+      player: getAccountExpandKey(topPlayer)
+    });
+    if (selectedLeaderboard !== "Global") {
+      topPlayerProfileParams.set("leaderboard", selectedLeaderboard);
+    }
+    topPlayerProfileUrl.search = topPlayerProfileParams.toString();
+  }
+  const topStreakPlayer = (rankedPlayers.length ? rankedPlayers : accountList)
+    .map((account) => ({ account, streak: getCurrentWinStreak(account) }))
+    .sort((left, right) => right.streak - left.streak || right.account.elo - left.account.elo)[0];
+  const topStreakProfileUrl = new URL("index.html", window.location.href);
+  if (topStreakPlayer) {
+    const topStreakProfileParams = new URLSearchParams({
+      playerSearch: topStreakPlayer.account.name || "",
+      player: getAccountExpandKey(topStreakPlayer.account)
+    });
+    if (selectedLeaderboard !== "Global") {
+      topStreakProfileParams.set("leaderboard", selectedLeaderboard);
+    }
+    topStreakProfileUrl.search = topStreakProfileParams.toString();
+  }
   const latestMatch = gameList[0];
+  const latestReplayUrl = latestMatch?.replayUrl ? normalizeReplayUrl(latestMatch.replayUrl) : "";
 
   summaryElement.innerHTML = `
     <article class="stats-card">
@@ -2123,12 +2281,23 @@ function renderSummary(accountList, gameList) {
     <article class="stats-card">
       <span class="stats-card-label">Top Elo</span>
       <strong class="stats-card-value">${topPlayer ? topPlayer.elo.toFixed(2) : "--"}</strong>
-      <span class="stats-player-note">${escapeHtml(topPlayer ? topPlayer.name : "Unknown player")}</span>
+      ${topPlayer
+        ? `<a class="stats-player-note stats-summary-player-link" href="${escapeHtml(topPlayerProfileUrl.href)}" target="_parent" aria-label="Open ${escapeHtml(topPlayer.name || "Unknown player")} profile">${escapeHtml(topPlayer.name || "Unknown player")}</a>`
+        : '<span class="stats-player-note">Unknown player</span>'}
     </article>
     <article class="stats-card">
       <span class="stats-card-label">Latest Match</span>
       <strong class="stats-card-value">${latestMatch ? formatShortDate(latestMatch.endDate) : "--"}</strong>
-      <span class="stats-player-note">${escapeHtml(latestMatch ? latestMatch.mapName : "Unknown map")}</span>
+      ${latestReplayUrl
+        ? `<a class="stats-player-note stats-replay-link" href="${escapeHtml(latestReplayUrl)}" data-replay-analyzer-url="${escapeHtml(latestReplayUrl)}" aria-label="Analyze latest match on ${escapeHtml(latestMatch.mapName || "Unknown map")}">${escapeHtml(latestMatch.mapName || "Unknown map")}</a>`
+        : `<span class="stats-player-note">${escapeHtml(latestMatch ? latestMatch.mapName : "Unknown map")}</span>`}
+    </article>
+    <article class="stats-card">
+      <span class="stats-card-label">Top Win Streak</span>
+      <strong class="stats-card-value">${topStreakPlayer ? `${topStreakPlayer.streak} ${topStreakPlayer.streak === 1 ? "win" : "wins"}` : "--"}</strong>
+      ${topStreakPlayer
+        ? `<a class="stats-player-note stats-summary-player-link" href="${escapeHtml(topStreakProfileUrl.href)}" target="_parent" aria-label="Open ${escapeHtml(topStreakPlayer.account.name || "Unknown player")} profile">${escapeHtml(topStreakPlayer.account.name || "Unknown player")}</a>`
+        : '<span class="stats-player-note">Unknown player</span>'}
     </article>
   `;
 }

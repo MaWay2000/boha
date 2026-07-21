@@ -829,7 +829,7 @@ function getPlayerPowerLabel(account) {
   const totalRankedPlayers = globalRankMap.size;
   const rank = getNumericGlobalRank(account);
   if (!totalRankedPlayers || !rank) {
-    return "N/A";
+    return "50%";
   }
 
   return `${Math.round(((totalRankedPlayers - rank + 1) / totalRankedPlayers) * 100)}%`;
@@ -844,7 +844,7 @@ function getTeamStrengthPercent(team) {
   const strengthScore = team.players.reduce((total, player) => {
     const rank = getNumericGlobalRank(player.account);
     if (!rank) {
-      return total;
+      return total + 0.5;
     }
 
     return total + ((totalRankedPlayers - rank + 1) / totalRankedPlayers);
@@ -1488,6 +1488,8 @@ function renderPlayerComparison(accounts) {
     const winsAPercentage = headToHeadGames.length ? (winsA / headToHeadGames.length) * 100 : 0;
     const winsBPercentage = headToHeadGames.length ? (winsB / headToHeadGames.length) * 100 : 0;
     const otherPercentage = headToHeadGames.length ? (otherResults / headToHeadGames.length) * 100 : 0;
+    const playerOneBarClass = winsA === winsB ? "is-tied" : winsA > winsB ? "is-winner" : "is-loser";
+    const playerTwoBarClass = winsA === winsB ? "is-tied" : winsB > winsA ? "is-winner" : "is-loser";
 
     comparisonBody = `
       <div class="stats-comparison-grid">
@@ -1505,9 +1507,9 @@ function renderPlayerComparison(accounts) {
         <div class="stats-comparison-head-to-head-result">
           <strong>${winsA} wins (${winsAPercentage.toFixed(0)}%) · ${otherResults} other (${otherPercentage.toFixed(0)}%) · ${winsB} wins (${winsBPercentage.toFixed(0)}%)</strong>
           <span class="stats-comparison-percentage-bar" role="img" aria-label="${escapeHtml(accountA.name || "Player one")} ${winsAPercentage.toFixed(0)} percent, other results ${otherPercentage.toFixed(0)} percent, ${escapeHtml(accountB.name || "Player two")} ${winsBPercentage.toFixed(0)} percent">
-            <i class="is-player-one" style="width: ${winsAPercentage}%"></i>
+            <i class="${playerOneBarClass}" style="width: ${winsAPercentage}%"></i>
             <i class="is-other" style="width: ${otherPercentage}%"></i>
-            <i class="is-player-two" style="width: ${winsBPercentage}%"></i>
+            <i class="${playerTwoBarClass}" style="width: ${winsBPercentage}%"></i>
           </span>
         </div>
         <small>${headToHeadGames.length} shared matches</small>

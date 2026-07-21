@@ -1817,10 +1817,10 @@
     const mostKills = getBestPlayer(competitors, (player) => playerStat(player, "kills"));
     const bestKd = getBestPlayer(competitors, totalKdValue);
     const bestResearch = getBestPlayer(competitors, (player) => player.researchActivity);
+    const totalKills = competitors.reduce((sum, player) => sum + Math.max(0, playerStat(player, "kills") || 0), 0);
+    const durationMinutes = Number(extraction.match.elapsedMilliseconds) / 60000;
+    const combatPace = durationMinutes > 0 ? totalKills / durationMinutes : null;
     const winningTeamKey = winners.length ? String(winners[0].team ?? winners[0].position) : null;
-    const winningTeam = winningTeamKey == null
-      ? []
-      : winners.filter((player) => String(player.team ?? player.position) === winningTeamKey);
     const teamScores = new Map();
     competitors.forEach((player) => {
       const key = String(player.team ?? player.position);
@@ -1840,10 +1840,6 @@
     const upsetVictory = Number.isFinite(winningPower)
       && strongestOpponent
       && winningPower < strongestOpponent.score;
-    const winningTeamNames = winningTeam.map((player) => player.name);
-    const winningTeamLabel = winningTeam.length
-      ? `${winningTeamNames.slice(0, 2).join(" · ")}${winningTeamNames.length > 2 ? ` · +${winningTeamNames.length - 2}` : ""}`
-      : "Draw / unresolved";
 
     const heading = document.createElement("div");
     heading.className = "replay-match-summary-heading";
@@ -1861,11 +1857,11 @@
     const grid = document.createElement("div");
     grid.className = "replay-match-summary-grid";
     const items = [
-      ["Winning team", winningTeamLabel],
       ["MVP", mvp ? `${mvp.player.name} · ${mvp.value.toLocaleString()}` : "--"],
       ["Most kills", mostKills ? `${mostKills.player.name} · ${mostKills.value.toLocaleString()}` : "--"],
       ["Best KD", bestKd ? `${bestKd.player.name} · ${bestKd.value === Number.MAX_SAFE_INTEGER ? "∞" : bestKd.value.toFixed(2)}` : "--"],
       ["Best research", bestResearch ? `${bestResearch.player.name} · ${bestResearch.value.toFixed(2)}%` : "--"],
+      ["Combat pace", combatPace == null ? "--" : `${combatPace.toFixed(1)} kills/min`],
       ["Team power difference", teamPowerGap == null ? "--" : `${teamPowerGap.toFixed(1)}%`]
     ];
     items.forEach(([label, value]) => {
@@ -1874,8 +1870,8 @@
       const itemValue = document.createElement("strong");
       itemLabel.textContent = label;
       itemValue.textContent = value;
-      if (label === "Winning team" && winningTeamNames.length) {
-        item.title = winningTeamNames.join(" · ");
+      if (label === "Combat pace") {
+        item.title = `${totalKills.toLocaleString()} total kills across ${formatDuration(extraction.match.elapsedMilliseconds)}.`;
       } else if (label === "Team power difference") {
         item.title = "Difference between the winning team and strongest opposing team by combined replay score.";
       }

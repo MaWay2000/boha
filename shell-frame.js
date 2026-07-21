@@ -26,6 +26,9 @@ function getPageSearchParams() {
 
 function getTabFromLocation() {
   const url = new URL(window.location.href);
+  if (url.searchParams.has("C")) {
+    return "compare";
+  }
   return normalizeTab(url.searchParams.get("tab"));
 }
 
@@ -79,7 +82,7 @@ function updateLocation(tab, replace = false, search = null) {
     : new URLSearchParams(String(search).replace(/^\?/, ""));
 
   url.search = params.toString();
-  if (tab === "leaderboards") {
+  if (tab === "leaderboards" || (tab === "compare" && url.searchParams.has("C"))) {
     url.searchParams.delete("tab");
   } else {
     url.searchParams.set("tab", tab);

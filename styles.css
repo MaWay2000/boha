@@ -1551,6 +1551,34 @@ main {
   font-variant-numeric: tabular-nums;
 }
 
+.stats-elo-value {
+  display: block;
+}
+
+.stats-form-indicators {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+  font-size: 0.72rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.stats-form-change,
+.stats-form-streak {
+  color: var(--muted);
+}
+
+.stats-form-change.is-positive,
+.stats-form-streak.is-active {
+  color: var(--green);
+}
+
+.stats-form-change.is-negative {
+  color: var(--coral);
+}
+
 .stats-record {
   white-space: nowrap;
   text-align: center;

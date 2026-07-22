@@ -2647,6 +2647,15 @@ function renderRanks(accountList) {
       const displayStats = getAccountDisplayStats(account);
       const displayGameCount = getAccountDisplayGameCount(account);
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
+      const recentTrend = getRecentPlayerTrend(account);
+      const eloChangeLabel = `${recentTrend.eloGain > 0 ? "+" : ""}${recentTrend.eloGain.toFixed(2)}`;
+      const eloChangeClass = recentTrend.eloGain > 0
+        ? "is-positive"
+        : recentTrend.eloGain < 0
+          ? "is-negative"
+          : "is-neutral";
+      const streakLabel = recentTrend.streak > 0 ? `🔥 ${recentTrend.streak}W` : "0W";
+      const formLabel = `${eloChangeLabel} ELO over the latest ${recentTrend.games} matches; current win streak ${recentTrend.streak}`;
       const publicKeys = [...account.publicKeys].sort();
       const accountNames = getSortedAccountNames(account);
       const keyCountLabel = `${publicKeys.length} key(s) tracked`;
@@ -2746,7 +2755,13 @@ function renderRanks(accountList) {
           <td class="stats-player-name">
             ${playerDetails}
           </td>
-          <td class="stats-elo">${eloLabel}</td>
+          <td class="stats-elo">
+            <span class="stats-elo-value">${eloLabel}</span>
+            <span class="stats-form-indicators" aria-label="${escapeHtml(formLabel)}" title="${escapeHtml(formLabel)}">
+              <span class="stats-form-change ${eloChangeClass}">${eloChangeLabel}</span>
+              <span class="stats-form-streak${recentTrend.streak > 0 ? " is-active" : ""}">${streakLabel}</span>
+            </span>
+          </td>
           <td>${account.games.length}</td>
           <td class="stats-record">
             <span class="stats-record-grid">

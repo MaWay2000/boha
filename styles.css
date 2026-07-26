@@ -237,6 +237,19 @@ code {
   flex: 0 0 auto;
 }
 
+@media (min-width: 1900px) {
+  .topnav {
+    display: grid;
+    grid-template-columns: repeat(7, max-content);
+    column-gap: 12px;
+  }
+
+  .topnav-actions {
+    grid-column: 1 / -1;
+    flex-basis: auto;
+  }
+}
+
 .topnav a,
 .discord-link {
   color: var(--muted);

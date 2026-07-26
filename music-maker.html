@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Warzone 2100 Music Maker</title>
+  <meta name="description" content="Make and save music patterns online with the Warzone 2100 Music Maker.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111c;
+      --panel: rgba(12, 26, 40, 0.92);
+      --panel-deep: #07131f;
+      --line: rgba(111, 226, 255, 0.18);
+      --cyan: #60ddf6;
+      --cyan-soft: rgba(96, 221, 246, 0.14);
+      --green: #87e58c;
+      --orange: #f19a52;
+      --text: #edf7ff;
+      --muted: #8eabc2;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+      background:
+        linear-gradient(90deg, rgba(70, 151, 183, 0.035) 1px, transparent 1px),
+        linear-gradient(rgba(70, 151, 183, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 10% 0%, rgba(34, 113, 143, 0.18), transparent 34%),
+        radial-gradient(circle at 92% 0%, rgba(139, 67, 30, 0.16), transparent 31%),
+        var(--bg);
+      background-size: 72px 72px, 72px 72px, auto, auto, auto;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+
+    .music-page {
+      width: min(1480px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .music-hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow,
+    .control-label,
+    .track-type {
+      color: var(--cyan);
+      font-family: "Oxanium", sans-serif;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, p { margin-top: 0; }
+
+    h1 {
+      margin-bottom: 5px;
+      font-family: "Oxanium", sans-serif;
+      font-size: clamp(2rem, 5vw, 4.25rem);
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+
+    .music-hero p {
+      max-width: 720px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .status-pill {
+      flex: 0 0 auto;
+      min-width: 170px;
+      padding: 10px 16px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(4, 15, 25, 0.76);
+      text-align: center;
+    }
+
+    .status-pill.is-playing {
+      color: var(--green);
+      border-color: rgba(135, 229, 140, 0.48);
+      box-shadow: 0 0 18px rgba(135, 229, 140, 0.12);
+    }
+
+    .studio {
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: linear-gradient(125deg, rgba(46, 37, 36, 0.72), rgba(13, 31, 48, 0.94) 48%, rgba(7, 18, 29, 0.98));
+      box-shadow: 0 22px 55px rgba(0, 0, 0, 0.24);
+    }
+
+    .transport {
+      display: grid;
+      grid-template-columns: auto repeat(3, minmax(130px, 1fr)) auto;
+      gap: 14px;
+      align-items: end;
+      padding: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .transport-actions,
+    .pattern-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .control {
+      min-width: 0;
+    }
+
+    .control-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .control-value {
+      color: var(--text);
+      font-family: "Oxanium", sans-serif;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--cyan);
+      cursor: pointer;
+    }
+
+    .action-button {
+      min-height: 44px;
+      padding: 0 18px;
+      border: 1px solid rgba(96, 221, 246, 0.28);
+      border-radius: 14px;
+      background: #091724;
+      font-family: "Oxanium", sans-serif;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+    }
+
+    .action-button:hover { border-color: var(--cyan); transform: translateY(-1px); }
+    .action-button:focus-visible, .step:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+    .action-button.primary {
+      min-width: 105px;
+      color: #041019;
+      border-color: transparent;
+      background: var(--cyan);
+      box-shadow: 0 0 22px rgba(96, 221, 246, 0.18);
+    }
+
+    .action-button.primary.is-playing { background: var(--green); }
+    .action-button.danger:hover { border-color: #ff7676; color: #ffaaaa; }
+
+    .sequencer-wrap {
+      overflow-x: auto;
+      padding: 20px;
+      scrollbar-color: var(--cyan) #08131e;
+    }
+
+    .sequencer {
+      min-width: 1040px;
+    }
+
+    .beat-numbers,
+    .track-row {
+      display: grid;
+      grid-template-columns: 160px repeat(16, minmax(38px, 1fr));
+      gap: 8px;
+    }
+
+    .beat-numbers {
+      margin-bottom: 9px;
+      color: #5f819a;
+      font-family: "Oxanium", sans-serif;
+      font-size: 0.68rem;
+      text-align: center;
+    }
+
+    .beat-numbers span:nth-child(4n + 2) { color: var(--cyan); }
+
+    .track-row {
+      align-items: center;
+      padding: 8px 0;
+      border-top: 1px solid rgba(111, 226, 255, 0.07);
+    }
+
+    .track-info {
+      min-width: 0;
+      padding-right: 12px;
+    }
+
+    .track-name {
+      display: block;
+      overflow: hidden;
+      color: var(--text);
+      font-family: "Oxanium", sans-serif;
+      font-weight: 700;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .track-type { color: var(--muted); font-size: 0.58rem; }
+
+    .step {
+      aspect-ratio: 1;
+      min-width: 38px;
+      border: 1px solid rgba(111, 226, 255, 0.14);
+      border-radius: 10px;
+      background: rgba(4, 13, 22, 0.82);
+      cursor: pointer;
+      transition: background 100ms ease, border-color 100ms ease, box-shadow 100ms ease, transform 100ms ease;
+    }
+
+    .step:nth-child(4n + 2) { border-left-color: rgba(96, 221, 246, 0.45); }
+    .step:hover { border-color: rgba(96, 221, 246, 0.62); transform: scale(1.04); }
+    .step[aria-pressed="true"] {
+      border-color: var(--cyan);
+      background: linear-gradient(145deg, var(--cyan), #1988aa);
+      box-shadow: 0 0 14px rgba(96, 221, 246, 0.22);
+    }
+
+    .track-row:nth-of-type(3) .step[aria-pressed="true"],
+    .track-row:nth-of-type(6) .step[aria-pressed="true"] {
+      border-color: var(--orange);
+      background: linear-gradient(145deg, #ffb45f, #a85028);
+      box-shadow: 0 0 14px rgba(241, 154, 82, 0.22);
+    }
+
+    .step.is-current {
+      box-shadow: 0 0 0 2px var(--green), 0 0 18px rgba(135, 229, 140, 0.35);
+      transform: translateY(-2px);
+    }
+
+    .studio-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 16px 20px 20px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    .studio-footer p { margin: 0; font-size: 0.86rem; }
+
+    @media (max-width: 980px) {
+      .transport { grid-template-columns: 1fr 1fr 1fr; }
+      .transport-actions, .pattern-actions { grid-column: span 3; }
+      .pattern-actions { justify-content: flex-end; }
+    }
+
+    @media (max-width: 640px) {
+      .music-page { width: min(100% - 18px, 1480px); padding-top: 18px; }
+      .music-hero { align-items: flex-start; flex-direction: column; }
+      .status-pill { min-width: 0; }
+      .transport { grid-template-columns: 1fr; }
+      .transport-actions, .pattern-actions { grid-column: auto; }
+      .pattern-actions { justify-content: flex-start; }
+      .studio-footer { align-items: flex-start; flex-direction: column; }
+      .sequencer-wrap { padding: 14px; }
+    }
+  </style>
+</head>
+<body class="embedded-page">
+  <main class="music-page">
+    <header class="music-hero">
+      <div>
+        <span class="eyebrow">Bohan Audio Lab</span>
+        <h1>Music Maker</h1>
+        <p>Build a loop with drums, bass, and synths. Everything plays and saves directly in your browser.</p>
+      </div>
+      <div class="status-pill" id="playStatus" role="status" aria-live="polite">Ready to compose</div>
+    </header>
+
+    <section class="studio" aria-label="Music sequencer">
+      <div class="transport">
+        <div class="transport-actions">
+          <button class="action-button primary" id="playButton" type="button">▶ Play</button>
+        </div>
+
+        <label class="control">
+          <span class="control-head"><span class="control-label">Tempo</span><output class="control-value" id="tempoValue">112 BPM</output></span>
+          <input id="tempo" type="range" min="60" max="180" value="112" step="1">
+        </label>
+
+        <label class="control">
+          <span class="control-head"><span class="control-label">Swing</span><output class="control-value" id="swingValue">10%</output></span>
+          <input id="swing" type="range" min="0" max="60" value="10" step="1">
+        </label>
+
+        <label class="control">
+          <span class="control-head"><span class="control-label">Volume</span><output class="control-value" id="volumeValue">75%</output></span>
+          <input id="volume" type="range" min="0" max="100" value="75" step="1">
+        </label>
+
+        <div class="pattern-actions">
+          <button class="action-button" id="randomButton" type="button">Randomize</button>
+          <button class="action-button danger" id="clearButton" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="sequencer-wrap">
+        <div class="sequencer" id="sequencer">
+          <div class="beat-numbers" aria-hidden="true">
+            <span></span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span>
+          </div>
+        </div>
+      </div>
+
+      <footer class="studio-footer">
+        <p>Tip: press <strong>Space</strong> to play or stop. Your saved pattern stays on this device.</p>
+        <div class="pattern-actions">
+          <button class="action-button" id="saveButton" type="button">Save Pattern</button>
+          <button class="action-button" id="loadButton" type="button">Load Saved</button>
+        </div>
+      </footer>
+    </section>
+  </main>
+
+  <script src="embedded-page.js?v=20260720-1"></script>
+  <script>
+    const tracks = [
+      { name: "Kick", type: "Drums", sound: "kick" },
+      { name: "Snare", type: "Drums", sound: "snare" },
+      { name: "Hi-Hat", type: "Drums", sound: "hat" },
+      { name: "Pulse Bass", type: "Synth", sound: "bass" },
+      { name: "Signal Lead", type: "Synth", sound: "lead" },
+      { name: "Metal FX", type: "Percussion", sound: "metal" }
+    ];
+    const defaultPattern = [
+      [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],
+      [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+      [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1],
+      [1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0],
+      [0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0]
+    ];
+    const storageKey = "bohaMusicMakerPatternV1";
+    const sequencer = document.getElementById("sequencer");
+    const playButton = document.getElementById("playButton");
+    const playStatus = document.getElementById("playStatus");
+    const tempoInput = document.getElementById("tempo");
+    const swingInput = document.getElementById("swing");
+    const volumeInput = document.getElementById("volume");
+    let pattern = defaultPattern.map((row) => [...row]);
+    let audioContext = null;
+    let masterGain = null;
+    let noiseBuffer = null;
+    let timer = null;
+    let nextStepTime = 0;
+    let currentStep = 0;
+    let isPlaying = false;
+
+    function renderGrid() {
+      sequencer.querySelectorAll(".track-row").forEach((row) => row.remove());
+      tracks.forEach((track, trackIndex) => {
+        const row = document.createElement("div");
+        row.className = "track-row";
+        const info = document.createElement("div");
+        info.className = "track-info";
+        info.innerHTML = `<span class="track-name">${track.name}</span><span class="track-type">${track.type}</span>`;
+        row.appendChild(info);
+
+        pattern[trackIndex].forEach((active, stepIndex) => {
+          const button = document.createElement("button");
+          button.className = "step";
+          button.type = "button";
+          button.dataset.track = trackIndex;
+          button.dataset.step = stepIndex;
+          button.setAttribute("aria-label", `${track.name}, step ${stepIndex + 1}`);
+          button.setAttribute("aria-pressed", String(Boolean(active)));
+          button.addEventListener("click", () => {
+            pattern[trackIndex][stepIndex] = pattern[trackIndex][stepIndex] ? 0 : 1;
+            button.setAttribute("aria-pressed", String(Boolean(pattern[trackIndex][stepIndex])));
+            if (pattern[trackIndex][stepIndex]) previewSound(track.sound, trackIndex);
+          });
+          row.appendChild(button);
+        });
+        sequencer.appendChild(row);
+      });
+    }
+
+    function ensureAudio() {
+      if (audioContext) return;
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioContext.createGain();
+      masterGain.gain.value = Number(volumeInput.value) / 100;
+      masterGain.connect(audioContext.destination);
+      noiseBuffer = audioContext.createBuffer(1, audioContext.sampleRate, audioContext.sampleRate);
+      const data = noiseBuffer.getChannelData(0);
+      for (let index = 0; index < data.length; index += 1) data[index] = Math.random() * 2 - 1;
+    }
+
+    function makeOscillator(time, frequency, endFrequency, duration, type, level) {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, time);
+      oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, endFrequency), time + duration);
+      gain.gain.setValueAtTime(level, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      oscillator.connect(gain).connect(masterGain);
+      oscillator.start(time);
+      oscillator.stop(time + duration);
+    }
+
+    function makeNoise(time, duration, highpass, level) {
+      const source = audioContext.createBufferSource();
+      const filter = audioContext.createBiquadFilter();
+      const gain = audioContext.createGain();
+      source.buffer = noiseBuffer;
+      filter.type = "highpass";
+      filter.frequency.value = highpass;
+      gain.gain.setValueAtTime(level, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+      source.connect(filter).connect(gain).connect(masterGain);
+      source.start(time);
+      source.stop(time + duration);
+    }
+
+    function playSound(sound, time, stepIndex) {
+      if (sound === "kick") makeOscillator(time, 150, 45, 0.22, "sine", 0.9);
+      if (sound === "snare") {
+        makeNoise(time, 0.16, 900, 0.38);
+        makeOscillator(time, 180, 105, 0.12, "triangle", 0.22);
+      }
+      if (sound === "hat") makeNoise(time, 0.055, 6200, 0.18);
+      if (sound === "bass") {
+        const notes = [55, 55, 65.41, 73.42, 55, 82.41, 73.42, 65.41];
+        const frequency = notes[Math.floor(stepIndex / 2) % notes.length];
+        makeOscillator(time, frequency, frequency * 0.98, 0.24, "sawtooth", 0.22);
+      }
+      if (sound === "lead") {
+        const notes = [220, 246.94, 261.63, 329.63, 293.66, 261.63, 246.94, 196];
+        const frequency = notes[Math.floor(stepIndex / 2) % notes.length];
+        makeOscillator(time, frequency, frequency, 0.2, "square", 0.08);
+      }
+      if (sound === "metal") {
+        makeOscillator(time, 520, 170, 0.08, "square", 0.08);
+        makeNoise(time, 0.08, 2800, 0.1);
+      }
+    }
+
+    function previewSound(sound, trackIndex) {
+      ensureAudio();
+      if (audioContext.state === "suspended") audioContext.resume();
+      playSound(sound, audioContext.currentTime, currentStep || trackIndex);
+    }
+
+    function secondsPerStep() {
+      return 60 / Number(tempoInput.value) / 4;
+    }
+
+    function scheduleStep(stepIndex, time) {
+      tracks.forEach((track, trackIndex) => {
+        if (pattern[trackIndex][stepIndex]) playSound(track.sound, time, stepIndex);
+      });
+      const delay = Math.max(0, (time - audioContext.currentTime) * 1000);
+      window.setTimeout(() => {
+        document.querySelectorAll(".step.is-current").forEach((step) => step.classList.remove("is-current"));
+        document.querySelectorAll(`.step[data-step="${stepIndex}"]`).forEach((step) => step.classList.add("is-current"));
+      }, delay);
+    }
+
+    function advanceStep() {
+      const stepLength = secondsPerStep();
+      const swingAmount = Number(swingInput.value) / 100;
+      const swungStepLength = currentStep % 2 === 0
+        ? stepLength * (1 + swingAmount)
+        : stepLength * (1 - swingAmount);
+      nextStepTime += swungStepLength;
+      currentStep = (currentStep + 1) % 16;
+    }
+
+    function scheduler() {
+      while (nextStepTime < audioContext.currentTime + 0.1) {
+        scheduleStep(currentStep, nextStepTime);
+        advanceStep();
+      }
+    }
+
+    function setPlaying(nextPlaying) {
+      if (nextPlaying === isPlaying) return;
+      isPlaying = nextPlaying;
+      if (isPlaying) {
+        ensureAudio();
+        if (audioContext.state === "suspended") audioContext.resume();
+        currentStep = 0;
+        nextStepTime = audioContext.currentTime + 0.05;
+        scheduler();
+        timer = window.setInterval(scheduler, 25);
+        playButton.textContent = "■ Stop";
+        playButton.classList.add("is-playing");
+        playStatus.textContent = "Sequence playing";
+        playStatus.classList.add("is-playing");
+      } else {
+        window.clearInterval(timer);
+        timer = null;
+        playButton.textContent = "▶ Play";
+        playButton.classList.remove("is-playing");
+        playStatus.textContent = "Sequence stopped";
+        playStatus.classList.remove("is-playing");
+        document.querySelectorAll(".step.is-current").forEach((step) => step.classList.remove("is-current"));
+      }
+    }
+
+    function updateControl(input, output, suffix) {
+      document.getElementById(output).textContent = `${input.value}${suffix}`;
+    }
+
+    playButton.addEventListener("click", () => setPlaying(!isPlaying));
+    tempoInput.addEventListener("input", () => updateControl(tempoInput, "tempoValue", " BPM"));
+    swingInput.addEventListener("input", () => updateControl(swingInput, "swingValue", "%"));
+    volumeInput.addEventListener("input", () => {
+      updateControl(volumeInput, "volumeValue", "%");
+      if (masterGain) masterGain.gain.value = Number(volumeInput.value) / 100;
+    });
+
+    document.getElementById("clearButton").addEventListener("click", () => {
+      pattern = tracks.map(() => Array(16).fill(0));
+      renderGrid();
+      playStatus.textContent = "Pattern cleared";
+    });
+
+    document.getElementById("randomButton").addEventListener("click", () => {
+      pattern = tracks.map((track, trackIndex) => Array.from({ length: 16 }, (_, stepIndex) => {
+        const chance = trackIndex === 2 ? 0.48 : trackIndex > 2 ? 0.2 : 0.28;
+        if (trackIndex === 0 && stepIndex % 4 === 0) return 1;
+        return Math.random() < chance ? 1 : 0;
+      }));
+      renderGrid();
+      playStatus.textContent = "New pattern generated";
+    });
+
+    document.getElementById("saveButton").addEventListener("click", () => {
+      localStorage.setItem(storageKey, JSON.stringify({
+        pattern,
+        tempo: tempoInput.value,
+        swing: swingInput.value,
+        volume: volumeInput.value
+      }));
+      playStatus.textContent = "Pattern saved locally";
+    });
+
+    document.getElementById("loadButton").addEventListener("click", () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        if (!saved || !Array.isArray(saved.pattern) || saved.pattern.length !== tracks.length) {
+          playStatus.textContent = "No saved pattern found";
+          return;
+        }
+        pattern = saved.pattern.map((row) => row.slice(0, 16).map((value) => value ? 1 : 0));
+        tempoInput.value = saved.tempo || 112;
+        swingInput.value = saved.swing || 10;
+        volumeInput.value = saved.volume || 75;
+        updateControl(tempoInput, "tempoValue", " BPM");
+        updateControl(swingInput, "swingValue", "%");
+        updateControl(volumeInput, "volumeValue", "%");
+        if (masterGain) masterGain.gain.value = Number(volumeInput.value) / 100;
+        renderGrid();
+        playStatus.textContent = "Saved pattern loaded";
+      } catch (error) {
+        playStatus.textContent = "Saved pattern could not be loaded";
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (event.code !== "Space" || target instanceof HTMLInputElement || target instanceof HTMLButtonElement) return;
+      event.preventDefault();
+      setPlaying(!isPlaying);
+    });
+
+    renderGrid();
+  </script>
+</body>
+</html>

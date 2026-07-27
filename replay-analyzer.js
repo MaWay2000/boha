@@ -1861,7 +1861,7 @@
       ["Most kills", mostKills ? `${mostKills.player.name} · ${mostKills.value.toLocaleString()}` : "--"],
       ["Best KD", bestKd ? `${bestKd.player.name} · ${bestKd.value === Number.MAX_SAFE_INTEGER ? "∞" : bestKd.value.toFixed(2)}` : "--"],
       ["Best research", bestResearch ? `${bestResearch.player.name} · ${bestResearch.value.toFixed(2)}%` : "--"],
-      ["Combat pace", combatPace == null ? "--" : `${combatPace.toFixed(1)} kills/min`],
+      ["Combat race", combatPace == null ? "--" : `${combatPace.toFixed(1)} kills/min`],
       ["Team power difference", teamPowerGap == null ? "--" : `${teamPowerGap.toFixed(1)}%`]
     ];
     items.forEach(([label, value]) => {
@@ -1870,7 +1870,7 @@
       const itemValue = document.createElement("strong");
       itemLabel.textContent = label;
       itemValue.textContent = value;
-      if (label === "Combat pace") {
+      if (label === "Combat race") {
         item.title = `${totalKills.toLocaleString()} total kills across ${formatDuration(extraction.match.elapsedMilliseconds)}.`;
       } else if (label === "Team power difference") {
         item.title = "Difference between the winning team and strongest opposing team by combined replay score.";

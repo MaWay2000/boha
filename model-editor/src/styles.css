@@ -80,6 +80,86 @@ code {
   animation: rise-in 420ms ease;
 }
 
+.compact-topbar {
+  justify-content: flex-start;
+  margin-bottom: 8px;
+  padding: 6px;
+  border-radius: 6px;
+  background: rgba(9, 20, 26, 0.88);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.compact-topbar .topbar-actions {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.compact-topbar .button {
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 3px;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.asset-kind-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.compact-topbar .asset-kind-button.active {
+  border-color: rgba(125, 207, 198, 0.5);
+  background: rgba(125, 207, 198, 0.16);
+  color: #d9fffa;
+}
+
+.viewport-menu-panel {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.viewport-menu-panel[hidden],
+.viewport-menu-panel .section-heading {
+  display: none;
+}
+
+.viewport-menu-panel .toggle-grid {
+  margin: 0;
+}
+
+.viewport-menu-panel .button-row .button {
+  width: 100%;
+}
+
+.summary-menu-panel {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
+.summary-menu-panel[hidden] {
+  display: none;
+}
+
+.edit-menu-panel {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
+.edit-menu-panel[hidden] {
+  display: none;
+}
+
+.edit-menu-panel .field-grid .field,
+.edit-menu-panel .field-grid input {
+  width: 100%;
+  min-width: 0;
+}
+
 .eyebrow,
 .section-kicker {
   margin: 0 0 8px;
@@ -90,7 +170,9 @@ code {
 }
 
 .topbar h1,
-.section h2 {
+.section h2,
+.summary-menu-panel h2,
+.edit-menu-panel h2 {
   margin: 0;
   font-size: clamp(1.3rem, 2vw, 2.6rem);
   line-height: 1.02;
@@ -163,7 +245,7 @@ code {
 
 .workspace {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 320px;
+  grid-template-columns: 320px minmax(0, 1fr) 380px;
   gap: 18px;
   align-items: start;
 }
@@ -233,6 +315,83 @@ code {
   border: 1px dashed rgba(255, 150, 86, 0.24);
   background: var(--accent-soft);
   color: var(--muted);
+}
+
+.mapmaker-browser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mapmaker-browser[hidden] {
+  display: none;
+}
+
+.mapmaker-browser > *,
+.mapmaker-browser .field input,
+.mapmaker-browser .field select {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.library-section .mapmaker-browser {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.library-section {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.compact-heading {
+  margin-bottom: 0;
+}
+
+.asset-results {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 180px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(6, 16, 21, 0.82);
+  color: var(--text);
+  font-size: 0.74rem;
+  line-height: 1.25;
+  overflow-x: hidden;
+}
+
+.asset-results option {
+  padding: 5px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.asset-load-button {
+  width: 100%;
+}
+
+.asset-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.assembly-part-field {
+  padding-top: 4px;
+}
+
+.assembly-part-field[hidden] {
+  display: none;
 }
 
 .stat-grid {

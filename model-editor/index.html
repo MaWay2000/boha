@@ -16,16 +16,7 @@
   </head>
   <body>
     <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Warzone 2100 Toolkit</p>
-          <h1>PIE Model Viewer</h1>
-          <p class="subtitle">
-            Inspect geometry, load matching texture pages, tweak vertex positions, and export
-            updated PIE files.
-          </p>
-        </div>
-
+      <header class="topbar compact-topbar">
         <div class="topbar-actions">
           <button class="button ghost" id="sample-button" type="button">Load Sample</button>
           <label class="button" for="file-input">Open PIE + Textures</label>
@@ -44,18 +35,7 @@
 
       <main class="workspace">
         <aside class="panel control-column">
-          <section class="section">
-            <p class="section-kicker">Pipeline</p>
-            <h2>Load Files</h2>
-            <p class="section-copy">
-              Drop a `.pie` file anywhere in the app. If you also drop the texture page named in
-              the `TEXTURE` line, it will bind automatically.
-            </p>
-            <div class="drop-hint">
-              Use the same texture filename referenced inside the model, for example
-              <code>page-17-droid-weapons.png</code>.
-            </div>
-          </section>
+          <section class="section library-section"></section>
 
           <section class="section">
             <div class="section-heading">

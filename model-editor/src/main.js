@@ -32,10 +32,95 @@ const elements = {
 };
 
 const SAMPLE_PIE_URL = new URL("../samples/trlcan.pie", import.meta.url).href;
+const MAPMAKER_ROOT = new URL("../mapmaker/", window.location.href).href.replace(/\/$/, "");
+const MAPMAKER_PIE_ROOT = `${MAPMAKER_ROOT}/pies`;
+const MAPMAKER_CATALOG_URL = new URL("../mapmaker-assets.json", import.meta.url).href;
+
+const assetKindControls = document.createElement("div");
+assetKindControls.className = "asset-kind-controls";
+assetKindControls.setAttribute("aria-label", "Left panel mode");
+assetKindControls.innerHTML = `
+  <input id="asset-kind" type="hidden" value="module" />
+  <button class="button asset-kind-button" type="button" data-asset-kind="pie" aria-pressed="false">
+    Individual PIE files
+  </button>
+  <button class="button asset-kind-button active" type="button" data-asset-kind="module" aria-pressed="true">
+    Complete droid modules
+  </button>
+  <button class="button asset-kind-button" id="viewport-menu-button" type="button" aria-pressed="false">
+    View
+  </button>
+  <button class="button asset-kind-button" id="summary-menu-button" type="button" aria-pressed="false">
+    Summary
+  </button>
+  <button class="button asset-kind-button" id="edit-menu-button" type="button" aria-pressed="false">
+    Edit
+  </button>
+`;
+document.querySelector(".topbar-actions")?.append(assetKindControls);
+
+const viewportControls = elements.levelSelect.closest(".section");
+viewportControls.classList.remove("section");
+viewportControls.classList.add("viewport-menu-panel");
+viewportControls.setAttribute("aria-label", "Viewport controls");
+viewportControls.hidden = true;
+
+const summaryPanel = elements.modelSummary.closest(".section");
+summaryPanel.classList.remove("section");
+summaryPanel.classList.add("summary-menu-panel");
+summaryPanel.setAttribute("aria-label", "Model summary");
+summaryPanel.hidden = true;
+
+const editPanel = elements.pointEditor.closest(".section");
+editPanel.classList.remove("section");
+editPanel.classList.add("edit-menu-panel");
+editPanel.setAttribute("aria-label", "Selected point editor");
+editPanel.hidden = true;
+
+const mapmakerBrowser = document.createElement("div");
+mapmakerBrowser.className = "mapmaker-browser";
+mapmakerBrowser.innerHTML = `
+  <label class="field">
+    <input id="asset-search" type="search" placeholder="cannon, body, wheels..." disabled />
+  </label>
+  <select class="asset-results" id="asset-results" size="7" disabled></select>
+  <label class="field assembly-part-field" id="assembly-part-field" hidden>
+    <span>Edit module part</span>
+    <select id="assembly-part-select"></select>
+  </label>
+`;
+document.querySelector(".library-section")?.append(
+  mapmakerBrowser,
+  viewportControls,
+  summaryPanel,
+  editPanel,
+);
+
+Object.assign(elements, {
+  assemblyPartField: mapmakerBrowser.querySelector("#assembly-part-field"),
+  assemblyPartSelect: mapmakerBrowser.querySelector("#assembly-part-select"),
+  assetKind: assetKindControls.querySelector("#asset-kind"),
+  assetKindButtons: assetKindControls.querySelectorAll("[data-asset-kind]"),
+  assetResults: mapmakerBrowser.querySelector("#asset-results"),
+  assetSearch: mapmakerBrowser.querySelector("#asset-search"),
+  editMenuButton: assetKindControls.querySelector("#edit-menu-button"),
+  summaryMenuButton: assetKindControls.querySelector("#summary-menu-button"),
+  viewportMenuButton: assetKindControls.querySelector("#viewport-menu-button"),
+});
 
 const state = {
   activeLevelIndex: 0,
+  assembly: [],
+  assemblyName: "",
   model: null,
+  mapmaker: {
+    bodies: {},
+    pathIndex: new Map(),
+    piePaths: [],
+    propulsions: {},
+    templates: {},
+    weapons: {},
+  },
   selectedPointIndex: null,
   loadedTextures: new Map(),
   textureUrls: new Map(),
@@ -138,8 +223,8 @@ function normalizeTextureKey(value) {
   return value.replaceAll("\\", "/").split("/").pop().toLowerCase();
 }
 
-async function loadTextureForCurrentModel() {
-  const textureName = state.model?.texture?.name;
+async function loadTextureForModel(model) {
+  const textureName = model?.texture?.name;
 
   if (!textureName) {
     return null;
@@ -166,13 +251,17 @@ async function loadTextureForCurrentModel() {
   return texture;
 }
 
-function uvToThree(uv) {
-  if (!state.model?.texture) {
+async function loadTextureForCurrentModel() {
+  return loadTextureForModel(state.model);
+}
+
+function uvToThree(uv, model = state.model) {
+  if (!model?.texture) {
     return [uv.u, uv.v];
   }
 
-  const { width, height } = state.model.texture;
-  const useNormalized = state.model.version >= 3 || width === 0 || height === 0;
+  const { width, height } = model.texture;
+  const useNormalized = model.version >= 3 || width === 0 || height === 0;
   const u = useNormalized ? uv.u : uv.u / width;
   const v = useNormalized ? uv.v : uv.v / height;
 
@@ -196,27 +285,25 @@ function clearGroup(group) {
   }
 }
 
-function buildLevelGeometry(level) {
+function buildLevelGeometry(level, model = state.model) {
   const positions = [];
   const uvs = [];
 
   for (const polygon of level.polygons) {
-    if (polygon.vertexCount !== 3) {
-      continue;
-    }
+    for (let triangleIndex = 1; triangleIndex < polygon.vertexCount - 1; triangleIndex += 1) {
+      for (const vertexIndex of [0, triangleIndex, triangleIndex + 1]) {
+        const point = level.points[polygon.indices[vertexIndex]];
 
-    polygon.indices.forEach((pointIndex, vertexIndex) => {
-      const point = level.points[pointIndex];
+        if (!point) {
+          continue;
+        }
 
-      if (!point) {
-        return;
+        positions.push(point.x, point.y, point.z);
+        const uv = polygon.uvs[vertexIndex] ?? { u: 0, v: 0 };
+        const [u, v] = uvToThree(uv, model);
+        uvs.push(u, v);
       }
-
-      positions.push(point.x, point.y, point.z);
-      const uv = polygon.uvs[vertexIndex] ?? { u: 0, v: 0 };
-      const [u, v] = uvToThree(uv);
-      uvs.push(u, v);
-    });
+    }
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -257,7 +344,57 @@ function computeModelScale(level) {
   return Math.max(box.getSize(new THREE.Vector3()).length(), 8);
 }
 
+function getConnectorVector(model, index = 0) {
+  const connector = model?.levels?.[0]?.connectors?.[index];
+  return connector ? new THREE.Vector3(connector.x, connector.z, connector.y) : null;
+}
+
+function getAssemblyPartOffset(part) {
+  const body = state.assembly.find((item) => item.role === "body");
+
+  if (!body || !["mount", "weapon"].includes(part.role)) {
+    return new THREE.Vector3();
+  }
+
+  const offset = getConnectorVector(body.model, part.slot ?? 0) ?? new THREE.Vector3();
+
+  if (part.role === "weapon") {
+    const mount = state.assembly.find(
+      (item) => item.role === "mount" && (item.slot ?? 0) === (part.slot ?? 0),
+    );
+    const mountConnector = getConnectorVector(mount?.model, 0);
+
+    if (mountConnector) {
+      offset.add(mountConnector);
+    }
+  }
+
+  return offset;
+}
+
+function fitCameraToAssembly() {
+  if (!state.assembly.length || !modelGroup.children.length) {
+    return;
+  }
+
+  modelGroup.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(modelGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z, 10);
+  const distance = maxSize * 1.8;
+
+  camera.position.set(center.x + distance, center.y + distance * 0.7, center.z + distance);
+  controls.target.copy(center);
+  controls.update();
+}
+
 function fitCameraToCurrentLevel() {
+  if (state.assembly.length) {
+    fitCameraToAssembly();
+    return;
+  }
+
   const level = getActiveLevel();
 
   if (!level) {
@@ -278,7 +415,7 @@ function fitCameraToCurrentLevel() {
   controls.update();
 }
 
-function updateSelectedPointMarker(level, scale) {
+function updateSelectedPointMarker(level, scale, offset = new THREE.Vector3()) {
   if (sceneObjects.selectedPoint) {
     modelGroup.remove(sceneObjects.selectedPoint);
     sceneObjects.selectedPoint.geometry.dispose();
@@ -301,7 +438,7 @@ function updateSelectedPointMarker(level, scale) {
     new THREE.MeshBasicMaterial({ color: 0xff9656 }),
   );
 
-  marker.position.set(point.x, point.y, point.z);
+  marker.position.set(point.x, point.y, point.z).add(offset);
   sceneObjects.selectedPoint = marker;
   modelGroup.add(marker);
 }
@@ -323,6 +460,85 @@ function updateOverlayVisibility() {
   }
 }
 
+async function rebuildAssemblyScene({ fitCamera = false } = {}) {
+  const activeLevel = getActiveLevel();
+  const texturePairs = await Promise.all(
+    state.assembly.map(async (part) => [part, await loadTextureForModel(part.model)]),
+  );
+
+  for (const [part, texture] of texturePairs) {
+    const level = part.model.levels[part.model === state.model ? state.activeLevelIndex : 0];
+
+    if (!level) {
+      continue;
+    }
+
+    const offset = getAssemblyPartOffset(part);
+    const geometry = buildLevelGeometry(level, part.model);
+    const material = new THREE.MeshStandardMaterial({
+      color: texture ? 0xffffff : 0x90a8ad,
+      map: texture,
+      flatShading: true,
+      metalness: 0.1,
+      roughness: 0.72,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(offset);
+    modelGroup.add(mesh);
+
+    if (part.model !== state.model) {
+      continue;
+    }
+
+    const scale = computeModelScale(level);
+    const wireframe = new THREE.LineSegments(
+      new THREE.WireframeGeometry(geometry),
+      new THREE.LineBasicMaterial({ color: 0xff9656, opacity: 0.72, transparent: true }),
+    );
+    wireframe.position.copy(offset);
+    sceneObjects.wireframe = wireframe;
+    modelGroup.add(wireframe);
+
+    const pointCloud = new THREE.Points(
+      buildPointGeometry(level),
+      new THREE.PointsMaterial({
+        color: 0xffd2b2,
+        size: Math.max(scale * 0.03, 0.8),
+        sizeAttenuation: true,
+      }),
+    );
+    pointCloud.position.copy(offset);
+    sceneObjects.pointCloud = pointCloud;
+    modelGroup.add(pointCloud);
+
+    if (level.connectors.length) {
+      const connectors = new THREE.Points(
+        buildConnectorGeometry(level),
+        new THREE.PointsMaterial({
+          color: 0x7dcfc6,
+          size: Math.max(scale * 0.035, 0.85),
+          sizeAttenuation: true,
+        }),
+      );
+      connectors.position.copy(offset);
+      sceneObjects.connectors = connectors;
+      modelGroup.add(connectors);
+    }
+
+    raycaster.params.Points.threshold = Math.max(scale * 0.05, 1.2);
+    updateSelectedPointMarker(level, scale, offset);
+  }
+
+  updateOverlayVisibility();
+
+  if (fitCamera) {
+    fitCameraToAssembly();
+  }
+
+  elements.textureChip.textContent = `${state.assembly.length} PIE parts in module`;
+}
+
 async function rebuildScene({ fitCamera = false } = {}) {
   const level = getActiveLevel();
 
@@ -331,6 +547,11 @@ async function rebuildScene({ fitCamera = false } = {}) {
   sceneObjects.pointCloud = null;
   sceneObjects.selectedPoint = null;
   sceneObjects.wireframe = null;
+
+  if (state.assembly.length) {
+    await rebuildAssemblyScene({ fitCamera });
+    return;
+  }
 
   if (!level) {
     renderer.render(scene, camera);
@@ -536,15 +757,34 @@ function renderConnectorList() {
     : '<div class="empty-state">This level does not define any connectors.</div>';
 }
 
+function renderAssemblyPartOptions() {
+  elements.assemblyPartField.hidden = !state.assembly.length;
+
+  if (!state.assembly.length) {
+    elements.assemblyPartSelect.innerHTML = "";
+    return;
+  }
+
+  elements.assemblyPartSelect.innerHTML = state.assembly
+    .map((part, index) => {
+      const label = `${part.label} — ${part.model.sourceName}`;
+      return `<option value="${index}" ${part.model === state.model ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
 function renderChrome() {
   const level = getActiveLevel();
 
   elements.exportButton.disabled = !state.model;
-  elements.modelChip.textContent = state.model
-    ? `${state.model.sourceName} | Level ${level?.index ?? "-"}`
-    : "No model loaded";
+  elements.modelChip.textContent = state.assembly.length
+    ? `${state.assemblyName} | Editing ${state.model?.sourceName ?? "-"}`
+    : state.model
+      ? `${state.model.sourceName} | Level ${level?.index ?? "-"}`
+      : "No model loaded";
   elements.uvBadge.textContent = state.model ? getUvMode(state.model) : "No file";
 
+  renderAssemblyPartOptions();
   renderLevelOptions();
   renderSummary();
   renderNotes();
@@ -588,7 +828,257 @@ function updateSelectedPoint(axis, rawValue) {
   rebuildScene();
 }
 
+function mapmakerUrl(base, path) {
+  const encodedPath = String(path)
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter(Boolean)
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `${base}/${encodedPath}`;
+}
+
+function resolveMapmakerPiePath(value, prefix = "") {
+  if (!value) {
+    return null;
+  }
+
+  let candidate = String(value).replaceAll("\\", "/").replace(/^\/?pies\//i, "");
+
+  if (!candidate.toLowerCase().endsWith(".pie")) {
+    candidate += ".pie";
+  }
+
+  const prefixed = candidate.includes("/") ? candidate : `${prefix}${candidate}`;
+  const exact = state.mapmaker.pathIndex.get(prefixed.toLowerCase());
+
+  if (exact) {
+    return exact;
+  }
+
+  const rootMatch = state.mapmaker.pathIndex.get(candidate.toLowerCase());
+
+  if (rootMatch) {
+    return rootMatch;
+  }
+
+  const fileName = candidate.split("/").pop().toLowerCase();
+  return state.mapmaker.piePaths.find((path) => path.toLowerCase().endsWith(`/${fileName}`)) ?? null;
+}
+
+function getRightPropulsionModel(leftModel) {
+  const left = String(leftModel || "");
+
+  if (/^prmvtl/i.test(left)) {
+    return "";
+  }
+
+  const right = left.replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
+  return right === left ? "" : right;
+}
+
+function getModulePartSpecs(template) {
+  const specs = [];
+  const body = state.mapmaker.bodies[template.body];
+  const propulsion = state.mapmaker.propulsions[template.propulsion];
+
+  function add(role, value, prefix, label, slot = 0) {
+    const path = resolveMapmakerPiePath(value, prefix);
+
+    if (path && !specs.some((part) => part.path === path && part.role === role && part.slot === slot)) {
+      specs.push({ label, path, role, slot });
+    }
+  }
+
+  add("body", body?.model ?? template.body, "components/bodies/", body?.name ?? "Body");
+
+  const extra = body?.propulsionExtraModels?.[template.propulsion];
+  const leftModel = typeof extra === "string" ? extra : extra?.left ?? propulsion?.model;
+
+  if (leftModel) {
+    add(
+      "propulsion",
+      leftModel,
+      "components/prop/",
+      `${propulsion?.name ?? "Propulsion"} left`,
+    );
+    const rightModel = getRightPropulsionModel(leftModel);
+
+    if (rightModel) {
+      add(
+        "propulsion",
+        rightModel,
+        "components/prop/",
+        `${propulsion?.name ?? "Propulsion"} right`,
+      );
+    }
+  }
+
+  for (const [slot, weaponId] of (template.weapons ?? []).entries()) {
+    const weapon = state.mapmaker.weapons[weaponId];
+    add(
+      "mount",
+      weapon?.mountModel,
+      "components/weapons/",
+      `${weapon?.name ?? weaponId} mount`,
+      slot,
+    );
+    add(
+      "weapon",
+      weapon?.model ?? weaponId,
+      "components/weapons/",
+      weapon?.name ?? weaponId,
+      slot,
+    );
+  }
+
+  return specs;
+}
+
+async function fetchMapmakerJson(path) {
+  const response = await fetch(mapmakerUrl(MAPMAKER_PIE_ROOT, path));
+
+  if (!response.ok) {
+    throw new Error(`Mapmaker returned ${response.status} for ${path}.`);
+  }
+
+  return response.json();
+}
+
+async function loadMapmakerModel(path) {
+  const response = await fetch(mapmakerUrl(MAPMAKER_PIE_ROOT, path));
+
+  if (!response.ok) {
+    throw new Error(`Mapmaker returned ${response.status} for ${path}.`);
+  }
+
+  const sourceName = path.split("/").pop();
+  const model = parsePie(await response.text(), sourceName);
+
+  if (model.texture?.name) {
+    const textureKey = normalizeTextureKey(model.texture.name);
+
+    if (!state.textureUrls.has(textureKey)) {
+      state.textureUrls.set(
+        textureKey,
+        mapmakerUrl(`${MAPMAKER_ROOT}/classic/texpages/texpages`, model.texture.name),
+      );
+    }
+  }
+
+  return model;
+}
+
+async function loadMapmakerPie(path) {
+  setStatus(`Loading ${path} from Mapmaker...`);
+  const model = await loadMapmakerModel(path);
+  state.assembly = [];
+  state.assemblyName = "";
+  state.model = model;
+  state.activeLevelIndex = 0;
+  state.selectedPointIndex = null;
+  await renderAll({ fitCamera: true });
+  setStatus(`Loaded Mapmaker PIE ${path}.`);
+}
+
+async function loadMapmakerModule(templateId) {
+  const template = state.mapmaker.templates[templateId];
+
+  if (!template) {
+    return;
+  }
+
+  const specs = getModulePartSpecs(template);
+
+  if (!specs.length) {
+    throw new Error(`No PIE parts were found for ${template.name ?? templateId}.`);
+  }
+
+  setStatus(`Assembling ${template.name ?? templateId} from ${specs.length} PIE files...`);
+  const parts = await Promise.all(
+    specs.map(async (spec) => ({ ...spec, model: await loadMapmakerModel(spec.path) })),
+  );
+  state.assembly = parts;
+  state.assemblyName = template.name ?? templateId;
+  state.model = parts.find((part) => part.role === "body")?.model ?? parts[0].model;
+  state.activeLevelIndex = 0;
+  state.selectedPointIndex = null;
+  await renderAll({ fitCamera: true });
+  setStatus(`Loaded ${state.assemblyName}. Choose a module part to inspect or edit it.`);
+}
+
+function getFilteredAssets() {
+  const query = elements.assetSearch.value.trim().toLowerCase();
+
+  if (elements.assetKind.value === "module") {
+    return Object.values(state.mapmaker.templates)
+      .filter((template) => template.body && template.propulsion && template.weapons?.length)
+      .filter((template) =>
+        [template.id, template.name, template.body, template.propulsion, ...(template.weapons ?? [])]
+          .join(" ")
+          .toLowerCase()
+          .includes(query),
+      )
+      .sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+  }
+
+  return state.mapmaker.piePaths.filter((path) => path.toLowerCase().includes(query));
+}
+
+function renderAssetResults() {
+  const isModule = elements.assetKind.value === "module";
+  const matches = getFilteredAssets();
+  const visibleMatches = matches.slice(0, 200);
+  elements.assetResults.innerHTML = "";
+
+  for (const item of visibleMatches) {
+    const option = document.createElement("option");
+    option.value = isModule ? item.id : item;
+    option.textContent = isModule ? item.name ?? item.id : item;
+    option.title = isModule
+      ? `${item.body} / ${item.propulsion} / ${item.weapons.join(", ")}`
+      : item;
+    elements.assetResults.append(option);
+  }
+
+}
+
+async function initializeMapmakerBrowser() {
+  const [packageData, bodies, propulsions, weapons, templates] = await Promise.all([
+    fetch(MAPMAKER_CATALOG_URL).then(
+      (response) => {
+        if (!response.ok) {
+          throw new Error(`Mapmaker returned ${response.status} for the model catalog.`);
+        }
+        return response.json();
+      },
+    ),
+    fetchMapmakerJson("components/bodies/body.json"),
+    fetchMapmakerJson("components/prop/propulsion.json"),
+    fetchMapmakerJson("components/weapons/weapons.json"),
+    fetchMapmakerJson("components/templates.json"),
+  ]);
+
+  state.mapmaker.piePaths = packageData.files
+    .map((file) => file.name)
+    .filter((name) => /^\/pies\/.*\.pie$/i.test(name))
+    .map((name) => name.slice("/pies/".length))
+    .sort((a, b) => a.localeCompare(b));
+  state.mapmaker.pathIndex = new Map(
+    state.mapmaker.piePaths.map((path) => [path.toLowerCase(), path]),
+  );
+  state.mapmaker.bodies = bodies;
+  state.mapmaker.propulsions = propulsions;
+  state.mapmaker.weapons = weapons;
+  state.mapmaker.templates = templates;
+  elements.assetSearch.disabled = false;
+  elements.assetResults.disabled = false;
+  renderAssetResults();
+}
+
 async function loadPieFromText(text, sourceName) {
+  state.assembly = [];
+  state.assemblyName = "";
   state.model = parsePie(text, sourceName);
   state.activeLevelIndex = 0;
   state.selectedPointIndex = null;
@@ -733,6 +1223,117 @@ function bindEvents() {
     }
   });
 
+  for (const button of elements.assetKindButtons) {
+    button.addEventListener("click", () => {
+      elements.assetKind.value = button.dataset.assetKind;
+      editPanel.hidden = true;
+      mapmakerBrowser.hidden = false;
+      summaryPanel.hidden = true;
+      viewportControls.hidden = true;
+      elements.editMenuButton.classList.remove("active");
+      elements.editMenuButton.setAttribute("aria-pressed", "false");
+      elements.summaryMenuButton.classList.remove("active");
+      elements.summaryMenuButton.setAttribute("aria-pressed", "false");
+      elements.viewportMenuButton.classList.remove("active");
+      elements.viewportMenuButton.setAttribute("aria-pressed", "false");
+
+      for (const kindButton of elements.assetKindButtons) {
+        const isActive = kindButton === button;
+        kindButton.classList.toggle("active", isActive);
+        kindButton.setAttribute("aria-pressed", String(isActive));
+      }
+
+      renderAssetResults();
+    });
+  }
+  elements.viewportMenuButton.addEventListener("click", () => {
+    editPanel.hidden = true;
+    mapmakerBrowser.hidden = true;
+    summaryPanel.hidden = true;
+    viewportControls.hidden = false;
+    elements.summaryMenuButton.classList.remove("active");
+    elements.summaryMenuButton.setAttribute("aria-pressed", "false");
+    elements.editMenuButton.classList.remove("active");
+    elements.editMenuButton.setAttribute("aria-pressed", "false");
+    elements.viewportMenuButton.classList.add("active");
+    elements.viewportMenuButton.setAttribute("aria-pressed", "true");
+
+    for (const kindButton of elements.assetKindButtons) {
+      kindButton.classList.remove("active");
+      kindButton.setAttribute("aria-pressed", "false");
+    }
+  });
+  elements.summaryMenuButton.addEventListener("click", () => {
+    editPanel.hidden = true;
+    mapmakerBrowser.hidden = true;
+    summaryPanel.hidden = false;
+    viewportControls.hidden = true;
+    elements.summaryMenuButton.classList.add("active");
+    elements.summaryMenuButton.setAttribute("aria-pressed", "true");
+    elements.editMenuButton.classList.remove("active");
+    elements.editMenuButton.setAttribute("aria-pressed", "false");
+    elements.viewportMenuButton.classList.remove("active");
+    elements.viewportMenuButton.setAttribute("aria-pressed", "false");
+
+    for (const kindButton of elements.assetKindButtons) {
+      kindButton.classList.remove("active");
+      kindButton.setAttribute("aria-pressed", "false");
+    }
+  });
+  elements.editMenuButton.addEventListener("click", () => {
+    editPanel.hidden = false;
+    mapmakerBrowser.hidden = true;
+    summaryPanel.hidden = true;
+    viewportControls.hidden = true;
+    elements.editMenuButton.classList.add("active");
+    elements.editMenuButton.setAttribute("aria-pressed", "true");
+    elements.summaryMenuButton.classList.remove("active");
+    elements.summaryMenuButton.setAttribute("aria-pressed", "false");
+    elements.viewportMenuButton.classList.remove("active");
+    elements.viewportMenuButton.setAttribute("aria-pressed", "false");
+
+    for (const kindButton of elements.assetKindButtons) {
+      kindButton.classList.remove("active");
+      kindButton.setAttribute("aria-pressed", "false");
+    }
+  });
+  elements.assetSearch.addEventListener("input", renderAssetResults);
+  elements.assetResults.addEventListener("change", async () => {
+    const selection = elements.assetResults.value;
+
+    if (!selection) {
+      return;
+    }
+
+    elements.assetResults.disabled = true;
+
+    try {
+      if (elements.assetKind.value === "module") {
+        await loadMapmakerModule(selection);
+      } else {
+        await loadMapmakerPie(selection);
+      }
+    } catch (error) {
+      setStatus(`Could not load the Mapmaker selection: ${error.message}`);
+    } finally {
+      elements.assetResults.disabled = false;
+    }
+  });
+
+  elements.assemblyPartSelect.addEventListener("change", async (event) => {
+    const part = state.assembly[Number(event.target.value)];
+
+    if (!part) {
+      return;
+    }
+
+    state.model = part.model;
+    state.activeLevelIndex = 0;
+    state.selectedPointIndex = null;
+    await renderAll();
+    setStatus(`Editing ${part.label} (${part.model.sourceName}) inside ${state.assemblyName}.`);
+  });
+
   let pointerDown = null;
 
   renderer.domElement.addEventListener("pointerdown", (event) => {
@@ -774,6 +1375,11 @@ function animate() {
 bindEvents();
 animate();
 renderChrome();
+
+initializeMapmakerBrowser().catch((error) => {
+  elements.assetCount.textContent = "Unavailable";
+  elements.assetHelp.textContent = `Could not load the Mapmaker catalog: ${error.message}`;
+});
 
 fetch(SAMPLE_PIE_URL)
   .then((response) => response.text())

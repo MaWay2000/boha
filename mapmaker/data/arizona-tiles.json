@@ -1,0 +1,1874 @@
+{
+  "tileset": "arizona",
+  "tileRange": "0-77",
+  "purpose": "Editable terrain relationship notes for improving Smart Tiles. This file is descriptive only until the editor loads it.",
+  "families": {
+    "yellow_sand": {
+      "label": "Y Sand",
+      "role": "primary",
+      "friends": [
+        "yellow_sand_grass",
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "Main Arizona plain sand terrain. Good transition source for dry natural ground."
+    },
+    "yellow_sand_grass": {
+      "label": "Y sand G",
+      "role": "primary_detail",
+      "friends": [
+        "yellow_sand",
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "Yellow sand with green brush/grass spots. Useful as a natural detail layer beside plain yellow sand."
+    },
+    "red_sand": {
+      "label": "Red sand",
+      "role": "primary",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "a_roads",
+        "b_roads",
+        "c_roads",
+        "stone_sand",
+        "meteor_holes"
+      ],
+      "notes": "Main red/brown dirt terrain. Often used around bases, roads, and rough ground."
+    },
+    "brown_sand": {
+      "label": "B sand",
+      "role": "secondary",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "Rough brown dirt and broken ground. Useful as a transition and detail layer."
+    },
+    "water": {
+      "label": "Water",
+      "role": "feature",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass"
+      ],
+      "notes": "Water center, edges, and corners. Needs connector-style rotation rules."
+    },
+    "plates": {
+      "label": "Plates",
+      "role": "base_surface",
+      "friends": [
+        "red_sand",
+        "roads",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "Hard/base plate tiles. User identified tiles 19, 20, 21, 22 as plate-friendly."
+    },
+    "roads": {
+      "label": "Roads",
+      "role": "constructed_surface",
+      "friends": [
+        "red_sand",
+        "plates",
+        "a_roads",
+        "b_roads",
+        "c_roads"
+      ],
+      "notes": "Road and track pieces. Needs connector-style rotation rules."
+    },
+    "a_roads": {
+      "label": "A roads",
+      "role": "constructed_surface",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads"
+      ],
+      "notes": "Road-looking transition pieces. User identified tiles 37 and 47."
+    },
+    "b_roads": {
+      "label": "B roads",
+      "role": "constructed_surface",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads",
+        "c_roads"
+      ],
+      "notes": "Road-looking red/base transition pieces. User identified tiles 49, 50, 51, 72, and 73."
+    },
+    "c_roads": {
+      "label": "C Roads",
+      "role": "constructed_surface",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads",
+        "stone_sand"
+      ],
+      "notes": "Road-looking red/base transition pieces. User identified tiles 60 and 61."
+    },
+    "stone_sand": {
+      "label": "Stone sand",
+      "role": "secondary",
+      "friends": [
+        "red_sand",
+        "brown_sand",
+        "c_roads",
+        "meteor_holes"
+      ],
+      "notes": "Stone-like sandy detail tile. User identified tile 74."
+    },
+    "meteor_holes": {
+      "label": "Meteor holes",
+      "role": "detail",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "brown_sand"
+      ],
+      "notes": "Crater / baked-earth detail tiles."
+    },
+    "meteor_a": {
+      "label": "Meteor A",
+      "role": "detail",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "brown_sand",
+        "meteor_holes",
+        "meteor_b",
+        "meteor_c",
+        "meteor_d"
+      ],
+      "notes": "Meteor/crater variant A. User identified tile 55."
+    },
+    "meteor_b": {
+      "label": "Meteor B",
+      "role": "detail",
+      "friends": [
+        "red_sand"
+      ],
+      "notes": "Meteor/crater variant B. User identified tile 56."
+    },
+    "meteor_c": {
+      "label": "Meteor C",
+      "role": "detail",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "brown_sand",
+        "meteor_holes",
+        "meteor_a",
+        "meteor_b",
+        "meteor_d"
+      ],
+      "notes": "Meteor/crater variant C. User identified tile 62."
+    },
+    "meteor_d": {
+      "label": "Meteor D",
+      "role": "detail",
+      "friends": [
+        "brown_sand"
+      ],
+      "notes": "Meteor/crater variant D. User identified tile 58."
+    },
+    "mountain": {
+      "label": "Mountain",
+      "role": "height_edge",
+      "friends": [
+        "brown_sand",
+        "red_sand",
+        "yellow_sand",
+        "yellow_sand_grass"
+      ],
+      "notes": "Brown cliff and mountain edge tiles. Use mostly with raised terrain."
+    },
+    "green_mud": {
+      "label": "Green mud",
+      "role": "special",
+      "friends": [
+        "water",
+        "brown_sand"
+      ],
+      "notes": "Green wet/muddy transition tiles."
+    }
+  },
+  "tiles": [
+    {
+      "id": 0,
+      "image": "classic/texpages/tertilesc1hw-128/tile-00.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "yellow_sand_grass",
+      "label": "yellow sand with grass",
+      "friends": [
+        "yellow_sand",
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        39,
+        41,
+        42,
+        43,
+        44,
+        53,
+        54,
+        76
+      ],
+      "friendTiles": [
+        1,
+        55,
+        63,
+        64,
+        65,
+        66
+      ],
+      "pieces": {
+        "bottomRight": "yellow_sand_grass"
+      }
+    },
+    {
+      "id": 1,
+      "image": "classic/texpages/tertilesc1hw-128/tile-01.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "yellow_sand",
+      "label": "plain yellow sand",
+      "friends": [
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        3,
+        5,
+        6,
+        7,
+        8,
+        13
+      ],
+      "friendTiles": [
+        0
+      ],
+      "pieces": {
+        "topLeft": "yellow_sand_grass"
+      }
+    },
+    {
+      "id": 2,
+      "image": "classic/texpages/tertilesc1hw-128/tile-02.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        23,
+        25
+      ],
+      "pieces": {
+        "topLeft": "yellow_sand",
+        "bottomLeft": "yellow_sand"
+      }
+    },
+    {
+      "id": 3,
+      "image": "classic/texpages/tertilesc1hw-128/tile-03.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        1,
+        23,
+        25
+      ],
+      "pieces": {
+        "bottomRight": "yellow_sand_grass"
+      }
+    },
+    {
+      "id": 4,
+      "image": "classic/texpages/tertilesc1hw-128/tile-04.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "brown_sand",
+      "label": "B sand",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as B sand.",
+      "wrongTiles": [
+        0,
+        23,
+        24,
+        25
+      ],
+      "pieces": {
+        "bottomLeft": "yellow_sand",
+        "bottomRight": "yellow_sand",
+        "topRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 5,
+      "image": "classic/texpages/tertilesc1hw-128/tile-05.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        1,
+        23,
+        25
+      ]
+    },
+    {
+      "id": 6,
+      "image": "classic/texpages/tertilesc1hw-128/tile-06.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        1,
+        23,
+        25
+      ]
+    },
+    {
+      "id": 7,
+      "image": "classic/texpages/tertilesc1hw-128/tile-07.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        1,
+        23,
+        25
+      ]
+    },
+    {
+      "id": 8,
+      "image": "classic/texpages/tertilesc1hw-128/tile-08.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble / transition",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "User marked this as useful corner/transition material.",
+      "wrongTiles": [
+        0,
+        1,
+        23,
+        25
+      ]
+    },
+    {
+      "id": 9,
+      "image": "classic/texpages/tertilesc1hw-128/tile-09.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "yellow_sand_grass",
+      "label": "yellow sand with grass",
+      "friends": [
+        "yellow_sand",
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 10,
+      "image": "classic/texpages/tertilesc1hw-128/tile-10.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "yellow_sand_grass",
+      "label": "yellow sand with grass",
+      "friends": [
+        "yellow_sand",
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "pieces": {
+        "topRight": "yellow_sand_grass",
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 11,
+      "image": "classic/texpages/tertilesc1hw-128/tile-11.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "yellow_sand_grass",
+      "label": "yellow sand with grass",
+      "friends": [
+        "yellow_sand",
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 12,
+      "image": "classic/texpages/tertilesc1hw-128/tile-12.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "yellow_sand",
+      "label": "plain yellow sand",
+      "friends": [
+        "brown_sand",
+        "water",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0
+      ]
+    },
+    {
+      "id": 13,
+      "image": "classic/texpages/tertilesc1hw-128/tile-13.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water edge / transition",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        1,
+        17,
+        23,
+        24,
+        25,
+        31,
+        32,
+        33
+      ],
+      "pieces": {
+        "topRight": "yellow_sand",
+        "bottomLeft": "green_mud",
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 14,
+      "image": "classic/texpages/tertilesc1hw-128/tile-14.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water edge",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "Used by current Smart Water edge hints.",
+      "wrongTiles": [
+        0,
+        23,
+        24,
+        25
+      ],
+      "pieces": {
+        "bottomLeft": "yellow_sand",
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 15,
+      "image": "classic/texpages/tertilesc1hw-128/tile-15.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water edge / transition",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        23,
+        24,
+        25
+      ],
+      "pieces": {
+        "topLeft": "yellow_sand",
+        "bottomLeft": "yellow_sand",
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 16,
+      "image": "classic/texpages/tertilesc1hw-128/tile-16.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water corner",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "Used by current Smart Water corner hints.",
+      "wrongTiles": [
+        0,
+        23,
+        24,
+        25
+      ],
+      "pieces": {
+        "bottomLeft": "yellow_sand"
+      }
+    },
+    {
+      "id": 17,
+      "image": "classic/texpages/tertilesc1hw-128/tile-17.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water center",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "Best main brush tile for painting water.",
+      "wrongTiles": [
+        0,
+        13,
+        23,
+        24,
+        25
+      ]
+    },
+    {
+      "id": 18,
+      "image": "classic/texpages/tertilesc1hw-128/tile-18.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "mountain",
+      "label": "cliff / mountain",
+      "friends": [
+        "brown_sand",
+        "red_sand",
+        "yellow_sand"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 19,
+      "image": "classic/texpages/tertilesc1hw-128/tile-19.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "plates",
+      "label": "plate / road surface",
+      "friends": [
+        "red_sand",
+        "roads"
+      ],
+      "notes": "User identified tile 19 as plate-friendly.",
+      "pieces": {
+        "bottomRight": "red_sand"
+      }
+    },
+    {
+      "id": 20,
+      "image": "classic/texpages/tertilesc1hw-128/tile-20.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "plates",
+      "label": "plate / red transition",
+      "friends": [
+        "red_sand",
+        "roads"
+      ],
+      "notes": "User identified tile 20 as plate-friendly.",
+      "pieces": {
+        "bottomLeft": "red_sand",
+        "bottomRight": "red_sand",
+        "topRight": "red_sand"
+      }
+    },
+    {
+      "id": 21,
+      "image": "classic/texpages/tertilesc1hw-128/tile-21.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "plates",
+      "label": "plate / red transition",
+      "friends": [
+        "red_sand",
+        "roads"
+      ],
+      "notes": "User identified tile 21 as plate-friendly.",
+      "pieces": {
+        "topRight": "red_sand",
+        "bottomRight": "red_sand"
+      }
+    },
+    {
+      "id": 22,
+      "image": "classic/texpages/tertilesc1hw-128/tile-22.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "plates",
+      "label": "plate / road surface",
+      "friends": [
+        "red_sand",
+        "roads"
+      ],
+      "notes": "User identified tile 22 as plate-friendly."
+    },
+    {
+      "id": 23,
+      "image": "classic/texpages/tertilesc1hw-128/tile-23.png",
+      "typeCode": 3,
+      "typeName": "Green Mud",
+      "family": "green_mud",
+      "label": "green mud",
+      "friends": [
+        "water",
+        "brown_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        13,
+        14,
+        15,
+        16,
+        17,
+        26,
+        30,
+        33,
+        34,
+        35,
+        36,
+        38,
+        39,
+        40
+      ]
+    },
+    {
+      "id": 24,
+      "image": "classic/texpages/tertilesc1hw-128/tile-24.png",
+      "typeCode": 3,
+      "typeName": "Green Mud",
+      "family": "green_mud",
+      "label": "green mud",
+      "friends": [
+        "water",
+        "brown_sand"
+      ],
+      "notes": "",
+      "pieces": {
+        "topRight": "brown_sand",
+        "bottomRight": "brown_sand"
+      },
+      "wrongTiles": [
+        4,
+        13,
+        14,
+        15,
+        16,
+        17,
+        30,
+        33,
+        35,
+        40
+      ]
+    },
+    {
+      "id": 25,
+      "image": "classic/texpages/tertilesc1hw-128/tile-25.png",
+      "typeCode": 3,
+      "typeName": "Green Mud",
+      "family": "green_mud",
+      "label": "green mud",
+      "friends": [
+        "water",
+        "brown_sand"
+      ],
+      "notes": "",
+      "pieces": {
+        "bottomRight": "brown_sand"
+      },
+      "wrongTiles": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        13,
+        14,
+        15,
+        16,
+        17,
+        30,
+        33,
+        34,
+        35,
+        36,
+        38,
+        39,
+        40
+      ]
+    },
+    {
+      "id": 26,
+      "image": "classic/texpages/tertilesc1hw-128/tile-26.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "green_mud",
+      "label": "green mud",
+      "friends": [
+        "water",
+        "brown_sand"
+      ],
+      "notes": "User identified this tile visually as green mud.",
+      "pieces": {
+        "bottomLeft": "brown_sand",
+        "bottomRight": "brown_sand",
+        "topRight": "brown_sand"
+      },
+      "wrongTiles": [
+        23
+      ]
+    },
+    {
+      "id": 27,
+      "image": "classic/texpages/tertilesc1hw-128/tile-27.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "pieces": {
+        "topLeft": "yellow_sand_grass",
+        "bottomLeft": "yellow_sand_grass"
+      },
+      "wrongTiles": [
+        49
+      ]
+    },
+    {
+      "id": 28,
+      "image": "classic/texpages/tertilesc1hw-128/tile-28.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as red sand.",
+      "pieces": {
+        "topLeft": "yellow_sand_grass",
+        "topRight": "yellow_sand_grass",
+        "bottomLeft": "yellow_sand_grass"
+      },
+      "wrongTiles": [
+        37,
+        47,
+        49
+      ]
+    },
+    {
+      "id": 29,
+      "image": "classic/texpages/tertilesc1hw-128/tile-29.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        49
+      ],
+      "pieces": {
+        "topLeft": "yellow_sand_grass"
+      }
+    },
+    {
+      "id": 30,
+      "image": "classic/texpages/tertilesc1hw-128/tile-30.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water transition",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        23,
+        24,
+        25
+      ],
+      "pieces": {
+        "bottomLeft": "brown_sand",
+        "bottomRight": "green_mud"
+      }
+    },
+    {
+      "id": 31,
+      "image": "classic/texpages/tertilesc1hw-128/tile-31.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water transition",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        13
+      ],
+      "pieces": {
+        "topLeft": "green_mud",
+        "topRight": "green_mud"
+      }
+    },
+    {
+      "id": 32,
+      "image": "classic/texpages/tertilesc1hw-128/tile-32.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water transition",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        13
+      ],
+      "pieces": {
+        "topLeft": "green_mud",
+        "bottomLeft": "green_mud",
+        "topRight": "green_mud"
+      }
+    },
+    {
+      "id": 33,
+      "image": "classic/texpages/tertilesc1hw-128/tile-33.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "water transition",
+      "friends": [
+        "yellow_sand"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        13,
+        23,
+        24,
+        25
+      ],
+      "pieces": {
+        "topLeft": "green_mud"
+      }
+    },
+    {
+      "id": 34,
+      "image": "classic/texpages/tertilesc1hw-128/tile-34.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "brown_sand",
+      "label": "B sand",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as B sand.",
+      "wrongTiles": [
+        0,
+        23,
+        25
+      ],
+      "pieces": {
+        "topLeft": "red_sand",
+        "bottomLeft": "red_sand",
+        "topRight": "brown_sand"
+      },
+      "friendTiles": [
+        47
+      ]
+    },
+    {
+      "id": 35,
+      "image": "classic/texpages/tertilesc1hw-128/tile-35.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "brown_sand",
+      "label": "B sand",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as B sand.",
+      "wrongTiles": [
+        0,
+        23,
+        24,
+        25,
+        58
+      ],
+      "pieces": {
+        "topLeft": "red_sand",
+        "bottomLeft": "red_sand",
+        "topRight": "red_sand"
+      },
+      "friendTiles": [
+        47
+      ]
+    },
+    {
+      "id": 36,
+      "image": "classic/texpages/tertilesc1hw-128/tile-36.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        23,
+        25
+      ],
+      "pieces": {
+        "topLeft": "red_sand"
+      }
+    },
+    {
+      "id": 37,
+      "image": "classic/texpages/tertilesc1hw-128/tile-37.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads"
+      ],
+      "notes": "",
+      "edges": {
+        "N": "b_roads",
+        "E": "a_roads",
+        "S": "red_sand",
+        "W": "a_roads"
+      },
+      "wrongTiles": [
+        28
+      ],
+      "friendTiles": [
+        57
+      ]
+    },
+    {
+      "id": 38,
+      "image": "classic/texpages/tertilesc1hw-128/tile-38.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "pieces": {
+        "topLeft": "yellow_sand_grass",
+        "bottomLeft": "yellow_sand_grass"
+      },
+      "wrongTiles": [
+        23,
+        25
+      ]
+    },
+    {
+      "id": 39,
+      "image": "classic/texpages/tertilesc1hw-128/tile-39.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "brown_sand",
+      "label": "brown rubble",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        23,
+        25
+      ],
+      "pieces": {
+        "bottomRight": "yellow_sand_grass"
+      }
+    },
+    {
+      "id": 40,
+      "image": "classic/texpages/tertilesc1hw-128/tile-40.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "brown_sand",
+      "label": "B sand",
+      "friends": [
+        "yellow_sand",
+        "yellow_sand_grass",
+        "red_sand",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as brown sand.",
+      "pieces": {
+        "bottomLeft": "yellow_sand_grass",
+        "bottomRight": "yellow_sand_grass",
+        "topRight": "yellow_sand_grass"
+      },
+      "wrongTiles": [
+        23,
+        24,
+        25,
+        58
+      ],
+      "friendTiles": [
+        47
+      ]
+    },
+    {
+      "id": 41,
+      "image": "classic/texpages/tertilesc1hw-128/tile-41.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        49
+      ],
+      "pieces": {
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 42,
+      "image": "classic/texpages/tertilesc1hw-128/tile-42.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as red sand.",
+      "wrongTiles": [
+        0,
+        49
+      ],
+      "pieces": {
+        "bottomLeft": "yellow_sand",
+        "topRight": "yellow_sand",
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 43,
+      "image": "classic/texpages/tertilesc1hw-128/tile-43.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        49
+      ],
+      "pieces": {
+        "topRight": "yellow_sand",
+        "bottomRight": "yellow_sand"
+      }
+    },
+    {
+      "id": 44,
+      "image": "classic/texpages/tertilesc1hw-128/tile-44.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush / transition",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0,
+        49
+      ]
+    },
+    {
+      "id": 45,
+      "image": "classic/texpages/tertilesc1hw-128/tile-45.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "mountain",
+      "label": "cliff / mountain",
+      "friends": [
+        "brown_sand",
+        "red_sand",
+        "yellow_sand"
+      ],
+      "notes": "",
+      "pieces": {
+        "bottomLeft": "red_sand"
+      }
+    },
+    {
+      "id": 46,
+      "image": "classic/texpages/tertilesc1hw-128/tile-46.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "mountain",
+      "label": "cliff / mountain",
+      "friends": [
+        "brown_sand",
+        "red_sand",
+        "yellow_sand"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 47,
+      "image": "classic/texpages/tertilesc1hw-128/tile-47.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads"
+      ],
+      "notes": "",
+      "pieces": {
+        "topRight": "red_sand",
+        "bottomRight": "red_sand"
+      },
+      "edges": {
+        "N": "red_sand",
+        "E": "red_sand",
+        "S": "red_sand",
+        "W": "a_roads"
+      },
+      "wrongTiles": [
+        28,
+        49,
+        50,
+        51,
+        73
+      ],
+      "friendTiles": [
+        34,
+        35,
+        40
+      ]
+    },
+    {
+      "id": 48,
+      "image": "classic/texpages/tertilesc1hw-128/tile-48.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        49
+      ]
+    },
+    {
+      "id": 49,
+      "image": "classic/texpages/tertilesc1hw-128/tile-49.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "b_roads",
+      "label": "B roads",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads"
+      ],
+      "notes": "",
+      "edges": {
+        "N": "b_roads",
+        "E": "red_sand",
+        "S": "b_roads",
+        "W": "red_sand"
+      },
+      "wrongTiles": [
+        27,
+        28,
+        29,
+        41,
+        42,
+        43,
+        44,
+        47,
+        48
+      ]
+    },
+    {
+      "id": 50,
+      "image": "classic/texpages/tertilesc1hw-128/tile-50.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "b_roads",
+      "label": "B roads",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads"
+      ],
+      "notes": "",
+      "pieces": {
+        "topLeft": "red_sand"
+      },
+      "edges": {
+        "N": "red_sand",
+        "E": "b_roads",
+        "S": "b_roads",
+        "W": "red_sand"
+      },
+      "wrongTiles": [
+        47
+      ]
+    },
+    {
+      "id": 51,
+      "image": "classic/texpages/tertilesc1hw-128/tile-51.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "b_roads",
+      "label": "B roads",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads"
+      ],
+      "notes": "",
+      "edges": {
+        "N": "b_roads",
+        "E": "red_sand",
+        "S": "b_roads",
+        "W": "red_sand"
+      },
+      "wrongTiles": [
+        47
+      ]
+    },
+    {
+      "id": 52,
+      "image": "classic/texpages/tertilesc1hw-128/tile-52.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "b_roads",
+      "label": "B roads",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads",
+        "c_roads"
+      ],
+      "notes": "User identified this tile visually as B roads.",
+      "pieces": {
+        "topLeft": "red_sand",
+        "topRight": "red_sand"
+      },
+      "edges": {
+        "N": "red_sand",
+        "E": "red_sand",
+        "S": "b_roads",
+        "W": "red_sand"
+      }
+    },
+    {
+      "id": 53,
+      "image": "classic/texpages/tertilesc1hw-128/tile-53.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0
+      ]
+    },
+    {
+      "id": 54,
+      "image": "classic/texpages/tertilesc1hw-128/tile-54.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_sand",
+      "label": "red sand brush",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        0
+      ]
+    },
+    {
+      "id": 55,
+      "image": "classic/texpages/tertilesc1hw-128/tile-55.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_a",
+      "label": "Meteor A",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "brown_sand",
+        "meteor_b",
+        "meteor_c"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor A.",
+      "friendTiles": [
+        0
+      ]
+    },
+    {
+      "id": 56,
+      "image": "classic/texpages/tertilesc1hw-128/tile-56.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_b",
+      "label": "Meteor B",
+      "friends": [
+        "red_sand"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor B."
+    },
+    {
+      "id": 57,
+      "image": "classic/texpages/tertilesc1hw-128/tile-57.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "road",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads"
+      ],
+      "notes": "",
+      "edges": {
+        "N": "red_sand",
+        "E": "roads",
+        "S": "roads",
+        "W": "roads"
+      },
+      "friendTiles": [
+        37
+      ]
+    },
+    {
+      "id": 58,
+      "image": "classic/texpages/tertilesc1hw-128/tile-58.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_d",
+      "label": "Meteor D",
+      "friends": [
+        "brown_sand"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor D.",
+      "wrongTiles": [
+        35,
+        40
+      ]
+    },
+    {
+      "id": 59,
+      "image": "classic/texpages/tertilesc1hw-128/tile-59.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "road",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads"
+      ],
+      "notes": "",
+      "edges": {
+        "N": "red_sand",
+        "E": "roads",
+        "S": "red_sand",
+        "W": "roads"
+      }
+    },
+    {
+      "id": 60,
+      "image": "classic/texpages/tertilesc1hw-128/tile-60.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "c_roads",
+      "label": "C Roads",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads",
+        "stone_sand"
+      ],
+      "notes": "User identified this tile visually as C Roads.",
+      "edges": {
+        "N": "red_sand",
+        "E": "c_roads",
+        "S": "red_sand",
+        "W": "c_roads"
+      }
+    },
+    {
+      "id": 61,
+      "image": "classic/texpages/tertilesc1hw-128/tile-61.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "c_roads",
+      "label": "C Roads",
+      "friends": [
+        "red_sand",
+        "roads",
+        "b_roads",
+        "stone_sand"
+      ],
+      "notes": "User identified this tile visually as C Roads.",
+      "edges": {
+        "N": "red_sand",
+        "E": "c_roads",
+        "S": "red_sand",
+        "W": "c_roads"
+      }
+    },
+    {
+      "id": 62,
+      "image": "classic/texpages/tertilesc1hw-128/tile-62.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_c",
+      "label": "Meteor C",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "brown_sand",
+        "meteor_a",
+        "meteor_b"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor C."
+    },
+    {
+      "id": 63,
+      "image": "classic/texpages/tertilesc1hw-128/tile-63.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_a",
+      "label": "Meteor A",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "brown_sand",
+        "meteor_b",
+        "meteor_c"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor A.",
+      "friendTiles": [
+        0
+      ]
+    },
+    {
+      "id": 64,
+      "image": "classic/texpages/tertilesc1hw-128/tile-64.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_a",
+      "label": "Meteor A",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "brown_sand",
+        "meteor_b",
+        "meteor_c"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor A.",
+      "friendTiles": [
+        0
+      ]
+    },
+    {
+      "id": 65,
+      "image": "classic/texpages/tertilesc1hw-128/tile-65.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_a",
+      "label": "Meteor A",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "brown_sand",
+        "meteor_b",
+        "meteor_c"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor A.",
+      "friendTiles": [
+        0
+      ]
+    },
+    {
+      "id": 66,
+      "image": "classic/texpages/tertilesc1hw-128/tile-66.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_a",
+      "label": "Meteor A",
+      "friends": [
+        "yellow_sand",
+        "red_sand",
+        "brown_sand",
+        "meteor_b",
+        "meteor_c"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor A.",
+      "friendTiles": [
+        0
+      ]
+    },
+    {
+      "id": 67,
+      "image": "classic/texpages/tertilesc1hw-128/tile-67.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_b",
+      "label": "Meteor B",
+      "friends": [
+        "red_sand"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor B."
+    },
+    {
+      "id": 68,
+      "image": "classic/texpages/tertilesc1hw-128/tile-68.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_b",
+      "label": "Meteor B",
+      "friends": [
+        "red_sand"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor B."
+    },
+    {
+      "id": 69,
+      "image": "classic/texpages/tertilesc1hw-128/tile-69.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_b",
+      "label": "Meteor B",
+      "friends": [
+        "red_sand"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor B."
+    },
+    {
+      "id": 70,
+      "image": "classic/texpages/tertilesc1hw-128/tile-70.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "meteor_b",
+      "label": "Meteor B",
+      "friends": [
+        "red_sand"
+      ],
+      "notes": "User identified this meteor/crater variant as Meteor B."
+    },
+    {
+      "id": 71,
+      "image": "classic/texpages/tertilesc1hw-128/tile-71.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "mountain",
+      "label": "cliff / mountain",
+      "friends": [
+        "brown_sand",
+        "red_sand",
+        "yellow_sand"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 72,
+      "image": "classic/texpages/tertilesc1hw-128/tile-72.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "b_roads",
+      "label": "B roads",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads"
+      ],
+      "notes": "",
+      "edges": {
+        "N": "b_roads",
+        "E": "b_roads",
+        "S": "b_roads",
+        "W": "red_sand"
+      }
+    },
+    {
+      "id": 73,
+      "image": "classic/texpages/tertilesc1hw-128/tile-73.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "b_roads",
+      "label": "B roads",
+      "friends": [
+        "red_sand",
+        "plates",
+        "roads",
+        "a_roads"
+      ],
+      "notes": "",
+      "wrongTiles": [
+        47
+      ]
+    },
+    {
+      "id": 74,
+      "image": "classic/texpages/tertilesc1hw-128/tile-74.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "stone_sand",
+      "label": "Stone sand",
+      "friends": [
+        "red_sand",
+        "brown_sand",
+        "c_roads",
+        "meteor_holes"
+      ],
+      "notes": "User identified this tile visually as Stone sand."
+    },
+    {
+      "id": 75,
+      "image": "classic/texpages/tertilesc1hw-128/tile-75.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "mountain",
+      "label": "cliff / mountain",
+      "friends": [
+        "brown_sand",
+        "red_sand",
+        "yellow_sand"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 76,
+      "image": "classic/texpages/tertilesc1hw-128/tile-76.png",
+      "typeCode": 5,
+      "typeName": "Pink Rock",
+      "family": "red_sand",
+      "label": "red sand",
+      "friends": [
+        "plates",
+        "yellow_sand",
+        "roads",
+        "meteor_holes"
+      ],
+      "notes": "Official type is Pink Rock, but visually this tile belongs with red sand.",
+      "wrongTiles": [
+        0
+      ]
+    },
+    {
+      "id": 77,
+      "image": "classic/texpages/tertilesc1hw-128/tile-77.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "plates",
+      "label": "plate / road surface",
+      "friends": [
+        "red_sand",
+        "roads",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified this tile visually as plates."
+    }
+  ]
+}

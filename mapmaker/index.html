@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Warzone2100 MapMaker - Browser Map Editor</title>
+  <meta name="description" content="Create, edit, validate, save, and preview Warzone 2100 maps in a browser with terrain, height, structures, droids, objects, templates, minimap, and local autosave.">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="MaWay2000">
+  <meta name="google-site-verification" content="jf-UL2u_GQDDYOx58Y7gXBXAiwGQUk7WwvaOIG89xEk">
+  <link rel="canonical" href="https://maway2000.github.io/boha/mapmaker/">
+  <meta property="og:title" content="Warzone2100 MapMaker">
+  <meta property="og:description" content="A browser-based Warzone 2100 map editor for terrain, height, structures, droids, objects, templates, validation, and local saves.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://maway2000.github.io/boha/mapmaker/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Warzone2100 MapMaker">
+  <meta name="twitter:description" content="Create and edit Warzone 2100 maps directly in your browser.">
+  <!-- Use local favicon to avoid network errors when previewing -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#151e28; --fg:#dde; --muted:#90a4b8; --bar:#151e28; --border:#283445; --accent:#4da3ff;
+      --menu-height:40px;
+      --editor-panel-width:320px;
+    }
+    @media (min-width: 1280px) {
+      :root { --editor-panel-width:400px; }
+    }
+    @media (min-width: 1600px) {
+      :root { --editor-panel-width:430px; }
+    }
+    html, body {
+      height: 100%; margin: 0; padding: 0;
+      background: var(--bg); color: var(--fg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      overflow: hidden;
+    }
+    /* 3D container */
+    #threeContainer {
+      position: absolute; left: var(--editor-panel-width); top: var(--menu-height); width: calc(100vw - var(--editor-panel-width)); height: calc(100vh - var(--menu-height));
+      background: var(--bg); z-index: 1;
+    }
+    body.overlay-open #threeContainer { left: 0; width: 100vw; }
+    /* Top bar (kept but minimal; can be toggled by the game) */
+    #uiBar {
+      position: absolute; left: var(--editor-panel-width); top: var(--menu-height); width: calc(100vw - var(--editor-panel-width)); z-index: 10;
+      padding: 4px 8px; background: var(--bar); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    body.overlay-open #uiBar { left: 0; width: 100vw; }
+    body.loading-map #uiBar { display:none; }
+    #uiBar.hidden { display:none; }
+    #mapFilename { color:#8cf; }
+    #menuBar {
+      position: fixed; top:0; left:0; width:100%; height:var(--menu-height);
+      display:flex; align-items:center; gap:6px; padding:4px 8px;
+      background: var(--bar); border-bottom:1px solid var(--border); box-sizing:border-box;
+      z-index:100; pointer-events:auto;
+    }
+    body.overlay-open #menuBar { display:none; }
+    body.loading-map #menuBar { display:none; }
+    #fileList {
+      position: fixed; left:0; top:var(--menu-height); width:360px; height:calc(100vh - var(--menu-height));
+      background: rgba(24,32,48,0.95);
+      padding:8px; overflow-y:auto;
+      z-index:60;
+    }
+    #fileList.hidden{ display:none; }
+    body.loading-map #fileList { display:none; }
+    #fileList div{
+      padding:4px; cursor:pointer; border-bottom:1px solid var(--border);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    #fileList div:hover{ background:#283445; }
+    #editPanel select {
+      background: #283445;
+      color: var(--fg);
+      border: 1px solid #435066;
+    }
+    #editPanel select option {
+      background: var(--bg);
+    }
+    #editPanel select option:hover,
+    #editPanel select option:checked {
+      background: #283445;
+    }
+    #editPanel input[type="search"] {
+      background: #283445;
+      color: var(--fg);
+      border: 1px solid #435066;
+      padding: 2px 5px;
+      font: inherit;
+    }
+    #editPanel input[type="search"]::placeholder {
+      color: var(--muted);
+    }
+    #info {
+      position: absolute; right: 8px; bottom: 8px;
+      background: rgba(24,32,48,0.8);
+      padding:8px; border-radius:5px;
+      z-index:50;
+    }
+
+    #compass {
+      position: absolute; right: 8px; top: calc(var(--menu-height) + 8px);
+      width: 60px; height: 60px;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    body.overlay-open #compass {
+      top: 8px;
+    }
+
+    body.compass-hidden #compass {
+      display: none;
+    }
+
+    #compass svg {
+      width: 100%; height: 100%;
+    }
+
+    #minimapPanel {
+      position: absolute;
+      right: 8px;
+      top: calc(var(--menu-height) + 76px);
+      width: 184px;
+      background: rgba(24,32,48,0.86);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px;
+      z-index: 50;
+      box-sizing: border-box;
+      pointer-events: auto;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    }
+    body.overlay-open #minimapPanel,
+    body.loading-map #minimapPanel {
+      display: none;
+    }
+    body.minimap-hidden #minimapPanel {
+      display: none;
+    }
+    #minimapTitle {
+      color: var(--fg);
+      font-size: 0.78rem;
+      line-height: 1;
+      margin-bottom: 5px;
+    }
+    #minimapCanvas {
+      display: block;
+      width: 170px;
+      height: 170px;
+      background: #101722;
+      border: 1px solid #435066;
+      image-rendering: pixelated;
+      box-sizing: border-box;
+      cursor: crosshair;
+    }
+
+    /* Top editor panel */
+    #editPanel {
+      position:absolute; left:0; top:var(--menu-height); width:var(--editor-panel-width); height:calc(100vh - var(--menu-height));
+      background: rgba(24,32,48,0.95); padding:6px; z-index:12;
+      display:flex; flex-direction:column; align-items:flex-start; gap:10px;
+      overflow-x:hidden;
+    }
+    #editPanel .panel {
+      width:100%; flex:1; overflow-y:auto; display:none;
+    }
+    #heightPanel {
+      position: relative;
+      box-sizing: border-box;
+      padding-bottom: 82px;
+    }
+    #texturesPanel {
+      position: relative;
+      box-sizing: border-box;
+      padding-bottom: 150px;
+    }
+    #heightShowHeightsSlot {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 34px;
+    }
+    #tileInfoSlot {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 8px;
+    }
+    #showHeightBtn { min-height: 34px; }
+    #viewPanel { display:block; }
+    .tab-btn {
+      background: #283445; color: #dde; border: 1px solid #435066;
+      padding: 2px 8px; cursor: pointer; font-size: 0.9rem;
+    }
+    .tab-btn.active { background: #6CF527; color: #000; }
+    .tab-btn:disabled { opacity: 0.5; }
+    .rotate-btn {
+      background: #283445; color: #dde; border: 1px solid #435066;
+      padding: 2px 6px; cursor: pointer; font-size: 0.9rem;
+    }
+    .rotate-btn.active { background: #6CF527; color: #000; }
+    .action-btn {
+      background: #283445; color: #dde; border: 1px solid #435066;
+      padding: 2px 8px; cursor: pointer; font-size: 0.9rem;
+    }
+    .action-btn.active { background: #6CF527; color: #000; }
+    .action-btn.ready  { background: #FFD447; color: #000; }
+    .action-btn:disabled { opacity: 0.5; cursor: default; }
+    .number-stepper {
+      display: inline-flex;
+      align-items: stretch;
+      height: 24px;
+      border: 1px solid #435066;
+      background: #1b2635;
+      box-sizing: border-box;
+    }
+    .number-stepper .step-btn {
+      width: 24px;
+      border: 0;
+      border-right: 1px solid #435066;
+      background: #283445;
+      color: #dde;
+      cursor: pointer;
+      font: inherit;
+      line-height: 1;
+      padding: 0;
+    }
+    .number-stepper .step-btn:last-child {
+      border-right: 0;
+      border-left: 1px solid #435066;
+    }
+    .number-stepper .step-btn:hover {
+      background: #34455c;
+    }
+    .number-stepper input[type="number"] {
+      width: 44px;
+      border: 0;
+      background: #202c3c;
+      color: var(--fg);
+      text-align: center;
+      font: inherit;
+      padding: 0 2px;
+      outline: none;
+      -moz-appearance: textfield;
+    }
+    .number-stepper input[type="number"]::-webkit-outer-spin-button,
+    .number-stepper input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .context-menu {
+      position: fixed;
+      z-index: 50;
+      display: none;
+      min-width: 130px;
+      background: #172130;
+      border: 1px solid #4b5f78;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+      padding: 4px;
+    }
+    .context-menu .action-btn {
+      width: 100%;
+      display: block;
+      text-align: left;
+      margin: 0;
+    }
+    .context-menu .action-btn + .action-btn { margin-top: 4px; }
+    .toggle-btn-input { display: none; }
+    .toggle-btn {
+      background: #283445; color: #dde; border: 1px solid #435066;
+      padding: 2px 8px; cursor: pointer; font-size: 0.9rem;
+      text-align: center;
+    }
+    .toggle-btn-input:checked + .toggle-btn { background: #6CF527; color: #000; }
+    .toggle-label { color: #dde; user-select:none; font-size:1rem; display:flex; align-items:center; gap:4px; cursor:pointer; }
+    .toggle-label input[type="checkbox"] { width:18px; height:18px; accent-color:#88f; }
+    .tile-options-box {
+      border: 1px solid var(--border);
+      padding: 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+    }
+    .toggle-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 8px;
+      align-items: center;
+    }
+    .panel-box {
+      border: 1px solid var(--border);
+      padding: 4px 8px 8px;
+      margin-top: 6px;
+      margin-bottom: 6px;
+      border-radius: 4px;
+    }
+    .file-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .file-actions .action-btn {
+      width: 100%;
+      min-width: 0;
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .file-actions-separator {
+      border-top: 1px solid var(--border);
+      margin: 4px 0;
+    }
+    .file-name-field {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    .file-name-field input {
+      width: 100%;
+      box-sizing: border-box;
+      background: #2b3a4d;
+      border: 1px solid #4b5f78;
+      color: var(--text);
+      padding: 4px 6px;
+      font: inherit;
+    }
+    #fileStatus {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    #loadingOverlay {
+      position: fixed;
+      left: calc(var(--editor-panel-width) + (100vw - var(--editor-panel-width)) / 2);
+      top: calc(var(--menu-height) + (100vh - var(--menu-height)) / 2);
+      transform: translate(-50%, -50%);
+      width: min(360px, calc(100vw - 24px));
+      background: rgba(24,32,48,0.95);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 10px 12px;
+      z-index: 120;
+      box-sizing: border-box;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.25);
+    }
+    body.overlay-open #loadingOverlay {
+      left: 50vw;
+    }
+    body.loading-map #loadingOverlay {
+      left: 50vw;
+      top: 50vh;
+    }
+    #loadingOverlay.hidden {
+      display: none;
+    }
+    #loadingTitle {
+      font-size: 1rem;
+      color: var(--fg);
+      margin-bottom: 4px;
+    }
+    #loadingDetail {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #loadingBarOuter {
+      height: 8px;
+      background: #111923;
+      border: 1px solid #435066;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    #loadingBarInner {
+      width: 0%;
+      height: 100%;
+      background: #6CF527;
+      transition: width 0.15s ease;
+    }
+    #loadingPercent {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-align: right;
+    }
+    #saveResultOverlay {
+      position: fixed;
+      left: calc(var(--editor-panel-width) + (100vw - var(--editor-panel-width)) / 2);
+      top: calc(var(--menu-height) + (100vh - var(--menu-height)) / 2);
+      transform: translate(-50%, -50%);
+      width: min(380px, calc(100vw - 24px));
+      background: rgba(24,32,48,0.97);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      z-index: 130;
+      box-sizing: border-box;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    }
+    body.overlay-open #saveResultOverlay {
+      left: 50vw;
+    }
+    #saveResultOverlay.hidden {
+      display: none;
+    }
+    #saveResultTitle {
+      font-size: 1rem;
+      margin-bottom: 8px;
+      color: var(--fg);
+    }
+    #saveResultFilename {
+      color: #dce8ff;
+      font-size: 0.9rem;
+      line-height: 1.3;
+      overflow-wrap: anywhere;
+      margin-bottom: 6px;
+    }
+    #saveResultDetails {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 3px 10px;
+      color: #dce8ff;
+      font-size: 0.82rem;
+      line-height: 1.3;
+      margin-bottom: 8px;
+    }
+    #saveResultDetails .save-result-label {
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    #saveResultDetails .save-result-value {
+      overflow-wrap: anywhere;
+    }
+    #saveResultPlayerSummary {
+      grid-column: 1 / -1;
+      color: var(--muted);
+      margin-top: 3px;
+      white-space: pre-line;
+    }
+    #saveResultLocation {
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.35;
+      margin-bottom: 10px;
+    }
+    #saveResultActions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+    .dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      z-index: 136;
+    }
+    .dialog-backdrop.hidden {
+      display: none;
+    }
+    .app-dialog {
+      position: fixed;
+      left: calc(var(--editor-panel-width) + (100vw - var(--editor-panel-width)) / 2);
+      top: calc(var(--menu-height) + (100vh - var(--menu-height)) / 2);
+      transform: translate(-50%, -50%);
+      width: min(380px, calc(100vw - 24px));
+      background: rgba(24,32,48,0.98);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      z-index: 137;
+      box-sizing: border-box;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+    }
+    body.overlay-open .app-dialog {
+      left: 50vw;
+    }
+    .app-dialog.hidden {
+      display: none;
+    }
+    .app-dialog-title {
+      font-size: 1rem;
+      color: var(--fg);
+      margin-bottom: 10px;
+    }
+    .app-dialog label {
+      display: block;
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+    .app-dialog input {
+      width: 100%;
+      box-sizing: border-box;
+      background: #283445;
+      border: 1px solid #435066;
+      color: var(--fg);
+      padding: 5px 7px;
+      font: inherit;
+    }
+    .app-dialog input:focus {
+      outline: none;
+      border-color: #6CF527;
+    }
+    .app-dialog-hint {
+      color: var(--muted);
+      font-size: 0.75rem;
+      line-height: 1.35;
+      margin-top: 6px;
+    }
+    .app-dialog-body {
+      color: var(--fg);
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .app-dialog-body p {
+      margin: 6px 0;
+    }
+    .app-dialog-body ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+    }
+    #licenseHelpDialog {
+      width: min(680px, calc(100vw - 24px));
+    }
+    #licenseHelpBody {
+      max-height: calc(100vh - var(--menu-height) - 112px);
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+    .app-dialog-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    #validationOverlay {
+      position: fixed;
+      left: calc(var(--editor-panel-width) + (100vw - var(--editor-panel-width)) / 2);
+      top: calc(var(--menu-height) + (100vh - var(--menu-height)) / 2);
+      transform: translate(-50%, -50%);
+      width: min(460px, calc(100vw - 24px));
+      max-height: calc(100vh - var(--menu-height) - 24px);
+      background: rgba(24,32,48,0.98);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      z-index: 135;
+      box-sizing: border-box;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+    }
+    body.overlay-open #validationOverlay {
+      left: 50vw;
+    }
+    #validationOverlay.hidden {
+      display: none;
+    }
+    #validationTitle {
+      font-size: 1rem;
+      color: var(--fg);
+    }
+    #validationSummary {
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.35;
+    }
+    #validationList {
+      margin: 0;
+      padding-left: 18px;
+      overflow-y: auto;
+      color: #dce8ff;
+      font-size: 0.82rem;
+      line-height: 1.35;
+      text-align: left;
+      display: inline-block;
+      max-width: 100%;
+    }
+    #validationList li.error {
+      color: #ff9b9b;
+    }
+    #validationList li.warning {
+      color: #ffd780;
+    }
+    #validationActions {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+    }
+    #tileTypeSelect {
+      min-width: 120px;
+      flex: 1 1 0;
+      width: 0;
+    }
+    .show-hide-title {
+      text-align: center;
+      margin-bottom: 4px;
+      font-weight: normal;
+      color: var(--fg);
+      font-size: 1rem;
+    }
+
+    /* Overlay (initial file chooser) */
+    #overlayMsg {
+      position: fixed; left:0; top:0; width:100vw; height:100vh;
+      display: flex; align-items: center; justify-content: center;
+      color: #dfe7ef; pointer-events: auto; z-index: 100;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(10,16,24,0.74), rgba(10,16,24,0.9)),
+        radial-gradient(circle at 24% 18%, rgba(86,245,39,0.16), transparent 28%),
+        radial-gradient(circle at 76% 80%, rgba(77,163,255,0.13), transparent 30%),
+        url("classic/texpages/tertilesc3hw-128/tile-21.png");
+      background-size: auto, auto, auto, 128px 128px;
+      text-shadow: 0 2px 10px #000;
+    }
+    #overlayMsg.hidden { display:none; }
+    body.loading-map #overlayMsg {
+      display: none !important;
+      pointer-events: none;
+    }
+    .welcome-panel {
+      position: relative;
+      z-index: 1;
+      width: min(860px, calc(100vw - 40px));
+      padding: 34px 36px 30px;
+      border: 1px solid rgba(128, 154, 184, 0.28);
+      border-radius: 8px;
+      background:
+        linear-gradient(180deg, rgba(22,32,46,0.9), rgba(16,24,36,0.94)),
+        linear-gradient(90deg, transparent, rgba(86,245,39,0.07), transparent);
+      box-shadow: 0 22px 70px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.05);
+      text-align: center;
+      box-sizing: border-box;
+    }
+    .welcome-title {
+      margin: 0 0 8px;
+      color: #f4f8fb;
+      font-size: 2.7rem;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    .welcome-subtitle {
+      margin: 0 auto 24px;
+      max-width: 620px;
+      color: #b8c7d7;
+      font-size: 1rem;
+      line-height: 1.4;
+      text-shadow: none;
+    }
+    .welcome-actions {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .overlay-btn{
+      display:inline-block; text-align:center; font-size:1rem; background:#283445; color:#fff;
+      border:1px solid #435066; border-radius:3px; padding:10px 14px; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.3); user-select:none;
+      box-sizing:border-box;
+      text-shadow:none;
+    }
+    .overlay-btn:hover{ filter:brightness(1.12); border-color:#6CF527; }
+    .overlay-btn.primary{ background:#56f527; color:#061008; border-color:#56f527; }
+    .welcome-local-save {
+      display:none;
+      margin: 0 auto;
+      max-width: 520px;
+    }
+    .welcome-local-label {
+      margin: 0 0 6px;
+      color: #b8c7d7;
+      font-size: 0.92rem;
+      text-align: left;
+      text-shadow: none;
+    }
+    #overlayLocalSaveSelect {
+      width:100%;
+      font-size:16px;
+      margin-bottom:8px;
+      background:#283445;
+      color:var(--fg);
+      border:1px solid #435066;
+      padding:7px 8px;
+      box-sizing:border-box;
+    }
+    .welcome-loading-hint {
+      margin-top: 14px;
+      color: #9fb1c2;
+      font-size: 0.9rem;
+      text-shadow: none;
+    }
+    @media (max-width: 760px) {
+      .welcome-panel { padding: 26px 18px 24px; }
+      .welcome-title { font-size: 2rem; }
+      .welcome-actions { grid-template-columns: 1fr; }
+    }
+    /* Hide panel while overlay or loading progress is shown */
+      body.overlay-open #editPanel,
+      body.loading-map #editPanel {
+        display:none;
+      }
+
+      input[type="range"] {
+        min-width: 0;
+      }
+
+    </style>
+  </head>
+  <body class="overlay-open">
+  <div id="menuBar">
+    <button type="button" class="tab-btn" data-tab="file">File</button>
+    <button type="button" class="tab-btn" data-tab="settings">Settings</button>
+    <button type="button" class="tab-btn" data-tab="view">Copy</button>
+    <button type="button" class="tab-btn" data-tab="textures">Tiles</button>
+    <button type="button" class="tab-btn" data-tab="height">Height</button>
+    <button type="button" class="tab-btn" data-tab="size">Resize</button>
+    <button type="button" class="tab-btn" data-tab="objects">Structures</button>
+    <button type="button" class="tab-btn" data-tab="droids">Droids</button>
+    <button type="button" class="tab-btn" data-tab="features">Objects</button>
+    <button type="button" class="tab-btn" data-tab="templates">Templates</button>
+    <button type="button" class="tab-btn" data-tab="about">About</button>
+    <button type="button" id="undoBtn" class="tab-btn" disabled title="Undo (Ctrl+Z)">↺</button>
+    <button type="button" id="redoBtn" class="tab-btn" disabled title="Redo (Ctrl+Y)">↻</button>
+  </div>
+  <div id="uiBar" class="hidden">
+    <span id="mapFilename"></span>
+  </div>
+
+  <!-- Top editor panel -->
+  <div id="editPanel">
+
+    <!-- FILE TAB -->
+    <div id="filePanel" class="panel">
+      <div class="panel-box">
+        <div class="show-hide-title">Map file</div>
+        <div class="file-actions">
+          <button type="button" id="fileNewBtn" class="action-btn">New map</button>
+          <button type="button" id="fileServerBtn" class="action-btn">Browse server maps</button>
+          <button type="button" id="fileLoadBtn" class="action-btn">Load map</button>
+          <button type="button" id="fileOfficialBtn" class="action-btn">Download official maps</button>
+          <div class="file-actions-separator"></div>
+          <button type="button" id="fileValidateBtn" class="action-btn">Validate map</button>
+          <label class="file-name-field" for="fileMapNameInput">
+            Map name
+            <input type="text" id="fileMapNameInput" value="Untitled Map" autocomplete="off" spellcheck="false">
+          </label>
+          <button type="button" id="fileSaveBtn" class="action-btn">Save map</button>
+          <div class="file-actions-separator"></div>
+          <select id="localSaveSelect" size="5" style="width:100%; font-size:0.85rem;"></select>
+          <div style="display:flex; gap:4px;">
+            <button type="button" id="localSaveLoadBtn" class="action-btn">Load local</button>
+            <button type="button" id="localSaveDeleteBtn" class="action-btn">Delete</button>
+          </div>
+          <div id="localSaveStatus" style="font-size:0.75rem; color:#8aa; line-height:1.3;"></div>
+        </div>
+        <div id="fileStatus">Load .wz, .map, or JSON maps. Save exports .wz.</div>
+      </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div id="settingsPanel" class="panel" style="display:none;">
+      <div class="panel-box">
+        <div class="show-hide-title">Settings</div>
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <button type="button" class="action-btn active" data-settings-mode="view" style="flex:1;">View</button>
+          <button type="button" class="action-btn" data-settings-mode="map" style="flex:1;">Map info</button>
+          <button type="button" class="action-btn" data-settings-mode="my" style="flex:1;">My info</button>
+        </div>
+        <div id="settingsViewPanel">
+          <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+            <label for="rightClickActionSelect" style="margin:0;">Right click:</label>
+            <select id="rightClickActionSelect" style="flex:1;">
+              <option value="camera" selected>Camera rotate</option>
+              <option value="browser">Browser menu</option>
+            </select>
+          </div>
+          <label class="toggle-label" style="font-size:0.85rem; margin-top:8px;">
+            <input type="checkbox" id="minimapVisibilityToggle" checked>
+            MiniMap
+          </label>
+          <label class="toggle-label" style="font-size:0.85rem; margin-top:6px;">
+            <input type="checkbox" id="compassVisibilityToggle" checked>
+            Compass
+          </label>
+          <label class="toggle-label" style="font-size:0.85rem; margin-top:6px;">
+            <input type="checkbox" id="localAutosaveToggle" checked>
+            Local autosave
+          </label>
+          <label class="toggle-label" style="font-size:0.85rem; margin-top:6px;">
+            <input type="checkbox" id="buildPreviewVisibilityToggle" checked>
+            Build preview
+          </label>
+          <label class="toggle-label" style="font-size:0.85rem; margin-top:6px;">
+            <input type="checkbox" id="tileGridVisibilityToggle">
+            Tile grid
+          </label>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+            <label for="previewQualitySelect" style="margin:0;">Preview quality:</label>
+            <select id="previewQualitySelect" style="flex:1;">
+              <option value="low">Low</option>
+              <option value="normal" selected>Normal</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:8px;">
+            <label for="tileQualitySelect" style="margin:0;">Tile quality:</label>
+            <select id="tileQualitySelect" style="flex:1;">
+              <option value="low">Low</option>
+              <option value="normal" selected>Normal</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <div style="display:grid; gap:6px; margin-top:10px;">
+            <label for="mapBrightnessInput" style="margin:0; font-size:0.85rem;">Brightness:</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="number" id="mapBrightnessInput" min="50" max="150" step="5" value="100" style="width:64px;">
+              <input type="range" id="mapBrightnessSlider" min="50" max="150" step="5" value="100" style="flex:1;">
+            </div>
+            <label for="cameraSpeedInput" style="margin:0; font-size:0.85rem;">Camera speed:</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="number" id="cameraSpeedInput" min="0.25" max="3" step="0.25" value="1" style="width:64px;">
+              <input type="range" id="cameraSpeedSlider" min="0.25" max="3" step="0.25" value="1" style="flex:1;">
+            </div>
+            <label for="zoomSpeedInput" style="margin:0; font-size:0.85rem;">Zoom speed:</label>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="number" id="zoomSpeedInput" min="0.25" max="3" step="0.25" value="1" style="width:64px;">
+              <input type="range" id="zoomSpeedSlider" min="0.25" max="3" step="0.25" value="1" style="flex:1;">
+            </div>
+          </div>
+        </div>
+        <div id="settingsMapInfoPanel" style="display:none;">
+          <div style="display:grid; gap:5px; margin-top:10px;">
+            <label for="settingsMapNameInput" style="margin:0; font-size:0.85rem;">Map name:</label>
+            <input type="text" id="settingsMapNameInput" autocomplete="off" spellcheck="false">
+            <label for="settingsMapAuthorInput" style="margin:0; font-size:0.85rem;">Author:</label>
+            <input type="text" id="settingsMapAuthorInput" autocomplete="off" spellcheck="false">
+            <label for="settingsMapCreatedInput" style="margin:0; font-size:0.85rem;">Created date:</label>
+            <input type="date" id="settingsMapCreatedInput">
+            <label for="settingsMapTypeInput" style="margin:0; font-size:0.85rem;">Map type:</label>
+            <select id="settingsMapTypeInput">
+              <option value="normal">Normal</option>
+              <option value="script-generated">Script-Generated</option>
+            </select>
+            <label for="settingsMapDescriptionInput" style="margin:0; font-size:0.85rem;">Description / README:</label>
+            <textarea id="settingsMapDescriptionInput" rows="4" autocomplete="off" spellcheck="true" style="resize:vertical;"></textarea>
+            <label for="settingsMapScavengersInput" style="margin:0; font-size:0.85rem;">Scavengers:</label>
+            <select id="settingsMapScavengersInput">
+              <option value="">Unknown</option>
+              <option value="0">No</option>
+              <option value="1">Yes</option>
+            </select>
+            <label for="settingsMapSlotsInput" style="margin:0; font-size:0.85rem;">Recommended players / slots:</label>
+            <input type="number" id="settingsMapSlotsInput" min="1" max="10" step="1">
+            <label for="settingsMapUploadedInput" style="margin:0; font-size:0.85rem;">Original uploaded date:</label>
+            <input type="date" id="settingsMapUploadedInput">
+            <label for="settingsMapVersionInput" style="margin:0; font-size:0.85rem;">Version:</label>
+            <input type="text" id="settingsMapVersionInput" autocomplete="off" spellcheck="false">
+            <label for="settingsMapTagsInput" style="margin:0; font-size:0.85rem;">Tags:</label>
+            <input type="text" id="settingsMapTagsInput" autocomplete="off" spellcheck="false">
+            <label for="settingsMapLicenseInput" style="margin:0; font-size:0.85rem;">License:</label>
+            <select id="settingsMapLicenseInput">
+              <option value="">Unknown</option>
+              <option value="CC0-1.0">CC0-1.0</option>
+              <option value="CC-BY-4.0">CC-BY-4.0</option>
+              <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
+              <option value="GPL-2.0-or-later">GPL-2.0-or-later</option>
+              <option value="GPL-3.0-or-later">GPL-3.0-or-later</option>
+              <option value="MIT">MIT</option>
+            </select>
+            <label for="settingsMapSourceInput" style="margin:0; font-size:0.85rem;">Source:</label>
+            <input type="text" id="settingsMapSourceInput" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+        <div id="settingsMyInfoPanel" style="display:none;">
+          <div style="display:grid; gap:5px; margin-top:10px;">
+            <label for="settingsMyAuthorInput" style="margin:0; font-size:0.85rem;">My name / author:</label>
+            <input type="text" id="settingsMyAuthorInput" autocomplete="off" spellcheck="false">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label for="settingsMyLicenseInput" style="margin:0; font-size:0.85rem;">Default license:</label>
+              <button type="button" id="licenseHelpBtn" class="action-btn" title="License help" style="width:28px; min-width:28px; height:24px; padding:0; line-height:1;">?</button>
+            </div>
+            <select id="settingsMyLicenseInput">
+              <option value="">Unknown</option>
+              <option value="CC0-1.0">CC0-1.0</option>
+              <option value="CC-BY-4.0">CC-BY-4.0</option>
+              <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
+              <option value="GPL-2.0-or-later">GPL-2.0-or-later</option>
+              <option value="GPL-3.0-or-later">GPL-3.0-or-later</option>
+              <option value="MIT">MIT</option>
+            </select>
+            <label for="settingsMySourceInput" style="margin:0; font-size:0.85rem;">My source / page:</label>
+            <input type="text" id="settingsMySourceInput" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+        <button type="button" id="resetSettingsBtn" class="action-btn" style="margin-top:10px; width:100%;">Reset settings</button>
+      </div>
+    </div>
+
+    <!-- VIEW TAB -->
+    <div id="viewPanel" class="panel">
+      <div style="margin-bottom:4px; line-height:1.4;">
+        <div id="viewSelectionInfo" class="panel-box" style="font-size:0.8rem; color:#ccd; line-height:1.35; white-space:pre-line;">Mouse1 click: inspect one map object.</div>
+        <div id="viewSelectionFilters" class="panel-box" style="margin-top:8px;">
+          <div style="font-size:0.8rem; color:#ccd; margin-bottom:5px;">Select types:</div>
+          <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px;">
+            <label class="toggle-label" style="font-size:0.8rem;">
+              <input type="checkbox" id="viewSelectStructures" checked>
+              Structures
+            </label>
+            <label class="toggle-label" style="font-size:0.8rem;">
+              <input type="checkbox" id="viewSelectDroids" checked>
+              Droids
+            </label>
+            <label class="toggle-label" style="font-size:0.8rem;">
+              <input type="checkbox" id="viewSelectObjects" checked>
+              Objects
+            </label>
+            <label class="toggle-label" style="font-size:0.8rem;">
+              <input type="checkbox" id="viewSelectTiles" checked>
+              Tiles
+            </label>
+            <label class="toggle-label" style="font-size:0.8rem;">
+              <input type="checkbox" id="viewSelectHeight" checked>
+              Height
+            </label>
+          </div>
+        </div>
+        <div class="panel-box" data-view-bulk-controls style="display:none; margin-top:8px;">
+          <div data-view-bulk-summary style="font-size:0.8rem; color:#ccd; line-height:1.35; white-space:pre-line;"></div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <label style="margin:0; font-size:0.8rem;">Owner:</label>
+            <select data-view-bulk-player-select style="flex:1; font-size:0.85rem;"></select>
+          </div>
+          <div style="display:grid; grid-template-columns:0.85fr 1.3fr 0.85fr; gap:6px; margin-top:6px;">
+            <button type="button" class="action-btn" data-view-bulk-action="copy">Copy</button>
+            <button type="button" class="action-btn" data-view-bulk-action="template">Create template</button>
+            <button type="button" class="action-btn" data-view-bulk-action="delete">Delete</button>
+          </div>
+          <div data-copy-placement-controls style="display:none; margin-top:6px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="margin:0; font-size:0.8rem;">Copy owner:</label>
+              <select data-copy-placement-player-select style="flex:1; font-size:0.85rem;"></select>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+              <label style="margin:0; font-size:0.8rem;">Copy rotation:</label>
+              <button type="button" class="rotate-btn" data-copy-placement-rotate="1">&#10226;</button>
+              <button type="button" class="rotate-btn" data-copy-placement-rotate="3">&#10227;</button>
+              <span data-copy-placement-rotation-display style="min-width:32px; text-align:center; font-size:0.85rem;">0&deg;</span>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr; gap:6px; margin-top:6px;">
+            <button type="button" class="action-btn" data-view-bulk-action="clear">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TILES TAB -->
+    <div id="texturesPanel" class="panel">
+      <div style="margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+        <label for="tilesetSelect" style="margin:0;">Tileset:</label>
+        <select id="tilesetSelect" style="flex:1;"></select>
+      </div>
+      <div class="panel-box">
+        <div id="tileBrushControls" style="display:none; flex-direction:column; align-items:stretch; gap:6px; margin-top:4px; margin-bottom:4px;">
+          <div class="toggle-grid" style="grid-template-columns:repeat(4, minmax(0, 1fr));">
+            <input type="radio" id="tileBrushShapeSquare" name="tileBrushShape" value="square" class="toggle-btn-input" checked>
+            <label for="tileBrushShapeSquare" class="toggle-btn">Square</label>
+            <input type="radio" id="tileBrushShapeCircle" name="tileBrushShape" value="circle" class="toggle-btn-input">
+            <label for="tileBrushShapeCircle" class="toggle-btn">Circle</label>
+            <input type="radio" id="tileBrushShapeDiamond" name="tileBrushShape" value="diamond" class="toggle-btn-input">
+            <label for="tileBrushShapeDiamond" class="toggle-btn">Diamond</label>
+            <input type="radio" id="tileBrushShapeLine" name="tileBrushShape" value="line" class="toggle-btn-input">
+            <label for="tileBrushShapeLine" class="toggle-btn">Line</label>
+          </div>
+          <div class="toggle-grid" style="grid-template-columns:minmax(0, 1fr);">
+            <input type="checkbox" id="tileBrushSmartTiles" class="toggle-btn-input">
+            <label for="tileBrushSmartTiles" class="toggle-btn">Smart Tiles</label>
+          </div>
+          <div id="tileBrushSmartPresetControls" class="toggle-grid" style="display:none; grid-template-columns:repeat(2, minmax(0, 1fr));">
+            <input type="checkbox" id="tileBrushRoads" class="toggle-btn-input">
+            <label for="tileBrushRoads" class="toggle-btn">Roads</label>
+            <input type="checkbox" id="tileBrushWater" class="toggle-btn-input">
+            <label for="tileBrushWater" class="toggle-btn">Water</label>
+            <button type="button" class="action-btn" data-smart-tile-preset="sand">Sand</button>
+            <button type="button" class="action-btn" data-smart-tile-preset="sand_grass">Sand grass</button>
+            <button type="button" class="action-btn" data-smart-tile-preset="baked_sand">Baked sand</button>
+            <button type="button" class="action-btn" data-smart-tile-preset="red_sand">Red sand</button>
+            <button type="button" class="action-btn" data-smart-tile-preset="plates">Plates</button>
+            <button type="button" class="action-btn" data-smart-tile-preset="grass">Grass</button>
+          </div>
+          <div id="tileBrushRoadOptionControls" style="display:none; flex-direction:column; align-items:stretch; gap:6px;">
+            <select id="tileBrushRoadFamily" aria-label="Road type">
+              <option value="a_roads">A roads</option>
+              <option value="b_roads">B roads</option>
+            </select>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="tileBrushRoadExtraTile">
+              <label for="tileBrushRoadExtraTile" style="margin:0;">Extra tile</label>
+            </div>
+          </div>
+          <div id="tileBrushWaterOptionControls" style="display:none; flex-direction:column; align-items:stretch; gap:6px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="tileBrushWaterExtraTile">
+              <label for="tileBrushWaterExtraTile" style="margin:0;">Extra tile</label>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label for="tileMirrorModeSelect" style="margin:0; white-space:nowrap;">Mirror:</label>
+            <select id="tileMirrorModeSelect" style="flex:1;">
+              <option value="off">Off</option>
+              <option value="vertical">Vertical</option>
+              <option value="horizontal">Horizontal</option>
+              <option value="both">Both</option>
+            </select>
+          </div>
+          <div id="tileBrushSizeControls" style="display:flex; align-items:center; gap:6px;">
+            <label for="brushSizeInput" style="margin:0; white-space:nowrap;">Size:</label>
+            <div class="number-stepper">
+              <button type="button" class="step-btn" data-step-target="brushSizeInput" data-step-delta="-1">-</button>
+              <input type="number" id="brushSizeInput" value="1" min="1" max="255" step="1">
+              <button type="button" class="step-btn" data-step-target="brushSizeInput" data-step-delta="1">+</button>
+            </div>
+            <input type="range" id="brushSizeSlider" min="1" max="255" value="1" style="flex:1;">
+          </div>
+        </div>
+        <div id="tileSelectControls" style="display:none; grid-template-columns:1fr 1fr; align-items:center; gap:6px; margin-top:4px; margin-bottom:4px;">
+          <button type="button" id="tileApplyBtn" class="action-btn" disabled>Apply</button>
+          <button type="button" id="tileCancelBtn" class="action-btn" disabled>Cancel</button>
+        </div>
+        <div id="tileViewSelectionControls" style="display:none; grid-template-columns:0.9fr 1.3fr; align-items:center; gap:6px; margin-top:4px; margin-bottom:4px;">
+          <button type="button" id="tileCopyBtn" class="action-btn" disabled>Copy area</button>
+          <button type="button" id="tileTemplateBtn" class="action-btn" disabled>Create template</button>
+          <button type="button" id="tileViewSelectionCancelBtn" class="action-btn" style="grid-column:1 / -1;" disabled>Cancel</button>
+        </div>
+        <div id="tilePaletteControls" style="display:flex; align-items:center; gap:6px; margin-bottom:4px; min-width:0;">
+          <button id="rotateLeft" class="rotate-btn">⟲</button>
+          <button id="rotateRight" class="rotate-btn">⟳</button>
+          <button id="tileFlip" class="rotate-btn" type="button" title="Flip tile horizontally" aria-pressed="false">⇋</button>
+          <span id="selectedRotationDisplay" style="min-width:24px; text-align:center; font-size:0.9rem;">0°</span>
+          <span>Tile: <span id="selectedTileIdDisplay">0</span></span>
+          <span id="selectedTileTypeLabel" style="color:#cfe8ff;">Type:</span>
+          <select id="tileTypeSelect"></select>
+        </div>
+        <div id="texturePalette" style="display:flex; flex-wrap:wrap; gap:2px; justify-content:flex-start;"></div>
+      </div>
+      <div id="tileInfoSlot">
+        <div id="tileOptions" class="tile-options-box" style="display:block;">
+          <div style="text-align:center; margin-bottom:6px;">Tiles info</div>
+          <input type="checkbox" id="showTileInfo" class="toggle-btn-input" checked>
+          <div class="toggle-grid">
+            <input type="checkbox" id="showPanelIds" class="toggle-btn-input" checked>
+            <label for="showPanelIds" class="toggle-btn">ID</label>
+            <input type="checkbox" id="displayTileTypes" class="toggle-btn-input">
+            <label for="displayTileTypes" class="toggle-btn">Type</label>
+          </div>
+          <div id="tileInfoButtons" class="toggle-grid" style="display:none; margin-top:4px;">
+            <input type="checkbox" id="showTileId" class="toggle-btn-input">
+            <label for="showTileId" class="toggle-btn">ID on map</label>
+            <input type="checkbox" id="showTileTypesOnMap" class="toggle-btn-input">
+            <label for="showTileTypesOnMap" class="toggle-btn">Type on map</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HEIGHT TAB -->
+    <div id="heightPanel" class="panel" style="display:none;">
+      <div id="heightViewInfo" class="panel-box" style="display:none; white-space:pre-line; margin-bottom:6px;">No height selected.</div>
+      <div id="heightViewSelectionControls" style="display:none; grid-template-columns:0.9fr 1.3fr; align-items:center; gap:6px; margin-top:4px; margin-bottom:4px;">
+        <button type="button" id="heightCopyBtn" class="action-btn" disabled>Copy area</button>
+        <button type="button" id="heightTemplateBtn" class="action-btn" disabled>Create template</button>
+        <button type="button" id="heightViewSelectionCancelBtn" class="action-btn" style="grid-column:1 / -1;" disabled>Cancel</button>
+      </div>
+      <div id="heightBrushControls" style="display:none; flex-direction:column; align-items:stretch; gap:6px; margin-top:4px;">
+        <div class="toggle-grid" style="grid-template-columns:repeat(4, minmax(0, 1fr));">
+          <input type="radio" id="heightBrushShapeSquare" name="heightBrushShape" value="square" class="toggle-btn-input" checked>
+          <label for="heightBrushShapeSquare" class="toggle-btn">Square</label>
+          <input type="radio" id="heightBrushShapeCircle" name="heightBrushShape" value="circle" class="toggle-btn-input">
+          <label for="heightBrushShapeCircle" class="toggle-btn">Circle</label>
+          <input type="radio" id="heightBrushShapeDiamond" name="heightBrushShape" value="diamond" class="toggle-btn-input">
+          <label for="heightBrushShapeDiamond" class="toggle-btn">Diamond</label>
+          <input type="radio" id="heightBrushShapeLine" name="heightBrushShape" value="line" class="toggle-btn-input">
+          <label for="heightBrushShapeLine" class="toggle-btn">Line</label>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label for="heightMirrorModeSelect" style="margin:0; white-space:nowrap;">Mirror:</label>
+          <select id="heightMirrorModeSelect" style="flex:1;">
+            <option value="off">Off</option>
+            <option value="vertical">Vertical</option>
+            <option value="horizontal">Horizontal</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <label for="heightBrushSizeInput" style="margin:0; white-space:nowrap;">Size:</label>
+          <div class="number-stepper">
+            <button type="button" class="step-btn" data-step-target="heightBrushSizeInput" data-step-delta="-1">-</button>
+            <input type="number" id="heightBrushSizeInput" value="1" min="1" max="255" step="1">
+            <button type="button" class="step-btn" data-step-target="heightBrushSizeInput" data-step-delta="1">+</button>
+          </div>
+          <input type="range" id="heightBrushSizeSlider" min="1" max="255" value="1" style="flex:1;">
+        </div>
+        <div id="heightRotationControls" style="display:none; align-items:center; gap:6px;">
+          <button type="button" id="heightRotateLeft" class="rotate-btn">⟲</button>
+          <button type="button" id="heightRotateRight" class="rotate-btn">⟳</button>
+          <span id="heightRotationDisplay" style="min-width:36px; text-align:center; font-size:0.9rem;">0°</span>
+        </div>
+        <div class="toggle-grid" style="grid-template-columns:repeat(4, minmax(0, 1fr));">
+          <input type="radio" id="heightBrushModeSet" name="heightBrushAction" value="set" class="toggle-btn-input" checked>
+          <label for="heightBrushModeSet" class="toggle-btn">Paint</label>
+          <input type="radio" id="heightBrushModeRaise" name="heightBrushAction" value="raise" class="toggle-btn-input">
+          <label for="heightBrushModeRaise" class="toggle-btn">Raise</label>
+          <input type="radio" id="heightBrushModeLower" name="heightBrushAction" value="lower" class="toggle-btn-input">
+          <label for="heightBrushModeLower" class="toggle-btn">Lower</label>
+          <input type="radio" id="heightBrushModeSmooth" name="heightBrushAction" value="smooth" class="toggle-btn-input">
+          <label for="heightBrushModeSmooth" class="toggle-btn">Smooth</label>
+        </div>
+      </div>
+      <div id="heightValueControls" style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+        <label for="heightValueInput" id="heightValueLabel" style="margin:0;">Height</label>
+        <div class="number-stepper">
+          <button type="button" class="step-btn" data-step-target="heightValueInput" data-step-delta="-1">-</button>
+          <input type="number" id="heightValueInput" value="0" min="0" max="255" step="1">
+          <button type="button" class="step-btn" data-step-target="heightValueInput" data-step-delta="1">+</button>
+        </div>
+        <input type="range" id="heightSlider" min="0" max="255" value="0" style="flex:1;">
+      </div>
+      <div id="heightPresets" style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+        <button type="button" class="action-btn height-preset" data-val="0">0</button>
+        <button type="button" class="action-btn height-preset" data-val="16">16</button>
+        <button type="button" class="action-btn height-preset" data-val="32">32</button>
+        <button type="button" class="action-btn height-preset" data-val="64">64</button>
+        <button type="button" class="action-btn height-preset" data-val="96">96</button>
+        <button type="button" class="action-btn height-preset" data-val="128">128</button>
+        <button type="button" class="action-btn height-preset" data-val="192">192</button>
+        <button type="button" class="action-btn height-preset" data-val="255">255</button>
+      </div>
+      <div id="heightSelectControls" style="display:none; justify-content:center; align-items:center; gap:6px; margin-top:4px;">
+        <button type="button" id="heightApplyBtn" class="action-btn" disabled>Apply</button>
+        <button type="button" id="heightCancelBtn" class="action-btn" disabled>Cancel</button>
+      </div>
+      <div id="heightShowHeightsSlot">
+        <button type="button" id="showHeightBtn" class="action-btn" style="width:100%;">Show heights in map</button>
+      </div>
+    </div>
+
+    <!-- SIZE TAB -->
+    <div id="sizePanel" class="panel" style="display:none;">
+      <div class="panel-box">
+        <div class="show-hide-title">Map size</div>
+        <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:4px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label for="sizeXInput" style="margin:0;">Size X</label>
+            <input type="number" id="sizeXInput" min="1" max="255" step="1" value="1" style="width:50px;">
+            <input type="range" id="sizeXSlider" min="1" max="255" value="1" style="flex:1;">
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label for="sizeYInput" style="margin:0;">Size Y</label>
+            <input type="number" id="sizeYInput" min="1" max="255" step="1" value="1" style="width:50px;">
+            <input type="range" id="sizeYSlider" min="1" max="255" value="1" style="flex:1;">
+          </div>
+        </div>
+        <div style="display:flex; gap:4px; margin-top:4px; justify-content:center;">
+          <button type="button" id="applySizeBtn" class="action-btn" disabled>Apply</button>
+          <button type="button" id="resetSizeBtn" class="action-btn">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- OBJECTS TAB -->
+    <div id="objectsPanel" class="panel" style="display:none;">
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <button type="button" id="structureModeView" class="action-btn active" data-structure-mode="view">View</button>
+        <button type="button" id="structureModeBuild" class="action-btn" data-structure-mode="build">Build</button>
+        <button type="button" id="structureModeDelete" class="action-btn" data-structure-mode="delete">Delete</button>
+      </div>
+      <div id="structureBuildControls">
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+        <label for="structureBuildPlayerSelect" style="margin:0; font-size:0.85rem;">Owner:</label>
+        <select id="structureBuildPlayerSelect" style="flex:1; font-size:0.85rem;"></select>
+      </div>
+      <div style="margin-bottom:4px;">
+        <label for="structureFilter" style="margin:0; display:block;">Type:</label>
+        <select id="structureFilter" style="width:100%; font-size:0.9rem;"></select>
+      </div>
+      <div style="margin-bottom:4px;">
+        <label for="structureSelect" style="margin:0; display:block;">Structure:</label>
+        <input type="search" id="structureSearch" placeholder="Search structures..." autocomplete="off" spellcheck="false" style="width:100%; box-sizing:border-box; margin-bottom:4px; font-size:0.9rem;">
+        <select id="structureSelect" size="16" style="width:100%; font-size:0.9rem;"></select>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+        <button id="structRotateLeft" class="rotate-btn">⟲</button>
+        <button id="structRotateRight" class="rotate-btn">⟳</button>
+        <span id="structureNameLabel" style="flex:1; font-size:0.85rem; color:#ccd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+      </div>
+      <div id="structurePreview" style="width:100%; height:160px; background:#1a2735; border:1px solid #435066; border-radius:4px; margin-bottom:4px;"></div>
+      </div>
+      <div id="structureInfo" style="display:none; margin:6px 0 0 0; font-size:0.8rem; color:#ccd; line-height:1.35; white-space:pre-line;"></div>
+      <div id="viewBulkSelectionControls" class="panel-box" data-view-bulk-controls style="display:none; margin-top:8px;">
+        <div id="viewBulkSelectionSummary" data-view-bulk-summary style="font-size:0.8rem; color:#ccd; line-height:1.35; white-space:pre-line;"></div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+          <label for="viewBulkPlayerSelect" style="margin:0; font-size:0.8rem;">Owner:</label>
+          <select id="viewBulkPlayerSelect" data-view-bulk-player-select style="flex:1; font-size:0.85rem;"></select>
+        </div>
+        <div style="display:grid; grid-template-columns:0.85fr 1.3fr 0.85fr; gap:6px; margin-top:6px;">
+          <button type="button" id="viewBulkCopyBtn" class="action-btn" data-view-bulk-action="copy">Copy</button>
+          <button type="button" id="viewBulkTemplateBtn" class="action-btn" data-view-bulk-action="template">Create template</button>
+          <button type="button" id="viewBulkDeleteBtn" class="action-btn" data-view-bulk-action="delete">Delete</button>
+        </div>
+        <div data-copy-placement-controls style="display:none; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="margin:0; font-size:0.8rem;">Copy owner:</label>
+            <select data-copy-placement-player-select style="flex:1; font-size:0.85rem;"></select>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <label style="margin:0; font-size:0.8rem;">Copy rotation:</label>
+            <button type="button" class="rotate-btn" data-copy-placement-rotate="1">&#10226;</button>
+            <button type="button" class="rotate-btn" data-copy-placement-rotate="3">&#10227;</button>
+            <span data-copy-placement-rotation-display style="min-width:32px; text-align:center; font-size:0.85rem;">0&deg;</span>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:6px; margin-top:6px;">
+          <button type="button" id="viewBulkClearBtn" class="action-btn" data-view-bulk-action="clear">Cancel</button>
+        </div>
+      </div>
+      <div id="structurePlayerControls" style="display:none; align-items:center; gap:6px; margin-top:6px;">
+        <label for="structurePlayerSelect" style="margin:0; font-size:0.8rem;">Owner:</label>
+        <select id="structurePlayerSelect" style="flex:1; font-size:0.85rem;"></select>
+      </div>
+      <div id="structureRotationControls" style="display:none; align-items:center; gap:6px; margin-top:6px;">
+        <label for="structureRotationInput" style="margin:0; font-size:0.8rem;">Rotation:</label>
+        <button type="button" id="structureViewRotateLeft" class="rotate-btn">⟲</button>
+        <button type="button" id="structureViewRotateRight" class="rotate-btn">⟳</button>
+        <input type="number" id="structureRotationInput" min="0" max="359" step="1" value="0" style="width:58px; font-size:0.85rem;">
+        <span style="font-size:0.8rem; color:#ccd;">deg</span>
+      </div>
+      <button type="button" id="structureViewDeleteBtn" class="action-btn" style="display:none; margin-top:8px;">Delete structure</button>
+      <button type="button" id="structureViewAddModuleBtn" class="action-btn" style="display:none; margin-top:8px;">Add module</button>
+      <p id="structureModeHint" style="display:none; margin:4px 0 0 0; font-size:0.75rem; color:#8aa;"></p>
+    </div>
+
+    <!-- DROIDS TAB -->
+    <div id="droidsPanel" class="panel" style="display:none;">
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <button type="button" class="action-btn active" data-droid-mode="view">View</button>
+        <button type="button" class="action-btn" data-droid-mode="build">Build</button>
+        <button type="button" class="action-btn" data-droid-mode="delete">Delete</button>
+      </div>
+      <div id="droidBuildControls" style="display:none;">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <label for="droidPlayerSelect" style="margin:0; font-size:0.85rem;">Owner:</label>
+          <select id="droidPlayerSelect" style="flex:1; font-size:0.85rem;"></select>
+        </div>
+        <div style="margin-bottom:4px;">
+          <label for="droidTemplateSelect" style="margin:0; display:block;">Droid:</label>
+          <input type="search" id="droidSearch" placeholder="Search droids..." autocomplete="off" spellcheck="false" style="width:100%; box-sizing:border-box; margin-bottom:4px; font-size:0.9rem;">
+          <select id="droidTemplateSelect" style="width:100%; font-size:0.9rem;"></select>
+        </div>
+        <label style="display:flex; align-items:center; gap:6px; margin:0 0 4px 0; font-size:0.85rem;">
+          <input type="checkbox" id="droidShowScavengers" style="margin:0;">
+          Show scavengers
+        </label>
+        <div style="margin-bottom:4px;">
+          <label for="droidBodySelect" style="margin:0; display:block; font-size:0.85rem;">Body:</label>
+          <select id="droidBodySelect" style="width:100%; font-size:0.85rem;"></select>
+        </div>
+        <div style="margin-bottom:4px;">
+          <label for="droidPropulsionSelect" style="margin:0; display:block; font-size:0.85rem;">Propulsion:</label>
+          <select id="droidPropulsionSelect" style="width:100%; font-size:0.85rem;"></select>
+        </div>
+        <div style="margin-bottom:4px;">
+          <label for="droidWeaponSelect" style="margin:0; display:block; font-size:0.85rem;">Weapon/tool:</label>
+          <select id="droidWeaponSelect" style="width:100%; font-size:0.85rem;"></select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <label for="droidRotationInput" style="margin:0; font-size:0.85rem;">Rotation:</label>
+          <button type="button" id="droidRotateLeft" class="rotate-btn">⟲</button>
+          <button type="button" id="droidRotateRight" class="rotate-btn">⟳</button>
+          <input type="number" id="droidRotationInput" min="0" max="359" step="1" value="0" style="width:58px; font-size:0.85rem;">
+          <span style="font-size:0.8rem; color:#ccd;">deg</span>
+        </div>
+        <div id="droidPreview" style="width:100%; height:180px; background:#1a2735; border:1px solid #435066; border-radius:4px; margin:6px 0 4px;"></div>
+      </div>
+      <div id="droidInfo" style="margin:4px 0 0 0; font-size:0.85rem; color:#ccd; line-height:1.35; white-space:pre-line;">No droid selected.</div>
+      <div class="panel-box" data-view-bulk-controls style="display:none; margin-top:8px;">
+        <div data-view-bulk-summary style="font-size:0.8rem; color:#ccd; line-height:1.35; white-space:pre-line;"></div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+          <label style="margin:0; font-size:0.8rem;">Owner:</label>
+          <select data-view-bulk-player-select style="flex:1; font-size:0.85rem;"></select>
+        </div>
+        <div style="display:grid; grid-template-columns:0.85fr 1.3fr 0.85fr; gap:6px; margin-top:6px;">
+          <button type="button" class="action-btn" data-view-bulk-action="copy">Copy</button>
+          <button type="button" class="action-btn" data-view-bulk-action="template">Create template</button>
+          <button type="button" class="action-btn" data-view-bulk-action="delete">Delete</button>
+        </div>
+        <div data-copy-placement-controls style="display:none; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="margin:0; font-size:0.8rem;">Copy owner:</label>
+            <select data-copy-placement-player-select style="flex:1; font-size:0.85rem;"></select>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <label style="margin:0; font-size:0.8rem;">Copy rotation:</label>
+            <button type="button" class="rotate-btn" data-copy-placement-rotate="1">&#10226;</button>
+            <button type="button" class="rotate-btn" data-copy-placement-rotate="3">&#10227;</button>
+            <span data-copy-placement-rotation-display style="min-width:32px; text-align:center; font-size:0.85rem;">0&deg;</span>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:6px; margin-top:6px;">
+          <button type="button" class="action-btn" data-view-bulk-action="clear">Cancel</button>
+        </div>
+      </div>
+      <div id="droidViewPlayerControls" style="display:none; align-items:center; gap:6px; margin-top:6px;">
+        <label for="droidViewPlayerSelect" style="margin:0; font-size:0.85rem;">Owner:</label>
+        <select id="droidViewPlayerSelect" style="flex:1; font-size:0.85rem;"></select>
+      </div>
+      <button type="button" id="droidViewDeleteBtn" class="action-btn" style="display:none; margin-top:8px;">Delete droid</button>
+      <p id="droidModeHint" style="margin:6px 0 0 0; font-size:0.75rem; color:#8aa;"></p>
+    </div>
+
+    <!-- FEATURE OBJECTS TAB -->
+    <div id="featuresPanel" class="panel" style="display:none;">
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <button type="button" class="action-btn active" data-feature-mode="view">View</button>
+        <button type="button" class="action-btn" data-feature-mode="build">Build</button>
+        <button type="button" class="action-btn" data-feature-mode="delete">Delete</button>
+      </div>
+      <div id="featureBuildControls" style="display:none;">
+        <div style="margin-bottom:4px;">
+          <label for="featureFilter" style="margin:0; display:block;">Type:</label>
+          <select id="featureFilter" style="width:100%; font-size:0.9rem;"></select>
+        </div>
+        <div style="margin-bottom:4px;">
+          <label for="featureSelect" style="margin:0; display:block;">Object:</label>
+          <input type="search" id="featureSearch" placeholder="Search objects..." autocomplete="off" spellcheck="false" style="width:100%; box-sizing:border-box; margin-bottom:4px; font-size:0.9rem;">
+          <select id="featureSelect" size="16" style="width:100%; font-size:0.9rem;"></select>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
+          <button type="button" id="featureRotateLeft" class="rotate-btn">âŸ²</button>
+          <button type="button" id="featureRotateRight" class="rotate-btn">âŸ³</button>
+          <span id="featureNameLabel" style="flex:1; font-size:0.85rem; color:#ccd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+        </div>
+        <div id="featurePreview" style="width:100%; height:160px; background:#1a2735; border:1px solid #435066; border-radius:4px; margin-bottom:4px;"></div>
+      </div>
+      <div id="featureInfo" style="margin:4px 0 0 0; font-size:0.85rem; color:#ccd; line-height:1.35; white-space:pre-line;">No object selected.</div>
+      <div class="panel-box" data-view-bulk-controls style="display:none; margin-top:8px;">
+        <div data-view-bulk-summary style="font-size:0.8rem; color:#ccd; line-height:1.35; white-space:pre-line;"></div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+          <label style="margin:0; font-size:0.8rem;">Owner:</label>
+          <select data-view-bulk-player-select style="flex:1; font-size:0.85rem;"></select>
+        </div>
+        <div style="display:grid; grid-template-columns:0.85fr 1.3fr 0.85fr; gap:6px; margin-top:6px;">
+          <button type="button" class="action-btn" data-view-bulk-action="copy">Copy</button>
+          <button type="button" class="action-btn" data-view-bulk-action="template">Create template</button>
+          <button type="button" class="action-btn" data-view-bulk-action="delete">Delete</button>
+        </div>
+        <div data-copy-placement-controls style="display:none; margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label style="margin:0; font-size:0.8rem;">Copy owner:</label>
+            <select data-copy-placement-player-select style="flex:1; font-size:0.85rem;"></select>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+            <label style="margin:0; font-size:0.8rem;">Copy rotation:</label>
+            <button type="button" class="rotate-btn" data-copy-placement-rotate="1">&#10226;</button>
+            <button type="button" class="rotate-btn" data-copy-placement-rotate="3">&#10227;</button>
+            <span data-copy-placement-rotation-display style="min-width:32px; text-align:center; font-size:0.85rem;">0&deg;</span>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:6px; margin-top:6px;">
+          <button type="button" class="action-btn" data-view-bulk-action="clear">Cancel</button>
+        </div>
+      </div>
+      <button type="button" id="featureViewDeleteBtn" class="action-btn" style="display:none; margin-top:8px;">Delete object</button>
+      <p id="featureModeHint" style="margin:6px 0 0 0; font-size:0.75rem; color:#8aa;"></p>
+    </div>
+
+    <!-- TEMPLATES TAB -->
+    <div id="templatesPanel" class="panel" style="display:none;">
+      <div id="structureTemplatesControls">
+        <div style="margin-bottom:4px;">
+          <label for="structureTemplateSelect" style="margin:0; display:block;">Template:</label>
+          <select id="structureTemplateSelect" size="10" style="width:100%; font-size:0.9rem;"></select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:6px;">
+          <button type="button" id="structureTemplateDeleteBtn" class="action-btn">Delete template</button>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:6px; margin-top:6px;">
+          <button type="button" id="structureTemplateCancelBtn" class="action-btn">Cancel</button>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+          <label for="structureTemplatePlayerSelect" style="margin:0; font-size:0.8rem;">Owner:</label>
+          <select id="structureTemplatePlayerSelect" style="flex:1; font-size:0.85rem;"></select>
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; margin-top:6px;">
+          <label for="structureTemplateRotationDisplay" style="margin:0; font-size:0.8rem;">Rotation:</label>
+          <button type="button" id="structureTemplateRotateLeft" class="rotate-btn">&#10226;</button>
+          <button type="button" id="structureTemplateRotateRight" class="rotate-btn">&#10227;</button>
+          <span id="structureTemplateRotationDisplay" style="min-width:32px; text-align:center; font-size:0.85rem;">0&deg;</span>
+        </div>
+        <p id="structureTemplateInfo" style="margin:6px 0 0 0; font-size:0.75rem; color:#8aa; line-height:1.35; white-space:pre-line;">No templates saved.</p>
+      </div>
+      <div id="tileTemplatesControls" class="panel-box" style="margin-top:8px;">
+        <div style="margin-bottom:4px;">
+          <label for="tileTemplateSelect" style="margin:0; display:block;">Tile template:</label>
+          <select id="tileTemplateSelect" size="6" style="width:100%; font-size:0.9rem;"></select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr; gap:6px;">
+          <button type="button" id="tileTemplateDeleteBtn" class="action-btn">Delete tile template</button>
+          <button type="button" id="tileTemplateCancelBtn" class="action-btn">Cancel tile template</button>
+        </div>
+        <p id="tileTemplateInfo" style="margin:6px 0 0 0; font-size:0.75rem; color:#8aa; line-height:1.35; white-space:pre-line;">No tile templates saved.</p>
+      </div>
+      <div id="templateContextMenu" class="context-menu">
+        <button type="button" class="action-btn" id="templateContextRenameBtn">Rename</button>
+        <button type="button" class="action-btn" id="templateContextDeleteBtn">Delete</button>
+      </div>
+    </div>
+
+    <!-- ABOUT TAB -->
+    <div id="aboutPanel" class="panel" style="display:none;">
+      <div style="display:flex; gap:4px; margin-bottom:6px;">
+        <button type="button" class="action-btn active" data-about-mode="help">Help</button>
+        <button type="button" class="action-btn" data-about-mode="controls">Controls</button>
+        <button type="button" class="action-btn" data-about-mode="about">About</button>
+      </div>
+      <div id="aboutHelpPanel" class="panel-box" style="line-height:1.35;">
+        <div class="show-hide-title">Warzone2100 MapMaker</div>
+        <p style="margin:4px 0 8px 0; color:#ccd;">
+          Need help, found a bug, or have an idea?
+        </p>
+        <a
+          class="action-btn"
+          href="https://github.com/MaWay2000/warzone2100-mapmaker/discussions/1"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="display:block; text-align:center; text-decoration:none; margin-bottom:8px;"
+        >Open Discussions</a>
+        <ul style="margin:0 0 0 18px; padding:0; color:#ccd;">
+          <li>Report bugs</li>
+          <li>Suggest features</li>
+          <li>Ask questions</li>
+          <li>Share maps, screenshots, and mapmaking talk</li>
+        </ul>
+      </div>
+      <div id="aboutControlsPanel" class="panel-box" style="display:none; line-height:1.4;">
+        <p style="margin:0;">Camera controls:</p>
+        <ul style="margin:4px 0 0 20px; padding:0;">
+          <li>Drag with mouse2 to rotate</li>
+          <li>Scroll to zoom in or out</li>
+          <li>Use <strong>WASD</strong> or arrow keys to move</li>
+          <li>Press <strong>R</strong> to reset the view</li>
+        </ul>
+        <p style="margin:8px 0 0 0;">Draw on map:</p>
+        <ul style="margin:4px 0 0 20px; padding:0;">
+          <li>Press <strong>Space</strong> to apply selection</li>
+          <li>Press <strong>Esc</strong> to cancel selection</li>
+        </ul>
+        <p style="margin:8px 0 0 0;">Undo / redo:</p>
+        <ul style="margin:4px 0 0 20px; padding:0;">
+          <li>Step back - <strong>Ctrl+Z</strong></li>
+          <li>Step forward - <strong>Ctrl+Y</strong></li>
+        </ul>
+      </div>
+      <div id="aboutInfoPanel" class="panel-box" style="display:none; line-height:1.35;">
+        <div class="show-hide-title">About</div>
+        <p style="margin:4px 0 8px 0; color:#ccd;">
+          Warzone2100 MapMaker was created by MaWay2000 for the Warzone 2100 mapmaking community.
+        </p>
+        <p style="margin:0 0 8px 0; color:#ccd;">
+          The goal is to make editing, previewing, and sharing Warzone 2100 maps easier directly in the browser.
+        </p>
+        <a
+          class="action-btn"
+          href="https://github.com/MaWay2000/boha/tree/main/mapmaker"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="display:block; text-align:center; text-decoration:none;"
+        >Open Project on GitHub</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="threeContainer"></div>
+  <div id="minimapPanel">
+    <div id="minimapTitle">Minimap</div>
+    <canvas id="minimapCanvas" width="170" height="170"></canvas>
+  </div>
+  <div id="loadingOverlay" class="hidden">
+    <div id="loadingTitle">Map loading</div>
+    <div id="loadingDetail">Preparing map...</div>
+    <div id="loadingBarOuter"><div id="loadingBarInner"></div></div>
+    <div id="loadingPercent">0%</div>
+  </div>
+  <div id="saveResultOverlay" class="hidden">
+    <div id="saveResultTitle">Map saved</div>
+    <div id="saveResultFilename"></div>
+    <div id="saveResultDetails"></div>
+    <div id="saveResultLocation"></div>
+    <div id="saveResultActions">
+      <button type="button" id="saveResultCloseBtn" class="action-btn">OK</button>
+    </div>
+  </div>
+  <div id="validationOverlay" class="hidden">
+    <div id="validationTitle">Map validation</div>
+    <div id="validationSummary"></div>
+    <ul id="validationList"></ul>
+    <div id="validationActions">
+      <button type="button" id="validationCancelBtn" class="action-btn">Close</button>
+      <button type="button" id="validationContinueBtn" class="action-btn">Continue save</button>
+    </div>
+  </div>
+  <div id="templateNameBackdrop" class="dialog-backdrop hidden"></div>
+  <div id="templateNameDialog" class="app-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="templateNameTitle">
+    <div id="templateNameTitle" class="app-dialog-title">Create template</div>
+    <label for="templateNameInput">Template name</label>
+    <input type="text" id="templateNameInput" autocomplete="off" spellcheck="false">
+    <div class="app-dialog-hint">Name the selected area before saving it to Templates.</div>
+    <div class="app-dialog-actions">
+      <button type="button" id="templateNameCancelBtn" class="action-btn">Cancel</button>
+      <button type="button" id="templateNameCreateBtn" class="action-btn active">Create</button>
+    </div>
+  </div>
+  <div id="serverMapLicenseBackdrop" class="dialog-backdrop hidden"></div>
+  <div id="serverMapLicenseDialog" class="app-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="serverMapLicenseTitle">
+    <div id="serverMapLicenseTitle" class="app-dialog-title">Server map license</div>
+    <div id="serverMapLicenseBody" class="app-dialog-body"></div>
+    <div class="app-dialog-actions" style="grid-template-columns:1fr;">
+      <button type="button" id="serverMapLicenseOkBtn" class="action-btn active">OK</button>
+    </div>
+  </div>
+  <div id="licenseHelpBackdrop" class="dialog-backdrop hidden"></div>
+  <div id="licenseHelpDialog" class="app-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="licenseHelpTitle">
+    <div id="licenseHelpTitle" class="app-dialog-title">License help</div>
+    <div id="licenseHelpBody" class="app-dialog-body"></div>
+    <div class="app-dialog-actions" style="grid-template-columns:1fr;">
+      <button type="button" id="licenseHelpOkBtn" class="action-btn active">OK</button>
+    </div>
+  </div>
+  <div id="fileList" class="hidden"></div>
+  <div id="info"></div>
+  <div id="compass">
+    <svg viewBox="0 0 100 100">
+      <circle cx="50" cy="50" r="48" stroke="#435066" stroke-width="2" fill="rgba(24,32,48,0.8)" />
+      <g id="compassNeedle">
+        <polygon points="50,20 60,60 50,50 40,60" fill="#6cf" />
+      </g>
+      <text x="50" y="94" text-anchor="middle" fill="#dde" font-size="20">N</text>
+    </svg>
+  </div>
+
+  <!-- Overlay -->
+  <div id="overlayMsg">
+    <div class="welcome-panel">
+      <h1 id="overlayText" class="welcome-title">Warzone2100 MapMaker</h1>
+      <p class="welcome-subtitle">Create a new battlefield, open your work, or browse maps from the community.</p>
+      <div class="welcome-actions">
+        <button id="overlayNewBtn" class="overlay-btn primary">New map</button>
+        <button id="overlayServerBtn" class="overlay-btn">Browse server maps</button>
+        <label for="wzLoader" id="overlayBrowseBtn" class="overlay-btn">Browse your map</label>
+        <button id="overlayUrlBtn" class="overlay-btn">Get official maps</button>
+      </div>
+      <div id="overlayLocalSaveBox" class="welcome-local-save">
+        <div class="welcome-local-label">Continue local save</div>
+        <select id="overlayLocalSaveSelect"></select>
+        <button id="overlayLocalSaveBtn" class="overlay-btn" style="width:100%;">Continue</button>
+      </div>
+      <input type="file" id="wzLoader" accept=".wz,.zip,.7z,.map,.gam,.json" style="position:absolute;left:-9999px;width:0.1px;height:0.1px;opacity:0;">
+      <div class="welcome-loading-hint">Loading map data can take a moment.</div>
+    </div>
+  </div>
+
+  <script type="module" src="js/jszip.min.js"></script>
+  <script type="module" src="js/game.js?v=tile-quality-setting"></script>
+
+<script type="module">
+    // Minimal UI bridge your game.js can use
+    window.UI = {
+      setMapFilename(name){
+        const cleanName = name || '';
+        const el=document.getElementById('mapFilename');
+        const input=document.getElementById('fileMapNameInput');
+        if(el){ el.textContent = cleanName; }
+        if(input){ input.value = cleanName; }
+      },
+      showTopBar(on=true){ document.getElementById('uiBar')?.classList.toggle('hidden', !on); },
+      hideOverlay(){
+        const el = document.getElementById('overlayMsg');
+        if(el){ el.classList.add('hidden'); el.style.display = 'none'; }
+        document.body.classList.remove('overlay-open');
+      },
+      showOverlay(){
+        const el = document.getElementById('overlayMsg');
+        if(el){
+          el.classList.remove('hidden');
+          el.style.display = 'flex';
+          el.style.pointerEvents = 'auto';
+        }
+        document.body.classList.add('overlay-open');
+      },
+    };
+
+    // Label triggers file input natively (no JS needed), but we also add a safety click handler
+    document.addEventListener('DOMContentLoaded', function(){
+      var btn = document.getElementById('overlayBrowseBtn');
+      var input = document.getElementById('wzLoader');
+      const fileListDiv = document.getElementById('fileList');
+      const overlayEl = document.getElementById('overlayMsg');
+      const serverBtn = document.getElementById('overlayServerBtn');
+      const urlBtn = document.getElementById('overlayUrlBtn');
+      const newBtn = document.getElementById('overlayNewBtn');
+      const localSaveBtn = document.getElementById('overlayLocalSaveBtn');
+      if(serverBtn){
+        const fileListWidth = 360;
+        serverBtn.addEventListener('click', () => {
+          fileListDiv.classList.toggle('hidden');
+          if(fileListDiv.classList.contains('hidden')){
+            if(overlayEl){ overlayEl.style.left='0'; overlayEl.style.width='100vw'; }
+          }else{
+            if(overlayEl){
+              overlayEl.style.left = fileListWidth + 'px';
+              overlayEl.style.width = `calc(100vw - ${fileListWidth}px)`;
+            }
+          }
+        });
+      }
+      if(urlBtn){
+        urlBtn.addEventListener('click', () => {
+          window.open('https://maps.wz2100.net/', '_blank');
+        });
+      }
+      if(newBtn){
+        newBtn.addEventListener('click', () => {
+          if (typeof window.confirmUnsavedChanges === 'function' && !window.confirmUnsavedChanges()) return;
+          fileListDiv.classList.add('hidden');
+          if (overlayEl){ overlayEl.style.left='0'; overlayEl.style.width='100vw'; }
+          window.UI.hideOverlay();
+          window.UI.setMapFilename('Untitled Map');
+          window.UI.showTopBar(false);
+          const mapNameEl = document.getElementById('mapFilename');
+          if (mapNameEl) mapNameEl.textContent = '';
+          if(typeof window.newMap === 'function') window.newMap();
+        });
+      }
+      if(localSaveBtn){
+        localSaveBtn.addEventListener('click', () => {
+          if (typeof window.loadOverlayLocalSave === 'function') {
+            window.loadOverlayLocalSave();
+          }
+        });
+      }
+      if (btn && input){
+        btn.addEventListener('click', function(ev){
+          ev.preventDefault();
+          ev.stopPropagation();
+          try { input.click(); } catch(e) {}
+        });
+      }
+      async function loadServerList(){
+        try{
+          const resp = await fetch('maps/filelist.txt');
+          if(!resp.ok) throw new Error('HTTP ' + resp.status);
+          const text = await resp.text();
+          const files = text.split(/\r?\n/).filter(f => f.trim() !== '');
+          fileListDiv.innerHTML = '';
+          files.forEach(file => {
+            const div = document.createElement('div');
+            div.textContent = file;
+            div.addEventListener('click', () => {
+              if (typeof window.confirmUnsavedChanges === 'function' && !window.confirmUnsavedChanges()) return;
+              window.__skipNextUnsavedPrompt = true;
+              window.UI.hideOverlay();
+              fileListDiv.classList.add('hidden');
+              if (overlayEl){ overlayEl.style.left='0'; overlayEl.style.width='100vw'; }
+              window.UI.showTopBar(true);
+              window.UI.setMapFilename(file);
+              window.loadServerMap(file);
+            });
+            fileListDiv.appendChild(div);
+          });
+        }catch(err){
+          fileListDiv.textContent = 'Error loading map list.';
+          console.error(err);
+        }
+      }
+      window.loadServerList = loadServerList;
+      loadServerList();
+
+      const params = new URLSearchParams(location.search);
+      const remoteUrl = params.get('url');
+      if(remoteUrl){
+        window.UI.hideOverlay();
+        window.UI.showTopBar(true);
+        window.UI.setMapFilename(remoteUrl.split('/').pop());
+        window.loadRemoteMap(remoteUrl).catch(err => {
+          console.error('Map load error:', err);
+          window.UI.showOverlay();
+          window.UI.showTopBar(false);
+          window.UI.setMapFilename('');
+        });
+      }
+
+      // When user picks a file: hide overlay, notify the app
+      input.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (typeof window.confirmUnsavedChanges === 'function' && !window.confirmUnsavedChanges()) {
+          input.value = '';
+          return;
+        }
+        window.__skipNextUnsavedPrompt = true;
+        window.UI.hideOverlay();
+        window.UI.showTopBar(true);
+        window.UI.setMapFilename(file.name);
+        fileListDiv.classList.add('hidden');
+        if (overlayEl){ overlayEl.style.left='0'; overlayEl.style.width='100vw'; }
+
+        // If your app exposes loadWzArchive, call it; else dispatch event
+        try{
+          if (typeof window.loadWzArchive === 'function') {
+            await window.loadWzArchive(file);
+          } else {
+            window.dispatchEvent(new CustomEvent('mapfile:selected', { detail: { file } }));
+          }
+        } catch(err){
+          console.error('Map load error:', err);
+          // Let user retry
+          window.UI.showOverlay();
+          window.UI.showTopBar(false);
+          window.UI.setMapFilename('');
+          input.value='';
+          fileListDiv.classList.add('hidden');
+          if (overlayEl){ overlayEl.style.left='0'; overlayEl.style.width='100vw'; }
+        }
+      });
+    });
+</script>
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+  });
+</script>
+<script data-goatcounter="https://maway2000.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

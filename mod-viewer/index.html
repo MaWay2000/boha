@@ -209,6 +209,11 @@
       let activeCategory = '';
       let renderedRows = [];
 
+      const defaultSamples = {
+        current: { name: 'Warzone 2100 4.7.0', file: 'warzone-stats-4.7.0.wz' },
+        baseline: { name: 'Warzone 2100 4.6.3', file: 'warzone-stats-4.6.3.wz' }
+      };
+
       const categoryNames = {
         weapon: 'Weapons', weapons: 'Weapons', body: 'Bodies', bodies: 'Bodies',
         propulsion: 'Propulsion', propulsions: 'Propulsion', structure: 'Structures', structures: 'Structures',
@@ -276,6 +281,12 @@
         }
         if (!result.size) throw new Error('JSON files were found, but no table data could be read.');
         return result;
+      }
+
+      async function fetchDefaultSample(sample) {
+        const response = await fetch(`samples/${sample.file}`);
+        if (!response.ok) throw new Error(`Unable to load ${sample.name}.`);
+        return new File([await response.blob()], sample.file, { type: 'application/zip' });
       }
 
       function identity(row, index) {
@@ -405,6 +416,27 @@
         }
       }
 
+      async function loadDefaultSamples() {
+        status.textContent = 'Loading official Warzone 2100 comparison...';
+        status.classList.remove('error');
+        try {
+          const [currentSample, baselineSample] = await Promise.all([
+            fetchDefaultSample(defaultSamples.current),
+            fetchDefaultSample(defaultSamples.baseline)
+          ]);
+          [currentData, baselineData] = await Promise.all([
+            readFile(currentSample),
+            readFile(baselineSample)
+          ]);
+          currentName.textContent = defaultSamples.current.name;
+          baselineName.textContent = defaultSamples.baseline.name;
+          renderTabs();
+        } catch (error) {
+          status.textContent = error.message || 'Unable to load the default comparison.';
+          status.classList.add('error');
+        }
+      }
+
       function setupDrop(input, zone, target) {
         input.addEventListener('change', () => loadSelected(input.files[0], target));
         ['dragenter', 'dragover'].forEach((eventName) => zone.addEventListener(eventName, (event) => {
@@ -442,6 +474,7 @@
       details.addEventListener('click', (event) => {
         if (event.target === details) details.close();
       });
+      loadDefaultSamples();
     })();
   </script>
 </body>

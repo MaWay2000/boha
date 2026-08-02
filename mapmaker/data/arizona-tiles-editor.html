@@ -1,0 +1,1325 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arizona Tiles Editor</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101822;
+      --panel: #172234;
+      --panel2: #1f2e43;
+      --line: #3a4d68;
+      --text: #e7edf7;
+      --muted: #9fb0c7;
+      --green: #55ff22;
+      --greenText: #071307;
+      --warn: #ffd35a;
+      --bad: #ff7070;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 16px;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 12px;
+      background: #111b28;
+      border-bottom: 1px solid #2c3b52;
+    }
+
+    h1 {
+      margin: 0 12px 0 0;
+      font-size: 22px;
+      font-weight: 400;
+    }
+
+    button,
+    select,
+    input,
+    textarea {
+      min-height: 30px;
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      font: inherit;
+    }
+
+    button {
+      padding: 4px 12px;
+      cursor: pointer;
+    }
+
+    button.primary {
+      background: var(--green);
+      color: var(--greenText);
+      border-color: var(--green);
+    }
+
+    button.warn {
+      color: var(--bad);
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 4px 7px;
+    }
+
+    textarea {
+      min-height: 68px;
+      resize: vertical;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 360px minmax(460px, 1fr) 430px;
+      gap: 10px;
+      padding: 10px;
+    }
+
+    section {
+      min-width: 0;
+      background: var(--panel);
+      border: 1px solid #263650;
+      padding: 10px;
+    }
+
+    main > section:first-child {
+      max-height: calc(100vh - 72px);
+      overflow-y: auto;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      font-weight: 400;
+      text-align: center;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    label {
+      display: block;
+      margin: 8px 0 4px;
+      color: var(--muted);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .status {
+      color: var(--warn);
+      min-height: 20px;
+      margin-left: auto;
+    }
+
+    .autosave-toggle {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      width: auto;
+      margin: 0;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .autosave-toggle input {
+      width: auto;
+      min-height: auto;
+    }
+
+    .family-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .family-card {
+      padding: 8px;
+      background: #121c2a;
+      border: 1px solid #2a3a54;
+    }
+
+    .family-card.active {
+      border-color: var(--green);
+    }
+
+    .family-title {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+
+    .family-key {
+      color: var(--green);
+      font-size: 13px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 5px;
+    }
+
+    .chip {
+      padding: 2px 6px;
+      background: #263650;
+      border: 1px solid #405572;
+      color: #cbd8e9;
+      font-size: 12px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+      gap: 8px;
+    }
+
+    .tile-card {
+      display: grid;
+      gap: 4px;
+      padding: 6px;
+      background: #121c2a;
+      border: 1px solid #2a3a54;
+      cursor: pointer;
+    }
+
+    .tile-card.active {
+      background: rgba(85, 255, 34, 0.28);
+      border-color: var(--green);
+      box-shadow: 0 0 0 2px var(--green) inset;
+    }
+
+    .tile-card.friend {
+      background: rgba(255, 211, 90, 0.28);
+      border-color: #ffd35a;
+      box-shadow: 0 0 0 2px #ffd35a inset;
+    }
+
+    .tile-card.wrong {
+      background: rgba(255, 32, 32, 0.3);
+      border-color: #ff2a2a;
+      box-shadow: 0 0 0 2px #ff2a2a inset;
+    }
+
+    .tile-card.wrong .tile-id,
+    .tile-card.wrong .tile-family {
+      color: #ffaaaa;
+    }
+
+    .tile-card.friend .tile-id {
+      color: #ffd35a;
+    }
+
+    .tile-card img {
+      width: 64px;
+      height: 64px;
+      image-rendering: pixelated;
+      justify-self: center;
+      background: #0b111a;
+    }
+
+    .tile-card.water img {
+      background: #155d73;
+    }
+
+    .tile-id {
+      color: var(--green);
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .tile-family {
+      overflow: hidden;
+      color: var(--muted);
+      text-align: center;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      font-size: 12px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: -2px 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 4px;
+      border: 1px solid currentColor;
+      vertical-align: -1px;
+    }
+
+    .legend .selected {
+      color: var(--green);
+    }
+
+    .legend .friend {
+      color: #ffd35a;
+    }
+
+    .legend .wrong {
+      color: #ff8888;
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 20;
+      display: none;
+      min-width: 170px;
+      padding: 6px;
+      background: #111b28;
+      border: 1px solid var(--line);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .context-menu.open {
+      display: grid;
+      gap: 5px;
+    }
+
+    .context-menu-title {
+      padding: 4px 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .context-menu button {
+      width: 100%;
+      text-align: left;
+    }
+
+    .context-menu .friend-action {
+      color: #ffd35a;
+    }
+
+    .context-menu .wrong-action {
+      color: #ffaaaa;
+    }
+
+    .tile-piece-preview {
+      position: relative;
+      width: 128px;
+      height: 128px;
+      margin: 0 auto 8px;
+    }
+
+    .editor-image {
+      display: block;
+      width: 128px;
+      height: 128px;
+      margin: 0;
+      image-rendering: pixelated;
+      background: #0b111a;
+      border: 1px solid var(--line);
+    }
+
+    .editor-image.water {
+      background: #155d73;
+    }
+
+    .piece-cross::before,
+    .piece-cross::after {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      background: rgba(255, 80, 80, 0.9);
+      pointer-events: none;
+    }
+
+    .piece-cross::before {
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 3px;
+      transform: translateX(-50%);
+    }
+
+    .piece-cross::after {
+      top: 50%;
+      right: 0;
+      left: 0;
+      height: 3px;
+      transform: translateY(-50%);
+    }
+
+    .piece-label {
+      position: absolute;
+      z-index: 2;
+      max-width: 58px;
+      padding: 2px 4px;
+      overflow: hidden;
+      color: #ffffff;
+      background: rgba(7, 12, 20, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 10px;
+      line-height: 1.1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .piece-label.top-left {
+      top: 5px;
+      left: 5px;
+    }
+
+    .piece-label.top-right {
+      top: 5px;
+      right: 5px;
+    }
+
+    .piece-label.bottom-left {
+      bottom: 5px;
+      left: 5px;
+    }
+
+    .piece-label.bottom-right {
+      right: 5px;
+      bottom: 5px;
+    }
+
+    .edge-label.top {
+      top: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .edge-label.right {
+      top: 50%;
+      right: 5px;
+      transform: translateY(-50%);
+    }
+
+    .edge-label.bottom {
+      bottom: 5px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .edge-label.left {
+      top: 50%;
+      left: 5px;
+      transform: translateY(-50%);
+    }
+
+    .connector-kind {
+      width: fit-content;
+      max-width: 100%;
+      margin: 0 auto 10px;
+      padding: 4px 8px;
+      color: var(--warn);
+      background: #121c2a;
+      border: 1px solid var(--line);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .piece-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .piece-grid label {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .edge-toggle {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 10px;
+      color: var(--text);
+    }
+
+    .edge-toggle input {
+      width: auto;
+      min-height: auto;
+    }
+
+    .friend-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .friend-grid label {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin: 0;
+      padding: 5px;
+      color: var(--text);
+      background: #121c2a;
+      border: 1px solid #2a3a54;
+    }
+
+    .friend-grid input {
+      width: auto;
+      min-height: auto;
+      accent-color: #8e88ff;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .export-box {
+      margin-top: 10px;
+      min-height: 160px;
+      font-family: Consolas, monospace;
+      font-size: 13px;
+    }
+
+    @media (max-width: 1160px) {
+      main {
+        grid-template-columns: 320px 1fr;
+      }
+
+      .editor {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 760px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Arizona Tiles Editor</h1>
+    <button id="openFileBtn">Open JSON</button>
+    <button id="saveFileBtn">Save JSON</button>
+    <button id="downloadBtn" class="primary">Download JSON</button>
+    <label class="autosave-toggle">
+      <input id="directAutosaveToggle" type="checkbox">
+      Autosave opened file
+    </label>
+    <input id="fileInput" type="file" accept=".json,application/json" hidden>
+    <span id="status" class="status"></span>
+  </header>
+
+  <div id="tileContextMenu" class="context-menu">
+    <div id="tileContextTitle" class="context-menu-title"></div>
+    <button id="markFriendBtn" class="friend-action" type="button">Friend</button>
+    <button id="markWrongBtn" class="wrong-action" type="button">Wrong</button>
+  </div>
+
+  <main>
+    <section>
+      <h2>Families</h2>
+      <div class="toolbar">
+        <button id="addFamilyBtn">Add family</button>
+        <button id="sortFamiliesBtn">Sort</button>
+      </div>
+      <div id="familyList" class="family-list"></div>
+    </section>
+
+    <section>
+      <h2>Tiles 0-77</h2>
+      <div class="toolbar">
+        <select id="familyFilter"></select>
+        <button id="clearFilterBtn">Show all</button>
+      </div>
+      <div class="legend">
+        <span class="selected">selected</span>
+        <span class="friend">friend</span>
+        <span class="wrong">wrong</span>
+      </div>
+      <div id="tileGrid" class="tile-grid"></div>
+    </section>
+
+    <section class="editor">
+      <h2>Selected Tile</h2>
+      <div id="tileEditor"></div>
+      <textarea id="exportText" class="export-box" spellcheck="false" readonly></textarea>
+    </section>
+  </main>
+
+  <script>
+    const DATA_URL = "arizona-tiles.json";
+    const DRAFT_STORAGE_KEY = "warzone2100-mapmaker:arizona-tiles-editor:draft";
+    const DRAFT_LABEL_KEY = "warzone2100-mapmaker:arizona-tiles-editor:draft-label";
+    const statusEl = document.getElementById("status");
+    const familyListEl = document.getElementById("familyList");
+    const tileGridEl = document.getElementById("tileGrid");
+    const tileEditorEl = document.getElementById("tileEditor");
+    const familyFilterEl = document.getElementById("familyFilter");
+    const exportTextEl = document.getElementById("exportText");
+    const fileInputEl = document.getElementById("fileInput");
+    const directAutosaveToggleEl = document.getElementById("directAutosaveToggle");
+    const tileContextMenuEl = document.getElementById("tileContextMenu");
+    const tileContextTitleEl = document.getElementById("tileContextTitle");
+
+    let data = null;
+    let selectedTileId = 0;
+    let selectedFamilyKey = "";
+    let scrollSelectedFamilyIntoView = false;
+    let fileHandle = null;
+    let currentFileName = "";
+    let contextTileId = null;
+    let autoSaveTimer = null;
+    let autoSavePending = false;
+    let autoSaveRunning = false;
+    const TILE_PIECES = [
+      ["topLeft", "Top left"],
+      ["topRight", "Top right"],
+      ["bottomLeft", "Bottom left"],
+      ["bottomRight", "Bottom right"]
+    ];
+    const TILE_EDGES = [
+      ["N", "Up"],
+      ["E", "Right"],
+      ["S", "Down"],
+      ["W", "Left"]
+    ];
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+      if (text) {
+        window.clearTimeout(setStatus.timer);
+        setStatus.timer = window.setTimeout(() => {
+          statusEl.textContent = "";
+        }, 5000);
+      }
+    }
+
+    function hasWritableFileHandle() {
+      return Boolean(fileHandle && fileHandle.createWritable);
+    }
+
+    function updateDirectAutosaveState() {
+      const canWriteFile = hasWritableFileHandle();
+      directAutosaveToggleEl.disabled = !canWriteFile;
+      directAutosaveToggleEl.title = canWriteFile
+        ? "Autosave can write to the opened JSON file."
+        : "This browser opened JSON as read-only. Use Download JSON or a browser with File System Access support.";
+      if (!canWriteFile) {
+        directAutosaveToggleEl.checked = false;
+      }
+    }
+
+    function imageSrc(path) {
+      const value = String(path || "");
+      return value.startsWith("classic/") ? `../${value}` : value;
+    }
+
+    function cssClass(value) {
+      return String(value || "").replace(/[^a-z0-9_-]+/gi, "_");
+    }
+
+    function familyKeys() {
+      return Object.keys(data.families || {});
+    }
+
+    function tileById(id) {
+      return data.tiles.find((tile) => tile.id === id);
+    }
+
+    function selectFamily(key) {
+      selectedFamilyKey = key;
+      scrollSelectedFamilyIntoView = true;
+      const firstTile = data.tiles.find((tile) => tile.family === key);
+      if (firstTile) selectedTileId = firstTile.id;
+    }
+
+    function refreshAll() {
+      if (!data) return;
+      renderFamilyFilter();
+      renderFamilies();
+      renderTiles();
+      renderTileEditor();
+      exportTextEl.value = JSON.stringify(data, null, 2);
+    }
+
+    function renderFamilyFilter() {
+      const current = familyFilterEl.value;
+      familyFilterEl.innerHTML = `<option value="">All families</option>`;
+      for (const key of familyKeys()) {
+        const option = document.createElement("option");
+        option.value = key;
+        option.textContent = data.families[key].label || key;
+        familyFilterEl.appendChild(option);
+      }
+      familyFilterEl.value = familyKeys().includes(current) ? current : "";
+    }
+
+    function renderFamilies() {
+      familyListEl.innerHTML = "";
+      for (const key of familyKeys()) {
+        const family = data.families[key];
+        const card = document.createElement("div");
+        card.className = `family-card${key === selectedFamilyKey ? " active" : ""}`;
+        card.innerHTML = `
+          <div class="family-title">
+            <strong>${escapeText(family.label || key)}</strong>
+            <button class="warn" data-delete-family="${escapeAttr(key)}">Delete</button>
+          </div>
+          <div class="family-key">${escapeText(key)}</div>
+          <div class="hint">${escapeText(family.role || "")}</div>
+          <div class="chips">${(family.friends || []).map((friend) => `<span class="chip">${escapeText(friend)}</span>`).join("")}</div>
+          <label>Label</label>
+          <input data-family-field="${escapeAttr(key)}:label" value="${escapeAttr(family.label || "")}">
+          <label>Role</label>
+          <input data-family-field="${escapeAttr(key)}:role" value="${escapeAttr(family.role || "")}">
+          <label>Friends</label>
+          <div class="friend-grid">${renderFriendChecks(key, family.friends || [], "family")}</div>
+          <label>Notes</label>
+          <textarea data-family-field="${escapeAttr(key)}:notes">${escapeText(family.notes || "")}</textarea>
+        `;
+        familyListEl.appendChild(card);
+      }
+      if (scrollSelectedFamilyIntoView) {
+        const activeFamily = familyListEl.querySelector(".family-card.active");
+        const familyPanel = familyListEl.closest("section");
+        if (activeFamily && familyPanel) {
+          familyPanel.scrollTo({
+            top: Math.max(0, activeFamily.offsetTop - familyPanel.offsetTop - 8),
+            behavior: "smooth"
+          });
+        }
+        scrollSelectedFamilyIntoView = false;
+      }
+    }
+
+    function renderFriendChecks(targetKey, friends, kind) {
+      return familyKeys()
+        .filter((key) => key !== targetKey)
+        .map((key) => `
+          <label>
+            <input type="checkbox" data-${kind}-friend="${escapeAttr(targetKey)}:${escapeAttr(key)}" ${friends.includes(key) ? "checked" : ""}>
+            ${escapeText(data.families[key].label || key)}
+          </label>
+        `)
+        .join("");
+    }
+
+    function renderFamilyOptions(selectedKey) {
+      return familyKeys()
+        .map((key) => `<option value="${escapeAttr(key)}" ${selectedKey === key ? "selected" : ""}>${escapeText(data.families[key].label || key)}</option>`)
+        .join("");
+    }
+
+    function tilePieceValue(tile, pieceKey) {
+      return tile.pieces?.[pieceKey] || tile.family;
+    }
+
+    function tileEdgeValue(tile, edgeKey) {
+      return tile.edges?.[edgeKey] || tile.family;
+    }
+
+    function renderPieceLabels(tile) {
+      return TILE_PIECES
+        .map(([key]) => {
+          const familyKey = tilePieceValue(tile, key);
+          const familyLabel = data.families[familyKey]?.label || familyKey;
+          return `<span class="piece-label ${key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)}">${escapeText(familyLabel)}</span>`;
+        })
+        .join("");
+    }
+
+    function renderEdgeLabels(tile) {
+      return TILE_EDGES
+        .map(([key]) => {
+          const familyKey = tileEdgeValue(tile, key);
+          const familyLabel = data.families[familyKey]?.label || familyKey;
+          const className = {
+            N: "top",
+            E: "right",
+            S: "bottom",
+            W: "left"
+          }[key];
+          return `<span class="piece-label edge-label ${className}">${escapeText(familyLabel)}</span>`;
+        })
+        .join("");
+    }
+
+    function renderConnectorLabels(tile) {
+      return tile.edges ? renderEdgeLabels(tile) : renderPieceLabels(tile);
+    }
+
+    function detectTileConnectorKind(tile) {
+      const counts = new Map();
+      TILE_PIECES.forEach(([key]) => {
+        const value = tilePieceValue(tile, key);
+        counts.set(value, (counts.get(value) || 0) + 1);
+      });
+      const pattern = Array.from(counts.values()).sort((a, b) => b - a).join("-");
+      if (pattern === "4") return "Stand alone";
+      if (pattern === "3-1") return "Corner connector";
+      if (pattern === "2-2") return "Half connector";
+      if (pattern === "2-1-1") return "Triple connector";
+      return "Mixed connector";
+    }
+
+    function renderPieceSelects(tile) {
+      return TILE_PIECES
+        .map(([key, label]) => `
+          <label>
+            ${label}
+            <select data-tile-piece="${key}">${renderFamilyOptions(tilePieceValue(tile, key))}</select>
+          </label>
+        `)
+        .join("");
+    }
+
+    function renderEdgeSelects(tile) {
+      return TILE_EDGES
+        .map(([key, label]) => `
+          <label>
+            ${label}
+            <select data-tile-edge="${key}">${renderFamilyOptions(tileEdgeValue(tile, key))}</select>
+          </label>
+        `)
+        .join("");
+    }
+
+    function getTileRelationClass(tile) {
+      const selectedTile = tileById(selectedTileId);
+      if (!selectedTile || tile.id === selectedTile.id) return "active";
+      if ((selectedTile.friendTiles || []).includes(tile.id)) return "friend";
+      if ((selectedTile.wrongTiles || []).includes(tile.id)) return "wrong";
+      const friends = selectedTile.friends || [];
+      if (tile.family === selectedTile.family || friends.includes(tile.family)) return "friend";
+      return "wrong";
+    }
+
+    function renderTiles() {
+      const filter = familyFilterEl.value;
+      tileGridEl.innerHTML = "";
+      for (const tile of data.tiles) {
+        if (filter && tile.family !== filter) continue;
+        const card = document.createElement("button");
+        card.className = `tile-card ${getTileRelationClass(tile)} ${cssClass(tile.family)}`;
+        card.type = "button";
+        card.dataset.tileId = tile.id;
+        card.innerHTML = `
+          <img src="${escapeAttr(imageSrc(tile.image))}" alt="Tile ${tile.id}">
+          <div class="tile-id">${tile.id}</div>
+          <div class="tile-family">${escapeText(data.families[tile.family]?.label || tile.family)}</div>
+        `;
+        tileGridEl.appendChild(card);
+      }
+    }
+
+    function renderTileEditor() {
+      const tile = tileById(selectedTileId) || data.tiles[0];
+      if (!tile) {
+        tileEditorEl.innerHTML = `<p class="hint">No tile selected.</p>`;
+        return;
+      }
+      selectedTileId = tile.id;
+      const familyOptions = renderFamilyOptions(tile.family);
+      const customFriends = tile.friendTiles || [];
+      const customWrongs = tile.wrongTiles || [];
+      tileEditorEl.innerHTML = `
+        <div class="tile-piece-preview piece-cross">
+          <img class="editor-image ${cssClass(tile.family)}" src="${escapeAttr(imageSrc(tile.image))}" alt="Tile ${tile.id}">
+          ${renderConnectorLabels(tile)}
+        </div>
+        <div class="connector-kind">${escapeText(detectTileConnectorKind(tile))}</div>
+        <div class="row">
+          <div>
+            <label>ID</label>
+            <input value="${tile.id}" readonly>
+          </div>
+          <div>
+            <label>Type</label>
+            <input value="${escapeAttr(tile.typeName || "")}" readonly>
+          </div>
+        </div>
+        <label>Family</label>
+        <select id="tileFamilySelect">${familyOptions}</select>
+        <label>Tile pieces</label>
+        <div class="piece-grid">${renderPieceSelects(tile)}</div>
+        <label class="edge-toggle">
+          <input id="tileEdgesToggle" type="checkbox" ${tile.edges ? "checked" : ""}>
+          Extra edges for directions
+        </label>
+        ${tile.edges ? `<div class="piece-grid">${renderEdgeSelects(tile)}</div>` : ""}
+        <label>Label</label>
+        <input id="tileLabelInput" value="${escapeAttr(tile.label || "")}">
+        <label>Friends</label>
+        <div class="friend-grid">${renderFriendChecks(tile.family, tile.friends || [], "tile")}</div>
+        <div class="hint">
+          Custom tile friends: ${customFriends.length ? customFriends.join(", ") : "none"}<br>
+          Custom tile wrongs: ${customWrongs.length ? customWrongs.join(", ") : "none"}
+        </div>
+        <label>Notes</label>
+        <textarea id="tileNotesInput">${escapeText(tile.notes || "")}</textarea>
+      `;
+    }
+
+    function escapeAttr(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("<", "&lt;");
+    }
+
+    function escapeText(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function setFriends(list, key, enabled) {
+      const friends = new Set(list || []);
+      if (enabled) {
+        friends.add(key);
+      } else {
+        friends.delete(key);
+      }
+      return Array.from(friends);
+    }
+
+    function setFamilyFriends(key, friendKey, enabled) {
+      data.families[key].friends = setFriends(data.families[key].friends, friendKey, enabled);
+      for (const tile of data.tiles) {
+        if (tile.family === key) {
+          tile.friends = setFriends(tile.friends, friendKey, enabled);
+        }
+      }
+    }
+
+    function setOneWayTileOverride(tile, id, type) {
+      const friendTiles = new Set(tile.friendTiles || []);
+      const wrongTiles = new Set(tile.wrongTiles || []);
+      if (type === "friend") {
+        friendTiles.add(id);
+        wrongTiles.delete(id);
+      } else {
+        wrongTiles.add(id);
+        friendTiles.delete(id);
+      }
+      tile.friendTiles = Array.from(friendTiles).sort((a, b) => a - b);
+      tile.wrongTiles = Array.from(wrongTiles).sort((a, b) => a - b);
+      if (!tile.friendTiles.length) delete tile.friendTiles;
+      if (!tile.wrongTiles.length) delete tile.wrongTiles;
+    }
+
+    function setTileOverride(tile, id, type) {
+      setOneWayTileOverride(tile, id, type);
+      const otherTile = tileById(id);
+      if (otherTile) {
+        setOneWayTileOverride(otherTile, tile.id, type);
+      }
+    }
+
+    function hideTileContextMenu() {
+      tileContextMenuEl.classList.remove("open");
+      contextTileId = null;
+    }
+
+    function showTileContextMenu(event, tileId) {
+      const selectedTile = tileById(selectedTileId);
+      const tile = tileById(tileId);
+      if (!selectedTile || !tile || tile.id === selectedTile.id) return;
+      contextTileId = tile.id;
+      tileContextTitleEl.textContent = `Tile ${tile.id}: ${tile.family}`;
+      tileContextMenuEl.style.left = `${event.clientX}px`;
+      tileContextMenuEl.style.top = `${event.clientY}px`;
+      tileContextMenuEl.classList.add("open");
+    }
+
+    function markContextTileFriend(enabled) {
+      const selectedTile = tileById(selectedTileId);
+      const tile = tileById(contextTileId);
+      if (!selectedTile || !tile) return;
+      setTileOverride(selectedTile, tile.id, enabled ? "friend" : "wrong");
+      refreshAll();
+      setStatus(`Tile ${tile.id} marked ${enabled ? "friend" : "wrong"} for tile ${selectedTile.id}.`);
+      scheduleAutoSave();
+      hideTileContextMenu();
+    }
+
+    function downloadJson() {
+      const blob = new Blob([JSON.stringify(data, null, 2) + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "arizona-tiles.json";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function openJsonFile() {
+      if (window.showOpenFilePicker) {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
+        });
+        fileHandle = handle;
+        const file = await handle.getFile();
+        loadJsonText(await file.text(), file.name);
+      } else {
+        fileHandle = null;
+        updateDirectAutosaveState();
+        fileInputEl.click();
+      }
+    }
+
+    async function saveJsonFile() {
+      const text = JSON.stringify(data, null, 2) + "\n";
+      if (hasWritableFileHandle()) {
+        await writeJsonToOpenedFile(text);
+        setStatus(`Saved ${currentFileName || "JSON file"}.`);
+        return;
+      }
+      if (window.showSaveFilePicker) {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: currentFileName || "arizona-tiles.json",
+          types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
+        });
+        currentFileName = fileHandle.name || currentFileName || "arizona-tiles.json";
+        const writable = await fileHandle.createWritable();
+        await writable.write(text);
+        await writable.close();
+        setStatus(`Saved ${currentFileName}.`);
+        return;
+      }
+      downloadJson();
+      setStatus("Downloaded JSON. Browser cannot write this file directly.");
+    }
+
+    async function writeJsonToOpenedFile(text) {
+      const writable = await fileHandle.createWritable();
+      await writable.write(text);
+      await writable.close();
+    }
+
+    async function runAutoSave() {
+      if (!data) return;
+      saveLocalDraft();
+      if (!directAutosaveToggleEl.checked || !hasWritableFileHandle()) {
+        setStatus(hasWritableFileHandle() ? "Autosaved browser draft." : "Autosaved browser draft only. Download JSON to update the file.");
+        return;
+      }
+      if (autoSaveRunning) {
+        autoSavePending = true;
+        return;
+      }
+      autoSaveRunning = true;
+      try {
+        await writeJsonToOpenedFile(JSON.stringify(data, null, 2) + "\n");
+        setStatus(`Autosaved ${currentFileName || "JSON file"}.`);
+      } catch (error) {
+        setStatus(`Autosave failed: ${error.message}`);
+      } finally {
+        autoSaveRunning = false;
+        if (autoSavePending) {
+          autoSavePending = false;
+          scheduleAutoSave();
+        }
+      }
+    }
+
+    function scheduleAutoSave() {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(runAutoSave, 700);
+    }
+
+    function saveLocalDraft() {
+      if (!data) return;
+      localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(data));
+      localStorage.setItem(DRAFT_LABEL_KEY, currentFileName || "browser draft");
+    }
+
+    function loadLocalDraft() {
+      const text = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (!text) return false;
+      loadJsonText(text, localStorage.getItem(DRAFT_LABEL_KEY) || "browser draft");
+      setStatus("Restored browser draft. Download JSON to update the file in browsers without direct file writing.");
+      return true;
+    }
+
+    function loadJsonText(text, label) {
+      const parsed = JSON.parse(text);
+      if (!parsed.tiles || !parsed.families) throw new Error("JSON needs tiles and families.");
+      data = parsed;
+      currentFileName = label || "";
+      selectedTileId = parsed.tiles[0]?.id || 0;
+      selectedFamilyKey = familyKeys()[0] || "";
+      refreshAll();
+      updateDirectAutosaveState();
+      const directSave = hasWritableFileHandle()
+        ? " Save JSON can update this file."
+        : " This browser cannot write the opened file directly; use Download JSON.";
+      setStatus(`Loaded ${label || "JSON"}.${directSave}`);
+    }
+
+    async function loadDefaultJson() {
+      try {
+        if (loadLocalDraft()) return;
+      } catch (error) {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem(DRAFT_LABEL_KEY);
+        setStatus(`Ignored broken browser draft: ${error.message}`);
+      }
+      try {
+        const response = await fetch(DATA_URL, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        loadJsonText(await response.text(), DATA_URL);
+      } catch (error) {
+        data = {
+          tileset: "arizona",
+          tileRange: "0-77",
+          purpose: "Open data/arizona-tiles.json to edit it.",
+          families: {},
+          tiles: []
+        };
+        refreshAll();
+        setStatus("Default JSON could not auto-load from file://. Use open-arizona-tiles-editor.bat or press Open JSON.");
+      }
+    }
+
+    function findFamilyDeleteBlocker(key) {
+      if (data.tiles.some((tile) => tile.family === key)) return "tile families";
+      if (data.tiles.some((tile) => Object.values(tile.pieces || {}).includes(key))) return "tile pieces";
+      if (data.tiles.some((tile) => Object.values(tile.edges || {}).includes(key))) return "tile edges";
+      if (data.tiles.some((tile) => (tile.friends || []).includes(key))) return "tile friends";
+      if (Object.values(data.families).some((family) => (family.friends || []).includes(key))) return "family friends";
+      return "";
+    }
+
+    document.getElementById("openFileBtn").addEventListener("click", () => {
+      openJsonFile().catch((error) => setStatus(error.message));
+    });
+
+    document.getElementById("saveFileBtn").addEventListener("click", () => {
+      if (!data) return;
+      saveJsonFile().catch((error) => setStatus(error.message));
+    });
+
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      if (data) downloadJson();
+    });
+
+    fileInputEl.addEventListener("change", async () => {
+      const file = fileInputEl.files[0];
+      if (!file) return;
+      try {
+        fileHandle = null;
+        updateDirectAutosaveState();
+        loadJsonText(await file.text(), file.name);
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
+
+    document.getElementById("addFamilyBtn").addEventListener("click", () => {
+      const key = prompt("Family key, example: rocky_sand");
+      if (!key) return;
+      const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+      if (!cleanKey || data.families[cleanKey]) return;
+      data.families[cleanKey] = { label: cleanKey.replaceAll("_", " "), role: "", friends: [], notes: "" };
+      selectedFamilyKey = cleanKey;
+      scrollSelectedFamilyIntoView = true;
+      refreshAll();
+      scheduleAutoSave();
+    });
+
+    document.getElementById("sortFamiliesBtn").addEventListener("click", () => {
+      data.families = Object.fromEntries(Object.entries(data.families).sort(([a], [b]) => a.localeCompare(b)));
+      refreshAll();
+      scheduleAutoSave();
+    });
+
+    familyFilterEl.addEventListener("change", renderTiles);
+    document.getElementById("clearFilterBtn").addEventListener("click", () => {
+      familyFilterEl.value = "";
+      renderTiles();
+    });
+
+    tileGridEl.addEventListener("click", (event) => {
+      hideTileContextMenu();
+      const card = event.target.closest("[data-tile-id]");
+      if (!card) return;
+      selectedTileId = Number(card.dataset.tileId);
+      selectedFamilyKey = tileById(selectedTileId)?.family || selectedFamilyKey;
+      scrollSelectedFamilyIntoView = true;
+      refreshAll();
+    });
+
+    tileGridEl.addEventListener("contextmenu", (event) => {
+      const card = event.target.closest("[data-tile-id]");
+      if (!card) return;
+      event.preventDefault();
+      showTileContextMenu(event, Number(card.dataset.tileId));
+    });
+
+    document.getElementById("markFriendBtn").addEventListener("click", () => {
+      markContextTileFriend(true);
+    });
+
+    document.getElementById("markWrongBtn").addEventListener("click", () => {
+      markContextTileFriend(false);
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("#tileContextMenu")) hideTileContextMenu();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") hideTileContextMenu();
+    });
+
+    familyListEl.addEventListener("input", (event) => {
+      const field = event.target.dataset.familyField;
+      if (!field) return;
+      const [key, prop] = field.split(":");
+      data.families[key][prop] = event.target.value;
+      exportTextEl.value = JSON.stringify(data, null, 2);
+      renderTiles();
+      scheduleAutoSave();
+    });
+
+    familyListEl.addEventListener("change", (event) => {
+      const field = event.target.dataset.familyField;
+      if (field) {
+        refreshAll();
+        scheduleAutoSave();
+        return;
+      }
+      const friend = event.target.dataset.familyFriend;
+      if (!friend) return;
+      const [key, friendKey] = friend.split(":");
+      selectFamily(key);
+      setFamilyFriends(key, friendKey, event.target.checked);
+      refreshAll();
+      scheduleAutoSave();
+    });
+
+    familyListEl.addEventListener("click", (event) => {
+      const deleteKey = event.target.dataset.deleteFamily;
+      const interactive = event.target.closest("input, textarea, select, button, label");
+      const card = event.target.closest(".family-card");
+      if (card && !deleteKey && !interactive) {
+        const keyEl = card.querySelector(".family-key");
+        if (keyEl) selectFamily(keyEl.textContent);
+        refreshAll();
+      }
+      if (!deleteKey) return;
+      const blocker = findFamilyDeleteBlocker(deleteKey);
+      if (blocker) {
+        setStatus(`Cannot delete a family while ${blocker} use it.`);
+        return;
+      }
+      delete data.families[deleteKey];
+      for (const family of Object.values(data.families)) {
+        family.friends = (family.friends || []).filter((key) => key !== deleteKey);
+      }
+      selectedFamilyKey = familyKeys()[0] || "";
+      scrollSelectedFamilyIntoView = true;
+      refreshAll();
+      scheduleAutoSave();
+    });
+
+    tileEditorEl.addEventListener("input", (event) => {
+      const tile = tileById(selectedTileId);
+      if (!tile) return;
+      if (event.target.id === "tileLabelInput") tile.label = event.target.value;
+      if (event.target.id === "tileNotesInput") tile.notes = event.target.value;
+      exportTextEl.value = JSON.stringify(data, null, 2);
+      renderTiles();
+      scheduleAutoSave();
+    });
+
+    tileEditorEl.addEventListener("change", (event) => {
+      const tile = tileById(selectedTileId);
+      if (!tile) return;
+      if (event.target.id === "tileFamilySelect") {
+        tile.family = event.target.value;
+        selectedFamilyKey = tile.family;
+        scrollSelectedFamilyIntoView = true;
+        tile.friends = [...(data.families[tile.family]?.friends || [])];
+      }
+      if (event.target.id === "tileEdgesToggle") {
+        if (event.target.checked) {
+          tile.edges = {
+            N: tile.family,
+            E: tile.family,
+            S: tile.family,
+            W: tile.family,
+            ...(tile.edges || {})
+          };
+        } else {
+          delete tile.edges;
+        }
+      }
+      const pieceKey = event.target.dataset.tilePiece;
+      if (pieceKey) {
+        tile.pieces = tile.pieces || {};
+        tile.pieces[pieceKey] = event.target.value;
+      }
+      const edgeKey = event.target.dataset.tileEdge;
+      if (edgeKey) {
+        tile.edges = tile.edges || {};
+        tile.edges[edgeKey] = event.target.value;
+      }
+      const friend = event.target.dataset.tileFriend;
+      if (friend) {
+        const friendKey = friend.split(":")[1];
+        tile.friends = setFriends(tile.friends, friendKey, event.target.checked);
+      }
+      refreshAll();
+      scheduleAutoSave();
+    });
+
+    window.addEventListener("beforeunload", saveLocalDraft);
+
+    loadDefaultJson();
+  </script>
+</body>
+</html>

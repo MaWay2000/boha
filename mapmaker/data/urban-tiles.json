@@ -1,0 +1,1412 @@
+{
+  "tileset": "urban",
+  "tileRange": "0-80",
+  "purpose": "Editable Urban terrain relationship notes for Smart Tiles. Starter data is based on official tile type codes; refine families, pieces, and edges in the editor.",
+  "families": {
+    "sand": {
+      "label": "Sand",
+      "role": "primary",
+      "friends": [
+        "sandy_brush",
+        "rubble",
+        "water",
+        "red_brush"
+      ],
+      "notes": "Starter Urban sand/plain terrain family. Adjust after visual review."
+    },
+    "sandy_brush": {
+      "label": "Sandy Brush",
+      "role": "primary_detail",
+      "friends": [
+        "sand",
+        "rubble",
+        "red_brush",
+        "water"
+      ],
+      "notes": "Starter Urban sandy brush/detail terrain family. Adjust after visual review."
+    },
+    "rubble": {
+      "label": "Rubble",
+      "role": "primary",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "red_brush",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "Starter Urban rubble/concrete-looking terrain family. Split into smaller families if needed."
+    },
+    "green_mud": {
+      "label": "Green Mud",
+      "role": "primary",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "water"
+      ],
+      "notes": "Starter Urban green mud family. Adjust tile pieces after visual review."
+    },
+    "red_brush": {
+      "label": "Red Brush",
+      "role": "primary",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "Starter Urban red brush/dirt family. Adjust after visual review."
+    },
+    "a_roads": {
+      "label": "A roads",
+      "role": "constructed_surface",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": "Starter Urban road family. Assign road pieces and direction edges in the editor."
+    },
+    "b_roads": {
+      "label": "B roads",
+      "role": "constructed_surface",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "a_roads"
+      ],
+      "notes": "Optional second Urban road family for split road sets."
+    },
+    "water": {
+      "label": "Water",
+      "role": "feature",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": "Starter Urban water family. Add pieces for edges/corners in the editor."
+    },
+    "cliff_face": {
+      "label": "Cliff Face",
+      "role": "edge",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "pink_rock"
+      ],
+      "notes": "Starter Urban cliff/edge family."
+    },
+    "baked_earth": {
+      "label": "Baked Earth",
+      "role": "primary",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "Starter Urban baked earth/dry terrain family."
+    },
+    "black_stone": {
+      "label": "Black stone",
+      "role": "primary",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified from Urban tile 0."
+    },
+    "gray_stone": {
+      "label": "Gray stone",
+      "role": "primary",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified from Urban tile 7."
+    },
+    "black_plate": {
+      "label": "Black plate",
+      "role": "base_surface",
+      "friends": [
+        "black_stone",
+        "gray_stone",
+        "white_plate",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified from Urban tile 18."
+    },
+    "red_sand": {
+      "label": "Red sand",
+      "role": "primary",
+      "friends": [
+        "red_brush",
+        "grass",
+        "rubble",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified from Urban tile 22."
+    },
+    "grass": {
+      "label": "Grass",
+      "role": "primary",
+      "friends": [
+        "red_sand",
+        "green_mud",
+        "water"
+      ],
+      "notes": "User identified from Urban tile 50."
+    },
+    "white_plate": {
+      "label": "White plate",
+      "role": "base_surface",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified from Urban tile 51."
+    }
+  },
+  "tiles": [
+    {
+      "id": 0,
+      "image": "classic/texpages/tertilesc2hw-128/tile-00.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 1,
+      "image": "classic/texpages/tertilesc2hw-128/tile-01.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 2,
+      "image": "classic/texpages/tertilesc2hw-128/tile-02.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 3,
+      "image": "classic/texpages/tertilesc2hw-128/tile-03.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 4,
+      "image": "classic/texpages/tertilesc2hw-128/tile-04.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 5,
+      "image": "classic/texpages/tertilesc2hw-128/tile-05.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 6,
+      "image": "classic/texpages/tertilesc2hw-128/tile-06.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 7,
+      "image": "classic/texpages/tertilesc2hw-128/tile-07.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 8,
+      "image": "classic/texpages/tertilesc2hw-128/tile-08.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 9,
+      "image": "classic/texpages/tertilesc2hw-128/tile-09.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 10,
+      "image": "classic/texpages/tertilesc2hw-128/tile-10.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 11,
+      "image": "classic/texpages/tertilesc2hw-128/tile-11.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "black_plate",
+      "label": "Black plate",
+      "friends": [
+        "black_stone",
+        "gray_stone",
+        "white_plate",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified this tile visually as Black plate."
+    },
+    {
+      "id": 12,
+      "image": "classic/texpages/tertilesc2hw-128/tile-12.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "black_plate",
+      "label": "Black plate",
+      "friends": [
+        "black_stone",
+        "gray_stone",
+        "white_plate",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified this tile visually as Black plate."
+    },
+    {
+      "id": 13,
+      "image": "classic/texpages/tertilesc2hw-128/tile-13.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 14,
+      "image": "classic/texpages/tertilesc2hw-128/tile-14.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 15,
+      "image": "classic/texpages/tertilesc2hw-128/tile-15.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 16,
+      "image": "classic/texpages/tertilesc2hw-128/tile-16.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 17,
+      "image": "classic/texpages/tertilesc2hw-128/tile-17.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 18,
+      "image": "classic/texpages/tertilesc2hw-128/tile-18.png",
+      "typeCode": 1,
+      "typeName": "Sandy Brush",
+      "family": "black_plate",
+      "label": "Black plate",
+      "friends": [
+        "black_stone",
+        "gray_stone",
+        "white_plate",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified this tile visually as Black plate."
+    },
+    {
+      "id": 19,
+      "image": "classic/texpages/tertilesc2hw-128/tile-19.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "cliff_face",
+      "label": "Cliff Face",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "pink_rock"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 20,
+      "image": "classic/texpages/tertilesc2hw-128/tile-20.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 21,
+      "image": "classic/texpages/tertilesc2hw-128/tile-21.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 22,
+      "image": "classic/texpages/tertilesc2hw-128/tile-22.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "red_sand",
+      "label": "Red sand",
+      "friends": [
+        "red_brush",
+        "grass",
+        "rubble",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified this tile visually as Red sand."
+    },
+    {
+      "id": 23,
+      "image": "classic/texpages/tertilesc2hw-128/tile-23.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 24,
+      "image": "classic/texpages/tertilesc2hw-128/tile-24.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 25,
+      "image": "classic/texpages/tertilesc2hw-128/tile-25.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 26,
+      "image": "classic/texpages/tertilesc2hw-128/tile-26.png",
+      "typeCode": 7,
+      "typeName": "Water",
+      "family": "water",
+      "label": "Water",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "green_mud",
+        "rubble"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 27,
+      "image": "classic/texpages/tertilesc2hw-128/tile-27.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 28,
+      "image": "classic/texpages/tertilesc2hw-128/tile-28.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 29,
+      "image": "classic/texpages/tertilesc2hw-128/tile-29.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 30,
+      "image": "classic/texpages/tertilesc2hw-128/tile-30.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 31,
+      "image": "classic/texpages/tertilesc2hw-128/tile-31.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "sand",
+      "label": "Sand",
+      "friends": [
+        "sandy_brush",
+        "rubble",
+        "water",
+        "red_brush"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 32,
+      "image": "classic/texpages/tertilesc2hw-128/tile-32.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 33,
+      "image": "classic/texpages/tertilesc2hw-128/tile-33.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 34,
+      "image": "classic/texpages/tertilesc2hw-128/tile-34.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 35,
+      "image": "classic/texpages/tertilesc2hw-128/tile-35.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "black_stone",
+      "label": "Black stone",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Black stone."
+    },
+    {
+      "id": 36,
+      "image": "classic/texpages/tertilesc2hw-128/tile-36.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 37,
+      "image": "classic/texpages/tertilesc2hw-128/tile-37.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 38,
+      "image": "classic/texpages/tertilesc2hw-128/tile-38.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "sand",
+      "label": "Sand",
+      "friends": [
+        "sandy_brush",
+        "rubble",
+        "water",
+        "red_brush"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 39,
+      "image": "classic/texpages/tertilesc2hw-128/tile-39.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 40,
+      "image": "classic/texpages/tertilesc2hw-128/tile-40.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 41,
+      "image": "classic/texpages/tertilesc2hw-128/tile-41.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "rubble",
+      "label": "Rubble",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "red_brush",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 42,
+      "image": "classic/texpages/tertilesc2hw-128/tile-42.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 43,
+      "image": "classic/texpages/tertilesc2hw-128/tile-43.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 44,
+      "image": "classic/texpages/tertilesc2hw-128/tile-44.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 45,
+      "image": "classic/texpages/tertilesc2hw-128/tile-45.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 46,
+      "image": "classic/texpages/tertilesc2hw-128/tile-46.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 47,
+      "image": "classic/texpages/tertilesc2hw-128/tile-47.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 48,
+      "image": "classic/texpages/tertilesc2hw-128/tile-48.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 49,
+      "image": "classic/texpages/tertilesc2hw-128/tile-49.png",
+      "typeCode": 6,
+      "typeName": "Road",
+      "family": "a_roads",
+      "label": "A roads",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "baked_earth",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 50,
+      "image": "classic/texpages/tertilesc2hw-128/tile-50.png",
+      "typeCode": 3,
+      "typeName": "Green Mud",
+      "family": "grass",
+      "label": "Grass",
+      "friends": [
+        "red_sand",
+        "green_mud",
+        "water"
+      ],
+      "notes": "User identified this tile visually as Grass."
+    },
+    {
+      "id": 51,
+      "image": "classic/texpages/tertilesc2hw-128/tile-51.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "white_plate",
+      "label": "White plate",
+      "friends": [
+        "gray_stone",
+        "black_plate",
+        "rubble",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": "User identified this tile visually as White plate."
+    },
+    {
+      "id": 52,
+      "image": "classic/texpages/tertilesc2hw-128/tile-52.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 53,
+      "image": "classic/texpages/tertilesc2hw-128/tile-53.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "rubble",
+      "label": "Rubble",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "red_brush",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 54,
+      "image": "classic/texpages/tertilesc2hw-128/tile-54.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "rubble",
+      "label": "Rubble",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "red_brush",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 55,
+      "image": "classic/texpages/tertilesc2hw-128/tile-55.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 56,
+      "image": "classic/texpages/tertilesc2hw-128/tile-56.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 57,
+      "image": "classic/texpages/tertilesc2hw-128/tile-57.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 58,
+      "image": "classic/texpages/tertilesc2hw-128/tile-58.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 59,
+      "image": "classic/texpages/tertilesc2hw-128/tile-59.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 60,
+      "image": "classic/texpages/tertilesc2hw-128/tile-60.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 61,
+      "image": "classic/texpages/tertilesc2hw-128/tile-61.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 62,
+      "image": "classic/texpages/tertilesc2hw-128/tile-62.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 63,
+      "image": "classic/texpages/tertilesc2hw-128/tile-63.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 64,
+      "image": "classic/texpages/tertilesc2hw-128/tile-64.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 65,
+      "image": "classic/texpages/tertilesc2hw-128/tile-65.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 66,
+      "image": "classic/texpages/tertilesc2hw-128/tile-66.png",
+      "typeCode": 9,
+      "typeName": "Baked Earth",
+      "family": "baked_earth",
+      "label": "Baked Earth",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 67,
+      "image": "classic/texpages/tertilesc2hw-128/tile-67.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "cliff_face",
+      "label": "Cliff Face",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "pink_rock"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 68,
+      "image": "classic/texpages/tertilesc2hw-128/tile-68.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "cliff_face",
+      "label": "Cliff Face",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "pink_rock"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 69,
+      "image": "classic/texpages/tertilesc2hw-128/tile-69.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "cliff_face",
+      "label": "Cliff Face",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "pink_rock"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 70,
+      "image": "classic/texpages/tertilesc2hw-128/tile-70.png",
+      "typeCode": 8,
+      "typeName": "Cliff Face",
+      "family": "cliff_face",
+      "label": "Cliff Face",
+      "friends": [
+        "rubble",
+        "red_brush",
+        "pink_rock"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 71,
+      "image": "classic/texpages/tertilesc2hw-128/tile-71.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 72,
+      "image": "classic/texpages/tertilesc2hw-128/tile-72.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 73,
+      "image": "classic/texpages/tertilesc2hw-128/tile-73.png",
+      "typeCode": 0,
+      "typeName": "Sand",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 74,
+      "image": "classic/texpages/tertilesc2hw-128/tile-74.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 75,
+      "image": "classic/texpages/tertilesc2hw-128/tile-75.png",
+      "typeCode": 4,
+      "typeName": "Red Brush",
+      "family": "red_brush",
+      "label": "Red Brush",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "rubble",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 76,
+      "image": "classic/texpages/tertilesc2hw-128/tile-76.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "rubble",
+      "label": "Rubble",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "red_brush",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    },
+    {
+      "id": 77,
+      "image": "classic/texpages/tertilesc2hw-128/tile-77.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 78,
+      "image": "classic/texpages/tertilesc2hw-128/tile-78.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 79,
+      "image": "classic/texpages/tertilesc2hw-128/tile-79.png",
+      "typeCode": 3,
+      "typeName": "Green Mud",
+      "family": "gray_stone",
+      "label": "Gray stone",
+      "friends": [
+        "black_stone",
+        "white_plate",
+        "rubble"
+      ],
+      "notes": "User identified this tile visually as Gray stone."
+    },
+    {
+      "id": 80,
+      "image": "classic/texpages/tertilesc2hw-128/tile-80.png",
+      "typeCode": 2,
+      "typeName": "Rubble",
+      "family": "rubble",
+      "label": "Rubble",
+      "friends": [
+        "sand",
+        "sandy_brush",
+        "red_brush",
+        "baked_earth",
+        "a_roads",
+        "b_roads"
+      ],
+      "notes": ""
+    }
+  ]
+}

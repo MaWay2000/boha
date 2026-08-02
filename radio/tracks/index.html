@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Warzone Radio Tracks</title>
+<meta name="theme-color" content="#08111a">
+<link rel="icon" type="image/webp" href="../assets/warzone-radio-logo.webp">
+<style>
+:root {
+  --bg-0: #02070d;
+  --bg-1: #09131d;
+  --bg-2: #101d29;
+  --panel-0: rgba(15, 25, 37, 0.96);
+  --panel-1: rgba(9, 15, 22, 0.98);
+  --line: rgba(120, 188, 255, 0.2);
+  --line-strong: rgba(124, 220, 255, 0.42);
+  --text: #eef9ff;
+  --text-soft: rgba(202, 232, 255, 0.72);
+  --text-dim: rgba(154, 199, 230, 0.58);
+  --accent: #43d8ff;
+  --accent-strong: #8af2ff;
+  --shadow: 0 20px 40px rgba(0, 0, 0, 0.38);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: Arial, sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(62, 138, 180, 0.26), transparent 28%),
+    radial-gradient(circle at top right, rgba(43, 82, 130, 0.18), transparent 24%),
+    linear-gradient(180deg, #1a2430 0%, #0b121b 34%, #050a10 100%);
+}
+
+.shell {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 28px 0 42px;
+}
+
+.hero,
+.panel,
+.license-panel {
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at top right, rgba(67, 216, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(30, 43, 57, 0.96) 0%, rgba(8, 13, 20, 0.99) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03),
+    var(--shadow);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 128px minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  padding: 24px;
+}
+
+.hero-logo {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.45));
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(34px, 6vw, 56px);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 14px 0 0;
+  max-width: 760px;
+  color: var(--text-soft);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.hero-actions,
+.stats,
+.credits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero-actions {
+  margin-top: 20px;
+}
+
+.action,
+.stat-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+
+.action {
+  border: 1px solid rgba(124, 220, 255, 0.32);
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(24, 43, 61, 0.96) 0%, rgba(7, 21, 32, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 16px rgba(0, 180, 255, 0.1);
+}
+
+.action:hover {
+  border-color: rgba(138, 242, 255, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 0 20px rgba(0, 200, 255, 0.16);
+}
+
+.action.is-primary {
+  color: #041018;
+  background: linear-gradient(180deg, rgba(162, 248, 255, 0.98) 0%, rgba(55, 215, 255, 0.98) 100%);
+}
+
+.stats {
+  margin: 22px 0 0;
+}
+
+.stat-pill {
+  border: 1px solid rgba(117, 178, 222, 0.18);
+  color: var(--text-soft);
+  background: rgba(6, 13, 21, 0.68);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr);
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel h2,
+.license-panel h2 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.panel-copy {
+  margin: 12px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.credits {
+  margin-top: 18px;
+}
+
+.credit-card {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(122, 188, 235, 0.18);
+  background: linear-gradient(180deg, rgba(14, 24, 36, 0.92) 0%, rgba(7, 13, 19, 0.98) 100%);
+}
+
+.credit-label {
+  margin: 0 0 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.credit-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.credit-copy {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.preview-title {
+  margin-top: 14px;
+  color: var(--text-dim);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.now-playing {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(126, 214, 255, 0.24);
+  background:
+    radial-gradient(circle at left center, rgba(68, 214, 255, 0.2), transparent 45%),
+    linear-gradient(180deg, rgba(26, 68, 96, 0.94) 0%, rgba(10, 28, 42, 0.98) 100%);
+}
+
+.now-playing strong {
+  display: block;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.now-playing span {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.preview-player {
+  width: 100%;
+  margin-top: 16px;
+  filter: hue-rotate(158deg) saturate(1.12) brightness(0.96);
+}
+
+.catalog-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.catalog-head p {
+  margin: 8px 0 0;
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.track-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.track-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto auto auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(116, 170, 225, 0.16);
+  background: linear-gradient(180deg, rgba(19, 30, 42, 0.94) 0%, rgba(10, 16, 23, 0.98) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.track-row:hover {
+  border-color: rgba(126, 220, 255, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 0 0 1px rgba(78, 198, 255, 0.08);
+}
+
+.track-index {
+  color: rgba(138, 220, 255, 0.82);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.track-main {
+  min-width: 0;
+}
+
+.track-title {
+  display: block;
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.track-file {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-meta {
+  color: var(--text-soft);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.track-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(121, 199, 255, 0.24);
+  border-radius: 999px;
+  color: var(--text);
+  background: linear-gradient(180deg, rgba(37, 49, 65, 0.96) 0%, rgba(14, 20, 28, 0.98) 100%);
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.track-action:hover {
+  border-color: rgba(138, 242, 255, 0.5);
+}
+
+.track-action.is-play {
+  color: #041018;
+  background: linear-gradient(180deg, rgba(157, 247, 255, 0.98) 0%, rgba(67, 216, 255, 0.98) 100%);
+}
+
+.license-panel {
+  margin-top: 18px;
+  padding: 20px;
+}
+
+.license-copy {
+  margin: 10px 0 0;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+.license-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.license-note {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(116, 170, 225, 0.16);
+  background: linear-gradient(180deg, rgba(16, 25, 37, 0.94) 0%, rgba(7, 13, 20, 0.98) 100%);
+}
+
+.license-note strong {
+  display: block;
+  font-size: 17px;
+}
+
+.license-note span {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+@media (max-width: 920px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .hero p,
+  .stats,
+  .hero-actions {
+    justify-content: center;
+  }
+
+  .catalog-head {
+    align-items: start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100vw - 20px, 1120px);
+    padding-top: 14px;
+  }
+
+  .panel,
+  .license-panel,
+  .hero {
+    border-radius: 22px;
+  }
+
+  .track-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .track-meta,
+  .track-action {
+    justify-self: start;
+  }
+
+  .track-row > .track-meta:nth-of-type(1),
+  .track-row > .track-meta:nth-of-type(2) {
+    margin-left: 50px;
+  }
+
+  .track-row > .track-action {
+    margin-left: 50px;
+  }
+
+  .license-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <section class="hero">
+    <img class="hero-logo" src="../assets/warzone-radio-logo.webp" alt="Warzone 2100 Radio logo">
+    <div>
+      <p class="eyebrow">Warzone Radio Archive</p>
+      <h1>Track Library</h1>
+      <p>
+        A clean public index for the local MP3 archive used by Warzone Radio. Visitors can browse the full soundtrack,
+        preview any file directly in the browser, download individual tracks, and open the project license without
+        digging through the repository tree.
+      </p>
+      <div class="hero-actions">
+        <a class="action is-primary" href="../">Back to Radio</a>
+        <a class="action" href="../LICENSE">View License</a>
+        <a class="action" href="https://github.com/MaWay2000/boha/tree/main/radio/tracks">Open on GitHub</a>
+      </div>
+      <div class="stats">
+        <span class="stat-pill">29 MP3 files</span>
+        <span class="stat-pill">4:00:04 total play time</span>
+        <span class="stat-pill">329.9 MB archive size</span>
+        <span class="stat-pill">MIT repository license</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="layout">
+    <section class="panel">
+      <p class="eyebrow">Source Notes</p>
+      <h2>What Is In This Folder</h2>
+      <p class="panel-copy">
+        This page covers the MP3 archive currently committed under <code>/tracks</code>. The set includes the core
+        Warzone Radio soundtrack selection, community remasters, and the Aftermath additions that are used by the
+        live player.
+      </p>
+      <div class="credits">
+        <article class="credit-card">
+          <p class="credit-label">Original / Base Material</p>
+          <p class="credit-title">Martin Severn</p>
+          <p class="credit-copy">
+            Original Warzone 2100 soundtrack material, including the classic atmospheric mission tracks at the start
+            of this archive.
+          </p>
+        </article>
+        <article class="credit-card">
+          <p class="credit-label">Community Soundtracks</p>
+          <p class="credit-title">LupusMechanicus</p>
+          <p class="credit-copy">
+            Legacy and Aftermath soundtrack additions, including enhanced menu music and the extended community track
+            set used in the current radio build.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <p class="eyebrow">Quick Preview</p>
+      <h2>Browser Player</h2>
+      <p class="panel-copy">
+        Press any <em>Play</em> button below to preview a track here without leaving the catalog page.
+      </p>
+      <div class="preview-title">Now Playing</div>
+      <div class="now-playing">
+        <strong id="previewTitle">Select a track</strong>
+        <span id="previewMeta">No preview started yet</span>
+      </div>
+      <audio class="preview-player" id="previewPlayer" controls preload="none"></audio>
+    </aside>
+  </section>
+
+  <section class="panel" style="margin-top: 18px;">
+    <div class="catalog-head">
+      <div>
+        <p class="eyebrow">Catalog</p>
+        <h2>All Files</h2>
+        <p>Each row links to the exact file in this folder and shows length, size, and the committed filename.</p>
+      </div>
+    </div>
+    <div class="track-list" id="trackList"></div>
+  </section>
+
+  <section class="license-panel" id="license">
+    <p class="eyebrow">License</p>
+    <h2>Repository License</h2>
+    <p class="license-copy">
+      The repository currently ships with the MIT license. The full license text is available from the root
+      <code>LICENSE</code> file.
+    </p>
+    <div class="license-grid">
+      <div class="license-note">
+        <strong>MIT License</strong>
+        <span>
+          Permission is granted to use, copy, modify, merge, publish, distribute, sublicense, and sell copies of the
+          software, provided the copyright notice and license text are included.
+        </span>
+      </div>
+      <a class="action" href="../LICENSE">Open Full License</a>
+    </div>
+  </section>
+</main>
+
+<script>
+const TRACKS = [
+  { number: "01", title: "Nuclear Silence", length: "7:00", size: "9.63 MB", file: "01-nuclear-silence.mp3" },
+  { number: "02", title: "Radar Dish", length: "7:51", size: "10.78 MB", file: "02-radar-dish.mp3" },
+  { number: "03", title: "Enfeebling Emptiness", length: "4:59", size: "6.85 MB", file: "03-enfeebling-emptiness.mp3" },
+  { number: "04", title: "Uncertain Future", length: "10:58", size: "15.06 MB", file: "04-uncertain-future.mp3" },
+  { number: "05", title: "Recovery Ops", length: "6:58", size: "9.57 MB", file: "05-recovery-ops.mp3" },
+  { number: "06", title: "Incoming Transmission", length: "5:12", size: "7.14 MB", file: "06-incoming-transmission.mp3" },
+  { number: "07", title: "My Kind of Wasteland", length: "7:48", size: "10.71 MB", file: "07-my-kind-of-wasteland.mp3" },
+  { number: "08", title: "Advanced Manufacturing", length: "6:36", size: "9.07 MB", file: "08-advanced-manufacturing.mp3" },
+  { number: "09", title: "The Project", length: "8:12", size: "11.26 MB", file: "09-the-project.mp3" },
+  { number: "10", title: "The Collective", length: "12:36", size: "17.31 MB", file: "10-the-collective.mp3" },
+  { number: "11", title: "Awakened", length: "6:15", size: "8.60 MB", file: "11-awakened.mp3" },
+  { number: "12", title: "New Dawn", length: "6:31", size: "8.97 MB", file: "12-new-dawn.mp3" },
+  { number: "13", title: "Broken Dreams", length: "7:05", size: "9.73 MB", file: "13-broken-dreams.mp3" },
+  { number: "14", title: "Artifact Beacon", length: "6:05", size: "8.37 MB", file: "14-artifact-beacon.mp3" },
+  { number: "15", title: "Unexpected Outcome", length: "6:12", size: "8.52 MB", file: "15-unexpected-outcome.mp3" },
+  { number: "16", title: "Geiger Ghosts", length: "8:07", size: "11.16 MB", file: "16-geiger-ghosts.mp3" },
+  { number: "17", title: "Menu Theme [Enhanced]", length: "10:48", size: "14.83 MB", file: "17-menu-theme-enhanced.mp3" },
+  { number: "18", title: "Track 03 [Enhanced]", length: "4:59", size: "6.85 MB", file: "18-track-03-enhanced.mp3" },
+  { number: "19", title: "Nuclear Heartbeat", length: "7:57", size: "10.92 MB", file: "19-nuclear-heartbeat.mp3" },
+  { number: "20", title: "Moonlight Tactics", length: "10:21", size: "14.22 MB", file: "20-moonlight-tactics.mp3" },
+  { number: "21", title: "Undisclosed Location", length: "6:01", size: "8.28 MB", file: "21-undisclosed-location.mp3" },
+  { number: "22", title: "Shifting Realities", length: "9:45", size: "13.39 MB", file: "22-shifting-realities.mp3" },
+  { number: "23", title: "The Collapse", length: "10:54", size: "14.97 MB", file: "23-the-collapse.mp3" },
+  { number: "24", title: "Aftershocks", length: "9:48", size: "13.46 MB", file: "24-aftershocks.mp3" },
+  { number: "25", title: "Blast Zone", length: "11:20", size: "15.56 MB", file: "25-blast-zone.mp3" },
+  { number: "26", title: "Reclamation", length: "8:47", size: "12.06 MB", file: "26-reclamation.mp3" },
+  { number: "27", title: "Rainout", length: "9:54", size: "13.60 MB", file: "27-rainout.mp3" },
+  { number: "28", title: "Just Rewards", length: "14:07", size: "19.40 MB", file: "28-just-rewards.mp3" },
+  { number: "29", title: "Launch Codes", length: "6:58", size: "9.58 MB", file: "29-launch-codes.mp3" }
+];
+
+const trackList = document.getElementById("trackList");
+const previewPlayer = document.getElementById("previewPlayer");
+const previewTitle = document.getElementById("previewTitle");
+const previewMeta = document.getElementById("previewMeta");
+
+function setPreview(track) {
+  previewPlayer.src = track.file;
+  previewTitle.textContent = track.title;
+  previewMeta.textContent = `${track.file} | ${track.length} | ${track.size}`;
+  previewPlayer.play().catch(() => {});
+}
+
+TRACKS.forEach((track) => {
+  const row = document.createElement("article");
+  row.className = "track-row";
+
+  row.innerHTML = `
+    <div class="track-index">${track.number}</div>
+    <div class="track-main">
+      <span class="track-title">${track.title}</span>
+      <span class="track-file">${track.file}</span>
+    </div>
+    <div class="track-meta">${track.length}</div>
+    <div class="track-meta">${track.size}</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="track-action is-play" type="button">Play</button>
+      <a class="track-action" href="${track.file}" download>Download</a>
+    </div>
+  `;
+
+  row.querySelector("button").addEventListener("click", () => setPreview(track));
+  row.querySelector(".track-title").addEventListener("click", () => setPreview(track));
+  row.querySelector(".track-title").style.cursor = "pointer";
+  trackList.appendChild(row);
+});
+</script>
+</body>
+</html>

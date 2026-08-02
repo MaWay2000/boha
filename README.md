@@ -8,12 +8,16 @@ Modern remake of the legacy Warzone 2100 community hub.
 - `styles.css` - visual system and responsive layout
 - `assets/` - local branding and artwork used by the remake
 - `stats/` - mirrored upstream leaderboard logic, player-key mapping, live snapshot data, and auto-refresh manifest
-- `radio/` - the original Warzone Radio player and its local assets
+- `radio/` - the integrated Warzone Radio player, original MP3 tracks, and related pages
+- `mapmaker/` - browser-based Warzone 2100 map editor
+- `model-editor/` - browser-based PIE model viewer and editor
+- `opus2mp3/` - browser-based OPUS-to-MP3 converter
 
 ## Notes
 
 - The page is ready for static hosting, including GitHub Pages.
 - The radio player is available at `radio/`.
+- The consolidated tools are available at `mapmaker/`, `model-editor/`, and `opus2mp3/`.
 - The embedded stats board auto-refreshes mirrored upstream files through `stats/upstream-manifest.json`.
 - Because the upstream site does not expose CORS headers, GitHub Pages cannot read those files directly from the browser.
 - `node stats/sync-upstream.js` refreshes `calculate.js`, `leaderboards.js`, `upstream-results.js`, `player-public-keys.json`, `results.json`-based snapshot data, and the manifest in one pass.

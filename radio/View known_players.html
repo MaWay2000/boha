@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SQLite Known Players Viewer</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #121933;
+    --panel-2: #0f1530;
+    --text: #eef3ff;
+    --muted: #9fb0d1;
+    --line: #253156;
+    --good: #52c97f;
+    --bad: #ff6b6b;
+    --warn: #ffca57;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background:
+      radial-gradient(circle at top left, #18244d 0%, transparent 30%),
+      radial-gradient(circle at top right, #10203b 0%, transparent 25%),
+      linear-gradient(180deg, #09101d 0%, #0b1020 100%);
+    color: var(--text);
+  }
+  .wrap { max-width: 1500px; margin: 0 auto; padding: 18px; }
+  .title { font-size: 28px; font-weight: bold; margin-bottom: 6px; }
+  .subtitle { color: var(--muted); margin-bottom: 18px; }
+  .topbar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .btn, .toolbar input, .toolbar select, .toolbar button {
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px 12px;
+    font-size: 14px;
+  }
+  .btn, .toolbar button {
+    cursor: pointer;
+    transition: transform 0.08s ease, background 0.12s ease;
+  }
+  .btn:hover, .toolbar button:hover { background: #182142; }
+  .btn:active, .toolbar button:active { transform: translateY(1px); }
+  .file-status {
+    min-height: 20px;
+    color: var(--muted);
+    word-break: break-word;
+  }
+  .card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .stat-label {
+    color: var(--muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .stat-value { font-size: 28px; font-weight: bold; }
+  .pillbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .pill {
+    padding: 8px 10px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr auto auto auto;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .toolbar input, .toolbar select, .toolbar button { width: 100%; }
+  .table-wrap {
+    background: rgba(11,16,32,0.7);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .table-scroll { overflow: auto; max-height: 70vh; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td {
+    padding: 11px 12px;
+    border-bottom: 1px solid rgba(37,49,86,0.7);
+    text-align: left;
+    vertical-align: middle;
+    font-size: 14px;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #101735;
+    user-select: none;
+    cursor: pointer;
+  }
+  thead th:hover { background: #131c40; }
+  tbody tr:hover { background: rgba(110,168,254,0.08); }
+  .pk {
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    word-break: break-all;
+    color: #d8e5ff;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: bold;
+    border: 1px solid transparent;
+  }
+  .b-good {
+    color: #b8ffd0;
+    background: rgba(82,201,127,0.12);
+    border-color: rgba(82,201,127,0.28);
+  }
+  .b-bad {
+    color: #ffd0d0;
+    background: rgba(255,107,107,0.12);
+    border-color: rgba(255,107,107,0.28);
+  }
+  .b-warn {
+    color: #ffe7a6;
+    background: rgba(255,202,87,0.12);
+    border-color: rgba(255,202,87,0.28);
+  }
+  .nick-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .nick {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    background: rgba(159,176,209,0.10);
+    border: 1px solid rgba(159,176,209,0.20);
+    color: #dfe9ff;
+  }
+  .footer { color: var(--muted); margin-top: 12px; font-size: 13px; }
+  .hidden { display: none; }
+  .error-box {
+    white-space: pre-wrap;
+    background: rgba(255,107,107,0.08);
+    border: 1px solid rgba(255,107,107,0.28);
+    color: #ffd0d0;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 1050px) {
+    .toolbar { grid-template-columns: 1fr 1fr; }
+    .topbar { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 700px) {
+    .toolbar { grid-template-columns: 1fr; }
+    .title { font-size: 22px; }
+    th, td { padding: 9px 8px; font-size: 13px; }
+  }
+
+.btn-primary {
+  background: linear-gradient(180deg, #4ade80, #22c55e);
+  color: #052e16;
+  border: 1px solid rgba(34,197,94,0.6);
+  box-shadow: 0 0 12px rgba(34,197,94,0.4);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, #5efc95, #16a34a);
+  box-shadow: 0 0 18px rgba(34,197,94,0.6);
+}
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+
+.dropzone {
+  margin: 14px 0 16px 0;
+  padding: 24px 18px;
+  border: 2px dashed #2c5aa0;
+  border-radius: 16px;
+  background: rgba(40, 80, 160, 0.08);
+  color: #cfe0ff;
+  text-align: center;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+.dropzone strong {
+  display: block;
+  font-size: 20px;
+  margin-bottom: 8px;
+  color: #eef3ff;
+}
+.dropzone .muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+.dropzone.dragover {
+  background: rgba(74, 222, 128, 0.12);
+  border-color: #4ade80;
+  transform: scale(1.01);
+}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="title">SQLite Known Players Viewer</div>
+  
+
+  <div class="card" style="margin-bottom:16px;">
+    <div style="font-weight:bold; font-size:16px; margin-bottom:8px;">Where to find <code>folder</code></div>
+    <div style="color:var(--muted); line-height:1.5;">
+      In Windows, press <strong>Win + R</strong> and paste:<br>
+      <code style="display:inline-block; margin-top:8px; padding:8px 10px; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; color:var(--text);">%AppData%\Warzone 2100 Project\Warzone 2100</code>
+      <br><br>
+      Or open <code>%AppData%</code> and browse to:<br>
+      <code style="display:inline-block; margin-top:8px; padding:8px 10px; background:var(--panel-2); border:1px solid var(--line); border-radius:8px; color:var(--text);">Roaming\Warzone 2100 Project\Warzone 2100\</code>
+      <br><br>
+      If you do not see the file, enable <strong>hidden items</strong> in File Explorer. The database usually appears after playing multiplayer.
+    </div>
+  </div>
+
+  <div class="topbar">
+    <label class="btn btn-primary" for="fileInput">Open folder</label>
+    <div class="file-status" id="fileStatus">No file loaded yet. Tip: use the path above to find folder.</div>
+    <button class="btn" id="demoBtn" type="button">Load last opened again</button>
+  </div>
+  <input id="fileInput" type="file" accept=".db,.sqlite,.sqlite3,application/octet-stream" class="hidden" />
+
+  <div id="dropZone" class="dropzone">
+    <strong>Drop knownPlayers.db here</strong>
+    <div class="muted">You can drag and drop the database file into this area instead of browsing manually.</div>
+  </div>
+
+
+  <div id="errorBox" class="error-box hidden"></div>
+
+  <div class="stats">
+    <div class="card"><div class="stat-label">Known player rows</div><div class="stat-value" id="statPlayers">0</div></div>
+    <div class="card"><div class="stat-label">Unique names</div><div class="stat-value" id="statNames">0</div></div>
+    <div class="card"><div class="stat-label">Unique public keys</div><div class="stat-value" id="statPks">0</div></div>
+    <div class="card"><div class="stat-label">PKs with many names</div><div class="stat-value" id="statDupNames">0</div></div>
+    <div class="card"><div class="stat-label">Names shared by many PKs</div><div class="stat-value" id="statDupPks">0</div></div>
+  </div>
+
+  <div class="pillbar">
+    <div class="pill">Reads SQLite in browser</div>
+    <div class="pill">One row per public key</div>
+    <div class="pill">Shows all known nicknames per PK</div>
+    <div class="pill">Export filtered rows to CSV</div>
+  </div>
+
+  <div class="toolbar">
+    <input id="searchBox" type="text" placeholder="Search name or public key..." />
+    <select id="filterType">
+      <option value="all">Show: All public keys</option>
+      <option value="many_names">Only PKs with many nicknames</option>
+      <option value="shared_name">Only nicknames used by many PKs</option>
+      <option value="with_options">Only public keys with options</option>
+    </select>
+    <select id="sortMode">
+      <option value="first_local_id:asc">Sort: First ID ascending</option>
+      <option value="first_local_id:desc">Sort: First ID descending</option>
+      <option value="primary_name:asc">Sort: Main name A-Z</option>
+      <option value="primary_name:desc">Sort: Main name Z-A</option>
+      <option value="pk:asc">Sort: PK A-Z</option>
+      <option value="pk:desc">Sort: PK Z-A</option>
+      <option value="nickname_count:desc">Sort: Most nicknames first</option>
+      <option value="nickname_count:asc">Sort: Fewest nicknames first</option>
+    </select>
+    <button id="copyJsonBtn">Copy filtered JSON</button>
+    <button id="exportBtn">Export CSV</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th data-col="first_local_id">First ID</th>
+            <th data-col="primary_name">Main name</th>
+            <th>All known nicknames</th>
+            <th data-col="nickname_count">Nickname count</th>
+            <th data-col="pk">Public key</th>
+            <th>Shared nickname</th>
+            <th>Options</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer" id="footerInfo">Open a database to begin.</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script>
+let SQL = null;
+let rawPlayers = [];
+let enriched = [];
+let nameCounts = new Map();
+let pkCounts = new Map();
+
+const els = {
+  fileInput: document.getElementById('fileInput'),
+  dropZone: document.getElementById('dropZone'),
+  fileStatus: document.getElementById('fileStatus'),
+  demoBtn: document.getElementById('demoBtn'),
+  errorBox: document.getElementById('errorBox'),
+  rows: document.getElementById('rows'),
+  searchBox: document.getElementById('searchBox'),
+  filterType: document.getElementById('filterType'),
+  sortMode: document.getElementById('sortMode'),
+  exportBtn: document.getElementById('exportBtn'),
+  copyJsonBtn: document.getElementById('copyJsonBtn'),
+  resetBtn: document.getElementById('resetBtn'),
+  footerInfo: document.getElementById('footerInfo'),
+  statPlayers: document.getElementById('statPlayers'),
+  statNames: document.getElementById('statNames'),
+  statPks: document.getElementById('statPks'),
+  statDupNames: document.getElementById('statDupNames'),
+  statDupPks: document.getElementById('statDupPks')
+};
+
+function showError(message) {
+  els.errorBox.textContent = message;
+  els.errorBox.classList.remove('hidden');
+}
+function hideError() {
+  els.errorBox.textContent = '';
+  els.errorBox.classList.add('hidden');
+}
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+function resetStats() {
+  els.statPlayers.textContent = '0';
+  els.statNames.textContent = '0';
+  els.statPks.textContent = '0';
+  els.statDupNames.textContent = '0';
+  els.statDupPks.textContent = '0';
+}
+function tableExists(db, tableName) {
+  const result = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name = ?", [tableName]);
+  return result.length > 0 && result[0].values.length > 0;
+}
+function queryRows(db, sql) {
+  const result = db.exec(sql);
+  if (!result.length) return [];
+  const cols = result[0].columns;
+  return result[0].values.map(vals => Object.fromEntries(cols.map((c, i) => [c, vals[i]])));
+}
+function enrichData(players, options) {
+  rawPlayers = players.slice();
+  const optionsByPk = new Map();
+  for (const o of options) {
+    const pk = String(o.pk ?? '').trim();
+    if (pk && !optionsByPk.has(pk)) optionsByPk.set(pk, o);
+  }
+
+  nameCounts = new Map();
+  pkCounts = new Map();
+
+  for (const p of players) {
+    const nameKey = String(p.name ?? '').trim();
+    const pkKey = String(p.pk ?? '').trim();
+    if (nameKey) nameCounts.set(nameKey, (nameCounts.get(nameKey) || 0) + 1);
+    if (pkKey) pkCounts.set(pkKey, (pkCounts.get(pkKey) || 0) + 1);
+  }
+
+  const grouped = new Map();
+
+  for (const p of players) {
+    const pk = String(p.pk ?? '').trim();
+    const name = String(p.name ?? '').trim();
+    const localId = Number(p.local_id) || 0;
+    const key = pk || `__NO_PK__:${localId}:${name}`;
+
+    if (!grouped.has(key)) {
+      grouped.set(key, {
+        pk,
+        first_local_id: localId,
+        primary_name: name,
+        local_ids: [],
+        nicknames: [],
+        nicknameSet: new Set(),
+        hasSharedNickname: false,
+        options: optionsByPk.get(pk) || null
+      });
+    }
+
+    const item = grouped.get(key);
+    item.local_ids.push(localId);
+
+    if (name && !item.nicknameSet.has(name)) {
+      item.nicknameSet.add(name);
+      item.nicknames.push(name);
+      if ((nameCounts.get(name) || 0) > 1) item.hasSharedNickname = true;
+    }
+
+    if (!item.primary_name && name) item.primary_name = name;
+    if (localId && localId < item.first_local_id) item.first_local_id = localId;
+    if (!item.options && pk && optionsByPk.has(pk)) item.options = optionsByPk.get(pk);
+  }
+
+  enriched = Array.from(grouped.values()).map(item => ({
+    first_local_id: item.first_local_id,
+    primary_name: item.primary_name || '',
+    pk: item.pk,
+    nicknames: item.nicknames,
+    nickname_count: item.nicknames.length,
+    hasManyNames: item.nicknames.length > 1,
+    hasSharedNickname: item.hasSharedNickname,
+    options: item.options
+  }));
+}
+function updateStats() {
+  const uniqueNames = new Set(rawPlayers.map(p => String(p.name || '').trim()).filter(Boolean)).size;
+  const uniquePks = new Set(rawPlayers.map(p => String(p.pk || '').trim()).filter(Boolean)).size;
+  const pksWithManyNames = enriched.filter(p => p.nickname_count > 1).length;
+  const sharedNames = [...nameCounts.entries()].filter(([k, v]) => k && v > 1).length;
+
+  els.statPlayers.textContent = rawPlayers.length;
+  els.statNames.textContent = uniqueNames;
+  els.statPks.textContent = uniquePks;
+  els.statDupNames.textContent = pksWithManyNames;
+  els.statDupPks.textContent = sharedNames;
+}
+function getFilteredData() {
+  const q = els.searchBox.value.trim().toLowerCase();
+  const filterType = els.filterType.value;
+  const [sortCol, sortDir] = els.sortMode.value.split(':');
+
+  const data = enriched.filter(p => {
+    const hit = !q ||
+      (p.primary_name || '').toLowerCase().includes(q) ||
+      (p.pk || '').toLowerCase().includes(q) ||
+      p.nicknames.some(n => n.toLowerCase().includes(q));
+    if (!hit) return false;
+    if (filterType === 'many_names' && !p.hasManyNames) return false;
+    if (filterType === 'shared_name' && !p.hasSharedNickname) return false;
+    if (filterType === 'with_options' && !p.options) return false;
+    return true;
+  });
+
+  data.sort((a, b) => {
+    let av = a[sortCol] ?? '';
+    let bv = b[sortCol] ?? '';
+    if (sortCol === 'first_local_id' || sortCol === 'nickname_count') {
+      av = Number(av) || 0;
+      bv = Number(bv) || 0;
+      return sortDir === 'asc' ? av - bv : bv - av;
+    }
+    av = String(av).toLowerCase();
+    bv = String(bv).toLowerCase();
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  return data;
+}
+function render() {
+  const data = getFilteredData();
+  els.rows.innerHTML = data.map(p => {
+    let optHtml = '<span class="badge b-warn">none</span>';
+    if (p.options) {
+      const muted = Number(p.options.muted) ? '<span class="badge b-warn">muted</span>' : '<span class="badge b-good">not muted</span>';
+      const banned = Number(p.options.banned) ? '<span class="badge b-bad">banned</span>' : '<span class="badge b-good">not banned</span>';
+      optHtml = muted + ' ' + banned;
+    }
+    const nickHtml = p.nicknames.length
+      ? `<div class="nick-list">${p.nicknames.map(n => `<span class="nick">${escapeHtml(n)}</span>`).join('')}</div>`
+      : '<span class="badge b-warn">none</span>';
+    return `
+      <tr>
+        <td>${escapeHtml(p.first_local_id)}</td>
+        <td>${escapeHtml(p.primary_name)}</td>
+        <td>${nickHtml}</td>
+        <td>${escapeHtml(p.nickname_count)}</td>
+        <td class="pk">${escapeHtml(p.pk)}</td>
+        <td>${p.hasSharedNickname ? '<span class="badge b-bad">yes</span>' : '<span class="badge b-good">no</span>'}</td>
+        <td>${optHtml}</td>
+      </tr>
+    `;
+  }).join('');
+  els.footerInfo.textContent = `Showing ${data.length} public keys from ${rawPlayers.length} raw player rows`;
+}
+function exportCsv() {
+  const data = getFilteredData();
+  const headers = ['first_local_id','primary_name','all_nicknames','nickname_count','pk','hasSharedNickname','muted','banned'];
+  const lines = [headers.join(',')];
+  for (const p of data) {
+    const row = [
+      p.first_local_id,
+      p.primary_name,
+      p.nicknames.join(' | '),
+      p.nickname_count,
+      p.pk,
+      p.hasSharedNickname ? 1 : 0,
+      p.options ? (Number(p.options.muted) ? 1 : 0) : '',
+      p.options ? (Number(p.options.banned) ? 1 : 0) : ''
+    ].map(v => `"${String(v ?? '').replaceAll('"', '""')}"`);
+    lines.push(row.join(','));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'known_players_filtered.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+async function copyFilteredJson() {
+  const json = JSON.stringify(getFilteredData().map(p => ({ ...p, nicknames: p.nicknames.slice() })), null, 2);
+  try {
+    await navigator.clipboard.writeText(json);
+    els.copyJsonBtn.textContent = 'Copied!';
+    setTimeout(() => els.copyJsonBtn.textContent = 'Copy filtered JSON', 1200);
+  } catch {
+    alert('Clipboard copy failed in this browser.');
+  }
+}
+async function ensureSqlJs() {
+  if (SQL) return SQL;
+  if (typeof initSqlJs !== 'function') {
+    throw new Error('sql.js library failed to load. Open this HTML with internet access so the CDN script can load.');
+  }
+  SQL = await initSqlJs({
+    locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/${file}`
+  });
+  return SQL;
+}
+async function openDbBuffer(arrayBuffer, label) {
+  hideError();
+  els.fileStatus.textContent = `Loading ${label}...`;
+  try {
+    const SQLMod = await ensureSqlJs();
+    const db = new SQLMod.Database(new Uint8Array(arrayBuffer));
+
+    if (!tableExists(db, 'known_players')) {
+      throw new Error('Table "known_players" was not found in this database.');
+    }
+
+    const players = queryRows(db, 'SELECT local_id, name, pk FROM known_players ORDER BY local_id');
+    let options = [];
+    if (tableExists(db, 'player_options')) {
+      try {
+        options = queryRows(db, 'SELECT local_id, pk, name, muted, banned FROM player_options ORDER BY local_id');
+      } catch {
+        options = [];
+      }
+    }
+
+    enrichData(players, options);
+    updateStats();
+    render();
+
+    els.fileStatus.textContent = `Loaded: ${label}`;
+    localStorage.setItem('lastDbName', label);
+    localStorage.setItem('lastDbBytes', JSON.stringify(Array.from(new Uint8Array(arrayBuffer))));
+  } catch (err) {
+    enriched = [];
+    resetStats();
+    render();
+    els.fileStatus.textContent = `Failed to load: ${label}`;
+    showError(String(err && err.message ? err.message : err));
+  }
+}
+
+async function handleSelectedFile(file) {
+  if (!file) return;
+  const buf = await file.arrayBuffer();
+  await openDbBuffer(buf, file.name);
+}
+
+els.fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files && e.target.files[0];
+  await handleSelectedFile(file);
+});
+
+els.dropZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  els.dropZone.classList.add('dragover');
+});
+els.dropZone.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  els.dropZone.classList.add('dragover');
+});
+els.dropZone.addEventListener('dragleave', (e) => {
+  if (!els.dropZone.contains(e.relatedTarget)) {
+    els.dropZone.classList.remove('dragover');
+  }
+});
+els.dropZone.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  els.dropZone.classList.remove('dragover');
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  await handleSelectedFile(file);
+});
+els.demoBtn.addEventListener('click', async () => {
+  hideError();
+  const bytesJson = localStorage.getItem('lastDbBytes');
+  const name = localStorage.getItem('lastDbName');
+  if (!bytesJson) {
+    showError('No previously loaded database stored in this browser yet.');
+    return;
+  }
+  const bytes = JSON.parse(bytesJson);
+  const buf = new Uint8Array(bytes).buffer;
+  await openDbBuffer(buf, name || 'last opened db');
+});
+els.searchBox.addEventListener('input', render);
+els.filterType.addEventListener('change', render);
+els.sortMode.addEventListener('change', render);
+els.exportBtn.addEventListener('click', exportCsv);
+els.copyJsonBtn.addEventListener('click', copyFilteredJson);
+els.resetBtn.addEventListener('click', () => {
+  els.searchBox.value = '';
+  els.filterType.value = 'all';
+  els.sortMode.value = 'first_local_id:asc';
+  render();
+});
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.getAttribute('data-col');
+    const [curCol, curDir] = els.sortMode.value.split(':');
+    const nextDir = (curCol === col && curDir === 'asc') ? 'desc' : 'asc';
+    els.sortMode.value = `${col}:${nextDir}`;
+    render();
+  });
+});
+render();
+</script>
+
+  <div class="footer" style="text-align:center; margin-top:20px;">© 2026 Maway2000 — MIT License</div>
+</body>
+</html>

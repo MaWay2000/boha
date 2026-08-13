@@ -95,7 +95,7 @@ function updateLocation(tab, replace = false, search = null) {
   }
 }
 
-function loadTab(tab, { updateHistory = false, replaceHistory = false } = {}) {
+function loadTab(tab, { updateHistory = false, replaceHistory = false, resetSearch = false, forceReload = false } = {}) {
   const normalizedTab = normalizeTab(tab);
   const tabConfig = tabs[normalizedTab];
   if (!tabConfig) {
@@ -104,9 +104,10 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false } = {}) {
 
   setActiveTab(normalizedTab);
 
-  const nextSrc = buildFrameUrl(normalizedTab);
+  const searchParams = resetSearch ? new URLSearchParams() : getPageSearchParams();
+  const nextSrc = buildFrameUrl(normalizedTab, searchParams);
   const currentSrc = contentFrame.getAttribute("src") || "";
-  if (contentFrame.dataset.currentTab !== normalizedTab || currentSrc !== nextSrc) {
+  if (forceReload || contentFrame.dataset.currentTab !== normalizedTab || currentSrc !== nextSrc) {
     frameIsLoading = true;
     contentFrame.style.height = "480px";
     contentFrame.dataset.currentTab = normalizedTab;
@@ -114,7 +115,7 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false } = {}) {
   }
 
   if (updateHistory) {
-    updateLocation(normalizedTab, replaceHistory);
+    updateLocation(normalizedTab, replaceHistory, resetSearch ? "" : null);
   }
 }
 
@@ -130,7 +131,8 @@ tabControls.forEach((control) => {
     }
 
     event.preventDefault();
-    loadTab(tab, { updateHistory: true });
+    const resetFilters = control.classList.contains("brand");
+    loadTab(tab, { updateHistory: true, resetSearch: resetFilters, forceReload: resetFilters });
   });
 });
 

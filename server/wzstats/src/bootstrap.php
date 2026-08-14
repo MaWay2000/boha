@@ -12,6 +12,8 @@ require_once __DIR__ . '/ReplayParser.php';
 require_once __DIR__ . '/ReplayProcessor.php';
 require_once __DIR__ . '/ReplayMaterializer.php';
 require_once __DIR__ . '/Publisher.php';
+require_once __DIR__ . '/LegacyOutcomeImporter.php';
+require_once __DIR__ . '/LeaderboardCalculator.php';
 
 function wzstats_config(): array
 {

@@ -1,0 +1,69 @@
+# MaWay2000 wzstats server
+
+Server-side collection, replay storage and read-only API for MaWay2000's second completed-match source.
+
+## Replay-first synchronization
+
+Every server adapter returns only a normalized remote replay listing: source, remote ID, filename and download URL. The shared queue stores that listing in `remote_replays`, compares it on every scan, and downloads only records whose status is `pending` or `retry`.
+
+Downloaded files must have a valid `WZrp` header. They are stored by SHA-256, so the same replay discovered on multiple servers is saved and parsed only once. Remote HTTP 404 files are marked `missing`; transient download failures remain retryable. A server removing a file never deletes the local archived copy.
+
+After parsing, `ReplayMaterializer` creates normalized match, map, duration and non-spectator player records from replay data. Source totals are not silently promoted into replay-derived fields. Missing replay-native values remain null and can be attached later as explicitly attributed source metadata.
+
+Bohan/Retropaganda is the primary discovery source. Sunshine/wz2100.uk and future servers are additional discovery sources. Source website fields are provenance metadata; the replay file and versioned replay parser are the canonical data path.
+
+## GitHub publication
+
+Every completed cron run invokes `Publisher`, which atomically writes `data/matches.json` and `data/manifest.json`. The manifest includes the content SHA-256, byte size and match count. Its timestamp changes only when published match content changes.
+
+GitHub Actions downloads the manifest and snapshot from `https://onit.lt/wzstats/data/`, verifies the SHA-256 and commits only changed files under `stats/published/`. GitHub Pages reads those repository files; it does not query the live match API. Replay binaries remain content-addressed downloads from onit.lt.
+
+The existing legacy leaderboard snapshot remains a temporary validation baseline. It must not be replaced until replay-derived outcome and final-total calculations match the established primary Bohan results.
+
+This directory is isolated from the existing static `stats/` system. It does not replace or modify the Retropaganda/legacy source.
+
+## Requirements
+
+- PHP 8.1+ with PDO MySQL, cURL, DOM, JSON and mbstring
+- MariaDB 10.6+ or MySQL 8+
+- Apache `mod_rewrite`
+- A scheduled cron job and PHP CLI
+
+## Configuration
+
+Copy `config.example.php` to a location outside `public_html` and set the `WZSTATS_CONFIG` environment variable for CLI jobs. If the hosting panel cannot expose an environment variable, `config.local.php` is supported as a fallback and is denied by the included `.htaccess`.
+
+Never commit `config.local.php`.
+
+## First run
+
+```sh
+php bin/wzstats.php migrate
+php bin/wzstats.php status
+php bin/wzstats.php sync 10
+php bin/wzstats.php parse 10
+```
+
+URL cron schedule:
+
+```cron
+0,30 * * * * cronurl 'https://onit.lt/wzstats/bin/bohan.php?key=BOHAN_CRON_KEY'
+15,45 * * * * cronurl 'https://onit.lt/wzstats/bin/sun.php?key=SUN_CRON_KEY'
+```
+
+`bohan.php` and `sun.php` scan their complete available listings, compare them with the saved queue, download up to 100 unseen replay files, SHA-256 deduplicate them and parse up to 100 pending files. Normal 30-minute arrivals are fully drained in one run; the initial historical backlog is drained safely across multiple runs. Each URL requires its own secret key and returns 404 without it.
+
+Replay parsing validates the WZrp container and records replay-native header, match, player and network-message metadata. Published final totals remain attributed to wz2100.uk; they are not presented as replay-native fields.
+
+## API
+
+- `GET /wzstats/api/v1/status`
+- `GET /wzstats/api/v1/matches?limit=30&offset=0`
+- `GET /wzstats/api/v1/matches/<database-id>`
+- `GET /wzstats/api/v1/replays/<sha256>`
+
+The public API is read-only. CORS is limited to the configured MaWay2000 and onit.lt origins.
+
+## Data provenance
+
+Final source statistics use `stats_source = wz2100.uk`. Replay-derived values will be added separately with parser version metadata; they must not silently overwrite conflicting source or legacy totals.

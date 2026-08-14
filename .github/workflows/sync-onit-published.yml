@@ -1,0 +1,41 @@
+name: Sync MaWay2000 Published Stats
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25,55 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-onit-published
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Download verified onit.lt publication
+        run: node stats/sync-onit-published.js
+
+      - name: Commit and push updates
+        run: |
+          if [[ -z "$(git status --short -- stats/published)" ]]; then
+            echo "No publication changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add stats/published/matches.json stats/published/manifest.json
+          git commit -m "updated MaWay2000 published stats"
+          git push

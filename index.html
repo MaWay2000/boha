@@ -271,7 +271,7 @@
         pendingReplayUrl = replayUrl.href;
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = "replay-analyzer.html";
+        modalFrame.src = `replay-analyzer.html?replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 
@@ -281,9 +281,7 @@
         }
 
         const frameDocument = modalFrame.contentDocument;
-        const replayUrlInput = frameDocument?.getElementById("replayUrl");
-        const replayUrlGo = frameDocument?.getElementById("replayUrlGo");
-        if (!replayUrlInput || !replayUrlGo) {
+        if (!frameDocument) {
           return;
         }
 
@@ -460,9 +458,6 @@
             summaryObserver.observe(summaryGrid, { childList: true });
           }
         }
-
-        replayUrlInput.value = pendingReplayUrl;
-        replayUrlGo.click();
       });
 
       window.addEventListener("message", (event) => {

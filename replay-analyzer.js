@@ -1,4 +1,5 @@
 (function () {
+  const wzstatsPublishedUrl = new URL("stats/published/matches.json", document.baseURI);
   const replayFile = document.getElementById("replayFile");
   const replayFileName = document.getElementById("replayFileName");
   const replayUrl = document.getElementById("replayUrl");
@@ -131,6 +132,7 @@
   let latestExtraction = null;
   let analysisRunning = false;
   let latestReplayId = "";
+  let latestReplaySha256 = "";
   let playerSortState = { key: "position", direction: "asc" };
 
   class ReplayMessageReader {
@@ -223,6 +225,50 @@
     return match ? match[1] : "";
   }
 
+  function extractReplaySha256(value) {
+    const match = String(value || "").match(/\/replays\/([a-f0-9]{64})(?:[/?#]|$)/i);
+    return match ? match[1].toLowerCase() : "";
+  }
+
+  async function loadWzstatsResult(replaySha256) {
+    if (!replaySha256) {
+      return null;
+    }
+
+    const matchesResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
+    if (!matchesResponse.ok) {
+      throw new Error(`Unable to load wz2100.uk match index (${matchesResponse.status}).`);
+    }
+
+    const matchesPayload = await matchesResponse.json();
+    const match = (matchesPayload.matches || []).find((item) => item.replay_sha256 === replaySha256);
+    if (!match) {
+      return null;
+    }
+
+    return {
+      replayUrl: match.replay_url,
+      endDate: match.ended_at ? `${match.ended_at.replace(" ", "T")}Z` : null,
+      partialStats: true,
+      playerData: (match.players || []).map((player) => ({
+        position: player.position,
+        usertype: player.result,
+        kills: player.kills,
+        droidsBuilt: player.droids_built,
+        droidsLost: player.droids_lost,
+        structuresBuilt: player.structures_built,
+        structuresLost: player.structures_lost,
+        structureKills: player.structures_destroyed,
+        researchComplete: player.research_complete,
+        score: player.score,
+        power: player.power,
+        oilRigs: player.oil_rigs,
+        droids: player.remaining_droids,
+        structs: player.remaining_structures
+      }))
+    };
+  }
+
   async function loadPublishedResult(replayId) {
     if (!replayId) {
       return null;
@@ -287,6 +333,7 @@
 
       playersMatched += 1;
       player.summary = {
+        partialStats: Boolean(publishedResult.partialStats),
         result: published.usertype || "",
         kills: published.kills,
         droidsBuilt: published.droidsBuilt,
@@ -310,6 +357,7 @@
       ? {
           replayUrl: publishedResult.replayUrl,
           endDate: publishedResult.endDate,
+          partialStats: Boolean(publishedResult.partialStats),
           playersMatched
         }
       : null;
@@ -764,13 +812,11 @@
       : `${minutes}:${String(seconds).padStart(2, "0")}`;
   }
 
-  function formatReplayDate(replayId) {
-    const timestamp = Number(replayId);
-    if (!Number.isFinite(timestamp)) {
-      return "Unknown";
-    }
-
-    const date = new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp);
+  function formatReplayDate(value) {
+    const timestamp = Number(value);
+    const date = Number.isFinite(timestamp) && String(value).trim() !== ""
+      ? new Date(timestamp < 1e12 ? timestamp * 1000 : timestamp)
+      : new Date(value);
     return Number.isNaN(date.getTime())
       ? "Unknown"
       : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -858,7 +904,9 @@
 
   function calculatePlayerAwards(players, events = []) {
     const awardsByPlayer = new Map(players.map((player) => [player, []]));
-    const competitors = players.filter((player) => !player.spectator && player.summary);
+    const competitors = players.filter((player) => (
+      !player.spectator && player.summary && !player.summary.partialStats
+    ));
     const number = (value) => Number(value).toLocaleString();
     const stat = (player, key) => playerStat(player, key) || 0;
     const isWinner = (player) => formatPlayerResult(player) === "Won";
@@ -1339,6 +1387,7 @@
     }
 
     const stats = player.summary || {};
+    const partialStats = Boolean(stats.partialStats);
     const result = formatPlayerResult(player);
     const score = formatStat(stats.score) || "an unrecorded score";
     const variants = {
@@ -1385,7 +1434,11 @@
       story.push(`They built ${number(unitsBuilt)} units and recorded ${number(kills)} kills without a recorded unit loss.`);
     }
 
-    if (structuresBuilt === highestConstruction && structuresBuilt > 0) {
+    if (partialStats) {
+      story.push(
+        `The source records ${number(structuresDestroyed)} enemy structures destroyed; final structure and surviving-unit totals are unavailable.`
+      );
+    } else if (structuresBuilt === highestConstruction && structuresBuilt > 0) {
       story.push(
         `Industrial expansion defined their campaign: ${number(structuresBuilt)} structures were built, ${number(structuresDestroyed)} were destroyed, and ${number(structuresAlive)} remained.`
       );
@@ -1791,7 +1844,11 @@
 
   function getBestPlayer(players, value) {
     return players.reduce((best, player) => {
-      const playerValue = Number(value(player));
+      const rawValue = value(player);
+      if (rawValue == null || rawValue === "") {
+        return best;
+      }
+      const playerValue = Number(rawValue);
       if (!Number.isFinite(playerValue)) {
         return best;
       }
@@ -1968,7 +2025,7 @@
       renderSummaryItem("Map", extraction.match.map),
       renderSummaryItem("Duration", formatDuration(extraction.match.elapsedMilliseconds)),
       renderSummaryItem("Players / observers", `${playerCount} / ${observerCount}`),
-      renderSummaryItem("Date", formatReplayDate(latestReplayId))
+      renderSummaryItem("Date", formatReplayDate(extraction.publishedStats?.endDate || latestReplayId))
     ]);
 
     const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
@@ -2070,6 +2127,7 @@
     const file = replayFile.files[0];
     const urlValue = replayUrl.value.trim();
     latestReplayId = "";
+    latestReplaySha256 = "";
 
     if (!file && !urlValue) {
       throw new Error("Choose a replay file or paste a replay URL first.");
@@ -2086,6 +2144,7 @@
     }
 
     latestReplayId = extractReplayId(url.href);
+    latestReplaySha256 = extractReplaySha256(url.href);
     setStatus("Downloading replay…");
     const response = await fetch(url.href);
     if (!response.ok) {
@@ -2116,6 +2175,13 @@
           publishedResult = await loadPublishedResult(latestReplayId);
         } catch (error) {
           latestExtraction.publishedStatsError = error.message || "Player summary could not be loaded.";
+        }
+      } else if (latestReplaySha256) {
+        setStatus("Loading wz2100.uk player summary…");
+        try {
+          publishedResult = await loadWzstatsResult(latestReplaySha256);
+        } catch (error) {
+          latestExtraction.publishedStatsError = error.message || "wz2100.uk player summary could not be loaded.";
         }
       }
       attachPublishedPlayerStats(latestExtraction, publishedResult);

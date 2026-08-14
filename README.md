@@ -22,6 +22,8 @@ Modern remake of the legacy Warzone 2100 community hub.
 - Because the upstream site does not expose CORS headers, GitHub Pages cannot read those files directly from the browser.
 - `node stats/sync-upstream.js` refreshes `calculate.js`, `leaderboards.js`, `upstream-results.js`, `player-public-keys.json`, `results.json`-based snapshot data, and the manifest in one pass.
 - The sync script also supports optional upstream auth via `UPSTREAM_BASIC_USER` and `UPSTREAM_BASIC_PASSWORD`, or a prebuilt `UPSTREAM_BASIC_AUTH` header.
-- `.github/workflows/sync-warzone-upstream.yml` is set to mirror the upstream stats stack every 5 minutes.
+- `.github/workflows/sync-warzone-upstream.yml` is retained as a manual-only legacy fallback while the final primary leaderboard output is validated.
+- `.github/workflows/sync-onit-published.yml` verifies and mirrors normalized replay-derived snapshots published by onit.lt every 30 minutes.
+- The browser reads secondary-source match metadata from `stats/published/matches.json`; onit.lt performs discovery, replay storage, parsing, normalization, and publication before GitHub receives it.
 - Several resource links intentionally point to the existing `warzone2100.retropaganda.info` endpoints.
 - When I verified the legacy routes on March 20, 2026, `results.json` was returning HTTP 500, so the remake links to the working legacy leaderboard view instead.

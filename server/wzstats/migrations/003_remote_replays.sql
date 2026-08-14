@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS remote_replays (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    source_id INT UNSIGNED NOT NULL,
+    remote_id VARCHAR(128) NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    source_url VARCHAR(512) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    attempts INT UNSIGNED NOT NULL DEFAULT 0,
+    last_error TEXT NULL,
+    replay_id BIGINT UNSIGNED NULL,
+    discovered_at DATETIME NOT NULL,
+    last_seen_at DATETIME NOT NULL,
+    last_attempt_at DATETIME NULL,
+    downloaded_at DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_remote_replays_source_remote (source_id, remote_id),
+    KEY ix_remote_replays_source_status (source_id, status, id),
+    KEY ix_remote_replays_replay (replay_id),
+    CONSTRAINT fk_remote_replays_source FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+    CONSTRAINT fk_remote_replays_replay FOREIGN KEY (replay_id) REFERENCES replays (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

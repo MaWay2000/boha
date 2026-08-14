@@ -13,6 +13,7 @@ const PLAYER_KEYS_URL = USE_REMOTE_MIRROR_JSON
   : new URL("./player-public-keys.json", import.meta.url);
 const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const WZSTATS_MATCHES_URL = new URL("./published/matches.json", import.meta.url);
+const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
@@ -102,6 +103,8 @@ const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data
 
 let selectedLeaderboard = "Global";
 let resultsData = { format: 0, results: [] };
+let leaderboardData = null;
+let leaderboardDataSignature = "";
 let wzstatsMatches = [];
 let wzstatsMatchesSignature = "";
 let liveFeedState = "idle";
@@ -505,6 +508,98 @@ async function ensureWzstatsMatches(force = false) {
     console.warn("Unable to refresh wz2100.uk matches; keeping the last good copy.", error);
     return false;
   }
+}
+
+async function ensureLeaderboardData(force = false) {
+  const payload = await readJson(
+    WZSTATS_LEADERBOARDS_URL,
+    force ? Date.now().toString() : "leaderboards",
+    force
+  );
+  const signature = `${payload.generatedAt || ""}:${payload.coverage?.attributedMatches || 0}`;
+  if (!force && signature === leaderboardDataSignature) {
+    return false;
+  }
+  if (!payload.leaderboards || !Array.isArray(payload.games)) {
+    throw new Error("Published leaderboard data is incomplete.");
+  }
+  leaderboardData = payload;
+  leaderboardDataSignature = signature;
+  runtime.leaderboards = Object.keys(payload.leaderboards);
+  ensureSelectedLeaderboard();
+  renderButtons();
+  return true;
+}
+
+function hydratePublishedBoard(name) {
+  const board = leaderboardData?.leaderboards?.[name];
+  if (!board) {
+    return { accounts: new Map(), games: [] };
+  }
+
+  const accounts = new Map((board.players || []).map((player) => [String(player.id), {
+    mainPublicKey: player.mainPublicKey || null,
+    publicKeys: new Set(player.publicKeys || []),
+    name: player.name || "Unknown",
+    names: new Map(Object.entries(player.names || { [player.name || "Unknown"]: 1 })),
+    bot: Boolean(player.bot),
+    games: [],
+    elo: Number(player.elo || 1500),
+    winCount: Number(player.wins || 0),
+    loseCount: Number(player.losses || 0),
+    drawCount: Number(player.draws || 0),
+    discounted: Boolean(player.discounted)
+  }]));
+  const gameIds = new Set(board.gameIds || []);
+  const ratingEvents = board.ratingEvents || {};
+  const games = (leaderboardData.games || [])
+    .filter((game) => gameIds.has(game.id))
+    .map((publishedGame) => {
+      const slots = (publishedGame.slots || []).map((slot) => {
+        let account = accounts.get(String(slot.id));
+        if (!account) {
+          account = {
+            mainPublicKey: null, publicKeys: new Set(), name: slot.name || "Unknown",
+            names: new Map([[slot.name || "Unknown", 1]]), bot: true, games: [],
+            elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, discounted: true
+          };
+          accounts.set(String(slot.id), account);
+        }
+        const rating = ratingEvents[publishedGame.id]?.[String(slot.id)];
+        return {
+          position: Number(slot.position || 0), team: Number(slot.team || 0),
+          userType: slot.userType || null, account,
+          elo: rating && Number.isFinite(Number(rating.elo)) ? Number(rating.elo) : null,
+          eloDelta: rating && Number.isFinite(Number(rating.eloDelta)) ? Number(rating.eloDelta) : null
+        };
+      });
+      const teamsByNumber = new Map();
+      slots.forEach((slot) => {
+        if (!teamsByNumber.has(slot.team)) {
+          teamsByNumber.set(slot.team, { userType: null, slots: [], players: [] });
+        }
+        const team = teamsByNumber.get(slot.team);
+        team.slots.push(slot);
+        if (["winner", "loser", "contender"].includes(slot.userType)) team.players.push(slot);
+      });
+      const teams = [...teamsByNumber.values()];
+      teams.forEach((team) => {
+        const types = [...new Set(team.players.map((slot) => slot.userType))];
+        team.userType = types.length === 1 ? types[0] : null;
+      });
+      const game = {
+        ...publishedGame,
+        endDate: Number(publishedGame.endDate || 0),
+        duration: Number(publishedGame.duration || 0),
+        alliancesType: Number(publishedGame.alliancesType || 0),
+        slots,
+        players: slots.filter((slot) => ["winner", "loser", "contender"].includes(slot.userType)),
+        teams
+      };
+      slots.forEach((slot) => slot.account.games.push(game));
+      return game;
+    });
+  return { accounts, games };
 }
 
 function ensureSelectedLeaderboard() {
@@ -2482,6 +2577,9 @@ function renderMatchup(game, options = {}) {
 }
 
 function getLastUpdateTime(results) {
+  if (leaderboardData?.generatedAt) {
+    return new Date(leaderboardData.generatedAt).getTime();
+  }
   if (liveFeedState === "live") {
     return getLatestEndDate(results) || getMirrorSyncTime();
   }
@@ -3169,14 +3267,14 @@ function renderMatchActions(totalMatches, shownMatches) {
 }
 
 function render() {
-  if (!runtime.gather || !runtime.calculate || !runtime.filterGame) {
+  if (!leaderboardData) {
     updateStatusText([]);
     updateSortIndicators();
     syncStateToUrl();
     return;
   }
 
-  if (!resultsData.results.length) {
+  if (!leaderboardData.games.length) {
     updateStatusText([]);
     leaderboardGameCounts = new Map();
     globalRankMap = new Map();
@@ -3190,54 +3288,29 @@ function render() {
     return;
   }
 
-  const {
-    accounts: globalAccounts,
-    games: globalGames
-  } = runtime.gather(
-    resultsData.results,
-    playerPublicKeys,
-    function* includeAllGames(allGames) {
-      yield* allGames;
-    }
-  );
-
-  runtime.calculate(globalGames);
+  const { accounts: globalAccounts, games: globalGames } = hydratePublishedBoard("Global");
 
   const allGames = [...globalGames];
   const globalAccountList = sortAccounts(globalAccounts.values());
   globalRankMap = buildGlobalRankMap(globalAccountList);
 
-  leaderboardGameCounts = new Map(
-    (runtime.leaderboards?.length ? runtime.leaderboards : ["Global"]).map((leaderboard) => [
-      leaderboard,
-      allGames.reduce(
-        (count, game) => count + (runtime.filterGame(leaderboard, game) ? 1 : 0),
-        0
-      )
-    ])
-  );
+  leaderboardGameCounts = new Map(Object.entries(leaderboardData.leaderboards)
+    .map(([leaderboard, board]) => [leaderboard, Number(board.matches || 0)]));
 
-  const { accounts, games } = runtime.gather(
-    resultsData.results,
-    playerPublicKeys,
-    function* filterSelectedGames(allGames) {
-      for (const game of allGames) {
-        if (runtime.filterGame(selectedLeaderboard, game)) {
-          yield game;
-        }
-      }
-    }
-  );
-
-  runtime.calculate(games);
+  const { accounts, games } = hydratePublishedBoard(selectedLeaderboard);
 
   const accountList = sortAccounts(accounts.values());
   const gameList = [...games].sort((left, right) => right.endDate - left.endDate);
   const recentGameList = selectedLeaderboard === "Global"
-    ? [...gameList, ...wzstatsMatches].sort((left, right) => right.endDate - left.endDate)
+    ? [
+        ...gameList,
+        ...wzstatsMatches.filter((game) => !allGames.some((ratedGame) => (
+          ratedGame.source === game.source && String(ratedGame.sourceMatchId) === String(game.sourceMatchId)
+        )))
+      ].sort((left, right) => right.endDate - left.endDate)
     : gameList;
 
-  updateStatusText(resultsData.results);
+  updateStatusText(leaderboardData.games);
   renderButtons();
   renderSummary(accountList, gameList);
   renderRanks(accountList);
@@ -3401,18 +3474,10 @@ function startLiveSync() {
 }
 
 async function refreshFromMirror(force = false) {
-  const manifest = await readManifest();
-  if (manifest) {
-    upstreamManifest = manifest;
-  }
-
-  const runtimeChanged = await ensureRuntime(force);
-  const playerKeysChanged = await ensurePlayerKeys(force);
-  const shouldRefreshSnapshot = force || liveFeedState !== "live";
-  const snapshotChanged = shouldRefreshSnapshot ? await ensureSnapshot(force) : false;
+  const leaderboardChanged = await ensureLeaderboardData(force);
   const wzstatsChanged = await ensureWzstatsMatches(force);
 
-  if (runtimeChanged || playerKeysChanged || snapshotChanged || wzstatsChanged || force) {
+  if (leaderboardChanged || wzstatsChanged || force) {
     render();
   }
 }
@@ -3478,7 +3543,6 @@ async function init() {
     return;
   }
 
-  startLiveSync();
   startRefreshLoop();
 }
 

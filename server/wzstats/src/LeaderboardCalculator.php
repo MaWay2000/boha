@@ -36,6 +36,7 @@ final class LeaderboardCalculator
                 'attributedMatches' => count($facts),
                 'byResultSource' => array_count_values(array_column($facts, 'resultSource')),
             ],
+            'games' => $this->publishedGames($facts),
             'leaderboards' => $boards,
         ];
         $current = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
@@ -63,22 +64,32 @@ final class LeaderboardCalculator
     private function facts(): array
     {
         $rows = $this->pdo->query(
-            'SELECT f.result_source, f.game_json, f.players_json
+            'SELECT f.result_source, f.game_json, f.players_json, s.source_key, s.display_name,
+                    m.source_match_id, r.sha256 AS replay_sha256
              FROM match_outcome_facts f
              JOIN matches m ON m.source_id = f.source_id AND m.source_match_id = f.source_match_id
+             JOIN sources s ON s.id = f.source_id
+             LEFT JOIN replays r ON r.id = m.replay_id
              ORDER BY f.legacy_order, m.id'
         )->fetchAll();
         $facts = [];
         foreach ($rows as $row) {
             $facts[] = [
                 'resultSource' => (string) $row['result_source'],
+                'key' => (string) $row['source_key'] . ':' . (string) $row['source_match_id'],
+                'source' => (string) $row['source_key'],
+                'sourceLabel' => (string) $row['display_name'],
+                'sourceMatchId' => (string) $row['source_match_id'],
+                'replayUrl' => $row['replay_sha256'] ? 'https://onit.lt/wzstats/api/v1/replays/' . $row['replay_sha256'] : '',
                 'game' => json_decode((string) $row['game_json'], true, 64, JSON_THROW_ON_ERROR),
                 'players' => json_decode((string) $row['players_json'], true, 64, JSON_THROW_ON_ERROR),
             ];
         }
         $sourceMatches = $this->pdo->query(
-            "SELECT m.id, m.started_at, m.ended_at, m.duration_ms, m.map_name, m.game_type
+            "SELECT m.id, m.source_match_id, m.started_at, m.ended_at, m.duration_ms, m.map_name, m.game_type,
+                    s.source_key, s.display_name, r.sha256 AS replay_sha256
              FROM matches m JOIN sources s ON s.id = m.source_id
+             LEFT JOIN replays r ON r.id = m.replay_id
              WHERE s.source_key <> 'bohan'
                AND EXISTS (SELECT 1 FROM match_players mp WHERE mp.match_id = m.id AND LOWER(mp.result) IN ('winner', 'loser', 'contender'))"
         )->fetchAll();
@@ -109,6 +120,11 @@ final class LeaderboardCalculator
                 $start = $match['started_at'] ? strtotime((string) $match['started_at'] . ' UTC') * 1000 : 0;
                 $facts[] = [
                     'resultSource' => $resultSources[$matchId] ?? 'source',
+                    'key' => (string) $match['source_key'] . ':' . (string) $match['source_match_id'],
+                    'source' => (string) $match['source_key'],
+                    'sourceLabel' => (string) $match['display_name'],
+                    'sourceMatchId' => (string) $match['source_match_id'],
+                    'replayUrl' => $match['replay_sha256'] ? 'https://onit.lt/wzstats/api/v1/replays/' . $match['replay_sha256'] : '',
                     'game' => [
                         'version' => '', 'startDate' => $start,
                         'endDate' => $match['ended_at'] ? strtotime((string) $match['ended_at'] . ' UTC') * 1000 : null,
@@ -131,6 +147,7 @@ final class LeaderboardCalculator
         foreach ($facts as $fact) {
             $gameData = $fact['game'];
             $game = [
+                'key' => (string) $fact['key'],
                 'duration' => (int) ($gameData['duration'] ?? 0),
                 'mapName' => (string) ($gameData['mapName'] ?? ''),
                 'alliancesType' => (int) ($gameData['alliancesType'] ?? 0),
@@ -194,6 +211,7 @@ final class LeaderboardCalculator
         foreach ($games as $game) foreach ($game['slots'] as $slot) $accounts[$slot['id']]['games']++;
 
         $validMatches = 0;
+        $ratingEvents = [];
         foreach ($games as &$game) {
             if ($game['cheated'] || $game['duration'] < 180000 || $this->allTeamsAreLosers($game['teams'])) continue;
             $sizes = array_map(static fn(array $team): int => count($team['players']), array_filter($game['teams'], static fn(array $team): bool => count($team['players']) > 0));
@@ -232,7 +250,11 @@ final class LeaderboardCalculator
                 $ratedTeams[$first]['delta'] += $delta;
                 $ratedTeams[$second]['delta'] -= $delta;
             }
-            foreach ($ratedTeams as $team) foreach ($team['ids'] as $id) $accounts[$id]['elo'] += $team['delta'] / count($team['ids']);
+            foreach ($ratedTeams as $team) foreach ($team['ids'] as $id) {
+                $delta = $team['delta'] / count($team['ids']);
+                $ratingEvents[$game['key']][$id] = ['elo' => round($accounts[$id]['elo'], 2), 'eloDelta' => round($delta, 2)];
+                $accounts[$id]['elo'] += $delta;
+            }
             foreach ($game['teams'] as $team) foreach ($team['players'] as $slot) {
                 if ($team['userType'] === 'winner') $accounts[$slot['id']]['wins']++;
                 elseif ($team['userType'] === 'loser') $accounts[$slot['id']]['losses']++;
@@ -256,7 +278,49 @@ final class LeaderboardCalculator
             unset($player['allGames']);
         }
         unset($player);
-        return ['matches' => count($games), 'validMatches' => $validMatches, 'players' => $players];
+        return [
+            'matches' => count($games), 'validMatches' => $validMatches,
+            'gameIds' => array_column($games, 'key'), 'ratingEvents' => $ratingEvents, 'players' => $players,
+        ];
+    }
+
+    private function publishedGames(array $facts): array
+    {
+        $games = [];
+        foreach ($facts as $fact) {
+            $gameData = $fact['game'];
+            $slots = [];
+            $teams = [];
+            $players = $fact['players'];
+            usort($players, static fn(array $a, array $b): int => ((int) ($a['position'] ?? 0)) <=> ((int) ($b['position'] ?? 0)));
+            foreach ($players as $index => $player) {
+                [$id, $name] = $this->identity($player);
+                $userType = $player['usertype'] ?? null;
+                $team = (int) ($player['team'] ?? (!empty($gameData['alliancesType']) ? 0 : $index));
+                $slots[] = ['id' => $id, 'name' => $name, 'position' => (int) ($player['position'] ?? $index), 'team' => $team, 'userType' => $userType];
+                if (in_array($userType, ['winner', 'loser', 'contender'], true)) $teams[$team][] = count($slots) - 1;
+            }
+            if (empty($gameData['timeout'])) {
+                $contenderTeams = [];
+                foreach ($teams as $team => $indexes) {
+                    $types = array_values(array_unique(array_map(static fn(int $slot): mixed => $slots[$slot]['userType'], $indexes)));
+                    if ($types === ['contender']) $contenderTeams[] = $team;
+                }
+                if (count($contenderTeams) === 1) {
+                    foreach ($teams[$contenderTeams[0]] as $slot) $slots[$slot]['userType'] = 'winner';
+                }
+            }
+            $games[] = [
+                'id' => (string) $fact['key'], 'source' => (string) $fact['source'],
+                'sourceLabel' => (string) $fact['sourceLabel'], 'sourceMatchId' => (string) $fact['sourceMatchId'],
+                'resultSource' => (string) $fact['resultSource'], 'replayUrl' => (string) $fact['replayUrl'],
+                'startDate' => (int) ($gameData['startDate'] ?? 0), 'endDate' => (int) ($gameData['endDate'] ?? 0),
+                'duration' => (int) ($gameData['duration'] ?? 0), 'mapName' => (string) ($gameData['mapName'] ?? ''),
+                'mods' => (string) ($gameData['mods'] ?? ''), 'alliancesType' => (int) ($gameData['alliancesType'] ?? 0),
+                'timeout' => !empty($gameData['timeout']), 'cheated' => !empty($gameData['cheated']), 'slots' => $slots,
+            ];
+        }
+        return $games;
     }
 
     private function identity(array $player): array

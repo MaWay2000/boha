@@ -27,7 +27,8 @@ try {
     $migrations = Database::migrate($pdo, dirname(__DIR__) . '/migrations');
     $import = (new LegacyOutcomeImporter($pdo))->import(dirname(__DIR__) . '/data/legacy-outcomes.json');
     $publish = (new LeaderboardCalculator($pdo))->publish(dirname(__DIR__) . '/data/leaderboards.json');
-    echo json_encode(['migrations' => $migrations, 'import' => $import, 'publish' => $publish], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+    $manifest = (new Publisher($pdo, dirname(__DIR__) . '/data'))->publish();
+    echo json_encode(['migrations' => $migrations, 'import' => $import, 'publish' => $publish, 'manifest' => $manifest], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 } catch (Throwable $error) {
     $exitCode = 1;
     if (!$isCli) http_response_code(500);

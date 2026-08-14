@@ -32,11 +32,17 @@ final class Publisher
             $this->atomicWrite($matchesPath, $matchesJson);
         }
 
+        $leaderboardsPath = $this->directory . DIRECTORY_SEPARATOR . 'leaderboards.json';
+        $leaderboardsHash = is_file($leaderboardsPath) ? hash_file('sha256', $leaderboardsPath) : null;
+        $leaderboardsBytes = is_file($leaderboardsPath) ? filesize($leaderboardsPath) : null;
+
         $manifestPath = $this->directory . DIRECTORY_SEPARATOR . 'manifest.json';
         $currentManifest = is_file($manifestPath)
             ? json_decode((string) file_get_contents($manifestPath), true)
             : null;
-        $publishedAt = $changed || !is_array($currentManifest)
+        $previousLeaderboardHash = $currentManifest['files']['leaderboards.json']['sha256'] ?? null;
+        $leaderboardsChanged = $leaderboardsHash !== $previousLeaderboardHash;
+        $publishedAt = $changed || $leaderboardsChanged || !is_array($currentManifest)
             ? gmdate('c')
             : (string) ($currentManifest['publishedAt'] ?? gmdate('c'));
         $manifest = [
@@ -50,16 +56,23 @@ final class Publisher
                 ],
             ],
         ];
+        if ($leaderboardsHash !== null) {
+            $manifest['files']['leaderboards.json'] = [
+                'sha256' => $leaderboardsHash,
+                'bytes' => $leaderboardsBytes,
+            ];
+        }
         $manifestJson = $this->encode($manifest);
         if (!is_file($manifestPath) || file_get_contents($manifestPath) !== $manifestJson) {
             $this->atomicWrite($manifestPath, $manifestJson);
         }
 
         return [
-            'changed' => $changed,
+            'changed' => $changed || $leaderboardsChanged,
             'publishedAt' => $publishedAt,
             'matches' => count($payload['matches']),
             'sha256' => $matchesHash,
+            'leaderboardsSha256' => $leaderboardsHash,
             'cleanup' => $cleanup,
         ];
     }

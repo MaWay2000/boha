@@ -18,7 +18,7 @@ Every completed cron run invokes `Publisher`, which atomically writes `data/matc
 
 GitHub Actions downloads the manifest and snapshot from `https://onit.lt/wzstats/data/`, verifies the SHA-256 and commits only changed files under `stats/published/`. GitHub Pages reads those repository files; it does not query the live match API. Replay binaries remain content-addressed downloads from onit.lt.
 
-The existing legacy leaderboard snapshot remains a temporary validation baseline. It must not be replaced until replay-derived outcome and final-total calculations match the established primary Bohan results.
+The legacy result snapshot is imported as an explicitly attributed outcome fact only when its source replay ID also exists in the new database. The server calculates `data/leaderboards.json`; matches without a trustworthy outcome are excluded from wins, losses and Elo. The existing public leaderboard remains unchanged until the server result has been validated.
 
 This directory is isolated from the existing static `stats/` system. It does not replace or modify the Retropaganda/legacy source.
 
@@ -42,6 +42,8 @@ php bin/wzstats.php migrate
 php bin/wzstats.php status
 php bin/wzstats.php sync 10
 php bin/wzstats.php parse 10
+node tools/build-legacy-outcomes.mjs
+php bin/leaderboard.php
 ```
 
 URL cron schedule:
@@ -52,6 +54,10 @@ URL cron schedule:
 ```
 
 `bohan.php` and `sun.php` scan their complete available listings, compare them with the saved queue, download up to 100 unseen replay files, SHA-256 deduplicate them and parse up to 100 pending files. Normal 30-minute arrivals are fully drained in one run; the initial historical backlog is drained safely across multiple runs. Each URL requires its own secret key and returns 404 without it.
+
+`tools/build-legacy-outcomes.mjs` creates the private upload artifact `data/legacy-outcomes.json`. `leaderboard.php` imports it, links facts to materialized matches by source ID, and atomically publishes `data/leaderboards.json`. The artifact and generated output are ignored by Git.
+
+After the initial import, both source cron scripts recalculate the leaderboard. An unchanged calculation preserves the existing file and `generatedAt` value.
 
 Replay parsing validates the WZrp container and records replay-native header, match, player and network-message metadata. Published final totals remain attributed to wz2100.uk; they are not presented as replay-native fields.
 

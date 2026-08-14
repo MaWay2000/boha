@@ -36,6 +36,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add stats/published/matches.json stats/published/manifest.json
+          git add stats/published/matches.json stats/published/leaderboards.json stats/published/manifest.json
           git commit -m "updated MaWay2000 published stats"
           git push

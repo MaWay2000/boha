@@ -57,6 +57,8 @@ URL cron schedule:
 
 `tools/build-legacy-outcomes.mjs` creates the private upload artifact `data/legacy-outcomes.json`. `leaderboard.php` imports it, links facts to materialized matches by source ID, and atomically publishes `data/leaderboards.json`. The artifact and generated output are ignored by Git.
 
+After the initial import, both source cron scripts recalculate the leaderboard. An unchanged calculation preserves the existing file and `generatedAt` value.
+
 Replay parsing validates the WZrp container and records replay-native header, match, player and network-message metadata. Published final totals remain attributed to wz2100.uk; they are not presented as replay-native fields.
 
 ## API

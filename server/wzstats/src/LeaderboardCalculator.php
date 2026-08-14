@@ -38,13 +38,26 @@ final class LeaderboardCalculator
             ],
             'leaderboards' => $boards,
         ];
+        $current = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+        if (is_array($current)) {
+            $candidateCore = $payload;
+            $currentCore = $current;
+            unset($candidateCore['generatedAt'], $currentCore['generatedAt']);
+            if (json_encode($candidateCore, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)
+                === json_encode($currentCore, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)) {
+                return [
+                    'changed' => false, 'matches' => count($facts), 'boards' => count($boards),
+                    'bytes' => filesize($path), 'sha256' => hash_file('sha256', $path),
+                ];
+            }
+        }
         $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR) . "\n";
         $temporary = $path . '.tmp-' . bin2hex(random_bytes(4));
         if (file_put_contents($temporary, $json, LOCK_EX) === false || !rename($temporary, $path)) {
             @unlink($temporary);
             throw new RuntimeException('Unable to publish leaderboards.json.');
         }
-        return ['matches' => count($facts), 'boards' => count($boards), 'bytes' => strlen($json), 'sha256' => hash('sha256', $json)];
+        return ['changed' => true, 'matches' => count($facts), 'boards' => count($boards), 'bytes' => strlen($json), 'sha256' => hash('sha256', $json)];
     }
 
     private function facts(): array

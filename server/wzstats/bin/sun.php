@@ -37,7 +37,8 @@ try {
     $parse = (new ReplayProcessor($pdo, new ReplayParser()))->processPending($parseLimit);
     $matches = (new ReplayMaterializer($pdo))->materialize($parseLimit);
     $publish = (new Publisher($pdo, dirname(__DIR__) . '/data'))->publish();
-    $result = ['source' => 'wz2100.uk', 'scan' => $scan, 'downloads' => $downloads, 'parse' => $parse, 'matches' => $matches, 'publish' => $publish];
+    $leaderboards = (new LeaderboardCalculator($pdo))->publish(dirname(__DIR__) . '/data/leaderboards.json');
+    $result = ['source' => 'wz2100.uk', 'scan' => $scan, 'downloads' => $downloads, 'parse' => $parse, 'matches' => $matches, 'publish' => $publish, 'leaderboards' => $leaderboards];
     $exitCode = $downloads['errors'] === [] && $parse['errors'] === [] && $matches['errors'] === [] ? 0 : 2;
     echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . PHP_EOL;
 } catch (Throwable $error) {

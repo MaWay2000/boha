@@ -158,8 +158,29 @@ try {
         if (!filter_var($sourceUrl, FILTER_VALIDATE_URL) || !in_array($scheme, ['http', 'https'], true)) {
             respond(['error' => 'Replay source is unavailable.'], 404);
         }
-        header('Cache-Control: no-store');
-        header('Location: ' . $sourceUrl, true, 302);
+        $handle = curl_init($sourceUrl);
+        if ($handle === false) {
+            respond(['error' => 'Replay source is unavailable.'], 502);
+        }
+        curl_setopt_array($handle, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_USERAGENT => 'MaWay2000-wzstats/1.0',
+        ]);
+        $bytes = curl_exec($handle);
+        $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        curl_close($handle);
+        if (!is_string($bytes) || $status < 200 || $status >= 300 || !str_starts_with($bytes, 'WZrp')) {
+            respond(['error' => 'Replay source is unavailable.'], 502);
+        }
+        header('Content-Type: application/octet-stream');
+        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $replay['filename']) . '"');
+        header('Content-Length: ' . strlen($bytes));
+        header('Cache-Control: public, max-age=3600');
+        echo $bytes;
         exit;
     }
 

@@ -167,6 +167,10 @@
   let battlefieldLastTick = 0;
   let battlefieldLastDraw = 0;
   let battlefieldTerrain = null;
+  let battlefieldDroidDefinitions = new Map();
+  let battlefieldStructureDefinitions = new Map();
+  let battlefieldModelLibraryPromise = null;
+  const battlefieldSpriteCache = new Map();
   const battlefieldHiddenPlayers = new Set();
 
   class ReplayMessageReader {
@@ -2208,6 +2212,11 @@
       interpolated[2] = Number(object[2]) + (Number(next[2]) - Number(object[2])) * ratio;
       interpolated[3] = Number(object[3]) + (Number(next[3]) - Number(object[3])) * ratio;
       interpolated[4] = Number(object[4]) + (Number(next[4]) - Number(object[4])) * ratio;
+      if (interpolated[7] === null || interpolated[7] === undefined) {
+        const deltaX = Number(next[2]) - Number(object[2]);
+        const deltaY = Number(next[3]) - Number(object[3]);
+        if (deltaX || deltaY) interpolated[7] = Math.atan2(deltaX, -deltaY) * 180 / Math.PI;
+      }
       return interpolated;
     });
 
@@ -2219,6 +2228,238 @@
       });
     }
     return objects;
+  }
+
+  function collectBattlefieldObjectDefinitions(frames) {
+    battlefieldDroidDefinitions = new Map();
+    battlefieldStructureDefinitions = new Map();
+    frames.forEach((frame) => {
+      (frame.droidDefinitions || []).forEach((definition) => {
+        battlefieldDroidDefinitions.set(Number(definition[0]), {
+          id: Number(definition[0]),
+          name: definition[1] || "",
+          body: definition[2] || "",
+          propulsion: definition[3] || "",
+          weapons: Array.isArray(definition[4]) ? definition[4].filter(Boolean) : [],
+          droidType: definition[5]
+        });
+      });
+      (frame.structureDefinitions || []).forEach((definition) => {
+        battlefieldStructureDefinitions.set(Number(definition[0]), {
+          id: Number(definition[0]),
+          name: definition[1] || "",
+          statType: definition[2]
+        });
+      });
+    });
+  }
+
+  function normalizeBattlefieldModelName(value) {
+    return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+  }
+
+  async function loadBattlefieldModelLibrary() {
+    if (battlefieldModelLibraryPromise) {
+      return battlefieldModelLibraryPromise;
+    }
+    battlefieldModelLibraryPromise = (async () => {
+      window.PIES_BASE = new URL("mapmaker/pies/", window.location.href).href;
+      window.TEX_BASE = new URL("mapmaker/classic/texpages/texpages/", window.location.href).href;
+      const [THREE, droidModule, structureModule, bodyDefs, propDefs, weaponDefs, templateDefs,
+        constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs, structureDefs] = await Promise.all([
+        import("./mapmaker/js/three.module.js"),
+        import("./mapmaker/js/droidGroup.js"),
+        import("./mapmaker/js/structureGroup.js"),
+        fetch("mapmaker/pies/components/bodies/body.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/prop/propulsion.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/weapons/weapons.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/templates.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/construction.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/repair.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/sensor.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/brain.json").then((response) => response.json()),
+        fetch("mapmaker/pies/components/ecm.json").then((response) => response.json()),
+        fetch("mapmaker/structure.json").then((response) => response.json())
+      ]);
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(1);
+      renderer.setSize(96, 96, false);
+      renderer.setClearColor(0x000000, 0);
+      const structureNames = new Map();
+      Object.values(structureDefs).forEach((definition) => {
+        [definition.id, definition.name].filter(Boolean).forEach((name) => {
+          structureNames.set(normalizeBattlefieldModelName(name), definition);
+        });
+      });
+      const templateNames = new Map();
+      Object.values(templateDefs).forEach((definition) => {
+        [definition.id, definition.name].filter(Boolean).forEach((name) => {
+          templateNames.set(normalizeBattlefieldModelName(name), definition);
+        });
+      });
+      return {
+        THREE, renderer, buildDroidGroup: droidModule.buildDroidGroup,
+        buildStructureGroup: structureModule.buildStructureGroup,
+        bodyDefs, propDefs, weaponDefs, templateDefs, templateNames,
+        constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs,
+        structureDefs, structureNames
+      };
+    })();
+    return battlefieldModelLibraryPromise;
+  }
+
+  function battlefieldPiePath(value, prefix = "") {
+    let name = String(value || "");
+    if (!name.toLowerCase().endsWith(".pie")) name += ".pie";
+    return name.includes("/") ? name : `${prefix}${name}`;
+  }
+
+  function battlefieldDroidParts(definition, library) {
+    const template = library.templateNames.get(normalizeBattlefieldModelName(definition.name));
+    const design = template || definition;
+    const bodyId = definition.body || design.body;
+    const propulsionId = definition.propulsion || design.propulsion;
+    const weapons = definition.weapons.length ? definition.weapons : (design.weapons || []);
+    const parts = [];
+    const body = library.bodyDefs[bodyId];
+    const propulsion = library.propDefs[propulsionId];
+    parts.push({
+      role: "meta",
+      propulsionType: propulsion?.type,
+      droidType: design.type || definition.droidType
+    });
+    if (bodyId) {
+      parts.push({ role: "body", path: battlefieldPiePath(body?.model || bodyId, "components/bodies/") });
+    }
+    let bodySpecificPropulsion = false;
+    const propulsionModels = body?.propulsionExtraModels?.[propulsionId];
+    if (propulsionModels) {
+      const left = typeof propulsionModels === "string" ? propulsionModels : propulsionModels.left;
+      if (left) {
+        parts.push({ role: "propulsion", path: battlefieldPiePath(left, "components/prop/"), side: "left" });
+        const right = String(left).replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
+        if (right !== left && !/^prmvtl/i.test(left)) {
+          parts.push({ role: "propulsion", path: battlefieldPiePath(right, "components/prop/"), side: "right" });
+        }
+        bodySpecificPropulsion = true;
+      }
+    }
+    if (propulsionId && !bodySpecificPropulsion) {
+      parts.push({
+        role: "propulsion",
+        path: battlefieldPiePath(propulsion?.model || propulsionId, "components/prop/")
+      });
+    }
+    const addTurret = (componentId, definitions, kind, slot = 0) => {
+      if (!componentId) return;
+      const component = definitions[componentId];
+      const mount = component?.mountModel;
+      const model = component?.model || component?.sensorModel || componentId;
+      if (mount) parts.push({ role: "mount", path: battlefieldPiePath(mount, "components/weapons/"), kind, slot });
+      if (model && model !== mount) {
+        parts.push({ role: "weapon", path: battlefieldPiePath(model, "components/weapons/"), kind, slot });
+      }
+    };
+    weapons.forEach((weapon, index) => addTurret(weapon, library.weaponDefs, "weapon", index));
+    if (!weapons.length) {
+      const droidType = Number(definition.droidType);
+      addTurret(design.construct || (droidType === 3 ? "Spade1Mk1" : droidType === 10 ? "CyborgSpade" : ""), library.constructionDefs, "construct");
+      addTurret(design.repair || (droidType === 8 ? "LightRepair1" : droidType === 11 ? "CyborgRepair" : ""), library.repairDefs, "repair");
+      addTurret(design.sensor || (droidType === 1 ? "SensorTurret1Mk1" : ""), library.sensorDefs, "sensor");
+      addTurret(design.ecm || (droidType === 2 ? "ECM1TurretMk1" : ""), library.ecmDefs, "ecm");
+      const brainWeapon = library.brainDefs[design.brain]?.turret;
+      if (brainWeapon) addTurret(brainWeapon, library.weaponDefs, "weapon");
+      else addTurret(design.brain || (droidType === 7 ? "CommandBrain01" : ""), library.brainDefs, "brain");
+    }
+    return parts;
+  }
+
+  function disposeBattlefieldModel(group) {
+    group.traverse((item) => {
+      item.geometry?.dispose?.();
+      const materials = Array.isArray(item.material) ? item.material : [item.material];
+      materials.filter(Boolean).forEach((material) => {
+        material.map?.dispose?.();
+        material.dispose?.();
+      });
+    });
+  }
+
+  async function createBattlefieldModelSprite(kind, definition) {
+    const library = await loadBattlefieldModelLibrary();
+    const { THREE, renderer } = library;
+    let group;
+    if (kind === "droid") {
+      const parts = battlefieldDroidParts(definition, library);
+      if (parts.length <= 1) return null;
+      group = await library.buildDroidGroup(parts);
+    } else {
+      let structure = library.structureNames.get(normalizeBattlefieldModelName(definition.name));
+      if (!structure) {
+        structure = Object.values(library.structureDefs).find((item) => item.type === definition.statType);
+      }
+      if (!structure) return null;
+      const models = Array.isArray(structure.structureModel)
+        ? structure.structureModel
+        : (structure.structureModel ? [structure.structureModel] : []);
+      const nonModules = models.filter((model) => !/module/i.test(model));
+      const mainModel = nonModules.find((model) => !/^tr/i.test(model));
+      const turretPieces = nonModules.filter((model) => /^tr/i.test(model));
+      const pies = [structure.baseModel, mainModel, ...turretPieces].filter(Boolean);
+      group = await library.buildStructureGroup({
+        ...structure,
+        pies,
+        alignPiesByOrigin: Boolean(structure.baseModel),
+        preserveModelOrigin: structure.type === "WALL" || structure.type === "GATE"
+      }, 0, structure.width || 1, structure.breadth || 1);
+    }
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 2.2));
+    const directional = new THREE.DirectionalLight(0xffffff, 2.4);
+    directional.position.set(-3, 8, -5);
+    scene.add(directional, group);
+    group.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(group);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const span = Math.max(size.x, size.z, 0.5) * 0.66;
+    const camera = new THREE.OrthographicCamera(-span, span, span, -span, 0.1, 1000);
+    camera.position.set(center.x, box.max.y + Math.max(size.x, size.z, 2) * 3, center.z + 0.001);
+    camera.up.set(0, 0, -1);
+    camera.lookAt(center);
+    renderer.clear();
+    renderer.render(scene, camera);
+    const sprite = document.createElement("canvas");
+    sprite.width = 96;
+    sprite.height = 96;
+    sprite.getContext("2d").drawImage(renderer.domElement, 0, 0);
+    disposeBattlefieldModel(group);
+    return sprite;
+  }
+
+  function battlefieldModelSprite(kind, object) {
+    const id = Number(object[0]);
+    const definition = kind === "droid"
+      ? battlefieldDroidDefinitions.get(id)
+      : battlefieldStructureDefinitions.get(id);
+    if (!definition) return null;
+    const key = `${kind}:${JSON.stringify(definition)}`;
+    if (!battlefieldSpriteCache.has(key)) {
+      battlefieldSpriteCache.set(key, null);
+      createBattlefieldModelSprite(kind, definition)
+        .then((sprite) => {
+          if (sprite) battlefieldSpriteCache.set(key, sprite);
+          drawBattlefield();
+        })
+        .catch(() => {});
+    }
+    return battlefieldSpriteCache.get(key);
+  }
+
+  function battlefieldDirectionRadians(value) {
+    let direction = Number(value) || 0;
+    if (Math.abs(direction) > 360) direction = direction * 360 / 65536;
+    return direction * Math.PI / 180;
   }
 
   function battlefieldTerrainColour(tileset, terrainType) {
@@ -2384,13 +2625,24 @@
       }
       visibleStructures += 1;
       const health = Math.max(0, Math.min(100, Number(structure[4]) || 0));
-      const size = Math.max(3, Math.min(6, fieldWidth / map.width * 1.4));
+      const size = Math.max(7, Math.min(18, fieldWidth / map.width * 3));
+      const sprite = battlefieldModelSprite("structure", structure);
+      const x = projectX(structure[2]);
+      const y = projectY(structure[3]);
       context.globalAlpha = 0.35 + health / 155;
-      context.fillStyle = battlefieldPlayerColour(player);
-      context.fillRect(projectX(structure[2]) - size / 2, projectY(structure[3]) - size / 2, size, size);
+      if (sprite) {
+        context.save();
+        context.translate(x, y);
+        context.rotate(battlefieldDirectionRadians(structure[7]));
+        context.drawImage(sprite, -size / 2, -size / 2, size, size);
+        context.restore();
+      } else {
+        context.fillStyle = battlefieldPlayerColour(player);
+        context.fillRect(x - size / 2, y - size / 2, size, size);
+      }
       context.strokeStyle = "rgba(255, 255, 255, 0.55)";
       context.lineWidth = 0.7;
-      context.strokeRect(projectX(structure[2]) - size / 2, projectY(structure[3]) - size / 2, size, size);
+      context.strokeRect(x - size / 2, y - size / 2, size, size);
     });
 
     droids.forEach((droid) => {
@@ -2400,12 +2652,22 @@
       }
       visibleDroids += 1;
       const health = Math.max(0, Math.min(100, Number(droid[4]) || 0));
-      const radius = Math.max(1.8, Math.min(3.5, fieldWidth / map.width * 0.72));
+      const radius = Math.max(3.5, Math.min(8, fieldWidth / map.width * 1.35));
+      const sprite = battlefieldModelSprite("droid", droid);
+      const x = projectX(droid[2]);
+      const y = projectY(droid[3]);
       context.globalAlpha = 0.4 + health / 150;
       context.beginPath();
-      context.arc(projectX(droid[2]), projectY(droid[3]), radius, 0, Math.PI * 2);
+      context.arc(x, y, radius, 0, Math.PI * 2);
       context.fillStyle = battlefieldPlayerColour(player);
       context.fill();
+      if (sprite) {
+        context.save();
+        context.translate(x, y);
+        context.rotate(battlefieldDirectionRadians(droid[7]));
+        context.drawImage(sprite, -radius, -radius, radius * 2, radius * 2);
+        context.restore();
+      }
       context.strokeStyle = "rgba(255, 255, 255, 0.7)";
       context.lineWidth = 0.65;
       context.stroke();
@@ -2476,6 +2738,8 @@
     battlefieldFrames = tacticalReplay.positionFrames;
     battlefieldExtraction = extraction;
     battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
+    collectBattlefieldObjectDefinitions(battlefieldFrames);
+    battlefieldSpriteCache.clear();
     battlefieldCurrentTime = 0;
     battlefieldLastDraw = 0;
     battlefieldHiddenPlayers.clear();
@@ -2486,7 +2750,8 @@
     battlefieldRange.max = String(duration);
     battlefieldRange.value = "0";
     battlefieldDuration.value = formatDuration(duration);
-    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}`;
+    const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
+    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
     battlefieldDroids.checked = true;
     battlefieldStructures.checked = true;
     battlefieldBackground.checked = Boolean(battlefieldTerrain);
@@ -2513,6 +2778,9 @@
       battlefieldFrames = [];
       battlefieldExtraction = null;
       battlefieldTerrain = null;
+      battlefieldDroidDefinitions = new Map();
+      battlefieldStructureDefinitions = new Map();
+      battlefieldSpriteCache.clear();
     }
 
     snapshotPanel.hidden = snapshots.length === 0;

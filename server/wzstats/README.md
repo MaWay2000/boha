@@ -16,7 +16,7 @@ Bohan/Retropaganda is the primary discovery source. Sunshine/wz2100.uk and futur
 
 Every completed cron run invokes `Publisher`, which atomically writes `data/matches.json` and `data/manifest.json`. The manifest includes the content SHA-256, byte size and match count. Its timestamp changes only when published match content changes.
 
-GitHub Actions downloads the manifest and snapshot from `https://onit.lt/wzstats/data/`, verifies the SHA-256 and commits only changed files under `stats/published/`. GitHub Pages reads those repository files; it does not query the live match API. Replay binaries remain content-addressed downloads from onit.lt.
+GitHub Actions downloads the manifest and snapshot from `https://onit.lt/wzstats/data/`, verifies the SHA-256 and commits only changed files under `stats/published/`. GitHub Pages uses that snapshot for discovery and reads confirmed replay-engine player details from the live API. Replay binaries remain content-addressed downloads from onit.lt.
 
 The legacy result snapshot is imported as an explicitly attributed outcome fact only when its source replay ID also exists in the new database. The server calculates `data/leaderboards.json`; matches without a trustworthy outcome are excluded from wins, losses and Elo. The existing public leaderboard remains unchanged until the server result has been validated.
 
@@ -59,7 +59,7 @@ URL cron schedule:
 
 After the initial import, both source cron scripts recalculate the leaderboard. An unchanged calculation preserves the existing file and `generatedAt` value.
 
-Replay parsing validates the WZrp container and records replay-native header, match, player and network-message metadata. Published final totals remain attributed to wz2100.uk; they are not presented as replay-native fields.
+Replay parsing validates the WZrp container and records replay-native header, match, player and network-message metadata. Final player totals are published only after the PC replay engine confirms them with `stats_source = replay-engine`.
 
 ## API
 
@@ -68,8 +68,15 @@ Replay parsing validates the WZrp container and records replay-native header, ma
 - `GET /wzstats/api/v1/matches/<database-id>`
 - `GET /wzstats/api/v1/replays/<sha256>`
 
-The public API is read-only. CORS is limited to the configured MaWay2000 and onit.lt origins.
+Authenticated worker operations:
+
+- `GET /wzstats/api/v1/worker/status`
+- `GET /wzstats/api/v1/worker/jobs?limit=5`
+- `POST /wzstats/api/v1/worker/results`
+- `POST /wzstats/api/v1/worker/retry-failed`
+
+The public API is read-only. Worker mutation endpoints require the private bearer token. CORS is limited to the configured MaWay2000 and onit.lt origins.
 
 ## Data provenance
 
-Final source statistics use `stats_source = wz2100.uk`. Replay-derived values will be added separately with parser version metadata; they must not silently overwrite conflicting source or legacy totals.
+Source servers provide discovery metadata and replay downloads only. Player totals are public only when `stats_source = replay-engine`; all other player-stat fields are returned as null. See `REPLAY_ENGINE.md` for the versioned contract.

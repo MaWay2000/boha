@@ -268,6 +268,41 @@
     return match ? match[1].toLowerCase() : "";
   }
 
+  async function decodeGzipBase64Json(value) {
+    if (typeof DecompressionStream !== "function") {
+      throw new Error("This browser cannot expand compressed replay telemetry.");
+    }
+    const binary = atob(value);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    return JSON.parse(await new Response(stream).text());
+  }
+
+  async function expandCompressedEngineAnalysis(engineAnalysis) {
+    const extended = engineAnalysis?.extended;
+    if (!extended) {
+      return;
+    }
+    try {
+      if (extended.snapshotsEncoding === "gzip+base64"
+          && typeof extended.snapshotsGzipBase64 === "string") {
+        extended.snapshots = await decodeGzipBase64Json(extended.snapshotsGzipBase64);
+        delete extended.snapshotsGzipBase64;
+      }
+      const tacticalReplay = extended.tacticalReplay;
+      if (tacticalReplay?.positionFramesEncoding === "gzip+base64"
+          && typeof tacticalReplay.positionFramesGzipBase64 === "string") {
+        tacticalReplay.positionFrames = await decodeGzipBase64Json(tacticalReplay.positionFramesGzipBase64);
+        delete tacticalReplay.positionFramesGzipBase64;
+      }
+    } catch (error) {
+      console.warn("Unable to expand compressed replay telemetry.", error);
+    }
+  }
+
   async function loadWzstatsResult(replaySha256) {
     if (!replaySha256) {
       return null;
@@ -292,6 +327,7 @@
       if (detailResponse.ok) {
         const detailPayload = await detailResponse.json();
         detailMatch = detailPayload.match || null;
+        await expandCompressedEngineAnalysis(detailMatch?.telemetry?.engineAnalysis);
       }
     } catch (error) {
       detailMatch = null;

@@ -14,10 +14,19 @@ const ANALYZER_MOD_DIRECTORY = resolve(SCRIPT_DIRECTORY, '..', 'analyzer-mod');
 const SNAPSHOT_INTERVAL_SECONDS = Math.min(60, Math.max(5,
   Number(process.env.WZ_SNAPSHOT_INTERVAL_SECONDS) || 15));
 
+function outputResult(result, pretty = false) {
+  const output = `${JSON.stringify(result, null, pretty ? 2 : 0)}\n`;
+  if (process.env.WZ_ANALYSIS_OUTPUT_PATH) {
+    writeFileSync(process.env.WZ_ANALYSIS_OUTPUT_PATH, output, 'utf8');
+  } else {
+    process.stdout.write(output);
+  }
+}
+
 function fail(message, details = undefined) {
   const result = { status: 'error', error: message };
   if (details) result.details = details;
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  outputResult(result, true);
   process.exitCode = 1;
 }
 
@@ -392,7 +401,7 @@ if (!replayArgument) {
               },
               analysisMilliseconds: Date.now() - startedAt,
             };
-            process.stdout.write(`${JSON.stringify(result)}\n`);
+            outputResult(result);
           }
         }
       } finally {

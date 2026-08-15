@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 $taskName = 'MaWay2000 Replay Analyzer'
 $workerPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'replay-worker.mjs')).Path
 $launcherPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'launch-replay-analyzer.vbs')).Path
+$workerLauncherPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'launch-replay-worker.vbs')).Path
 $nodePath = (Get-Command node -ErrorAction Stop).Source
 $configPath = Join-Path $env:LOCALAPPDATA 'MaWay2000Wzstats\worker.json'
 
@@ -12,7 +13,8 @@ if (-not (Test-Path -LiteralPath $configPath)) {
     throw "Worker configuration not found: $configPath"
 }
 
-$action = New-ScheduledTaskAction -Execute $nodePath -Argument ('"' + $workerPath + '"')
+$wscriptPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+$action = New-ScheduledTaskAction -Execute $wscriptPath -Argument ('"' + $workerLauncherPath + '" "' + $nodePath + '" "' + $workerPath + '"')
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `

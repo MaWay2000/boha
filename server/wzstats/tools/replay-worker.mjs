@@ -146,6 +146,14 @@ async function request(path, options = {}) {
   return payload;
 }
 
+function compressedResultRequest(pendingPath) {
+  return request('/results', {
+    method: 'POST',
+    body: gzipSync(readFileSync(pendingPath)),
+    headers: { 'Content-Encoding': 'gzip' },
+  });
+}
+
 async function downloadReplay(url, destination) {
   const response = await fetch(url, { headers: { 'User-Agent': 'MaWay2000-replay-worker/1.0' } });
   if (!response.ok || !response.body) {
@@ -294,10 +302,7 @@ async function processNextJob() {
     analysis = compactAnalysis(analysis);
     writeFileSync(temporaryPendingPath, JSON.stringify({ matchId: Number(job.id), analysis }), 'utf8');
     renameSync(temporaryPendingPath, pendingPath);
-    const accepted = await request('/results', {
-      method: 'POST',
-      body: readFileSync(pendingPath, 'utf8'),
-    });
+    const accepted = await compressedResultRequest(pendingPath);
     rmSync(pendingPath, { force: true });
     log('Result accepted.', {
       matchId: Number(job.id),
@@ -325,10 +330,7 @@ async function submitPendingResults() {
     const payload = JSON.parse(readFileSync(pendingPath, 'utf8'));
     payload.analysis = compactAnalysis(payload.analysis);
     writeFileSync(pendingPath, JSON.stringify(payload), 'utf8');
-    const accepted = await request('/results', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+    const accepted = await compressedResultRequest(pendingPath);
     rmSync(pendingPath, { force: true });
     log('Saved result accepted.', {
       matchId: Number(payload.matchId),

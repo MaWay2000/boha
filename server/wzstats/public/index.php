@@ -157,7 +157,18 @@ try {
         if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 8 * 1024 * 1024) {
             respond(['error' => 'Result is too large.'], 413);
         }
-        $payload = json_decode((string) file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        $requestBody = (string) file_get_contents('php://input');
+        if (strtolower((string) ($_SERVER['HTTP_CONTENT_ENCODING'] ?? '')) === 'gzip') {
+            $decodedBody = gzdecode($requestBody);
+            if ($decodedBody === false) {
+                respond(['error' => 'Compressed result is invalid.'], 400);
+            }
+            $requestBody = $decodedBody;
+        }
+        if (strlen($requestBody) > 64 * 1024 * 1024) {
+            respond(['error' => 'Expanded result is too large.'], 413);
+        }
+        $payload = json_decode($requestBody, true, 512, JSON_THROW_ON_ERROR);
         $matchId = (int) ($payload['matchId'] ?? 0);
         $analysis = is_array($payload['analysis'] ?? null) ? $payload['analysis'] : [];
         $status = (string) ($analysis['status'] ?? 'error');

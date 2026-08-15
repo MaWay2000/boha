@@ -154,7 +154,7 @@ try {
         if ($method !== 'POST') {
             respond(['error' => 'Method not allowed.'], 405);
         }
-        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 8 * 1024 * 1024) {
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 16 * 1024 * 1024) {
             respond(['error' => 'Result is too large.'], 413);
         }
         $requestBody = (string) file_get_contents('php://input');

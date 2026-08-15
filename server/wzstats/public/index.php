@@ -219,30 +219,34 @@ try {
         $pdo->beginTransaction();
         try {
             if ($status === 'confirmed') {
-                $positionStatement = $pdo->prepare(
-                    'SELECT position_number FROM match_players WHERE match_id = ?'
-                );
-                $positionStatement->execute([$matchId]);
-                $matchPositions = array_fill_keys(
-                    array_map('intval', $positionStatement->fetchAll(PDO::FETCH_COLUMN)),
-                    true
-                );
                 $playerUpdate = $pdo->prepare(
-                    "UPDATE match_players SET result = ?, score = ?, kills = ?, droids_built = ?,
-                        droids_lost = ?, structures_built = ?, structures_lost = ?, structures_destroyed = ?,
-                        research_complete = ?, power = ?, oil_rigs = ?, remaining_droids = ?,
-                        remaining_structures = ?, stats_source = 'replay-engine', raw_json = ?
-                     WHERE match_id = ? AND position_number = ?"
+                    "INSERT INTO match_players
+                        (match_id, position_number, player_name, team_number, result, score, kills,
+                         droids_built, droids_lost, structures_built, structures_lost, structures_destroyed,
+                         research_complete, power, oil_rigs, remaining_droids, remaining_structures,
+                         stats_source, raw_json)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'replay-engine', ?)
+                     ON DUPLICATE KEY UPDATE
+                        player_name = VALUES(player_name), team_number = VALUES(team_number),
+                        result = VALUES(result), score = VALUES(score), kills = VALUES(kills),
+                        droids_built = VALUES(droids_built), droids_lost = VALUES(droids_lost),
+                        structures_built = VALUES(structures_built), structures_lost = VALUES(structures_lost),
+                        structures_destroyed = VALUES(structures_destroyed),
+                        research_complete = VALUES(research_complete), power = VALUES(power),
+                        oil_rigs = VALUES(oil_rigs), remaining_droids = VALUES(remaining_droids),
+                        remaining_structures = VALUES(remaining_structures),
+                        stats_source = 'replay-engine', raw_json = VALUES(raw_json)"
                 );
                 foreach ($players as $player) {
                     if (!is_array($player) || !isset($player['position']) || !is_numeric($player['position'])) {
                         throw new RuntimeException('Worker result contains an invalid player position.');
                     }
                     $position = (int) $player['position'];
-                    if (!isset($matchPositions[$position])) {
-                        throw new RuntimeException('Worker result contains an unknown player position.');
-                    }
                     $playerUpdate->execute([
+                        $matchId,
+                        $position,
+                        (string) ($player['name'] ?? 'Unknown player'),
+                        isset($player['team']) && is_numeric($player['team']) ? (int) $player['team'] : null,
                         $player['state'] ?? null,
                         $player['score'] ?? null,
                         $player['kills'] ?? null,
@@ -257,8 +261,6 @@ try {
                         $player['droidsAlive'] ?? null,
                         $player['structuresAlive'] ?? null,
                         json_encode($player, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
-                        $matchId,
-                        $position,
                     ]);
                     $updatedPlayers++;
                 }
@@ -276,15 +278,13 @@ try {
             throw $error;
         }
 
-        $leaderboards = (new LeaderboardCalculator($pdo))->publish(dirname(__DIR__) . '/data/leaderboards.json');
-        $publication = (new Publisher($pdo, dirname(__DIR__) . '/data'))->publish();
         respond([
             'accepted' => true,
             'matchId' => $matchId,
             'status' => $status,
             'updatedPlayers' => $updatedPlayers,
-            'published' => $publication['changed'],
-            'leaderboards' => $leaderboards,
+            'published' => false,
+            'publicationPending' => true,
         ]);
     }
 

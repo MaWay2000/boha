@@ -339,11 +339,6 @@ async function submitPendingResults() {
   }
 }
 
-if (!acquireWorkerLock()) process.exit(0);
-process.on('exit', releaseWorkerLock);
-process.on('SIGINT', () => process.exit(130));
-process.on('SIGTERM', () => process.exit(143));
-
 const selectedPriority = applySavedPriority();
 log('Replay worker started.', {
   once,
@@ -363,6 +358,12 @@ if (retryFailed) {
   }
   process.exit();
 }
+
+if (!acquireWorkerLock()) process.exit(0);
+process.on('exit', releaseWorkerLock);
+process.on('SIGINT', () => process.exit(130));
+process.on('SIGTERM', () => process.exit(143));
+
 do {
   try {
     await submitPendingResults();

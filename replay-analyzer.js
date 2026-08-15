@@ -2427,6 +2427,31 @@
     });
   }
 
+  async function waitForBattlefieldModelTextures(group, timeoutMilliseconds = 5000) {
+    const textures = new Set();
+    group.traverse((item) => {
+      const materials = Array.isArray(item.material) ? item.material : [item.material];
+      materials.filter(Boolean).forEach((material) => {
+        if (material.map) textures.add(material.map);
+      });
+    });
+    if (!textures.size) return;
+
+    const startedAt = performance.now();
+    const textureReady = (texture) => {
+      const image = texture.image || texture.source?.data;
+      if (!image) return false;
+      if (typeof image.complete === "boolean") {
+        return image.complete && image.naturalWidth > 0;
+      }
+      return Boolean(image.width || image.videoWidth);
+    };
+    while ([...textures].some((texture) => !textureReady(texture))
+        && performance.now() - startedAt < timeoutMilliseconds) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
   async function createBattlefieldModelSprite(kind, definition) {
     const library = await loadBattlefieldModelLibrary();
     const { THREE, renderer } = library;
@@ -2455,6 +2480,7 @@
         preserveModelOrigin: structure.type === "WALL" || structure.type === "GATE"
       }, 0, structure.width || 1, structure.breadth || 1);
     }
+    await waitForBattlefieldModelTextures(group);
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 2.2));
     const directional = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -2670,7 +2696,7 @@
       : [];
     let visibleStructures = 0;
     let visibleDroids = 0;
-    const showDetailedModels = battlefieldView.scale >= 1.35;
+    const showDetailedModels = battlefieldView.scale >= 1;
 
     structures.forEach((structure) => {
       const player = Number(structure[1]);

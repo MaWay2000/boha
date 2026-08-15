@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { appendFileSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { constants as osConstants, homedir, setPriority, tmpdir } from 'node:os';
@@ -44,12 +44,56 @@ const logPath = join(logDirectory, 'worker.log');
 const progressPath = join(logDirectory, 'progress.json');
 const interfaceSettingsPath = join(logDirectory, 'interface-settings.json');
 const pendingDirectory = join(logDirectory, 'pending');
+const lockPath = join(logDirectory, 'worker.lock');
 mkdirSync(pendingDirectory, { recursive: true });
 
 function log(message, details = undefined) {
   const line = `[${new Date().toISOString()}] ${message}${details === undefined ? '' : ` ${JSON.stringify(details)}`}`;
   process.stdout.write(`${line}\n`);
   appendFileSync(logPath, `${line}\n`, 'utf8');
+}
+
+function processExists(processId) {
+  if (!Number.isInteger(processId) || processId <= 0) return false;
+  try {
+    process.kill(processId, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function acquireWorkerLock() {
+  const createLock = () => {
+    const handle = openSync(lockPath, 'wx');
+    writeFileSync(handle, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }), 'utf8');
+    closeSync(handle);
+  };
+  try {
+    createLock();
+  } catch (error) {
+    if (error?.code !== 'EEXIST') throw error;
+    let ownerPid = 0;
+    try {
+      ownerPid = Number(JSON.parse(readFileSync(lockPath, 'utf8')).pid) || 0;
+    } catch {
+    }
+    if (processExists(ownerPid)) {
+      log('Replay worker already running.', { ownerPid });
+      return false;
+    }
+    rmSync(lockPath, { force: true });
+    createLock();
+  }
+  return true;
+}
+
+function releaseWorkerLock() {
+  try {
+    const ownerPid = Number(JSON.parse(readFileSync(lockPath, 'utf8')).pid) || 0;
+    if (ownerPid === process.pid) rmSync(lockPath, { force: true });
+  } catch {
+  }
 }
 
 function applySavedPriority() {
@@ -116,6 +160,7 @@ async function downloadReplay(url, destination) {
 
 async function analyzeReplay(replayPath, job) {
   const analyzerPath = join(scriptDirectory, 'analyze-replay-outcome.mjs');
+  const analysisOutputPath = join(dirname(replayPath), 'analysis.json');
   const child = spawn(process.execPath, [analyzerPath, replayPath], {
     env: {
       ...process.env,
@@ -126,6 +171,7 @@ async function analyzeReplay(replayPath, job) {
       WZ_MATCH_SOURCE: String(job.source || ''),
       WZ_MATCH_MAP: String(job.map || ''),
       WZ_QUEUE_STATUS_JSON: JSON.stringify(job.queue || {}),
+      WZ_ANALYSIS_OUTPUT_PATH: analysisOutputPath,
     },
     windowsHide: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -134,8 +180,7 @@ async function analyzeReplay(replayPath, job) {
   let stderr = '';
   let processError = null;
   child.stdout.on('data', (chunk) => {
-    stdout += chunk.toString('utf8');
-    if (stdout.length > 16 * 1024 * 1024) child.kill();
+    stdout = `${stdout}${chunk.toString('utf8')}`.slice(-1024 * 1024);
   });
   child.stderr.on('data', (chunk) => {
     stderr = `${stderr}${chunk.toString('utf8')}`.slice(-4000);
@@ -151,7 +196,9 @@ async function analyzeReplay(replayPath, job) {
   if (processError) throw processError;
   let payload;
   try {
-    payload = JSON.parse(stdout);
+    payload = JSON.parse(existsSync(analysisOutputPath)
+      ? readFileSync(analysisOutputPath, 'utf8')
+      : stdout);
   } catch {
     throw new Error(`Analyzer returned invalid JSON (exit ${result.status}). ${stderr.trim().slice(-500)}`.trim());
   }
@@ -291,6 +338,11 @@ async function submitPendingResults() {
     });
   }
 }
+
+if (!acquireWorkerLock()) process.exit(0);
+process.on('exit', releaseWorkerLock);
+process.on('SIGINT', () => process.exit(130));
+process.on('SIGTERM', () => process.exit(143));
 
 const selectedPriority = applySavedPriority();
 log('Replay worker started.', {

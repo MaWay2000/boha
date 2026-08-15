@@ -15,6 +15,9 @@ $script:settingsPath = Join-Path $script:dataDirectory 'interface-settings.json'
 $script:workerProcess = $null
 $script:lastLogWriteUtc = [DateTime]::MinValue
 $script:lastQueueCheckUtc = [DateTime]::MinValue
+$script:lastWorkerProcessCheckUtc = [DateTime]::MinValue
+$script:lastAutomaticCheckUtc = [DateTime]::MinValue
+$script:externalWorkerRunning = $false
 $script:queueStatus = $null
 
 $script:priorityProfiles = @{
@@ -40,7 +43,30 @@ function Get-WorkerRunning {
     }
 
     $analyzerTask = Get-AnalyzerTask
-    return ($null -ne $analyzerTask -and $analyzerTask.State -eq 'Running')
+    if ($null -ne $analyzerTask -and $analyzerTask.State -eq 'Running') {
+        return $true
+    }
+    if (([DateTime]::UtcNow - $script:lastWorkerProcessCheckUtc).TotalSeconds -ge 5) {
+        try {
+            $script:externalWorkerRunning = $null -ne (Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
+                $_.Name -eq 'node.exe' -and $_.CommandLine -like '*replay-worker.mjs*'
+            } | Select-Object -First 1)
+        } catch {
+            $script:externalWorkerRunning = $false
+        }
+        $script:lastWorkerProcessCheckUtc = [DateTime]::UtcNow
+    }
+    return $script:externalWorkerRunning
+}
+
+function Start-AutomaticWorkerIfNeeded {
+    $analyzerTask = Get-AnalyzerTask
+    if ($null -eq $analyzerTask -or $analyzerTask.State -eq 'Disabled' -or $analyzerTask.State -eq 'Running') {
+        return
+    }
+    if (-not (Get-WorkerRunning)) {
+        Start-ScheduledTask -TaskName $script:taskName
+    }
 }
 
 function Get-SelectedPriority {
@@ -408,6 +434,10 @@ $footerLabel.Anchor = 'Bottom, Left'
 $form.Controls.Add($footerLabel)
 
 function Update-Dashboard([switch] $ForceLog) {
+    if (([DateTime]::UtcNow - $script:lastAutomaticCheckUtc).TotalSeconds -ge 10) {
+        Start-AutomaticWorkerIfNeeded
+        $script:lastAutomaticCheckUtc = [DateTime]::UtcNow
+    }
     $isRunning = Get-WorkerRunning
     $analyzerTask = Get-AnalyzerTask
     $isEnabled = ($null -ne $analyzerTask -and $analyzerTask.State -ne 'Disabled')
@@ -419,7 +449,7 @@ function Update-Dashboard([switch] $ForceLog) {
     $elapsedMilliseconds = if ($null -ne $progress) { [double] ($progress.elapsedMilliseconds) } else { 0 }
     $totalMilliseconds = if ($null -ne $progress) { [double] ($progress.totalMilliseconds) } else { 0 }
     $processingElapsedMilliseconds = if ($null -ne $progress) { Get-AnalysisElapsedMilliseconds ([long] $progress.matchId) } else { $null }
-    $processingElapsedText = if ($null -ne $processingElapsedMilliseconds) { ' · Elapsed: ' + (Format-GameTime $processingElapsedMilliseconds) } else { '' }
+    $processingElapsedText = if ($null -ne $processingElapsedMilliseconds) { ' | Elapsed: ' + (Format-GameTime $processingElapsedMilliseconds) } else { '' }
     $hasGameProgress = $isRunning -and $totalMilliseconds -gt 0
     $selectedPriority = Get-SelectedPriority
     $queue = if ($isRunning -and $null -ne $progress -and $null -ne $progress.queue) {

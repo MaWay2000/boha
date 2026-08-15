@@ -17,6 +17,11 @@ return [
     'storage' => [
         'replay_dir' => __DIR__ . '/storage/replays',
     ],
+    'worker' => [
+        'token_hash' => hash('sha256', 'CHANGE_ME_TO_A_RANDOM_WORKER_TOKEN'),
+        'analyzer_version' => '3.1.0',
+        'reanalysis_enabled' => false,
+    ],
     'cors_origins' => [
         'https://maway2000.github.io',
         'https://onit.lt',

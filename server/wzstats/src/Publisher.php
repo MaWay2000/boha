@@ -140,6 +140,15 @@ final class Publisher
         $playersStatement->execute($ids);
         $playersByMatch = [];
         foreach ($playersStatement->fetchAll() as $player) {
+            if (($player['stats_source'] ?? null) !== 'replay-engine') {
+                foreach ([
+                    'result', 'score', 'kills', 'droids_built', 'droids_lost', 'structures_built',
+                    'structures_lost', 'structures_destroyed', 'research_complete', 'power', 'oil_rigs',
+                    'remaining_droids', 'remaining_structures',
+                ] as $field) {
+                    $player[$field] = null;
+                }
+            }
             $playersByMatch[(int) $player['match_id']][] = $player;
         }
 

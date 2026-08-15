@@ -311,6 +311,44 @@
       margin-top: 0;
     }
 
+    .replay-extended-heading {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .replay-extended-heading p,
+    .replay-snapshot-control output,
+    .replay-extended-note {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .replay-snapshot-control {
+      display: grid;
+      grid-template-columns: minmax(180px, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      margin: 14px 0;
+    }
+
+    .replay-snapshot-control input {
+      width: 100%;
+      accent-color: var(--cyan);
+    }
+
+    .replay-snapshot-control output {
+      min-width: 84px;
+      font: 700 0.82rem "Oxanium", sans-serif;
+      text-align: right;
+    }
+
+    .replay-research-filters {
+      grid-template-columns: minmax(180px, 0.45fr) minmax(220px, 1fr);
+    }
+
     .replay-table-wrap {
       overflow: auto;
     }
@@ -677,6 +715,71 @@
             </div>
           </article>
 
+          <article class="data-card replay-results-section" id="replaySnapshotPanel" hidden>
+            <div class="replay-extended-heading">
+              <h3>Player development</h3>
+              <p id="replaySnapshotMeta"></p>
+            </div>
+            <label class="replay-snapshot-control" for="replaySnapshotRange">
+              <input id="replaySnapshotRange" type="range" min="0" max="0" value="0">
+              <output id="replaySnapshotTime">00:00</output>
+            </label>
+            <div class="stats-table-wrap replay-table-wrap">
+              <table class="stats-table replay-table">
+                <thead>
+                  <tr>
+                    <th>Player</th>
+                    <th>State</th>
+                    <th>Score</th>
+                    <th>Kills</th>
+                    <th>Units built</th>
+                    <th>Units lost</th>
+                    <th>Units alive</th>
+                    <th>Structures built</th>
+                    <th>Structures lost</th>
+                    <th>Structures alive</th>
+                    <th>Research</th>
+                    <th>Power</th>
+                    <th>Oil</th>
+                  </tr>
+                </thead>
+                <tbody id="replaySnapshotPlayers"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="data-card replay-results-section" id="replayResearchPanel" hidden>
+            <div class="replay-extended-heading">
+              <h3>Research timeline</h3>
+              <p id="replayResearchMeta"></p>
+            </div>
+            <div class="replay-event-filters replay-research-filters">
+              <div class="replay-field">
+                <label for="replayResearchPlayer">Player</label>
+                <select id="replayResearchPlayer">
+                  <option value="">All players</option>
+                </select>
+              </div>
+              <div class="replay-field">
+                <label for="replayResearchSearch">Search research</label>
+                <input id="replayResearchSearch" type="search" placeholder="Body, weapon, factory…">
+              </div>
+            </div>
+            <p class="replay-extended-note" id="replayResearchNote"></p>
+            <div class="stats-table-wrap replay-table-wrap">
+              <table class="stats-table replay-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Player</th>
+                    <th>Research</th>
+                  </tr>
+                </thead>
+                <tbody id="replayResearchEvents"></tbody>
+              </table>
+            </div>
+          </article>
+
           <article class="data-card replay-results-section" hidden>
             <h3>Network message inventory</h3>
             <p>Official message names are shown alongside their numeric replay IDs.</p>
@@ -743,7 +846,7 @@
     </main>
   </div>
 
-  <script src="replay-analyzer.js?v=20260813-1"></script>
+  <script src="replay-analyzer.js?v=20260815-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

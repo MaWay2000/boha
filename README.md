@@ -24,6 +24,6 @@ Modern remake of the legacy Warzone 2100 community hub.
 - The sync script also supports optional upstream auth via `UPSTREAM_BASIC_USER` and `UPSTREAM_BASIC_PASSWORD`, or a prebuilt `UPSTREAM_BASIC_AUTH` header.
 - `.github/workflows/sync-warzone-upstream.yml` is retained as a manual-only legacy fallback while the final primary leaderboard output is validated.
 - `.github/workflows/sync-onit-published.yml` verifies and mirrors normalized replay-derived snapshots published by onit.lt every 30 minutes.
-- The browser reads secondary-source match metadata from `stats/published/matches.json`; onit.lt performs discovery, replay storage, parsing, normalization, and publication before GitHub receives it.
+- The browser finds matches in `stats/published/matches.json`, then reads confirmed replay-engine player details from the onit.lt API. Source-calculated player totals are not used.
 - Several resource links intentionally point to the existing `warzone2100.retropaganda.info` endpoints.
 - When I verified the legacy routes on March 20, 2026, `results.json` was returning HTTP 500, so the remake links to the working legacy leaderboard view instead.

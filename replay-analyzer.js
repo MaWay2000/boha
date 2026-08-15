@@ -27,6 +27,17 @@
   const eventCategory = document.getElementById("replayEventCategory");
   const eventPlayer = document.getElementById("replayEventPlayer");
   const eventSearch = document.getElementById("replayEventSearch");
+  const snapshotPanel = document.getElementById("replaySnapshotPanel");
+  const snapshotMeta = document.getElementById("replaySnapshotMeta");
+  const snapshotRange = document.getElementById("replaySnapshotRange");
+  const snapshotTime = document.getElementById("replaySnapshotTime");
+  const snapshotPlayers = document.getElementById("replaySnapshotPlayers");
+  const researchPanel = document.getElementById("replayResearchPanel");
+  const researchMeta = document.getElementById("replayResearchMeta");
+  const researchPlayer = document.getElementById("replayResearchPlayer");
+  const researchSearch = document.getElementById("replayResearchSearch");
+  const researchNote = document.getElementById("replayResearchNote");
+  const researchEvents = document.getElementById("replayResearchEvents");
   const rawJson = document.getElementById("replayRawJson");
   const playerStoryPopup = document.createElement("div");
   playerStoryPopup.className = "replay-player-story-popup";
@@ -35,6 +46,7 @@
 
   const textDecoder = new TextDecoder("utf-8", { fatal: true });
   const displayedEventLimit = 500;
+  const displayedResearchLimit = 500;
   const messageTypeNames = Object.freeze({
     112: "GAME_DROIDINFO",
     113: "GAME_STRUCTUREINFO",
@@ -246,73 +258,63 @@
       return null;
     }
 
+    let detailMatch = null;
+    try {
+      const detailResponse = await fetch(`https://onit.lt/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`, {
+        cache: "no-store"
+      });
+      if (detailResponse.ok) {
+        const detailPayload = await detailResponse.json();
+        detailMatch = detailPayload.match || null;
+      }
+    } catch (error) {
+      detailMatch = null;
+    }
+
+    const players = Array.isArray(detailMatch?.players) ? detailMatch.players : (match.players || []);
+
     return {
       replayUrl: match.replay_url,
-      endDate: match.ended_at ? `${match.ended_at.replace(" ", "T")}Z` : null,
+      endDate: (detailMatch?.ended_at || match.ended_at)
+        ? `${(detailMatch?.ended_at || match.ended_at).replace(" ", "T")}Z`
+        : null,
       partialStats: true,
-      playerData: (match.players || []).map((player) => ({
-        position: player.position,
-        usertype: player.result,
-        kills: player.kills,
-        droidsBuilt: player.droids_built,
-        droidsLost: player.droids_lost,
-        structuresBuilt: player.structures_built,
-        structuresLost: player.structures_lost,
-        structureKills: player.structures_destroyed,
-        researchComplete: player.research_complete,
-        score: player.score,
-        power: player.power,
-        oilRigs: player.oil_rigs,
-        droids: player.remaining_droids,
-        structs: player.remaining_structures
-      }))
+      engineAnalysis: detailMatch?.telemetry?.engineAnalysis || null,
+      playerData: players.map((player) => {
+        const hasReplayEngineStats = player.stats_source === "replay-engine";
+        let rawPlayer = {};
+        if (hasReplayEngineStats) {
+          try {
+            rawPlayer = typeof player.raw_json === "string"
+              ? JSON.parse(player.raw_json)
+              : (player.raw_json || {});
+          } catch (error) {
+            rawPlayer = {};
+          }
+        }
+
+        return {
+          position: player.position ?? player.position_number,
+          usertype: hasReplayEngineStats ? player.result : null,
+          kills: hasReplayEngineStats ? player.kills : null,
+          droidsBuilt: hasReplayEngineStats ? player.droids_built : null,
+          droidsLost: hasReplayEngineStats ? player.droids_lost : null,
+          structuresBuilt: hasReplayEngineStats ? player.structures_built : null,
+          structuresLost: hasReplayEngineStats ? player.structures_lost : null,
+          structureKills: hasReplayEngineStats ? player.structures_destroyed : null,
+          researchComplete: hasReplayEngineStats ? player.research_complete : null,
+          score: hasReplayEngineStats ? player.score : null,
+          power: hasReplayEngineStats ? player.power : null,
+          oilRigs: hasReplayEngineStats ? player.oil_rigs : null,
+          droids: hasReplayEngineStats ? player.remaining_droids : null,
+          structs: hasReplayEngineStats ? player.remaining_structures : null,
+          statsSource: hasReplayEngineStats ? player.stats_source : null,
+          labResearchPerformance: rawPlayer.labResearchPerformance ?? rawPlayer.recentResearchPerformance,
+          labResearchPotential: rawPlayer.labResearchPotential ?? rawPlayer.recentResearchPotential,
+          playerLeftGameTime: rawPlayer.playerLeftGameTime
+        };
+      })
     };
-  }
-
-  async function loadPublishedResult(replayId) {
-    if (!replayId) {
-      return null;
-    }
-
-    const manifestUrl = new URL("stats/upstream-manifest.json", document.baseURI);
-    const manifestResponse = await fetch(manifestUrl, { cache: "no-store" });
-    if (!manifestResponse.ok) {
-      throw new Error(`Unable to load player-stat index (${manifestResponse.status}).`);
-    }
-
-    const manifest = await manifestResponse.json();
-    const snapshotMetadata = manifest.files && manifest.files["results-snapshot.json"];
-    const range = snapshotMetadata && snapshotMetadata.replayOffsets
-      ? snapshotMetadata.replayOffsets[replayId]
-      : null;
-    if (!Array.isArray(range) || range.length !== 2) {
-      return null;
-    }
-
-    const [start, length] = range;
-    const isLocalPreview = ["127.0.0.1", "localhost"].includes(window.location.hostname);
-    const snapshotUrl = isLocalPreview
-      ? new URL("https://raw.githubusercontent.com/MaWay2000/boha/main/stats/results-snapshot.json")
-      : new URL("stats/results-snapshot.json", document.baseURI);
-    const resultResponse = await fetch(snapshotUrl, {
-      headers: {
-        Range: `bytes=${start}-${start + length - 1}`
-      }
-    });
-
-    if (resultResponse.status !== 206) {
-      if (resultResponse.body) {
-        await resultResponse.body.cancel();
-      }
-      throw new Error("The statistics host did not return the requested replay range.");
-    }
-
-    const publishedResult = await resultResponse.json();
-    if (extractReplayId(publishedResult.replayUrl) !== replayId) {
-      throw new Error("The player-stat index does not match this replay.");
-    }
-
-    return publishedResult;
   }
 
   function attachPublishedPlayerStats(extraction, publishedResult) {
@@ -347,9 +349,10 @@
         oilRigs: published.oilRigs,
         remainingDroids: published.droids,
         remainingStructures: published.structs,
-        labResearchPerformance: published.labResearchPerformance ?? published.recentResearchPerformance,
-        labResearchPotential: published.labResearchPotential ?? published.recentResearchPotential,
-        playerLeftGameTime: published.playerLeftGameTime
+        labResearchPerformance: published.labResearchPerformance,
+        labResearchPotential: published.labResearchPotential,
+        playerLeftGameTime: published.playerLeftGameTime,
+        statsSource: published.statsSource
       };
     });
 
@@ -361,6 +364,7 @@
           playersMatched
         }
       : null;
+    extraction.engineAnalysis = publishedResult?.engineAnalysis || null;
   }
 
   function decodeGameTime(payload) {
@@ -1536,6 +1540,9 @@
 
   function calculateResearchActivity(players, events, matchDuration) {
     return new Map(players.map((player) => {
+      if (player.summary?.statsSource !== "replay-engine") {
+        return [player, null];
+      }
       const performance = playerStat(player, "labResearchPerformance");
       const potential = playerStat(player, "labResearchPotential");
       if (player.spectator) {
@@ -1544,68 +1551,7 @@
       if (performance != null && potential != null && potential > 0) {
         return [player, Math.max(0, Math.min(1, performance / potential)) * 100];
       }
-
-      const leftTime = playerStat(player, "playerLeftGameTime");
-      const activeEnd = Number.isFinite(leftTime) && leftTime > 0
-        ? Math.min(leftTime, Number(matchDuration))
-        : Number(matchDuration);
-      if (!Number.isFinite(activeEnd) || activeEnd <= 0) {
-        return [player, null];
-      }
-
-      const labs = new Map();
-      events
-        .filter((event) => (
-          (event.category === "Research"
-            || (event.category === "Production"
-              && (event.action === "Hold research" || event.action === "Release research")))
-          && Number(event.player) === Number(player.position)
-          && Number.isFinite(Number(event.time))
-          && Number(event.time) <= activeEnd
-        ))
-        .sort((left, right) => Number(left.time) - Number(right.time))
-        .forEach((event) => {
-          const labId = Number(event.data && event.data.structureId);
-          if (!Number.isFinite(labId) || labId <= 0) {
-            return;
-          }
-
-          const time = Math.max(0, Number(event.time));
-          const lab = labs.get(labId) || { firstStart: null, activeSince: null, busyTime: 0 };
-          const started = event.category === "Research"
-            ? event.data.started
-            : event.action === "Release research";
-          if (started) {
-            if (lab.firstStart == null) {
-              lab.firstStart = time;
-            }
-            if (lab.activeSince == null) {
-              lab.activeSince = time;
-            }
-          } else if (lab.activeSince != null) {
-            lab.busyTime += Math.max(0, time - lab.activeSince);
-            lab.activeSince = null;
-          }
-          labs.set(labId, lab);
-        });
-
-      let availableTime = 0;
-      let busyTime = 0;
-      labs.forEach((lab) => {
-        if (lab.firstStart == null || lab.firstStart >= activeEnd) {
-          return;
-        }
-        availableTime += activeEnd - lab.firstStart;
-        busyTime += lab.busyTime;
-        if (lab.activeSince != null) {
-          busyTime += activeEnd - lab.activeSince;
-        }
-      });
-
-      return [
-        player,
-        availableTime > 0 ? Math.min(1, busyTime / availableTime) * 100 : null
-      ];
+      return [player, null];
     }));
   }
 
@@ -1949,6 +1895,91 @@
     return player ? player.name : `Player ${position}`;
   }
 
+  function renderSnapshotFrame(extraction) {
+    const snapshots = extraction.engineAnalysis?.extended?.snapshots || [];
+    const snapshot = snapshots[Number(snapshotRange.value)] || snapshots[0];
+    if (!snapshot) {
+      snapshotPlayers.replaceChildren();
+      return;
+    }
+
+    snapshotTime.value = formatDuration(snapshot.timeMilliseconds);
+    replaceChildren(snapshotPlayers, (snapshot.players || []).map((player) => {
+      const row = document.createElement("tr");
+      row.append(
+        createCell(playerNameForPosition(extraction, Number(player.position))),
+        createCell(player.state || "--"),
+        createCell(formatStat(player.score)),
+        createCell(formatStat(player.kills)),
+        createCell(formatStat(player.droidsBuilt)),
+        createCell(formatStat(player.droidsLost)),
+        createCell(formatStat(player.droidsAlive)),
+        createCell(formatStat(player.structuresBuilt)),
+        createCell(formatStat(player.structuresLost)),
+        createCell(formatStat(player.structuresAlive)),
+        createCell(formatStat(player.researchComplete)),
+        createCell(formatStat(player.power)),
+        createCell(formatStat(player.oilRigs))
+      );
+      return row;
+    }));
+  }
+
+  function renderResearchTimeline(extraction) {
+    const timeline = extraction.engineAnalysis?.extended?.researchTimeline || [];
+    const selectedPlayer = researchPlayer.value;
+    const search = researchSearch.value.trim().toLowerCase();
+    const filtered = timeline.filter((event) => {
+      if (selectedPlayer && Number(event.position) !== Number(selectedPlayer)) {
+        return false;
+      }
+      return !search || String(event.research || "").toLowerCase().includes(search);
+    });
+    const displayed = filtered.slice(0, displayedResearchLimit);
+
+    researchNote.textContent = filtered.length > displayed.length
+      ? `Showing the first ${displayed.length.toLocaleString()} of ${filtered.length.toLocaleString()} matching events.`
+      : `${filtered.length.toLocaleString()} matching research event${filtered.length === 1 ? "" : "s"}.`;
+    replaceChildren(researchEvents, displayed.map((event) => {
+      const row = document.createElement("tr");
+      row.append(
+        createCell(formatDuration(event.timeMilliseconds)),
+        createCell(playerNameForPosition(extraction, Number(event.position))),
+        createCell(event.research || "--")
+      );
+      return row;
+    }));
+  }
+
+  function renderExtendedAnalysis(extraction) {
+    const engineAnalysis = extraction.engineAnalysis;
+    const extended = engineAnalysis?.extended;
+    const snapshots = Array.isArray(extended?.snapshots) ? extended.snapshots : [];
+    const timeline = Array.isArray(extended?.researchTimeline) ? extended.researchTimeline : [];
+
+    snapshotPanel.hidden = snapshots.length === 0;
+    if (snapshots.length) {
+      snapshotMeta.textContent = `${snapshots.length.toLocaleString()} snapshots · Analyzer ${engineAnalysis.analyzerVersion || "--"}`;
+      snapshotRange.min = "0";
+      snapshotRange.max = String(snapshots.length - 1);
+      snapshotRange.value = String(snapshots.length - 1);
+      renderSnapshotFrame(extraction);
+    }
+
+    researchPanel.hidden = timeline.length === 0;
+    if (timeline.length) {
+      researchMeta.textContent = `${timeline.length.toLocaleString()} completed topics`;
+      researchPlayer.replaceChildren();
+      appendOption(researchPlayer, "", "All players");
+      extraction.players
+        .filter((player) => !player.spectator)
+        .sort((left, right) => left.position - right.position)
+        .forEach((player) => appendOption(researchPlayer, String(player.position), player.name));
+      researchSearch.value = "";
+      renderResearchTimeline(extraction);
+    }
+  }
+
   function appendOption(select, value, label) {
     const option = document.createElement("option");
     option.value = value;
@@ -2038,6 +2069,7 @@
       player.researchActivity = researchActivityByPlayer.get(player);
     });
     renderCompactMatchSummary(extraction);
+    renderExtendedAnalysis(extraction);
     const renderPlayerRows = () => {
       replaceChildren(
         playersBody,
@@ -2169,19 +2201,12 @@
       setStatus("Parsing replay…");
       latestExtraction = parseReplay(arrayBuffer);
       let publishedResult = null;
-      if (latestReplayId) {
-        setStatus("Loading player summary…");
-        try {
-          publishedResult = await loadPublishedResult(latestReplayId);
-        } catch (error) {
-          latestExtraction.publishedStatsError = error.message || "Player summary could not be loaded.";
-        }
-      } else if (latestReplaySha256) {
-        setStatus("Loading wz2100.uk player summary…");
+      if (latestReplaySha256) {
+        setStatus("Loading replay-engine player summary…");
         try {
           publishedResult = await loadWzstatsResult(latestReplaySha256);
         } catch (error) {
-          latestExtraction.publishedStatsError = error.message || "wz2100.uk player summary could not be loaded.";
+          latestExtraction.publishedStatsError = error.message || "Replay-engine player summary could not be loaded.";
         }
       }
       attachPublishedPlayerStats(latestExtraction, publishedResult);
@@ -2262,6 +2287,24 @@
   eventSearch.addEventListener("input", () => {
     if (latestExtraction) {
       renderEventTimeline(latestExtraction);
+    }
+  });
+
+  snapshotRange.addEventListener("input", () => {
+    if (latestExtraction) {
+      renderSnapshotFrame(latestExtraction);
+    }
+  });
+
+  researchPlayer.addEventListener("change", () => {
+    if (latestExtraction) {
+      renderResearchTimeline(latestExtraction);
+    }
+  });
+
+  researchSearch.addEventListener("input", () => {
+    if (latestExtraction) {
+      renderResearchTimeline(latestExtraction);
     }
   });
 })();

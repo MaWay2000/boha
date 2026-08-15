@@ -172,6 +172,29 @@ function Format-GameTime([double] $milliseconds) {
     return '{0}:{1:00}' -f [math]::Floor($time.TotalMinutes), $time.Seconds
 }
 
+function Get-AnalysisElapsedMilliseconds([long] $matchId) {
+    if ($matchId -le 0 -or -not (Test-Path -LiteralPath $script:logPath)) {
+        return $null
+    }
+
+    $lines = @(Get-Content -LiteralPath $script:logPath -Tail 120 -ErrorAction SilentlyContinue)
+    [array]::Reverse($lines)
+    foreach ($line in $lines) {
+        if ($line -match '^\[(?<Timestamp>\d{4}-\d{2}-\d{2}T[^\]]+Z)\] Analyzing replay\.') {
+            $timestamp = $Matches.Timestamp
+            if ($line -match ('"matchId":' + $matchId + '(?:,|})')) {
+                try {
+                    $startedAt = [DateTimeOffset]::Parse($timestamp)
+                    return [math]::Max(0, ([DateTimeOffset]::UtcNow - $startedAt.ToUniversalTime()).TotalMilliseconds)
+                } catch {
+                    return $null
+                }
+            }
+        }
+    }
+    return $null
+}
+
 function Stop-ManualWorker {
     if ($null -eq $script:workerProcess) {
         return
@@ -395,6 +418,8 @@ function Update-Dashboard([switch] $ForceLog) {
     }
     $elapsedMilliseconds = if ($null -ne $progress) { [double] ($progress.elapsedMilliseconds) } else { 0 }
     $totalMilliseconds = if ($null -ne $progress) { [double] ($progress.totalMilliseconds) } else { 0 }
+    $processingElapsedMilliseconds = if ($null -ne $progress) { Get-AnalysisElapsedMilliseconds ([long] $progress.matchId) } else { $null }
+    $processingElapsedText = if ($null -ne $processingElapsedMilliseconds) { ' · Elapsed: ' + (Format-GameTime $processingElapsedMilliseconds) } else { '' }
     $hasGameProgress = $isRunning -and $totalMilliseconds -gt 0
     $selectedPriority = Get-SelectedPriority
     $queue = if ($isRunning -and $null -ne $progress -and $null -ne $progress.queue) {
@@ -421,11 +446,11 @@ function Update-Dashboard([switch] $ForceLog) {
             $progressBar.MarqueeAnimationSpeed = 0
             $progressBar.Style = 'Continuous'
             $progressBar.Value = [math]::Max(0, [math]::Min(1000, [math]::Round(($elapsedMilliseconds / $totalMilliseconds) * 1000)))
-            $progressLabel.Text = 'Game time: ' + (Format-GameTime $elapsedMilliseconds) + ' / ' + (Format-GameTime $totalMilliseconds)
+            $progressLabel.Text = 'Game time: ' + (Format-GameTime $elapsedMilliseconds) + ' / ' + (Format-GameTime $totalMilliseconds) + $processingElapsedText
         } else {
             $progressBar.Style = 'Marquee'
             $progressBar.MarqueeAnimationSpeed = 24
-            $progressLabel.Text = 'Game time: preparing replay'
+            $progressLabel.Text = 'Game time: preparing replay' + $processingElapsedText
         }
     } else {
         $stateLabel.Text = 'Idle'

@@ -7,6 +7,11 @@ Add-Type -AssemblyName System.Drawing
 
 $script:taskName = 'MaWay2000 Replay Analyzer'
 $script:workerPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'replay-worker.mjs')).Path
+$script:analyzerPath = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot 'analyze-replay-outcome.mjs')).Path
+$script:analyzerVersion = ([regex]::Match(
+    (Get-Content -LiteralPath $script:analyzerPath -Raw),
+    "ANALYZER_VERSION\s*=\s*'([^']+)'"
+)).Groups[1].Value
 $script:nodePath = (Get-Command node -ErrorAction Stop).Source
 $script:dataDirectory = Join-Path $env:LOCALAPPDATA 'MaWay2000Wzstats'
 $script:logPath = Join-Path $script:dataDirectory 'worker.log'
@@ -280,6 +285,17 @@ $titleLabel.ForeColor = $textColor
 $titleLabel.AutoSize = $true
 $titleLabel.Location = New-Object System.Drawing.Point(24, 19)
 $form.Controls.Add($titleLabel)
+
+$versionLabel = New-Object System.Windows.Forms.Label
+$versionLabel.Text = 'v' + $script:analyzerVersion
+$versionLabel.Font = New-Object System.Drawing.Font('Segoe UI Semibold', 8)
+$versionLabel.ForeColor = $primary
+$versionLabel.BackColor = $panelColor
+$versionLabel.BorderStyle = 'FixedSingle'
+$versionLabel.TextAlign = 'MiddleCenter'
+$versionLabel.Size = New-Object System.Drawing.Size(58, 23)
+$versionLabel.Location = New-Object System.Drawing.Point(($titleLabel.Left + $titleLabel.PreferredSize.Width + 12), 28)
+$form.Controls.Add($versionLabel)
 
 $subtitleLabel = New-Object System.Windows.Forms.Label
 $subtitleLabel.Text = 'Processes the Warzone replay queue and publishes confirmed statistics.'

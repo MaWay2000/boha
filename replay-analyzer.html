@@ -345,6 +345,124 @@
       text-align: right;
     }
 
+    .replay-battlefield-controls,
+    .replay-battlefield-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .replay-battlefield-controls {
+      margin: 14px 0;
+    }
+
+    .replay-battlefield-controls .replay-action {
+      min-width: 92px;
+    }
+
+    .replay-battlefield-option {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      min-height: 40px;
+      padding: 7px 11px;
+      color: var(--muted);
+      background: rgba(4, 12, 20, 0.58);
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      border-radius: 12px;
+      font-size: 0.82rem;
+    }
+
+    .replay-battlefield-option select {
+      color: var(--text);
+      background: #07131d;
+      border: 1px solid rgba(109, 232, 255, 0.22);
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    .replay-battlefield-option input {
+      accent-color: var(--cyan);
+    }
+
+    .replay-battlefield-stage {
+      display: flex;
+      min-height: 320px;
+      justify-content: center;
+      padding: 14px;
+      overflow: auto;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(31, 89, 100, 0.18), transparent 62%),
+        rgba(2, 8, 13, 0.84);
+      border: 1px solid rgba(109, 232, 255, 0.18);
+      border-radius: 16px;
+    }
+
+    .replay-battlefield-canvas {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: min(68vh, 720px);
+      max-height: 720px;
+      background: #071016;
+      border: 1px solid rgba(109, 232, 255, 0.32);
+      border-radius: 8px;
+      box-shadow: 0 0 24px rgba(35, 194, 219, 0.08);
+    }
+
+    .replay-battlefield-legend {
+      margin-top: 12px;
+    }
+
+    .replay-battlefield-player {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      padding: 6px 9px;
+      color: var(--text);
+      background: rgba(4, 12, 20, 0.58);
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      border-radius: 999px;
+      cursor: pointer;
+      font: 600 0.76rem "Space Grotesk", sans-serif;
+    }
+
+    .replay-battlefield-player[aria-pressed="false"] {
+      opacity: 0.4;
+    }
+
+    .replay-battlefield-player-marker {
+      width: 10px;
+      height: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      border-radius: 50%;
+    }
+
+    .replay-battlefield-timeline {
+      display: grid;
+      grid-template-columns: auto minmax(180px, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      margin-top: 14px;
+    }
+
+    .replay-battlefield-timeline input {
+      width: 100%;
+      accent-color: var(--cyan);
+    }
+
+    .replay-battlefield-timeline output,
+    .replay-battlefield-status {
+      color: var(--muted);
+      font: 700 0.8rem "Oxanium", sans-serif;
+    }
+
+    .replay-battlefield-status {
+      margin: 9px 0 0;
+      text-align: center;
+    }
+
     .replay-research-filters {
       grid-template-columns: minmax(180px, 0.45fr) minmax(220px, 1fr);
     }
@@ -637,6 +755,24 @@
         white-space: normal;
       }
 
+      .replay-battlefield-stage {
+        min-height: 240px;
+        padding: 8px;
+      }
+
+      .replay-battlefield-canvas {
+        height: min(60vh, 560px);
+      }
+
+      .replay-battlefield-timeline {
+        grid-template-columns: 1fr auto;
+      }
+
+      .replay-battlefield-timeline input {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
       .replay-choice-separator {
         display: none;
       }
@@ -748,6 +884,49 @@
             </div>
           </article>
 
+          <article class="data-card replay-results-section" id="replayBattlefieldPanel" hidden>
+            <div class="replay-extended-heading">
+              <h3>2D battlefield</h3>
+              <p id="replayBattlefieldMeta"></p>
+            </div>
+            <div class="replay-battlefield-controls">
+              <button class="replay-action" id="replayBattlefieldPlay" type="button">Play</button>
+              <label class="replay-battlefield-option" for="replayBattlefieldSpeed">
+                Speed
+                <select id="replayBattlefieldSpeed">
+                  <option value="1">1×</option>
+                  <option value="2">2×</option>
+                  <option value="4" selected>4×</option>
+                  <option value="8">8×</option>
+                </select>
+              </label>
+              <label class="replay-battlefield-option" for="replayBattlefieldDroids">
+                <input id="replayBattlefieldDroids" type="checkbox" checked>
+                Units
+              </label>
+              <label class="replay-battlefield-option" for="replayBattlefieldStructures">
+                <input id="replayBattlefieldStructures" type="checkbox" checked>
+                Structures
+              </label>
+            </div>
+            <div class="replay-battlefield-stage">
+              <canvas
+                class="replay-battlefield-canvas"
+                id="replayBattlefieldCanvas"
+                width="900"
+                height="600"
+                aria-label="Animated top-down battlefield replay"
+              ></canvas>
+            </div>
+            <div class="replay-battlefield-legend" id="replayBattlefieldLegend"></div>
+            <label class="replay-battlefield-timeline" for="replayBattlefieldRange">
+              <output id="replayBattlefieldTime">0:00</output>
+              <input id="replayBattlefieldRange" type="range" min="0" max="0" value="0" step="100">
+              <output id="replayBattlefieldDuration">0:00</output>
+            </label>
+            <p class="replay-battlefield-status" id="replayBattlefieldStatus"></p>
+          </article>
+
           <article class="data-card replay-results-section" id="replayResearchPanel" hidden style="display: none;">
             <div class="replay-extended-heading">
               <h3>Research timeline</h3>
@@ -846,7 +1025,7 @@
     </main>
   </div>
 
-  <script src="replay-analyzer.js?v=20260815-2"></script>
+  <script src="replay-analyzer.js?v=20260815-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

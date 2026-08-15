@@ -27,7 +27,7 @@ final class LeaderboardCalculator
             'format' => 1,
             'generatedAt' => gmdate('c'),
             'resultPolicy' => [
-                'historicalFacts' => 'legacy',
+                'historicalFacts' => 'replay-engine-only',
                 'unknownOutcomes' => 'excluded',
                 'eloBase' => self::ELO_BASE,
                 'minimumGamesForRating' => self::ELO_THRESHOLD,
@@ -63,41 +63,24 @@ final class LeaderboardCalculator
 
     private function facts(): array
     {
-        $rows = $this->pdo->query(
-            'SELECT f.result_source, f.game_json, f.players_json, s.source_key, s.display_name,
-                    m.source_match_id, r.sha256 AS replay_sha256
-             FROM match_outcome_facts f
-             JOIN matches m ON m.source_id = f.source_id AND m.source_match_id = f.source_match_id
-             JOIN sources s ON s.id = f.source_id
-             LEFT JOIN replays r ON r.id = m.replay_id
-             ORDER BY f.legacy_order, m.id'
-        )->fetchAll();
         $facts = [];
-        foreach ($rows as $row) {
-            $facts[] = [
-                'resultSource' => (string) $row['result_source'],
-                'key' => (string) $row['source_key'] . ':' . (string) $row['source_match_id'],
-                'source' => (string) $row['source_key'],
-                'sourceLabel' => (string) $row['display_name'],
-                'sourceMatchId' => (string) $row['source_match_id'],
-                'replayUrl' => $row['replay_sha256'] ? 'https://onit.lt/wzstats/api/v1/replays/' . $row['replay_sha256'] : '',
-                'game' => json_decode((string) $row['game_json'], true, 64, JSON_THROW_ON_ERROR),
-                'players' => json_decode((string) $row['players_json'], true, 64, JSON_THROW_ON_ERROR),
-            ];
-        }
         $sourceMatches = $this->pdo->query(
             "SELECT m.id, m.source_match_id, m.started_at, m.ended_at, m.duration_ms, m.map_name, m.game_type,
                     s.source_key, s.display_name, r.sha256 AS replay_sha256
              FROM matches m JOIN sources s ON s.id = m.source_id
              LEFT JOIN replays r ON r.id = m.replay_id
-             WHERE s.source_key <> 'bohan'
-               AND EXISTS (SELECT 1 FROM match_players mp WHERE mp.match_id = m.id AND LOWER(mp.result) IN ('winner', 'loser', 'contender'))"
+             WHERE EXISTS (
+                 SELECT 1 FROM match_players mp
+                 WHERE mp.match_id = m.id AND mp.stats_source = 'replay-engine'
+                   AND LOWER(mp.result) IN ('winner', 'loser', 'contender')
+             )"
         )->fetchAll();
         if ($sourceMatches !== []) {
             $ids = array_map('intval', array_column($sourceMatches, 'id'));
             $statement = $this->pdo->prepare(
                 'SELECT match_id, position_number, player_name, team_number, result, stats_source
-                 FROM match_players WHERE match_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')
+                 FROM match_players WHERE stats_source = \'replay-engine\'
+                   AND match_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')
                  ORDER BY match_id, position_number'
             );
             $statement->execute($ids);

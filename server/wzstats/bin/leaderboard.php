@@ -25,10 +25,9 @@ try {
         throw new RuntimeException('Another leaderboard build is already running.');
     }
     $migrations = Database::migrate($pdo, dirname(__DIR__) . '/migrations');
-    $import = (new LegacyOutcomeImporter($pdo))->import(dirname(__DIR__) . '/data/legacy-outcomes.json');
     $publish = (new LeaderboardCalculator($pdo))->publish(dirname(__DIR__) . '/data/leaderboards.json');
     $manifest = (new Publisher($pdo, dirname(__DIR__) . '/data'))->publish();
-    echo json_encode(['migrations' => $migrations, 'import' => $import, 'publish' => $publish, 'manifest' => $manifest], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+    echo json_encode(['migrations' => $migrations, 'publish' => $publish, 'manifest' => $manifest], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 } catch (Throwable $error) {
     $exitCode = 1;
     if (!$isCli) http_response_code(500);

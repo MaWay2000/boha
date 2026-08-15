@@ -1,6 +1,6 @@
 # Replay-engine statistics contract
 
-Analyzer contract: `3.0.0`
+Analyzer contract: `3.1.0`
 
 The replay file is the only authority for player statistics. Source adapters may
 discover replay URLs and supply listing metadata, but source-calculated player
@@ -28,15 +28,24 @@ must not substitute source statistics or estimate the value from command timing.
 ## Extended record
 
 - completed-research timeline;
-- one-minute player snapshots;
+- 15-second player snapshots, including combat, production, economy, research,
+  health and power-loss totals;
 - decoded production, construction, attack and research commands;
 - player departure and chat events;
 - player activity counts and last recorded activity;
 - manufactured unit designs and their weapon/component identifiers;
 - decoder error counts and explicit availability flags.
 
-The decoded network record is stored losslessly as `gzip+base64` to stay within
-shared-hosting request and database packet limits.
+The analyzer loads a read-only telemetry hook while the stock Warzone 4.7 engine
+replays the match. It captures exact surviving droid and structure coordinates,
+health and basic state every three seconds for 1v1 games and every ten seconds
+for larger games. Recorded attack and construction destinations remain the
+authoritative command stream.
+
+The decoded network record, 15-second snapshot series and tactical position
+frames are stored losslessly as `gzip+base64` to stay within shared-hosting
+request and database packet limits. The public match-detail API expands the
+snapshot and position series for the static website.
 
 ## Not currently available
 

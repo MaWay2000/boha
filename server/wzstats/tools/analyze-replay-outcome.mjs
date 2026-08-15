@@ -1,13 +1,18 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { decodeReplayNetwork } from './decode-replay-network.mjs';
 
-const ANALYZER_VERSION = '3.0.0';
+const ANALYZER_VERSION = '3.1.0';
+const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
+const ANALYZER_MOD_DIRECTORY = resolve(SCRIPT_DIRECTORY, '..', 'analyzer-mod');
+const SNAPSHOT_INTERVAL_SECONDS = Math.min(60, Math.max(5,
+  Number(process.env.WZ_SNAPSHOT_INTERVAL_SECONDS) || 15));
 
 function fail(message, details = undefined) {
   const result = { status: 'error', error: message };
@@ -36,6 +41,18 @@ function extractExtendedReport(logText) {
 
 function extractPeriodicReports(logText) {
   return [...logText.matchAll(/__REPORT__(.*?)__ENDREPORT__/gs)].map((match) => JSON.parse(match[1]));
+}
+
+function extractTacticalFrames(debugText) {
+  return [...debugText.matchAll(/__WZTACTICAL__(.*?)__ENDWZTACTICAL__/gs)].map((match) => JSON.parse(match[1]));
+}
+
+function readTacticalFrames(logsDir) {
+  if (!existsSync(logsDir)) return [];
+  return readdirSync(logsDir)
+    .filter((name) => /^init\.\d+\.log$/i.test(name))
+    .flatMap((name) => extractTacticalFrames(readFileSync(join(logsDir, name), 'utf8')))
+    .sort((left, right) => left.time - right.time);
 }
 
 function prepareEngineReplay(replayBuffer) {
@@ -176,6 +193,8 @@ function normalizeSnapshotPlayer(player) {
     healthPercent: player.hp ?? null,
     experience: player.summExp ?? null,
     recentPowerLost: player.recentPowerLost ?? null,
+    recentDroidPowerLost: player.recentDroidPowerLost ?? null,
+    recentStructurePowerLost: player.recentStructurePowerLost ?? null,
     recentPowerWon: player.recentPowerWon ?? null,
     recentResearchPerformance: player.recentResearchPerformance ?? null,
     recentResearchPotential: player.recentResearchPotential ?? null,
@@ -204,11 +223,13 @@ if (!replayArgument) {
       }
       const workDir = mkdtempSync(join(tmpdir(), 'wzstats-outcome-'));
       const replayDir = join(workDir, 'replay', 'multiplay');
+      const analyzerScriptDir = join(workDir, 'multiplay');
       const debugPath = join(workDir, 'warzone.log');
       const startedAt = Date.now();
 
       try {
         mkdirSync(replayDir, { recursive: true });
+        cpSync(join(ANALYZER_MOD_DIRECTORY, 'multiplay'), analyzerScriptDir, { recursive: true });
         writeFileSync(join(replayDir, 'probe.wzrp'), engineReplay.buffer);
 
         writeAnalyzerProgress({
@@ -226,7 +247,7 @@ if (!replayArgument) {
           '--debug=error',
           '--flush-debug-stderr',
           '--gamelog-output=log',
-          '--gamelog-frameinterval=60',
+          `--gamelog-frameinterval=${SNAPSHOT_INTERVAL_SECONDS}`,
           `--debugfile=${debugPath}`,
         ], workDir);
 
@@ -244,6 +265,7 @@ if (!replayArgument) {
             : null;
           const logText = logName ? readFileSync(join(logsDir, logName), 'utf8') : '';
           const report = extractExtendedReport(logText);
+          const tacticalFrames = readTacticalFrames(logsDir);
 
           if (!report || !Array.isArray(report.playerData)) {
             fail('Warzone completed without a final extended game report.');
@@ -327,12 +349,34 @@ if (!replayArgument) {
                   timeMilliseconds: snapshot.gameTime ?? null,
                   players: (Array.isArray(snapshot.playerData) ? snapshot.playerData : []).map(normalizeSnapshotPlayer),
                 })),
-                frameIntervalSeconds: 60,
+                frameIntervalSeconds: SNAPSHOT_INTERVAL_SECONDS,
                 recordedNetwork,
+                tacticalReplay: {
+                  mode: tacticalFrames.length > 0 ? 'exact-object-positions' : 'commands-and-aggregate-snapshots',
+                  exactObjectPositions: tacticalFrames.length > 0,
+                  aggregateFrameIntervalSeconds: SNAPSHOT_INTERVAL_SECONDS,
+                  positionFrameIntervalSeconds: tacticalFrames[0]?.interval ? tacticalFrames[0].interval / 1000 : null,
+                  positionFrameSchema: tacticalFrames.length > 0 ? {
+                    droids: ['id', 'player', 'x', 'y', 'health', 'droidType', 'order'],
+                    structures: ['id', 'player', 'x', 'y', 'health', 'statType', 'status'],
+                  } : null,
+                  positionFrames: tacticalFrames,
+                  commandEventCounts: recordedNetwork?.error ? null : {
+                    production: recordedNetwork.productionTimeline?.length || 0,
+                    construction: recordedNetwork.constructionOrders?.length || 0,
+                    attack: recordedNetwork.attackOrders?.length || 0,
+                    research: recordedNetwork.researchOrders?.length || 0,
+                    departures: recordedNetwork.playerDepartures?.length || 0,
+                  },
+                },
                 availability: {
                   researchTimeline: true,
-                  perMinuteSnapshots: true,
+                  aggregateSnapshots: true,
+                  snapshotIntervalSeconds: SNAPSHOT_INTERVAL_SECONDS,
                   buildAndLossDeltasFromSnapshots: true,
+                  exactUnitPositions: tacticalFrames.length > 0,
+                  exactStructurePositions: tacticalFrames.length > 0,
+                  commandDestinations: !recordedNetwork?.error,
                   individualUnitTypes: false,
                   individualWeaponStatistics: false,
                   damageDealt: false,
@@ -348,12 +392,16 @@ if (!replayArgument) {
               },
               analysisMilliseconds: Date.now() - startedAt,
             };
-            process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+            process.stdout.write(`${JSON.stringify(result)}\n`);
           }
         }
       } finally {
         const safePrefix = join(tmpdir(), 'wzstats-outcome-');
-        if (workDir.startsWith(safePrefix)) rmSync(workDir, { recursive: true, force: true });
+        if (process.env.WZ_KEEP_WORKDIR === '1') {
+          process.stderr.write(`Analyzer work directory retained at ${workDir}\n`);
+        } else if (workDir.startsWith(safePrefix)) {
+          rmSync(workDir, { recursive: true, force: true });
+        }
       }
     }
   }

@@ -66,7 +66,7 @@ function workerQueueStatus(PDO $pdo, string $targetVersion, bool $reanalysisEnab
 
 try {
     $config = wzstats_config();
-    $targetAnalyzerVersion = (string) ($config['worker']['analyzer_version'] ?? '3.0.0');
+    $targetAnalyzerVersion = (string) ($config['worker']['analyzer_version'] ?? '3.1.0');
     $reanalysisEnabled = (bool) ($config['worker']['reanalysis_enabled'] ?? false);
     applyCors($config['cors_origins'] ?? []);
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
@@ -385,6 +385,38 @@ try {
         unset($player);
         $record['metadata'] = $record['metadata_json'] ? json_decode($record['metadata_json'], true) : null;
         $record['telemetry'] = $record['telemetry_json'] ? json_decode($record['telemetry_json'], true) : null;
+        if (is_array($record['telemetry']['engineAnalysis']['extended'] ?? null)) {
+            $extended = &$record['telemetry']['engineAnalysis']['extended'];
+            if (($extended['snapshotsEncoding'] ?? null) === 'gzip+base64'
+                && is_string($extended['snapshotsGzipBase64'] ?? null)) {
+                $compressedSnapshots = base64_decode($extended['snapshotsGzipBase64'], true);
+                $snapshotJson = $compressedSnapshots === false ? false : @gzdecode($compressedSnapshots);
+                if (is_string($snapshotJson)) {
+                    $decodedSnapshots = json_decode($snapshotJson, true);
+                    if (is_array($decodedSnapshots)) {
+                        $extended['snapshots'] = $decodedSnapshots;
+                    }
+                }
+                unset($extended['snapshotsGzipBase64']);
+            }
+            if (is_array($extended['tacticalReplay'] ?? null)) {
+                $tactical = &$extended['tacticalReplay'];
+                if (($tactical['positionFramesEncoding'] ?? null) === 'gzip+base64'
+                    && is_string($tactical['positionFramesGzipBase64'] ?? null)) {
+                    $compressedFrames = base64_decode($tactical['positionFramesGzipBase64'], true);
+                    $frameJson = $compressedFrames === false ? false : @gzdecode($compressedFrames);
+                    if (is_string($frameJson)) {
+                        $decodedFrames = json_decode($frameJson, true);
+                        if (is_array($decodedFrames)) {
+                            $tactical['positionFrames'] = $decodedFrames;
+                        }
+                    }
+                    unset($tactical['positionFramesGzipBase64']);
+                }
+                unset($tactical);
+            }
+            unset($extended);
+        }
         $record['replay_analysis'] = $record['replay_metadata_json']
             ? json_decode($record['replay_metadata_json'], true)
             : null;

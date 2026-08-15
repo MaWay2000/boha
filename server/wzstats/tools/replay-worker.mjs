@@ -163,19 +163,39 @@ async function analyzeReplay(replayPath, job) {
 
 function compactAnalysis(analysis) {
   const recordedNetwork = analysis?.extended?.recordedNetwork;
-  if (!recordedNetwork || typeof recordedNetwork !== 'object') return analysis;
-  const json = JSON.stringify(recordedNetwork);
+  const snapshots = analysis?.extended?.snapshots;
+  const positionFrames = analysis?.extended?.tacticalReplay?.positionFrames;
+  if ((!recordedNetwork || typeof recordedNetwork !== 'object')
+      && !Array.isArray(snapshots)
+      && !Array.isArray(positionFrames)) return analysis;
+  const compacted = { ...analysis.extended };
+  if (recordedNetwork && typeof recordedNetwork === 'object') {
+    const json = JSON.stringify(recordedNetwork);
+    compacted.recordedNetworkEncoding = 'gzip+base64';
+    compacted.recordedNetworkCounts = Object.fromEntries(Object.entries(recordedNetwork)
+      .filter(([, value]) => Array.isArray(value))
+      .map(([name, value]) => [name, value.length]));
+    compacted.recordedNetworkGzipBase64 = gzipSync(json).toString('base64');
+    compacted.recordedNetwork = undefined;
+  }
+  if (Array.isArray(snapshots)) {
+    compacted.snapshotsEncoding = 'gzip+base64';
+    compacted.snapshotsCount = snapshots.length;
+    compacted.snapshotsGzipBase64 = gzipSync(JSON.stringify(snapshots)).toString('base64');
+    compacted.snapshots = undefined;
+  }
+  if (Array.isArray(positionFrames)) {
+    compacted.tacticalReplay = {
+      ...compacted.tacticalReplay,
+      positionFramesEncoding: 'gzip+base64',
+      positionFramesCount: positionFrames.length,
+      positionFramesGzipBase64: gzipSync(JSON.stringify(positionFrames)).toString('base64'),
+      positionFrames: undefined,
+    };
+  }
   return {
     ...analysis,
-    extended: {
-      ...analysis.extended,
-      recordedNetworkEncoding: 'gzip+base64',
-      recordedNetworkCounts: Object.fromEntries(Object.entries(recordedNetwork)
-        .filter(([, value]) => Array.isArray(value))
-        .map(([name, value]) => [name, value.length])),
-      recordedNetworkGzipBase64: gzipSync(json).toString('base64'),
-      recordedNetwork: undefined,
-    },
+    extended: compacted,
   };
 }
 

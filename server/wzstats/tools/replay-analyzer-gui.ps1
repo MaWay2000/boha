@@ -455,7 +455,7 @@ function Update-Dashboard([switch] $ForceLog) {
         $footerLabel.Text = 'Automatic mode disabled. You can still analyze one replay manually.'
     }
     if ($null -ne $queue) {
-        $footerLabel.Text += ' Completed: ' + $queue.completed + '; unknown: ' + $queue.unknown + '; failed: ' + $queue.failed + '.'
+        $footerLabel.Text += ' Pending: ' + $queue.pending + '; completed: ' + $queue.completed + '; unknown: ' + $queue.unknown + '; failed: ' + $queue.failed + '.'
     }
 
     $analyzeButton.Enabled = -not $isRunning

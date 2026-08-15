@@ -38,6 +38,7 @@
   const battlefieldSpeed = document.getElementById("replayBattlefieldSpeed");
   const battlefieldDroids = document.getElementById("replayBattlefieldDroids");
   const battlefieldStructures = document.getElementById("replayBattlefieldStructures");
+  const battlefieldBackground = document.getElementById("replayBattlefieldBackground");
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
   const battlefieldRange = document.getElementById("replayBattlefieldRange");
@@ -165,6 +166,7 @@
   let battlefieldAnimationFrame = 0;
   let battlefieldLastTick = 0;
   let battlefieldLastDraw = 0;
+  let battlefieldTerrain = null;
   const battlefieldHiddenPlayers = new Set();
 
   class ReplayMessageReader {
@@ -652,6 +654,7 @@
     let messageOffset = headerOffset + headerLength;
     let embeddedMapVersion = null;
     let embeddedMapBytes = 0;
+    let embeddedMapArchive = null;
 
     if (replayFormat >= 2) {
       assertRange(messageOffset, 8, bytes.length, "embedded map header");
@@ -659,6 +662,7 @@
       embeddedMapBytes = view.getUint32(messageOffset + 4, false);
       messageOffset += 8;
       assertRange(messageOffset, embeddedMapBytes, bytes.length, "embedded map");
+      embeddedMapArchive = bytes.slice(messageOffset, messageOffset + embeddedMapBytes);
       messageOffset += embeddedMapBytes;
     }
 
@@ -742,7 +746,7 @@
       return counts;
     }, {});
 
-    return {
+    const extraction = {
       format: {
         magic: "WZrp",
         replayFormat,
@@ -802,6 +806,176 @@
       header,
       endInfo
     };
+    Object.defineProperty(extraction, "embeddedMapArchive", {
+      value: embeddedMapArchive,
+      enumerable: false
+    });
+    return extraction;
+  }
+
+  async function decompressZipEntry(compressed, method, expectedSize) {
+    if (method === 0) {
+      return compressed;
+    }
+    if (method !== 8 || typeof DecompressionStream !== "function") {
+      throw new Error("This browser cannot decompress the embedded map.");
+    }
+
+    const stream = new Blob([compressed])
+      .stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    if (expectedSize && bytes.length !== expectedSize) {
+      throw new Error("The embedded map contains a damaged ZIP entry.");
+    }
+    return bytes;
+  }
+
+  async function readEmbeddedZipEntries(archive, requestedNames) {
+    if (!(archive instanceof Uint8Array) || archive.length < 22) {
+      return new Map();
+    }
+
+    const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
+    const minimumOffset = Math.max(0, archive.length - 65557);
+    let endOffset = -1;
+    for (let offset = archive.length - 22; offset >= minimumOffset; offset -= 1) {
+      if (view.getUint32(offset, true) === 0x06054b50) {
+        endOffset = offset;
+        break;
+      }
+    }
+    if (endOffset < 0) {
+      throw new Error("The embedded map ZIP directory is missing.");
+    }
+
+    const entryCount = view.getUint16(endOffset + 10, true);
+    let offset = view.getUint32(endOffset + 16, true);
+    const requested = new Set([...requestedNames].map((name) => name.toLowerCase()));
+    const entries = new Map();
+    if (entryCount > 2048 || offset >= archive.length) {
+      throw new Error("The embedded map ZIP directory is invalid.");
+    }
+
+    for (let index = 0; index < entryCount && requested.size; index += 1) {
+      if (offset + 46 > archive.length || view.getUint32(offset, true) !== 0x02014b50) {
+        throw new Error("The embedded map ZIP entry is invalid.");
+      }
+      const flags = view.getUint16(offset + 8, true);
+      const method = view.getUint16(offset + 10, true);
+      const compressedSize = view.getUint32(offset + 20, true);
+      const uncompressedSize = view.getUint32(offset + 24, true);
+      const nameLength = view.getUint16(offset + 28, true);
+      const extraLength = view.getUint16(offset + 30, true);
+      const commentLength = view.getUint16(offset + 32, true);
+      const localOffset = view.getUint32(offset + 42, true);
+      const nameStart = offset + 46;
+      const nameEnd = nameStart + nameLength;
+      if (nameEnd > archive.length || uncompressedSize > 8 * 1024 * 1024 || flags & 1) {
+        throw new Error("The embedded map ZIP entry is unsupported.");
+      }
+      const name = textDecoder.decode(archive.subarray(nameStart, nameEnd)).toLowerCase();
+      const normalizedName = name.split("/").pop();
+      if (requested.has(normalizedName)) {
+        if (localOffset + 30 > archive.length || view.getUint32(localOffset, true) !== 0x04034b50) {
+          throw new Error("The embedded map ZIP local entry is invalid.");
+        }
+        const localNameLength = view.getUint16(localOffset + 26, true);
+        const localExtraLength = view.getUint16(localOffset + 28, true);
+        const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+        const dataEnd = dataStart + compressedSize;
+        if (dataEnd > archive.length) {
+          throw new Error("The embedded map ZIP data is truncated.");
+        }
+        entries.set(
+          normalizedName,
+          await decompressZipEntry(archive.slice(dataStart, dataEnd), method, uncompressedSize)
+        );
+        requested.delete(normalizedName);
+      }
+      offset = nameEnd + extraLength + commentLength;
+    }
+    return entries;
+  }
+
+  function parseEmbeddedMapTerrain(entries) {
+    const mapBytes = entries.get("game.map");
+    const terrainBytes = entries.get("ttypes.ttp");
+    if (!mapBytes || !terrainBytes || mapBytes.length < 16 || terrainBytes.length < 12) {
+      return null;
+    }
+
+    const mapView = new DataView(mapBytes.buffer, mapBytes.byteOffset, mapBytes.byteLength);
+    const terrainView = new DataView(terrainBytes.buffer, terrainBytes.byteOffset, terrainBytes.byteLength);
+    if (mapBytes[0] !== 109 || mapBytes[1] !== 97 || mapBytes[2] !== 112
+        || terrainBytes[0] !== 116 || terrainBytes[1] !== 116
+        || terrainBytes[2] !== 121 || terrainBytes[3] !== 112) {
+      return null;
+    }
+
+    const version = mapView.getUint32(4, true);
+    const width = mapView.getUint32(8, true);
+    const height = mapView.getUint32(12, true);
+    const tileBytes = version >= 40 ? 4 : 3;
+    const tileCount = width * height;
+    if (version <= 9 || version > 40 || width <= 1 || height <= 1
+        || width > 256 || height > 256 || 16 + tileCount * tileBytes > mapBytes.length) {
+      return null;
+    }
+
+    const terrainCount = Math.min(terrainView.getUint32(8, true), 511);
+    if (12 + terrainCount * 2 > terrainBytes.length) {
+      return null;
+    }
+    const textureTerrain = new Uint8Array(terrainCount);
+    for (let index = 0; index < terrainCount; index += 1) {
+      textureTerrain[index] = Math.min(11, terrainView.getUint16(12 + index * 2, true));
+    }
+
+    const heights = new Uint16Array(tileCount);
+    const terrainTypes = new Uint8Array(tileCount);
+    let minimumHeight = Number.MAX_SAFE_INTEGER;
+    let maximumHeight = 0;
+    let offset = 16;
+    for (let index = 0; index < tileCount; index += 1) {
+      const texture = mapView.getUint16(offset, true) & 0x01ff;
+      const tileHeight = version >= 40
+        ? mapView.getUint16(offset + 2, true)
+        : mapView.getUint8(offset + 2) * 2;
+      heights[index] = tileHeight;
+      terrainTypes[index] = textureTerrain[texture] || 0;
+      minimumHeight = Math.min(minimumHeight, tileHeight);
+      maximumHeight = Math.max(maximumHeight, tileHeight);
+      offset += tileBytes;
+    }
+
+    let tileset = "arizona";
+    const levelBytes = entries.get("level.json");
+    if (levelBytes) {
+      try {
+        tileset = String(JSON.parse(textDecoder.decode(levelBytes)).tileset || tileset).toLowerCase();
+      } catch (error) {
+        tileset = "arizona";
+      }
+    }
+    return { width, height, heights, terrainTypes, minimumHeight, maximumHeight, tileset };
+  }
+
+  async function loadEmbeddedMapTerrain(extraction) {
+    if (!extraction.embeddedMapArchive) {
+      return;
+    }
+    const entries = await readEmbeddedZipEntries(
+      extraction.embeddedMapArchive,
+      new Set(["game.map", "ttypes.ttp", "level.json"])
+    );
+    const terrain = parseEmbeddedMapTerrain(entries);
+    if (terrain) {
+      Object.defineProperty(extraction, "mapTerrain", {
+        value: terrain,
+        enumerable: false
+      });
+    }
   }
 
   function formatBytes(value) {
@@ -2047,7 +2221,78 @@
     return objects;
   }
 
+  function battlefieldTerrainColour(tileset, terrainType) {
+    const palettes = {
+      arizona: {
+        ground: [116, 88, 46], brush: [100, 76, 38], rock: [136, 91, 58],
+        road: [112, 104, 87], water: [28, 87, 118], cliff: [76, 61, 44], rubble: [91, 76, 58]
+      },
+      urban: {
+        ground: [72, 78, 75], brush: [61, 73, 66], rock: [92, 91, 86],
+        road: [112, 112, 105], water: [31, 76, 99], cliff: [60, 62, 59], rubble: [83, 77, 70]
+      },
+      rockies: {
+        ground: [76, 96, 75], brush: [62, 84, 62], rock: [104, 108, 101],
+        road: [105, 105, 96], water: [35, 91, 122], cliff: [67, 72, 68], rubble: [88, 85, 75]
+      }
+    };
+    const palette = palettes[tileset] || palettes.arizona;
+    if (terrainType === 6) return palette.road;
+    if (terrainType === 7) return palette.water;
+    if (terrainType === 8) return palette.cliff;
+    if (terrainType === 9) return palette.rubble;
+    if (terrainType === 5 || terrainType === 2) return palette.rock;
+    if (terrainType === 1 || terrainType === 3 || terrainType === 4) return palette.brush;
+    if (terrainType === 10 || terrainType === 11) return [153, 167, 169];
+    return palette.ground;
+  }
+
+  function createBattlefieldTerrain(terrain) {
+    if (!terrain) {
+      return null;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = terrain.width;
+    canvas.height = terrain.height;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return null;
+    }
+    const image = context.createImageData(terrain.width, terrain.height);
+    const heightRange = Math.max(1, terrain.maximumHeight - terrain.minimumHeight);
+    const heightAt = (x, y) => terrain.heights[
+      Math.max(0, Math.min(terrain.height - 1, y)) * terrain.width
+      + Math.max(0, Math.min(terrain.width - 1, x))
+    ];
+
+    for (let y = 0; y < terrain.height; y += 1) {
+      for (let x = 0; x < terrain.width; x += 1) {
+        const index = y * terrain.width + x;
+        const terrainType = terrain.terrainTypes[index];
+        const base = battlefieldTerrainColour(terrain.tileset, terrainType);
+        const elevation = (terrain.heights[index] - terrain.minimumHeight) / heightRange;
+        const slope = (
+          heightAt(x - 1, y) - heightAt(x + 1, y)
+          + heightAt(x, y - 1) - heightAt(x, y + 1)
+        ) / Math.max(64, heightRange);
+        const light = terrainType === 7
+          ? 0.82
+          : Math.max(0.48, Math.min(1.28, 0.66 + elevation * 0.42 + slope * 0.22));
+        const pixel = index * 4;
+        image.data[pixel] = Math.round(base[0] * light);
+        image.data[pixel + 1] = Math.round(base[1] * light);
+        image.data[pixel + 2] = Math.round(base[2] * light);
+        image.data[pixel + 3] = 255;
+      }
+    }
+    context.putImageData(image, 0, 0);
+    return { ...terrain, canvas };
+  }
+
   function battlefieldMapSize(frame) {
+    if (battlefieldTerrain) {
+      return { width: battlefieldTerrain.width, height: battlefieldTerrain.height };
+    }
     const firstMap = battlefieldFrames.find((item) => item.map)?.map;
     if (firstMap?.width > 0 && firstMap?.height > 0) {
       return { width: Number(firstMap.width), height: Number(firstMap.height) };
@@ -2094,7 +2339,17 @@
     const margin = 12;
     const fieldWidth = Math.max(1, rect.width - margin * 2);
     const fieldHeight = Math.max(1, rect.height - margin * 2);
-    context.strokeStyle = "rgba(109, 232, 255, 0.11)";
+    if (battlefieldBackground.checked && battlefieldTerrain) {
+      context.imageSmoothingEnabled = true;
+      context.globalAlpha = 0.9;
+      context.drawImage(battlefieldTerrain.canvas, margin, margin, fieldWidth, fieldHeight);
+      context.globalAlpha = 1;
+      context.fillStyle = "rgba(2, 8, 13, 0.12)";
+      context.fillRect(margin, margin, fieldWidth, fieldHeight);
+    }
+    context.strokeStyle = battlefieldBackground.checked && battlefieldTerrain
+      ? "rgba(109, 232, 255, 0.17)"
+      : "rgba(109, 232, 255, 0.11)";
     context.lineWidth = 1;
     for (let index = 0; index <= 10; index += 1) {
       const x = margin + fieldWidth * index / 10;
@@ -2220,6 +2475,7 @@
     stopBattlefieldPlayback();
     battlefieldFrames = tacticalReplay.positionFrames;
     battlefieldExtraction = extraction;
+    battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
     battlefieldCurrentTime = 0;
     battlefieldLastDraw = 0;
     battlefieldHiddenPlayers.clear();
@@ -2230,9 +2486,11 @@
     battlefieldRange.max = String(duration);
     battlefieldRange.value = "0";
     battlefieldDuration.value = formatDuration(duration);
-    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}`;
+    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}`;
     battlefieldDroids.checked = true;
     battlefieldStructures.checked = true;
+    battlefieldBackground.checked = Boolean(battlefieldTerrain);
+    battlefieldBackground.disabled = !battlefieldTerrain;
     populateBattlefieldLegend(extraction);
     requestAnimationFrame(drawBattlefield);
   }
@@ -2254,6 +2512,7 @@
       stopBattlefieldPlayback();
       battlefieldFrames = [];
       battlefieldExtraction = null;
+      battlefieldTerrain = null;
     }
 
     snapshotPanel.hidden = snapshots.length === 0;
@@ -2500,6 +2759,14 @@
       const arrayBuffer = await loadReplay();
       setStatus("Parsing replay…");
       latestExtraction = parseReplay(arrayBuffer);
+      if (latestExtraction.embeddedMapArchive) {
+        setStatus("Reading embedded map terrain…");
+        try {
+          await loadEmbeddedMapTerrain(latestExtraction);
+        } catch (error) {
+          latestExtraction.mapTerrainError = error.message || "Embedded map terrain could not be loaded.";
+        }
+      }
       let publishedResult = null;
       if (latestReplaySha256) {
         setStatus("Loading replay-engine player summary…");
@@ -2621,6 +2888,7 @@
 
   battlefieldDroids.addEventListener("change", drawBattlefield);
   battlefieldStructures.addEventListener("change", drawBattlefield);
+  battlefieldBackground.addEventListener("change", drawBattlefield);
 
   if (typeof ResizeObserver === "function") {
     const battlefieldResizeObserver = new ResizeObserver(() => drawBattlefield());

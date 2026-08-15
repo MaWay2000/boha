@@ -2443,7 +2443,9 @@
       ? battlefieldDroidDefinitions.get(id)
       : battlefieldStructureDefinitions.get(id);
     if (!definition) return null;
-    const key = `${kind}:${JSON.stringify(definition)}`;
+    const key = kind === "droid"
+      ? `${kind}:${definition.body}:${definition.propulsion}:${definition.weapons.join(",")}:${definition.droidType}`
+      : `${kind}:${normalizeBattlefieldModelName(definition.name)}:${definition.statType}`;
     if (!battlefieldSpriteCache.has(key)) {
       battlefieldSpriteCache.set(key, null);
       createBattlefieldModelSprite(kind, definition)

@@ -19,7 +19,7 @@ return [
     ],
     'worker' => [
         'token_hash' => hash('sha256', 'CHANGE_ME_TO_A_RANDOM_WORKER_TOKEN'),
-        'analyzer_version' => '3.1.0',
+        'analyzer_version' => '3.2.0',
         'reanalysis_enabled' => false,
     ],
     'cors_origins' => [

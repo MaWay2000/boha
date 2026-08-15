@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { decodeReplayNetwork } from './decode-replay-network.mjs';
 
-const ANALYZER_VERSION = '3.1.0';
+const ANALYZER_VERSION = '3.2.0';
 const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const ANALYZER_MOD_DIRECTORY = resolve(SCRIPT_DIRECTORY, '..', 'analyzer-mod');
 const SNAPSHOT_INTERVAL_SECONDS = Math.min(60, Math.max(5,

@@ -78,7 +78,7 @@ final class LeaderboardCalculator
         if ($sourceMatches !== []) {
             $ids = array_map('intval', array_column($sourceMatches, 'id'));
             $statement = $this->pdo->prepare(
-                'SELECT match_id, position_number, player_name, team_number, result, stats_source
+                'SELECT match_id, position_number, player_name, team_number, result, stats_source, raw_json
                  FROM match_players WHERE stats_source = \'replay-engine\'
                    AND match_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')
                  ORDER BY match_id, position_number'
@@ -88,10 +88,12 @@ final class LeaderboardCalculator
             $resultSources = [];
             foreach ($statement->fetchAll() as $player) {
                 $matchId = (int) $player['match_id'];
+                $rawPlayer = json_decode((string) ($player['raw_json'] ?? ''), true);
+                $publicKey = is_array($rawPlayer) ? trim((string) ($rawPlayer['publicKey'] ?? '')) : '';
                 $players[$matchId][] = [
                     'name' => (string) $player['player_name'],
-                    'publicKey' => null,
-                    'canonicalPublicKey' => null,
+                    'publicKey' => $publicKey !== '' ? $publicKey : null,
+                    'canonicalPublicKey' => $publicKey !== '' ? $publicKey : null,
                     'position' => (int) $player['position_number'],
                     'team' => (int) $player['team_number'],
                     'usertype' => $player['result'] === null ? null : strtolower((string) $player['result']),
@@ -322,8 +324,7 @@ final class LeaderboardCalculator
             if (str_starts_with($name, $colour . '-')) $name = substr($name, strlen($colour) + 1);
         }
         if ($name === '') $name = $userType === 'spectator' ? 'spectator' : ($userType ? 'generic' : 'empty slot');
-        $syntheticPublicKey = $bot ? $name : null;
-        return [$name, $name, $syntheticPublicKey, (bool) $bot, !$syntheticPublicKey];
+        return [$name, $name, null, (bool) $bot, true];
     }
 
     private function matchesBoard(string $board, array $game): bool

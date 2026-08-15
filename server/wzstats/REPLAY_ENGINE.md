@@ -1,6 +1,6 @@
 # Replay-engine statistics contract
 
-Analyzer contract: `3.1.0`
+Analyzer contract: `3.2.0`
 
 The replay file is the only authority for player statistics. Source adapters may
 discover replay URLs and supply listing metadata, but source-calculated player

@@ -909,7 +909,9 @@
   function calculatePlayerAwards(players, events = []) {
     const awardsByPlayer = new Map(players.map((player) => [player, []]));
     const competitors = players.filter((player) => (
-      !player.spectator && player.summary && !player.summary.partialStats
+      !player.spectator && player.summary && (
+        !player.summary.partialStats || player.summary.statsSource === "replay-engine"
+      )
     ));
     const number = (value) => Number(value).toLocaleString();
     const stat = (player, key) => playerStat(player, key) || 0;

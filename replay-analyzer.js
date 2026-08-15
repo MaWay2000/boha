@@ -39,6 +39,10 @@
   const battlefieldDroids = document.getElementById("replayBattlefieldDroids");
   const battlefieldStructures = document.getElementById("replayBattlefieldStructures");
   const battlefieldBackground = document.getElementById("replayBattlefieldBackground");
+  const battlefieldZoomOut = document.getElementById("replayBattlefieldZoomOut");
+  const battlefieldZoomIn = document.getElementById("replayBattlefieldZoomIn");
+  const battlefieldResetView = document.getElementById("replayBattlefieldResetView");
+  const battlefieldZoom = document.getElementById("replayBattlefieldZoom");
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
   const battlefieldRange = document.getElementById("replayBattlefieldRange");
@@ -172,6 +176,8 @@
   let battlefieldModelLibraryPromise = null;
   const battlefieldSpriteCache = new Map();
   const battlefieldHiddenPlayers = new Set();
+  const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
+  let battlefieldPan = null;
 
   class ReplayMessageReader {
     constructor(bytes) {
@@ -2618,6 +2624,15 @@
     const margin = 12;
     const fieldWidth = Math.max(1, rect.width - margin * 2);
     const fieldHeight = Math.max(1, rect.height - margin * 2);
+    const fieldCenterX = margin + fieldWidth / 2;
+    const fieldCenterY = margin + fieldHeight / 2;
+    context.save();
+    context.beginPath();
+    context.rect(margin, margin, fieldWidth, fieldHeight);
+    context.clip();
+    context.translate(fieldCenterX + battlefieldView.offsetX, fieldCenterY + battlefieldView.offsetY);
+    context.scale(battlefieldView.scale, battlefieldView.scale);
+    context.translate(-fieldCenterX, -fieldCenterY);
     if (battlefieldBackground.checked && battlefieldTerrain) {
       context.imageSmoothingEnabled = true;
       context.globalAlpha = 0.9;
@@ -2655,6 +2670,7 @@
       : [];
     let visibleStructures = 0;
     let visibleDroids = 0;
+    const showDetailedModels = battlefieldView.scale >= 1.35;
 
     structures.forEach((structure) => {
       const player = Number(structure[1]);
@@ -2664,7 +2680,7 @@
       visibleStructures += 1;
       const health = Math.max(0, Math.min(100, Number(structure[4]) || 0));
       const size = Math.max(7, Math.min(18, fieldWidth / map.width * 3));
-      const sprite = battlefieldModelSprite("structure", structure);
+      const sprite = showDetailedModels ? battlefieldModelSprite("structure", structure) : null;
       const x = projectX(structure[2]);
       const y = projectY(structure[3]);
       context.globalAlpha = 0.35 + health / 155;
@@ -2691,7 +2707,7 @@
       visibleDroids += 1;
       const health = Math.max(0, Math.min(100, Number(droid[4]) || 0));
       const radius = Math.max(3.5, Math.min(8, fieldWidth / map.width * 1.35));
-      const sprite = battlefieldModelSprite("droid", droid);
+      const sprite = showDetailedModels ? battlefieldModelSprite("droid", droid) : null;
       const x = projectX(droid[2]);
       const y = projectY(droid[3]);
       context.globalAlpha = 0.4 + health / 150;
@@ -2711,10 +2727,36 @@
       context.stroke();
     });
     context.globalAlpha = 1;
+    context.restore();
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
     battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
-    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures`;
+    battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
+    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`;
+  }
+
+  function setBattlefieldZoom(nextScale, anchorX = null, anchorY = null) {
+    const previousScale = battlefieldView.scale;
+    const scale = Math.max(0.75, Math.min(5, Number(nextScale) || 1));
+    if (scale === previousScale) {
+      return;
+    }
+    const rect = battlefieldCanvas.getBoundingClientRect();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const x = anchorX == null ? centerX : anchorX;
+    const y = anchorY == null ? centerY : anchorY;
+    battlefieldView.offsetX = x - centerX - (x - centerX - battlefieldView.offsetX) * scale / previousScale;
+    battlefieldView.offsetY = y - centerY - (y - centerY - battlefieldView.offsetY) * scale / previousScale;
+    battlefieldView.scale = scale;
+    drawBattlefield();
+  }
+
+  function resetBattlefieldView() {
+    battlefieldView.scale = 1;
+    battlefieldView.offsetX = 0;
+    battlefieldView.offsetY = 0;
+    drawBattlefield();
   }
 
   function animateBattlefield(timestamp) {
@@ -2781,6 +2823,9 @@
     battlefieldCurrentTime = 0;
     battlefieldLastDraw = 0;
     battlefieldHiddenPlayers.clear();
+    battlefieldView.scale = 1;
+    battlefieldView.offsetX = 0;
+    battlefieldView.offsetY = 0;
     const lastFrameTime = Number(battlefieldFrames[battlefieldFrames.length - 1]?.time || 0);
     const duration = Math.max(lastFrameTime, Number(extraction.match.elapsedMilliseconds) || 0);
     const interval = Number(tacticalReplay.positionFrameIntervalSeconds) || 0;
@@ -3195,6 +3240,48 @@
   battlefieldDroids.addEventListener("change", drawBattlefield);
   battlefieldStructures.addEventListener("change", drawBattlefield);
   battlefieldBackground.addEventListener("change", drawBattlefield);
+  battlefieldZoomOut.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale / 1.25));
+  battlefieldZoomIn.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale * 1.25));
+  battlefieldResetView.addEventListener("click", resetBattlefieldView);
+  battlefieldCanvas.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    const rect = battlefieldCanvas.getBoundingClientRect();
+    setBattlefieldZoom(
+      battlefieldView.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15),
+      event.clientX - rect.left,
+      event.clientY - rect.top
+    );
+  }, { passive: false });
+  battlefieldCanvas.addEventListener("pointerdown", (event) => {
+    battlefieldPan = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      offsetX: battlefieldView.offsetX,
+      offsetY: battlefieldView.offsetY
+    };
+    battlefieldCanvas.setPointerCapture(event.pointerId);
+    battlefieldCanvas.classList.add("is-panning");
+  });
+  battlefieldCanvas.addEventListener("pointermove", (event) => {
+    if (!battlefieldPan || battlefieldPan.pointerId !== event.pointerId) {
+      return;
+    }
+    battlefieldView.offsetX = battlefieldPan.offsetX + event.clientX - battlefieldPan.x;
+    battlefieldView.offsetY = battlefieldPan.offsetY + event.clientY - battlefieldPan.y;
+    drawBattlefield();
+  });
+  battlefieldCanvas.addEventListener("pointerup", (event) => {
+    if (battlefieldPan?.pointerId === event.pointerId) {
+      battlefieldPan = null;
+      battlefieldCanvas.classList.remove("is-panning");
+    }
+  });
+  battlefieldCanvas.addEventListener("pointercancel", () => {
+    battlefieldPan = null;
+    battlefieldCanvas.classList.remove("is-panning");
+  });
+  battlefieldCanvas.addEventListener("dblclick", resetBattlefieldView);
 
   if (typeof ResizeObserver === "function") {
     const battlefieldResizeObserver = new ResizeObserver(() => drawBattlefield());

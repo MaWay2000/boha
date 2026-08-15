@@ -389,14 +389,40 @@
     .replay-battlefield-stage {
       display: flex;
       min-height: 320px;
-      justify-content: center;
+      justify-content: flex-end;
       padding: 14px;
-      overflow: auto;
+      overflow: hidden;
       background:
         radial-gradient(circle at 50% 45%, rgba(31, 89, 100, 0.18), transparent 62%),
         rgba(2, 8, 13, 0.84);
       border: 1px solid rgba(109, 232, 255, 0.18);
       border-radius: 16px;
+    }
+
+    .replay-battlefield-layout {
+      display: grid;
+      grid-template-columns: minmax(210px, 280px) minmax(0, 1fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .replay-battlefield-sidebar {
+      padding: 14px;
+      background: rgba(2, 8, 13, 0.84);
+      border: 1px solid rgba(109, 232, 255, 0.18);
+      border-radius: 16px;
+    }
+
+    .replay-battlefield-sidebar h4 {
+      margin: 0 0 8px;
+      color: var(--text);
+      font: 700 0.9rem "Oxanium", sans-serif;
+    }
+
+    .replay-battlefield-sidebar p {
+      margin: 0 0 12px;
+      color: var(--muted);
+      font-size: 0.78rem;
     }
 
     .replay-battlefield-canvas {
@@ -409,10 +435,18 @@
       border: 1px solid rgba(109, 232, 255, 0.32);
       border-radius: 8px;
       box-shadow: 0 0 24px rgba(35, 194, 219, 0.08);
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .replay-battlefield-canvas.is-panning {
+      cursor: grabbing;
     }
 
     .replay-battlefield-legend {
-      margin-top: 12px;
+      align-items: stretch;
+      flex-direction: column;
     }
 
     .replay-battlefield-player {
@@ -426,6 +460,24 @@
       border-radius: 999px;
       cursor: pointer;
       font: 600 0.76rem "Space Grotesk", sans-serif;
+    }
+
+    .replay-battlefield-zoom {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .replay-battlefield-zoom .replay-action {
+      min-width: 40px;
+      padding-inline: 10px;
+    }
+
+    .replay-battlefield-zoom output {
+      min-width: 48px;
+      color: var(--muted);
+      font: 700 0.76rem "Oxanium", sans-serif;
+      text-align: center;
     }
 
     .replay-battlefield-player[aria-pressed="false"] {
@@ -760,6 +812,19 @@
         padding: 8px;
       }
 
+      .replay-battlefield-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .replay-battlefield-sidebar {
+        order: 2;
+      }
+
+      .replay-battlefield-legend {
+        align-items: center;
+        flex-direction: row;
+      }
+
       .replay-battlefield-canvas {
         height: min(60vh, 560px);
       }
@@ -912,17 +977,29 @@
                 <input id="replayBattlefieldBackground" type="checkbox" checked>
                 Map background
               </label>
+              <span class="replay-battlefield-zoom" aria-label="Battlefield zoom controls">
+                <button class="replay-action" id="replayBattlefieldZoomOut" type="button" aria-label="Zoom out">−</button>
+                <output id="replayBattlefieldZoom">100%</output>
+                <button class="replay-action" id="replayBattlefieldZoomIn" type="button" aria-label="Zoom in">+</button>
+                <button class="replay-action" id="replayBattlefieldResetView" type="button">Reset view</button>
+              </span>
             </div>
-            <div class="replay-battlefield-stage">
-              <canvas
-                class="replay-battlefield-canvas"
-                id="replayBattlefieldCanvas"
-                width="900"
-                height="600"
-                aria-label="Animated top-down battlefield replay"
-              ></canvas>
+            <div class="replay-battlefield-layout">
+              <aside class="replay-battlefield-sidebar">
+                <h4>Players</h4>
+                <p>Select a player colour to show or hide their army. Detailed player statistics will be added here later.</p>
+                <div class="replay-battlefield-legend" id="replayBattlefieldLegend"></div>
+              </aside>
+              <div class="replay-battlefield-stage">
+                <canvas
+                  class="replay-battlefield-canvas"
+                  id="replayBattlefieldCanvas"
+                  width="900"
+                  height="600"
+                  aria-label="Animated top-down battlefield replay. Use the mouse wheel to zoom and drag to pan."
+                ></canvas>
+              </div>
             </div>
-            <div class="replay-battlefield-legend" id="replayBattlefieldLegend"></div>
             <label class="replay-battlefield-timeline" for="replayBattlefieldRange">
               <output id="replayBattlefieldTime">0:00</output>
               <input id="replayBattlefieldRange" type="range" min="0" max="0" value="0" step="100">

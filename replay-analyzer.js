@@ -27,11 +27,6 @@
   const eventCategory = document.getElementById("replayEventCategory");
   const eventPlayer = document.getElementById("replayEventPlayer");
   const eventSearch = document.getElementById("replayEventSearch");
-  const snapshotPanel = document.getElementById("replaySnapshotPanel");
-  const snapshotMeta = document.getElementById("replaySnapshotMeta");
-  const snapshotRange = document.getElementById("replaySnapshotRange");
-  const snapshotTime = document.getElementById("replaySnapshotTime");
-  const snapshotPlayers = document.getElementById("replaySnapshotPlayers");
   const battlefieldPanel = document.getElementById("replayBattlefieldPanel");
   const battlefieldMeta = document.getElementById("replayBattlefieldMeta");
   const battlefieldPlay = document.getElementById("replayBattlefieldPlay");
@@ -180,6 +175,8 @@
   const battlefieldSpriteCache = new Map();
   const battlefieldTintedSpriteCache = new WeakMap();
   const battlefieldHiddenPlayers = new Set();
+  const battlefieldPlayerStatElements = new Map();
+  let battlefieldRenderedSnapshotTime = null;
   const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
   let battlefieldPan = null;
 
@@ -2141,34 +2138,47 @@
     return player ? player.name : `Player ${position}`;
   }
 
-  function renderSnapshotFrame(extraction) {
+  function battlefieldSnapshotAtTime(extraction, timeMilliseconds) {
     const snapshots = extraction.engineAnalysis?.extended?.snapshots || [];
-    const snapshot = snapshots[Number(snapshotRange.value)] || snapshots[0];
-    if (!snapshot) {
-      snapshotPlayers.replaceChildren();
+    let selected = snapshots[0] || null;
+    for (const snapshot of snapshots) {
+      if (Number(snapshot.timeMilliseconds) > timeMilliseconds) {
+        break;
+      }
+      selected = snapshot;
+    }
+    return selected;
+  }
+
+  function createBattlefieldPlayerStat(label) {
+    const wrapper = document.createElement("span");
+    const caption = document.createElement("small");
+    const value = document.createElement("strong");
+    wrapper.className = "replay-battlefield-player-stat";
+    caption.textContent = label;
+    value.textContent = "--";
+    wrapper.append(caption, value);
+    return { wrapper, value };
+  }
+
+  function updateBattlefieldPlayerStats(force = false) {
+    if (!battlefieldExtraction) {
       return;
     }
-
-    snapshotTime.value = formatDuration(snapshot.timeMilliseconds);
-    replaceChildren(snapshotPlayers, (snapshot.players || []).map((player) => {
-      const row = document.createElement("tr");
-      row.append(
-        createCell(playerNameForPosition(extraction, Number(player.position))),
-        createCell(player.state || "--"),
-        createCell(formatStat(player.score)),
-        createCell(formatStat(player.kills)),
-        createCell(formatStat(player.droidsBuilt)),
-        createCell(formatStat(player.droidsLost)),
-        createCell(formatStat(player.droidsAlive)),
-        createCell(formatStat(player.structuresBuilt)),
-        createCell(formatStat(player.structuresLost)),
-        createCell(formatStat(player.structuresAlive)),
-        createCell(formatStat(player.researchComplete)),
-        createCell(formatStat(player.power)),
-        createCell(formatStat(player.oilRigs))
-      );
-      return row;
-    }));
+    const snapshot = battlefieldSnapshotAtTime(battlefieldExtraction, battlefieldCurrentTime);
+    const snapshotTime = Number(snapshot?.timeMilliseconds ?? -1);
+    if (!force && snapshotTime === battlefieldRenderedSnapshotTime) {
+      return;
+    }
+    const snapshotPlayers = new Map((snapshot?.players || []).map((player) => [Number(player.position), player]));
+    battlefieldPlayerStatElements.forEach((fields, position) => {
+      const player = snapshotPlayers.get(position);
+      fields.state.textContent = player?.state || "--";
+      fields.values.forEach(({ key, value }) => {
+        value.textContent = formatStat(player?.[key]) || "--";
+      });
+    });
+    battlefieldRenderedSnapshotTime = snapshotTime;
   }
 
   function renderResearchTimeline(extraction) {
@@ -2838,6 +2848,7 @@
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
     battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
+    updateBattlefieldPlayerStats();
     battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
     battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`;
   }
@@ -2943,12 +2954,30 @@
 
   function populateBattlefieldLegend(extraction) {
     battlefieldLegend.replaceChildren();
+    battlefieldPlayerStatElements.clear();
+    const statDefinitions = [
+      ["score", "Score"],
+      ["kills", "Kills"],
+      ["droidsBuilt", "U built"],
+      ["droidsLost", "U lost"],
+      ["droidsAlive", "U alive"],
+      ["structuresBuilt", "S built"],
+      ["structuresLost", "S lost"],
+      ["structuresAlive", "S alive"],
+      ["researchComplete", "Research"],
+      ["power", "Power"],
+      ["oilRigs", "Oil"]
+    ];
     extraction.players
       .filter((player) => !player.spectator)
       .sort((left, right) => Number(left.position) - Number(right.position))
       .forEach((player) => {
         const button = document.createElement("button");
         const marker = document.createElement("span");
+        const identity = document.createElement("span");
+        const name = document.createElement("span");
+        const state = document.createElement("span");
+        const stats = document.createElement("span");
         button.type = "button";
         button.className = "replay-battlefield-player";
         button.setAttribute("aria-pressed", "true");
@@ -2956,7 +2985,20 @@
         marker.className = "replay-battlefield-player-marker";
         marker.style.backgroundColor = playerColours[Number(player.colour)]?.value
           || battlefieldPlayerColour(player.position);
-        button.append(marker, document.createTextNode(player.name));
+        identity.className = "replay-battlefield-player-identity";
+        name.className = "replay-battlefield-player-name";
+        name.textContent = player.name;
+        state.className = "replay-battlefield-player-state";
+        state.textContent = "--";
+        stats.className = "replay-battlefield-player-stats";
+        const values = statDefinitions.map(([key, label]) => {
+          const field = createBattlefieldPlayerStat(label);
+          stats.append(field.wrapper);
+          return { key, value: field.value };
+        });
+        identity.append(marker, name, state);
+        button.append(identity, stats);
+        battlefieldPlayerStatElements.set(Number(player.position), { state, values });
         button.addEventListener("click", () => {
           const position = Number(player.position);
           if (battlefieldHiddenPlayers.has(position)) {
@@ -2969,6 +3011,8 @@
         });
         battlefieldLegend.append(button);
       });
+    battlefieldRenderedSnapshotTime = null;
+    updateBattlefieldPlayerStats(true);
   }
 
   function renderBattlefield(extraction, tacticalReplay) {
@@ -2980,6 +3024,7 @@
     collectBattlefieldObjectDefinitions(telemetryFrames);
     battlefieldSpriteCache.clear();
     battlefieldCurrentTime = 0;
+    battlefieldRenderedSnapshotTime = null;
     battlefieldLastDraw = 0;
     battlefieldHiddenPlayers.clear();
     battlefieldView.scale = 1;
@@ -3005,7 +3050,6 @@
   function renderExtendedAnalysis(extraction) {
     const engineAnalysis = extraction.engineAnalysis;
     const extended = engineAnalysis?.extended;
-    const snapshots = Array.isArray(extended?.snapshots) ? extended.snapshots : [];
     const timeline = Array.isArray(extended?.researchTimeline) ? extended.researchTimeline : [];
     const tacticalReplay = extended?.tacticalReplay;
     const positionFrames = Array.isArray(tacticalReplay?.positionFrames)
@@ -3025,15 +3069,6 @@
       battlefieldStructureDefinitions = new Map();
       battlefieldDestroyedAt = new Map();
       battlefieldSpriteCache.clear();
-    }
-
-    snapshotPanel.hidden = snapshots.length === 0;
-    if (snapshots.length) {
-      snapshotMeta.textContent = `${snapshots.length.toLocaleString()} snapshots · Analyzer ${engineAnalysis.analyzerVersion || "--"}`;
-      snapshotRange.min = "0";
-      snapshotRange.max = String(snapshots.length - 1);
-      snapshotRange.value = String(snapshots.length - 1);
-      renderSnapshotFrame(extraction);
     }
 
     researchPanel.hidden = timeline.length === 0;
@@ -3366,12 +3401,6 @@
   eventSearch.addEventListener("input", () => {
     if (latestExtraction) {
       renderEventTimeline(latestExtraction);
-    }
-  });
-
-  snapshotRange.addEventListener("input", () => {
-    if (latestExtraction) {
-      renderSnapshotFrame(latestExtraction);
     }
   });
 

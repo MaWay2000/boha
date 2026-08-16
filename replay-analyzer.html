@@ -503,6 +503,10 @@
       user-select: none;
     }
 
+    .replay-battlefield-canvas[hidden] {
+      display: none;
+    }
+
     .replay-battlefield-canvas.is-panning {
       cursor: grabbing;
     }
@@ -1610,8 +1614,15 @@
 
           <article class="data-card replay-results-section" id="replayBattlefieldPanel" hidden>
             <div class="replay-extended-heading replay-battlefield-heading">
-              <h3>2D battlefield</h3>
+              <h3>Battlefield</h3>
               <div class="replay-battlefield-controls">
+                <label class="replay-battlefield-option" for="replayBattlefieldViewMode">
+                  View
+                  <select id="replayBattlefieldViewMode">
+                    <option value="2d" selected>2D</option>
+                    <option value="3d">3D</option>
+                  </select>
+                </label>
                 <label class="replay-battlefield-option" for="replayBattlefieldSpeed">
                   Speed
                   <select id="replayBattlefieldSpeed">
@@ -1687,6 +1698,14 @@
                   width="900"
                   height="600"
                   aria-label="Animated top-down battlefield replay. Use the mouse wheel to zoom and drag to pan."
+                ></canvas>
+                <canvas
+                  class="replay-battlefield-canvas"
+                  id="replayBattlefield3dCanvas"
+                  width="900"
+                  height="600"
+                  aria-label="Animated three-dimensional tactical battlefield replay. Use the mouse wheel to zoom and drag to pan."
+                  hidden
                 ></canvas>
                 <canvas
                   class="replay-battlefield-minimap"

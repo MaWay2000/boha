@@ -1,6 +1,28 @@
 # Replay-engine statistics contract
 
-Analyzer contract: `3.2.0`
+Analyzer contract: `3.3.0`
+
+## Version history
+
+### 3.3.0
+
+- records exact droid and structure destruction events;
+- removes destroyed battlefield objects at their real replay timestamp;
+- keeps older tactical replay records compatible.
+
+### 3.2.0
+
+- records droid components, weapons and structure definitions;
+- adds object direction data for real-model 2D battlefield rendering.
+
+### 3.1.0
+
+- adds tactical droid and structure positions with health snapshots;
+- uses three-second samples for 1v1 and ten-second samples for larger games.
+
+### 3.0.0
+
+- introduces replay-only outcome and extended player statistics analysis.
 
 The replay file is the only authority for player statistics. Source adapters may
 discover replay URLs and supply listing metadata, but source-calculated player

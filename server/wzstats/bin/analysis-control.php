@@ -44,7 +44,7 @@ $pdo = null;
 $locked = false;
 try {
     $config = wzstats_config();
-    $targetVersion = (string) ($config['worker']['analyzer_version'] ?? '3.2.0');
+    $targetVersion = (string) ($config['worker']['analyzer_version'] ?? '3.3.0');
     $confirmation = 'RESET-REPLAY-ANALYSIS-' . $targetVersion;
 
     if (!$isCli) {

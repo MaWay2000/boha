@@ -12,6 +12,23 @@ $script:analyzerVersion = ([regex]::Match(
     (Get-Content -LiteralPath $script:analyzerPath -Raw),
     "ANALYZER_VERSION\s*=\s*'([^']+)'"
 )).Groups[1].Value
+$script:versionChangeLog = @"
+Version 3.3.0
+- Exact droid and structure destruction events.
+- Destroyed objects disappear at their real replay timestamp.
+- Older tactical replay results remain compatible.
+
+Version 3.2.0
+- Droid components, weapons and structure definitions.
+- Object direction data for real-model battlefield rendering.
+
+Version 3.1.0
+- Tactical unit and structure positions with health snapshots.
+- 3-second 1v1 and 10-second multiplayer samples.
+
+Version 3.0.0
+- Initial replay-only outcomes and extended player statistics.
+"@
 $script:nodePath = (Get-Command node -ErrorAction Stop).Source
 $script:dataDirectory = Join-Path $env:LOCALAPPDATA 'MaWay2000Wzstats'
 $script:logPath = Join-Path $script:dataDirectory 'worker.log'
@@ -349,7 +366,20 @@ $versionLabel.BorderStyle = 'FixedSingle'
 $versionLabel.TextAlign = 'MiddleCenter'
 $versionLabel.Size = New-Object System.Drawing.Size(58, 23)
 $versionLabel.Location = New-Object System.Drawing.Point(($titleLabel.Left + $titleLabel.PreferredSize.Width + 12), 28)
+$versionLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
 $form.Controls.Add($versionLabel)
+
+$versionToolTip = New-Object System.Windows.Forms.ToolTip
+$versionToolTip.SetToolTip($versionLabel, 'Click to view analyzer version history')
+$versionLabel.Add_Click({
+    [System.Windows.Forms.MessageBox]::Show(
+        $form,
+        $script:versionChangeLog.Trim(),
+        'Analyzer version history',
+        'OK',
+        'Information'
+    ) | Out-Null
+})
 
 $subtitleLabel = New-Object System.Windows.Forms.Label
 $subtitleLabel.Text = 'Processes the Warzone replay queue and publishes confirmed statistics.'

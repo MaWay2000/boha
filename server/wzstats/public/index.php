@@ -66,7 +66,7 @@ function workerQueueStatus(PDO $pdo, string $targetVersion, bool $reanalysisEnab
 
 try {
     $config = wzstats_config();
-    $targetAnalyzerVersion = (string) ($config['worker']['analyzer_version'] ?? '3.2.0');
+    $targetAnalyzerVersion = (string) ($config['worker']['analyzer_version'] ?? '3.3.0');
     $reanalysisEnabled = (bool) ($config['worker']['reanalysis_enabled'] ?? false);
     applyCors($config['cors_origins'] ?? []);
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {

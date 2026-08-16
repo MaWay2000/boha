@@ -3391,6 +3391,22 @@
     battlefieldCanvas.classList.remove("is-panning");
   });
   battlefieldCanvas.addEventListener("dblclick", resetBattlefieldView);
+  battlefieldMinimap.style.pointerEvents = "auto";
+  battlefieldMinimap.style.cursor = "crosshair";
+  battlefieldMinimap.addEventListener("click", (event) => {
+    const minimapRect = battlefieldMinimap.getBoundingClientRect();
+    const canvasRect = battlefieldCanvas.getBoundingClientRect();
+    const margin = 5;
+    const x = (event.clientX - minimapRect.left) / minimapRect.width * battlefieldMinimap.width;
+    const y = (event.clientY - minimapRect.top) / minimapRect.height * battlefieldMinimap.height;
+    const mapX = Math.max(0, Math.min(1, (x - margin) / (battlefieldMinimap.width - margin * 2)));
+    const mapY = Math.max(0, Math.min(1, (y - margin) / (battlefieldMinimap.height - margin * 2)));
+    const fieldWidth = Math.max(1, canvasRect.width - 24);
+    const fieldHeight = Math.max(1, canvasRect.height - 24);
+    battlefieldView.offsetX = (0.5 - mapX) * fieldWidth * battlefieldView.scale;
+    battlefieldView.offsetY = (0.5 - mapY) * fieldHeight * battlefieldView.scale;
+    drawBattlefield();
+  });
 
   if (typeof ResizeObserver === "function") {
     const battlefieldResizeObserver = new ResizeObserver(() => drawBattlefield());

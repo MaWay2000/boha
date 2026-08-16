@@ -175,6 +175,7 @@
   let battlefieldTerrain = null;
   let battlefieldDroidDefinitions = new Map();
   let battlefieldStructureDefinitions = new Map();
+  let battlefieldDestroyedAt = new Map();
   let battlefieldModelLibraryPromise = null;
   const battlefieldSpriteCache = new Map();
   const battlefieldTintedSpriteCache = new WeakMap();
@@ -2280,6 +2281,7 @@
   function collectBattlefieldObjectDefinitions(frames) {
     battlefieldDroidDefinitions = new Map();
     battlefieldStructureDefinitions = new Map();
+    battlefieldDestroyedAt = new Map();
     frames.forEach((frame) => {
       (frame.droidDefinitions || []).forEach((definition) => {
         battlefieldDroidDefinitions.set(Number(definition[0]), {
@@ -2298,7 +2300,19 @@
           statType: definition[2]
         });
       });
+      (frame.destroyed || []).forEach((event) => {
+        const key = `${event[1]}:${Number(event[2])}`;
+        const time = Number(event[0]);
+        if (Number.isFinite(time) && (!battlefieldDestroyedAt.has(key) || time < battlefieldDestroyedAt.get(key))) {
+          battlefieldDestroyedAt.set(key, time);
+        }
+      });
     });
+  }
+
+  function battlefieldObjectWasDestroyed(kind, object, timeMilliseconds) {
+    const destroyedAt = battlefieldDestroyedAt.get(`${kind}:${Number(object[0])}`);
+    return Number.isFinite(destroyedAt) && timeMilliseconds >= destroyedAt;
   }
 
   function normalizeBattlefieldModelName(value) {
@@ -2764,9 +2778,11 @@
     const projectY = (y) => margin + Math.max(0, Math.min(map.height, Number(y))) / map.height * fieldHeight;
     const structures = battlefieldStructures.checked
       ? interpolateBattlefieldObjects(pair.current.structures || [], pair.next.structures || [], pair.ratio)
+        .filter((structure) => !battlefieldObjectWasDestroyed("structure", structure, battlefieldCurrentTime))
       : [];
     const droids = battlefieldDroids.checked
       ? interpolateBattlefieldObjects(pair.current.droids || [], pair.next.droids || [], pair.ratio)
+        .filter((droid) => !battlefieldObjectWasDestroyed("droid", droid, battlefieldCurrentTime))
       : [];
     let visibleStructures = 0;
     let visibleDroids = 0;
@@ -2957,10 +2973,11 @@
 
   function renderBattlefield(extraction, tacticalReplay) {
     stopBattlefieldPlayback();
-    battlefieldFrames = tacticalReplay.positionFrames;
+    const telemetryFrames = tacticalReplay.positionFrames;
+    battlefieldFrames = telemetryFrames.filter((frame) => !frame.eventsOnly);
     battlefieldExtraction = extraction;
     battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
-    collectBattlefieldObjectDefinitions(battlefieldFrames);
+    collectBattlefieldObjectDefinitions(telemetryFrames);
     battlefieldSpriteCache.clear();
     battlefieldCurrentTime = 0;
     battlefieldLastDraw = 0;
@@ -2994,9 +3011,10 @@
     const positionFrames = Array.isArray(tacticalReplay?.positionFrames)
       ? tacticalReplay.positionFrames
       : [];
+    const battlefieldPositionFrames = positionFrames.filter((frame) => !frame.eventsOnly);
 
-    battlefieldPanel.hidden = positionFrames.length === 0;
-    if (positionFrames.length) {
+    battlefieldPanel.hidden = battlefieldPositionFrames.length === 0;
+    if (battlefieldPositionFrames.length) {
       renderBattlefield(extraction, tacticalReplay);
     } else {
       stopBattlefieldPlayback();
@@ -3005,6 +3023,7 @@
       battlefieldTerrain = null;
       battlefieldDroidDefinitions = new Map();
       battlefieldStructureDefinitions = new Map();
+      battlefieldDestroyedAt = new Map();
       battlefieldSpriteCache.clear();
     }
 

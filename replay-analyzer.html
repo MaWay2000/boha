@@ -457,6 +457,21 @@
       font-size: 0.78rem;
     }
 
+    .replay-battlefield-development {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(109, 232, 255, 0.18);
+    }
+
+    .replay-battlefield-development .replay-extended-heading {
+      align-items: center;
+    }
+
+    .replay-battlefield-development .replay-extended-heading p {
+      margin: 0;
+      text-align: right;
+    }
+
     .replay-battlefield-canvas {
       display: block;
       width: auto;
@@ -1075,39 +1090,6 @@
             </div>
           </article>
 
-          <article class="data-card replay-results-section" id="replaySnapshotPanel" hidden>
-            <div class="replay-extended-heading">
-              <h3>Player development</h3>
-              <p id="replaySnapshotMeta"></p>
-            </div>
-            <label class="replay-snapshot-control" for="replaySnapshotRange">
-              <input id="replaySnapshotRange" type="range" min="0" max="0" value="0">
-              <output id="replaySnapshotTime">00:00</output>
-            </label>
-            <div class="stats-table-wrap replay-table-wrap">
-              <table class="stats-table replay-table">
-                <thead>
-                  <tr>
-                    <th>Player</th>
-                    <th>State</th>
-                    <th>Score</th>
-                    <th>Kills</th>
-                    <th>Units built</th>
-                    <th>Units lost</th>
-                    <th>Units alive</th>
-                    <th>Structures built</th>
-                    <th>Structures lost</th>
-                    <th>Structures alive</th>
-                    <th>Research</th>
-                    <th>Power</th>
-                    <th>Oil</th>
-                  </tr>
-                </thead>
-                <tbody id="replaySnapshotPlayers"></tbody>
-              </table>
-            </div>
-          </article>
-
           <article class="data-card replay-results-section" id="replayBattlefieldPanel" hidden>
             <div class="replay-extended-heading">
               <h3>2D battlefield</h3>
@@ -1146,8 +1128,40 @@
             <div class="replay-battlefield-layout">
               <aside class="replay-battlefield-sidebar">
                 <h4>Players</h4>
-                <p>Select a player colour to show or hide their army. Detailed player statistics will be added here later.</p>
+                <p>Select a player colour to show or hide their army.</p>
                 <div class="replay-battlefield-legend" id="replayBattlefieldLegend"></div>
+                <section class="replay-battlefield-development replay-results-section" id="replaySnapshotPanel" hidden>
+                  <div class="replay-extended-heading">
+                    <h3>Player development</h3>
+                    <p id="replaySnapshotMeta"></p>
+                  </div>
+                  <label class="replay-snapshot-control" for="replaySnapshotRange">
+                    <input id="replaySnapshotRange" type="range" min="0" max="0" value="0">
+                    <output id="replaySnapshotTime">00:00</output>
+                  </label>
+                  <div class="stats-table-wrap replay-table-wrap">
+                    <table class="stats-table replay-table">
+                      <thead>
+                        <tr>
+                          <th>Player</th>
+                          <th>State</th>
+                          <th>Score</th>
+                          <th>Kills</th>
+                          <th>Units built</th>
+                          <th>Units lost</th>
+                          <th>Units alive</th>
+                          <th>Structures built</th>
+                          <th>Structures lost</th>
+                          <th>Structures alive</th>
+                          <th>Research</th>
+                          <th>Power</th>
+                          <th>Oil</th>
+                        </tr>
+                      </thead>
+                      <tbody id="replaySnapshotPlayers"></tbody>
+                    </table>
+                  </div>
+                </section>
               </aside>
               <div class="replay-battlefield-stage">
                 <canvas

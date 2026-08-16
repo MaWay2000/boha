@@ -4,6 +4,8 @@ var _mawayTacticalFirstFrame = true;
 var _mawayTacticalKnownDroids = {};
 var _mawayTacticalKnownStructures = {};
 
+receiveAllEvents(true);
+
 function _mawayComponentName(component)
 {
 	if (component === null || component === undefined)
@@ -40,6 +42,23 @@ function _mawayDroidDefinition(droid)
 function _mawayStructureDefinition(structure)
 {
 	return [structure.id, structure.name || null, structure.stattype];
+}
+
+function eventDestroyed(object)
+{
+	if (!object || (object.type !== DROID && object.type !== STRUCTURE))
+	{
+		return;
+	}
+	dump("__WZTACTICAL__" + JSON.stringify({
+		time: gameTime,
+		interval: _mawayTacticalInterval,
+		eventsOnly: true,
+		destroyed: [[
+			gameTime, object.type === DROID ? "droid" : "structure",
+			object.id, object.player, object.x, object.y
+		]]
+	}) + "__ENDWZTACTICAL__");
 }
 
 function _mawayCaptureTacticalFrame()

@@ -2559,10 +2559,12 @@
       tinted.height = sprite.height;
       const tintedContext = tinted.getContext("2d");
       tintedContext.drawImage(sprite, 0, 0);
-      tintedContext.globalCompositeOperation = "source-atop";
-      tintedContext.globalAlpha = 0.72;
+      tintedContext.globalCompositeOperation = "source-in";
       tintedContext.fillStyle = colour;
       tintedContext.fillRect(0, 0, tinted.width, tinted.height);
+      tintedContext.globalCompositeOperation = "source-over";
+      tintedContext.globalAlpha = 0.28;
+      tintedContext.drawImage(sprite, 0, 0);
       colourSprites.set(colour, tinted);
     }
     return colourSprites.get(colour);

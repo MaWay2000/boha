@@ -2195,7 +2195,9 @@
 
   function stopBattlefieldPlayback() {
     battlefieldPlaying = false;
-    battlefieldPlay.textContent = "Play";
+    battlefieldPlay.classList.remove("is-playing");
+    battlefieldPlay.setAttribute("aria-label", "Play replay");
+    battlefieldPlay.title = "Play replay";
     battlefieldLastTick = 0;
     if (battlefieldAnimationFrame) {
       cancelAnimationFrame(battlefieldAnimationFrame);
@@ -3252,7 +3254,9 @@
       battlefieldCurrentTime = 0;
     }
     battlefieldPlaying = true;
-    battlefieldPlay.textContent = "Pause";
+    battlefieldPlay.classList.add("is-playing");
+    battlefieldPlay.setAttribute("aria-label", "Pause replay");
+    battlefieldPlay.title = "Pause replay";
     battlefieldLastTick = 0;
     battlefieldAnimationFrame = requestAnimationFrame(animateBattlefield);
   });

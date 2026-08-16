@@ -40,6 +40,7 @@
   const battlefieldFullscreen = document.getElementById("replayBattlefieldFullscreen");
   const battlefieldZoom = document.getElementById("replayBattlefieldZoom");
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
+  const battlefieldStage = battlefieldCanvas.closest(".replay-battlefield-stage");
   const battlefieldMinimap = document.getElementById("replayBattlefieldMinimap");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
   const battlefieldRange = document.getElementById("replayBattlefieldRange");
@@ -3436,14 +3437,14 @@
   battlefieldZoomIn.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale * 1.25));
   battlefieldResetView.addEventListener("click", resetBattlefieldView);
   battlefieldFullscreen.addEventListener("click", async () => {
-    if (document.fullscreenElement === battlefieldPanel) {
+    if (document.fullscreenElement === battlefieldStage) {
       await document.exitFullscreen();
     } else {
-      await battlefieldPanel.requestFullscreen();
+      await battlefieldStage.requestFullscreen();
     }
   });
   document.addEventListener("fullscreenchange", () => {
-    const active = document.fullscreenElement === battlefieldPanel;
+    const active = document.fullscreenElement === battlefieldStage;
     battlefieldFullscreen.textContent = active ? "Exit full screen" : "Full screen";
     battlefieldFullscreen.setAttribute("aria-pressed", String(active));
     requestAnimationFrame(drawBattlefield);

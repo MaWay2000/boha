@@ -10,6 +10,13 @@ function normalizeTexPath(name) {
   return n;
 }
 
+const TEAM_MASK_PAGES = new Set(['page-10', 'page-11', 'page-12', 'page-13', 'page-14', 'page-15', 'page-16', 'page-17']);
+
+function getTeamMaskPath(textureName) {
+  const match = normalizeTexPath(textureName).match(/^(page-\d+)(?:-[^/]*)?\.png$/);
+  return match && TEAM_MASK_PAGES.has(match[1]) ? match[1] + '_tcmask.png' : null;
+}
+
 function makeDroidMaterial(geo, role = '') {
   if (geo.userData && geo.userData.textureName) {
     const tl = new THREE.TextureLoader();
@@ -66,7 +73,22 @@ function makeDroidMaterial(geo, role = '') {
         opacity: role === 'muzzle' ? 0.85 : 1
       });
     }
-    return new THREE.MeshLambertMaterial({ map: tex });
+    const material = new THREE.MeshLambertMaterial({ map: tex });
+    const maskName = geo.userData.teamColorMask ? getTeamMaskPath(tn) : null;
+    if (!maskName) return material;
+    const mask = tl.load(((typeof window !== 'undefined' && window.TEX_BASE) ? window.TEX_BASE : TEX_BASE) + maskName, undefined, undefined, () => {});
+    mask.magFilter = THREE.NearestFilter;
+    mask.minFilter = THREE.LinearMipMapLinearFilter;
+    material.userData.teamColor = new THREE.Color(0xff0000);
+    material.userData.teamColorMask = mask;
+    material.onBeforeCompile = shader => {
+      shader.uniforms.teamColor = { value: material.userData.teamColor };
+      shader.uniforms.teamColorMask = { value: mask };
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform vec3 teamColor;\nuniform sampler2D teamColorMask;')
+        .replace('#include <map_fragment>', '#include <map_fragment>\n#ifdef USE_MAP\n  vec3 teamDiffuse = texture2D(map, vUv).rgb;\n  float blueMarker = smoothstep(0.025, 0.25, teamDiffuse.b - max(teamDiffuse.r, teamDiffuse.g));\n  float teamMask = max(texture2D(teamColorMask, vUv).a, blueMarker);\n  float visibleTeamMask = smoothstep(0.02, 0.6, teamMask);\n  diffuseColor.rgb = mix(diffuseColor.rgb, teamColor, visibleTeamMask * 0.78);\n#endif');
+    };
+    return material;
   }
   if (role === 'effect' || role === 'muzzle') {
     return new THREE.MeshBasicMaterial({

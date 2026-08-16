@@ -11,6 +11,7 @@ export function parsePie(data) {
   let typeFlags = 0;
   let texWidth = null;
   let texHeight = null;
+  let currentLevel = 1;
   while (i < lines.length) {
     const line = lines[i].trim();
     if (line.startsWith('TYPE')) {
@@ -25,18 +26,23 @@ export function parsePie(data) {
         texWidth = w > 0 ? w : null;
         texHeight = h > 0 ? h : null;
       }
+    } else if (/^LEVEL\s+/.test(line)) {
+      currentLevel = parseInt(line.split(/\s+/)[1], 10) || 1;
     } else if (line.startsWith('POINTS')) {
       const parts = line.split(/\s+/);
       const count = parseInt(parts[1], 10);
       for (let j = 0; j < count; j++) {
         i++;
         const coords = lines[i].trim().split(/\s+/).map(parseFloat);
-        points.push([coords[0] / 128, coords[1] / 128, coords[2] / 128]);
+        if (currentLevel === 1) {
+          points.push([coords[0] / 128, coords[1] / 128, coords[2] / 128]);
+        }
       }
     } else if (line.startsWith('POLYGONS')) {
       const count = parseInt(line.split(/\s+/)[1], 10);
       for (let j = 0; j < count; j++) {
         i++;
+        if (currentLevel !== 1) continue;
         const nums = lines[i].trim().split(/\s+/).map(Number);
         if (nums.length < 3) continue;
         const vertCount = nums[1];
@@ -60,7 +66,9 @@ export function parsePie(data) {
       for (let j = 0; j < count; j++) {
         i++;
         const coords = lines[i].trim().split(/\s+/).map(parseFloat);
-        if (coords.length >= 3) connectors.push([coords[0] / 128, coords[1] / 128, coords[2] / 128]);
+        if (currentLevel === 1 && coords.length >= 3) {
+          connectors.push([coords[0] / 128, coords[1] / 128, coords[2] / 128]);
+        }
       }
     }
     i++;

@@ -2491,9 +2491,9 @@
       });
     });
     const scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 2.2));
-    const directional = new THREE.DirectionalLight(0xffffff, 2.4);
-    directional.position.set(-3, 8, -5);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const directional = new THREE.DirectionalLight(0xffffff, 0.6);
+    directional.position.set(10, 20, 10);
     scene.add(directional, group);
     group.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(group);

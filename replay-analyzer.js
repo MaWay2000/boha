@@ -2747,7 +2747,7 @@
       }
       visibleDroids += 1;
       const health = Math.max(0, Math.min(100, Number(droid[4]) || 0));
-      const radius = Math.max(3.5, Math.min(8, fieldWidth / map.width * 1.35));
+      const size = Math.max(3, Math.min(8, fieldWidth / map.width));
       const sprite = showDetailedModels ? battlefieldModelSprite("droid", droid) : null;
       const x = projectX(droid[2]);
       const y = projectY(droid[3]);
@@ -2756,11 +2756,11 @@
         context.save();
         context.translate(x, y);
         context.rotate(battlefieldDirectionRadians(droid[7]));
-        context.drawImage(sprite, -radius, -radius, radius * 2, radius * 2);
+        context.drawImage(sprite, -size / 2, -size / 2, size, size);
         context.restore();
       } else {
         context.beginPath();
-        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.arc(x, y, size / 2, 0, Math.PI * 2);
         context.fillStyle = battlefieldPlayerColour(player);
         context.fill();
         context.strokeStyle = "rgba(255, 255, 255, 0.7)";

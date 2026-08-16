@@ -177,6 +177,7 @@
   let battlefieldStructureDefinitions = new Map();
   let battlefieldModelLibraryPromise = null;
   const battlefieldSpriteCache = new Map();
+  const battlefieldTintedSpriteCache = new WeakMap();
   const battlefieldHiddenPlayers = new Set();
   const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
   let battlefieldPan = null;
@@ -2565,14 +2566,36 @@
     return battlefieldSpriteCache.get(key);
   }
 
+  function battlefieldPlayerSprite(sprite, colour) {
+    let colourSprites = battlefieldTintedSpriteCache.get(sprite);
+    if (!colourSprites) {
+      colourSprites = new Map();
+      battlefieldTintedSpriteCache.set(sprite, colourSprites);
+    }
+    if (!colourSprites.has(colour)) {
+      const tinted = document.createElement("canvas");
+      tinted.width = sprite.width;
+      tinted.height = sprite.height;
+      const tintedContext = tinted.getContext("2d");
+      tintedContext.drawImage(sprite, 0, 0);
+      tintedContext.globalCompositeOperation = "source-in";
+      tintedContext.fillStyle = colour;
+      tintedContext.fillRect(0, 0, tinted.width, tinted.height);
+      tintedContext.globalCompositeOperation = "source-over";
+      tintedContext.globalAlpha = 0.28;
+      tintedContext.drawImage(sprite, 0, 0);
+      colourSprites.set(colour, tinted);
+    }
+    return colourSprites.get(colour);
+  }
+
   function drawBattlefieldPlayerSprite(context, sprite, x, y, size, rotation, player) {
     const colour = battlefieldPlayerColour(player);
+    const tinted = battlefieldPlayerSprite(sprite, colour);
     context.save();
     context.translate(x, y);
     context.rotate(rotation);
-    context.shadowColor = colour;
-    context.shadowBlur = Math.max(2, 4 / battlefieldView.scale);
-    context.drawImage(sprite, -size / 2, -size / 2, size, size);
+    context.drawImage(tinted, -size / 2, -size / 2, size, size);
     context.restore();
   }
 

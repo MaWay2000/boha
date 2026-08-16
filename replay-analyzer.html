@@ -392,6 +392,7 @@
 
     .replay-battlefield-stage {
       display: flex;
+      position: relative;
       min-height: 320px;
       justify-content: flex-end;
       padding: 14px;
@@ -401,6 +402,33 @@
         rgba(2, 8, 13, 0.84);
       border: 1px solid rgba(109, 232, 255, 0.18);
       border-radius: 16px;
+    }
+
+    .replay-battlefield-minimap {
+      position: absolute;
+      right: 14px;
+      bottom: 14px;
+      width: min(170px, 30%);
+      height: auto;
+      background: rgba(2, 8, 13, 0.92);
+      border: 1px solid rgba(109, 232, 255, 0.72);
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.42);
+      pointer-events: none;
+    }
+
+    #replayBattlefieldPanel:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      padding: 18px;
+      overflow: hidden;
+      background: #09131f;
+      border-radius: 0;
+    }
+
+    #replayBattlefieldPanel:fullscreen .replay-battlefield-minimap {
+      width: min(210px, 28%);
     }
 
     .replay-battlefield-layout {
@@ -1112,6 +1140,7 @@
                 <output id="replayBattlefieldZoom">100%</output>
                 <button class="replay-action" id="replayBattlefieldZoomIn" type="button" aria-label="Zoom in">+</button>
                 <button class="replay-action" id="replayBattlefieldResetView" type="button">Reset view</button>
+                <button class="replay-action" id="replayBattlefieldFullscreen" type="button">Full screen</button>
               </span>
             </div>
             <div class="replay-battlefield-layout">
@@ -1127,6 +1156,13 @@
                   width="900"
                   height="600"
                   aria-label="Animated top-down battlefield replay. Use the mouse wheel to zoom and drag to pan."
+                ></canvas>
+                <canvas
+                  class="replay-battlefield-minimap"
+                  id="replayBattlefieldMinimap"
+                  width="180"
+                  height="120"
+                  aria-label="Battlefield minimap showing the visible area."
                 ></canvas>
               </div>
             </div>

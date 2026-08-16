@@ -42,8 +42,10 @@
   const battlefieldZoomOut = document.getElementById("replayBattlefieldZoomOut");
   const battlefieldZoomIn = document.getElementById("replayBattlefieldZoomIn");
   const battlefieldResetView = document.getElementById("replayBattlefieldResetView");
+  const battlefieldFullscreen = document.getElementById("replayBattlefieldFullscreen");
   const battlefieldZoom = document.getElementById("replayBattlefieldZoom");
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
+  const battlefieldMinimap = document.getElementById("replayBattlefieldMinimap");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
   const battlefieldRange = document.getElementById("replayBattlefieldRange");
   const battlefieldTime = document.getElementById("replayBattlefieldTime");
@@ -2768,6 +2770,7 @@
     });
     context.globalAlpha = 1;
     context.restore();
+    drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight);
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
     battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
@@ -2775,9 +2778,60 @@
     battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`;
   }
 
+  function drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight) {
+    const minimapHeight = Math.max(90, Math.min(240, Math.round(battlefieldMinimap.width * map.height / map.width)));
+    if (battlefieldMinimap.height !== minimapHeight) {
+      battlefieldMinimap.height = minimapHeight;
+    }
+    const context = battlefieldMinimap.getContext("2d");
+    if (!context) return;
+    const width = battlefieldMinimap.width;
+    const height = battlefieldMinimap.height;
+    const margin = 5;
+    const mapWidth = width - margin * 2;
+    const mapHeight = height - margin * 2;
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "#071016";
+    context.fillRect(0, 0, width, height);
+    if (battlefieldBackground.checked && battlefieldTerrain) {
+      context.globalAlpha = 0.78;
+      context.drawImage(battlefieldTerrain.canvas, margin, margin, mapWidth, mapHeight);
+      context.globalAlpha = 1;
+    }
+    const projectX = (x) => margin + Math.max(0, Math.min(map.width, Number(x))) / map.width * mapWidth;
+    const projectY = (y) => margin + Math.max(0, Math.min(map.height, Number(y))) / map.height * mapHeight;
+    structures.forEach((structure) => {
+      const player = Number(structure[1]);
+      if (battlefieldHiddenPlayers.has(player)) return;
+      context.fillStyle = battlefieldPlayerColour(player);
+      context.fillRect(projectX(structure[2]) - 1.5, projectY(structure[3]) - 1.5, 3, 3);
+    });
+    droids.forEach((droid) => {
+      const player = Number(droid[1]);
+      if (battlefieldHiddenPlayers.has(player)) return;
+      context.fillStyle = battlefieldPlayerColour(player);
+      context.fillRect(projectX(droid[2]) - 1, projectY(droid[3]) - 1, 2, 2);
+    });
+    const scale = battlefieldView.scale;
+    const visibleWidth = Math.min(1, 1 / scale);
+    const visibleHeight = Math.min(1, 1 / scale);
+    const centerX = 0.5 - battlefieldView.offsetX / (fieldWidth * scale);
+    const centerY = 0.5 - battlefieldView.offsetY / (fieldHeight * scale);
+    const left = Math.max(0, Math.min(1 - visibleWidth, centerX - visibleWidth / 2));
+    const top = Math.max(0, Math.min(1 - visibleHeight, centerY - visibleHeight / 2));
+    context.strokeStyle = "#6de8ff";
+    context.lineWidth = 2;
+    context.strokeRect(
+      margin + left * mapWidth,
+      margin + top * mapHeight,
+      visibleWidth * mapWidth,
+      visibleHeight * mapHeight
+    );
+  }
+
   function setBattlefieldZoom(nextScale, anchorX = null, anchorY = null) {
     const previousScale = battlefieldView.scale;
-    const scale = Math.max(0.75, Math.min(5, Number(nextScale) || 1));
+    const scale = Math.max(0.75, Math.min(16, Number(nextScale) || 1));
     if (scale === previousScale) {
       return;
     }
@@ -3285,6 +3339,19 @@
   battlefieldZoomOut.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale / 1.25));
   battlefieldZoomIn.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale * 1.25));
   battlefieldResetView.addEventListener("click", resetBattlefieldView);
+  battlefieldFullscreen.addEventListener("click", async () => {
+    if (document.fullscreenElement === battlefieldPanel) {
+      await document.exitFullscreen();
+    } else {
+      await battlefieldPanel.requestFullscreen();
+    }
+  });
+  document.addEventListener("fullscreenchange", () => {
+    const active = document.fullscreenElement === battlefieldPanel;
+    battlefieldFullscreen.textContent = active ? "Exit full screen" : "Full screen";
+    battlefieldFullscreen.setAttribute("aria-pressed", String(active));
+    requestAnimationFrame(drawBattlefield);
+  });
   battlefieldCanvas.addEventListener("wheel", (event) => {
     event.preventDefault();
     const rect = battlefieldCanvas.getBoundingClientRect();

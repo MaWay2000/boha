@@ -177,6 +177,7 @@
   let battlefieldStructureDefinitions = new Map();
   let battlefieldModelLibraryPromise = null;
   const battlefieldSpriteCache = new Map();
+  const battlefieldTintedSpriteCache = new WeakMap();
   const battlefieldHiddenPlayers = new Set();
   const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
   let battlefieldPan = null;
@@ -2314,7 +2315,7 @@
       const [THREE, droidModule, structureModule, bodyDefs, propDefs, weaponDefs, templateDefs,
         constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs, structureDefs] = await Promise.all([
         import("./mapmaker/js/three.module.js"),
-        import("./mapmaker/js/droidGroup.js"),
+        import("./mapmaker/js/droidGroup.js?v=battlefield-player-colours"),
         import("./mapmaker/js/structureGroup.js"),
         fetch("mapmaker/pies/components/bodies/body.json").then((response) => response.json()),
         fetch("mapmaker/pies/components/prop/propulsion.json").then((response) => response.json()),
@@ -2437,6 +2438,7 @@
       const materials = Array.isArray(item.material) ? item.material : [item.material];
       materials.filter(Boolean).forEach((material) => {
         if (material.map) textures.add(material.map);
+        if (material.userData?.teamColorMask) textures.add(material.userData.teamColorMask);
       });
     });
     if (!textures.size) return;
@@ -2456,7 +2458,23 @@
     }
   }
 
-  async function createBattlefieldModelSprite(kind, definition) {
+  function applyBattlefieldModelPlayerColour(group, colour, THREE) {
+    const teamColour = new THREE.Color(colour);
+    group.traverse((item) => {
+      const materials = Array.isArray(item.material) ? item.material : [item.material];
+      materials.filter(Boolean).forEach((material) => {
+        if (material.userData?.teamColor) {
+          material.userData.teamColor.copy(teamColour);
+          material.needsUpdate = true;
+        }
+        if (material.userData?.classicFactoryTint) {
+          material.color.copy(teamColour).lerp(new THREE.Color(0xffffff), 0.2);
+        }
+      });
+    });
+  }
+
+  async function createBattlefieldModelSprite(kind, definition, colour) {
     const library = await loadBattlefieldModelLibrary();
     const { THREE, renderer } = library;
     let group;
@@ -2483,6 +2501,7 @@
         preserveModelOrigin: structure.type === "WALL" || structure.type === "GATE"
       }, 0, structure.width || 1, structure.breadth || 1);
     }
+    applyBattlefieldModelPlayerColour(group, colour, THREE);
     await waitForBattlefieldModelTextures(group);
     group.traverse((item) => {
       const materials = Array.isArray(item.material) ? item.material : [item.material];
@@ -2531,12 +2550,13 @@
       ? battlefieldDroidDefinitions.get(id)
       : battlefieldStructureDefinitions.get(id);
     if (!definition) return null;
+    const colour = battlefieldPlayerColour(Number(object[1]));
     const key = kind === "droid"
-      ? `${kind}:${definition.body}:${definition.propulsion}:${definition.weapons.join(",")}:${definition.droidType}`
-      : `${kind}:${normalizeBattlefieldModelName(definition.name)}:${definition.statType}`;
+      ? `${kind}:${definition.body}:${definition.propulsion}:${definition.weapons.join(",")}:${definition.droidType}:${colour}`
+      : `${kind}:${normalizeBattlefieldModelName(definition.name)}:${definition.statType}:${colour}`;
     if (!battlefieldSpriteCache.has(key)) {
       battlefieldSpriteCache.set(key, null);
-      createBattlefieldModelSprite(kind, definition)
+      createBattlefieldModelSprite(kind, definition, colour)
         .then((sprite) => {
           if (sprite) battlefieldSpriteCache.set(key, sprite);
           drawBattlefield();
@@ -2544,6 +2564,39 @@
         .catch(() => {});
     }
     return battlefieldSpriteCache.get(key);
+  }
+
+  function battlefieldPlayerSprite(sprite, colour) {
+    let colourSprites = battlefieldTintedSpriteCache.get(sprite);
+    if (!colourSprites) {
+      colourSprites = new Map();
+      battlefieldTintedSpriteCache.set(sprite, colourSprites);
+    }
+    if (!colourSprites.has(colour)) {
+      const tinted = document.createElement("canvas");
+      tinted.width = sprite.width;
+      tinted.height = sprite.height;
+      const tintedContext = tinted.getContext("2d");
+      tintedContext.drawImage(sprite, 0, 0);
+      tintedContext.globalCompositeOperation = "source-in";
+      tintedContext.fillStyle = colour;
+      tintedContext.fillRect(0, 0, tinted.width, tinted.height);
+      tintedContext.globalCompositeOperation = "source-over";
+      tintedContext.globalAlpha = 0.28;
+      tintedContext.drawImage(sprite, 0, 0);
+      colourSprites.set(colour, tinted);
+    }
+    return colourSprites.get(colour);
+  }
+
+  function drawBattlefieldPlayerSprite(context, sprite, x, y, size, rotation, player) {
+    const colour = battlefieldPlayerColour(player);
+    const tinted = battlefieldPlayerSprite(sprite, colour);
+    context.save();
+    context.translate(x, y);
+    context.rotate(rotation);
+    context.drawImage(tinted, -size / 2, -size / 2, size, size);
+    context.restore();
   }
 
   function battlefieldDirectionRadians(value) {
@@ -2717,7 +2770,7 @@
       : [];
     let visibleStructures = 0;
     let visibleDroids = 0;
-    const showDetailedModels = battlefieldView.scale >= 1;
+    const showDetailedModels = true;
 
     structures.forEach((structure) => {
       const player = Number(structure[1]);
@@ -2737,17 +2790,10 @@
       const y = projectY(structure[3]);
       context.globalAlpha = 0.35 + health / 155;
       if (sprite) {
-        context.save();
-        context.translate(x, y);
-        context.rotate(battlefieldDirectionRadians(structure[7]));
-        context.drawImage(sprite, -size / 2, -size / 2, size, size);
-        context.restore();
-      } else {
-        context.fillStyle = battlefieldPlayerColour(player);
-        context.fillRect(x - size / 2, y - size / 2, size, size);
-        context.strokeStyle = "rgba(255, 255, 255, 0.55)";
-        context.lineWidth = 0.7;
-        context.strokeRect(x - size / 2, y - size / 2, size, size);
+        drawBattlefieldPlayerSprite(
+          context, sprite, x, y, size,
+          battlefieldDirectionRadians(structure[7]), player
+        );
       }
     });
 
@@ -2764,19 +2810,10 @@
       const y = projectY(droid[3]);
       context.globalAlpha = 0.4 + health / 150;
       if (sprite) {
-        context.save();
-        context.translate(x, y);
-        context.rotate(battlefieldDirectionRadians(droid[7]));
-        context.drawImage(sprite, -size / 2, -size / 2, size, size);
-        context.restore();
-      } else {
-        context.beginPath();
-        context.arc(x, y, size / 2, 0, Math.PI * 2);
-        context.fillStyle = battlefieldPlayerColour(player);
-        context.fill();
-        context.strokeStyle = "rgba(255, 255, 255, 0.7)";
-        context.lineWidth = 0.65;
-        context.stroke();
+        drawBattlefieldPlayerSprite(
+          context, sprite, x, y, size,
+          battlefieldDirectionRadians(droid[7]), player
+        );
       }
     });
     context.globalAlpha = 1;

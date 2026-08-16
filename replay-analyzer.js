@@ -2560,7 +2560,7 @@
       const tintedContext = tinted.getContext("2d");
       tintedContext.drawImage(sprite, 0, 0);
       tintedContext.globalCompositeOperation = "source-atop";
-      tintedContext.globalAlpha = 0.52;
+      tintedContext.globalAlpha = 0.72;
       tintedContext.fillStyle = colour;
       tintedContext.fillRect(0, 0, tinted.width, tinted.height);
       colourSprites.set(colour, tinted);
@@ -2751,7 +2751,7 @@
       : [];
     let visibleStructures = 0;
     let visibleDroids = 0;
-    const showDetailedModels = battlefieldView.scale >= 1;
+    const showDetailedModels = true;
 
     structures.forEach((structure) => {
       const player = Number(structure[1]);
@@ -2775,12 +2775,6 @@
           context, sprite, x, y, size,
           battlefieldDirectionRadians(structure[7]), player
         );
-      } else {
-        context.fillStyle = battlefieldPlayerColour(player);
-        context.fillRect(x - size / 2, y - size / 2, size, size);
-        context.strokeStyle = "rgba(255, 255, 255, 0.55)";
-        context.lineWidth = 0.7;
-        context.strokeRect(x - size / 2, y - size / 2, size, size);
       }
     });
 
@@ -2801,14 +2795,6 @@
           context, sprite, x, y, size,
           battlefieldDirectionRadians(droid[7]), player
         );
-      } else {
-        context.beginPath();
-        context.arc(x, y, size / 2, 0, Math.PI * 2);
-        context.fillStyle = battlefieldPlayerColour(player);
-        context.fill();
-        context.strokeStyle = "rgba(255, 255, 255, 0.7)";
-        context.lineWidth = 0.65;
-        context.stroke();
       }
     });
     context.globalAlpha = 1;

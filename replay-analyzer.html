@@ -439,14 +439,14 @@
     }
 
     .replay-battlefield-sidebar {
-      padding: 14px;
+      padding: 8px;
       background: rgba(2, 8, 13, 0.84);
       border: 1px solid rgba(109, 232, 255, 0.18);
       border-radius: 16px;
     }
 
     .replay-battlefield-sidebar h4 {
-      margin: 0 0 8px;
+      margin: 0 0 5px;
       color: var(--text);
       font: 700 0.9rem "Oxanium", sans-serif;
     }
@@ -477,20 +477,22 @@
     }
 
     .replay-battlefield-legend {
-      align-items: stretch;
-      flex-direction: column;
+      display: grid;
+      gap: 4px;
+      align-content: start;
     }
 
     .replay-battlefield-player {
       display: grid;
-      grid-template-columns: minmax(130px, 0.7fr) minmax(0, 2fr);
-      gap: 8px 14px;
+      grid-template-columns: minmax(120px, 0.55fr) minmax(0, 2fr);
+      gap: 5px 8px;
       align-items: center;
-      padding: 8px 10px;
+      min-height: 0;
+      padding: 4px 6px;
       color: var(--text);
       background: rgba(4, 12, 20, 0.58);
       border: 1px solid rgba(109, 232, 255, 0.16);
-      border-radius: 12px;
+      border-radius: 8px;
       cursor: pointer;
       font: 600 0.76rem "Space Grotesk", sans-serif;
       text-align: left;
@@ -498,7 +500,7 @@
 
     .replay-battlefield-player-identity {
       display: flex;
-      gap: 7px;
+      gap: 5px;
       align-items: center;
       min-width: 0;
     }
@@ -512,14 +514,14 @@
     .replay-battlefield-player-state {
       margin-left: auto;
       color: var(--muted);
-      font: 600 0.66rem "Oxanium", sans-serif;
+      font: 600 0.58rem "Oxanium", sans-serif;
       text-transform: uppercase;
     }
 
     .replay-battlefield-player-stats {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(62px, 1fr));
-      gap: 5px;
+      grid-template-columns: repeat(11, minmax(48px, 1fr));
+      gap: 3px;
       min-width: 0;
     }
 
@@ -527,15 +529,15 @@
       display: grid;
       gap: 1px;
       min-width: 0;
-      padding: 4px 6px;
+      padding: 2px 4px;
       background: rgba(13, 31, 43, 0.72);
-      border-radius: 7px;
+      border-radius: 5px;
     }
 
     .replay-battlefield-player-stat small {
       overflow: hidden;
       color: var(--muted);
-      font: 600 0.56rem "Oxanium", sans-serif;
+      font: 600 0.48rem "Oxanium", sans-serif;
       letter-spacing: 0.04em;
       text-overflow: ellipsis;
       text-transform: uppercase;
@@ -545,7 +547,7 @@
     .replay-battlefield-player-stat strong {
       overflow: hidden;
       color: var(--text);
-      font: 700 0.7rem "Space Grotesk", sans-serif;
+      font: 700 0.62rem "Space Grotesk", sans-serif;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
@@ -1174,7 +1176,6 @@
             <div class="replay-battlefield-layout">
               <aside class="replay-battlefield-sidebar">
                 <h4>Players</h4>
-                <p>Player statistics follow the battlefield timeline. Select a player to show or hide their army.</p>
                 <div class="replay-battlefield-legend" id="replayBattlefieldLegend"></div>
               </aside>
               <div class="replay-battlefield-stage">

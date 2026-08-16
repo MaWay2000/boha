@@ -2327,7 +2327,7 @@
       ]);
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(1);
-      renderer.setSize(96, 96, false);
+      renderer.setSize(192, 192, false);
       renderer.setClearColor(0x000000, 0);
       const structureNames = new Map();
       Object.values(structureDefs).forEach((definition) => {
@@ -2463,10 +2463,7 @@
       if (parts.length <= 1) return null;
       group = await library.buildDroidGroup(parts);
     } else {
-      let structure = library.structureNames.get(normalizeBattlefieldModelName(definition.name));
-      if (!structure) {
-        structure = Object.values(library.structureDefs).find((item) => item.type === definition.statType);
-      }
+      const structure = library.structureNames.get(normalizeBattlefieldModelName(definition.name));
       if (!structure) return null;
       const models = Array.isArray(structure.structureModel)
         ? structure.structureModel
@@ -2483,6 +2480,16 @@
       }, 0, structure.width || 1, structure.breadth || 1);
     }
     await waitForBattlefieldModelTextures(group);
+    group.traverse((item) => {
+      const materials = Array.isArray(item.material) ? item.material : [item.material];
+      materials.filter(Boolean).forEach((material) => {
+        if (material.map && material.blending === THREE.NormalBlending) {
+          material.transparent = true;
+          material.alphaTest = Math.max(Number(material.alphaTest) || 0, 0.5);
+          material.needsUpdate = true;
+        }
+      });
+    });
     const scene = new THREE.Scene();
     scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 2.2));
     const directional = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -2500,9 +2507,12 @@
     renderer.clear();
     renderer.render(scene, camera);
     const sprite = document.createElement("canvas");
-    sprite.width = 96;
-    sprite.height = 96;
-    sprite.getContext("2d").drawImage(renderer.domElement, 0, 0);
+    sprite.width = 192;
+    sprite.height = 192;
+    const spriteContext = sprite.getContext("2d");
+    spriteContext.imageSmoothingEnabled = true;
+    spriteContext.imageSmoothingQuality = "high";
+    spriteContext.drawImage(renderer.domElement, 0, 0);
     disposeBattlefieldModel(group);
     return sprite;
   }
@@ -2661,8 +2671,9 @@
     context.translate(fieldCenterX + battlefieldView.offsetX, fieldCenterY + battlefieldView.offsetY);
     context.scale(battlefieldView.scale, battlefieldView.scale);
     context.translate(-fieldCenterX, -fieldCenterY);
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
     if (battlefieldBackground.checked && battlefieldTerrain) {
-      context.imageSmoothingEnabled = true;
       context.globalAlpha = 0.9;
       context.drawImage(battlefieldTerrain.canvas, margin, margin, fieldWidth, fieldHeight);
       context.globalAlpha = 1;
@@ -2721,10 +2732,10 @@
       } else {
         context.fillStyle = battlefieldPlayerColour(player);
         context.fillRect(x - size / 2, y - size / 2, size, size);
+        context.strokeStyle = "rgba(255, 255, 255, 0.55)";
+        context.lineWidth = 0.7;
+        context.strokeRect(x - size / 2, y - size / 2, size, size);
       }
-      context.strokeStyle = "rgba(255, 255, 255, 0.55)";
-      context.lineWidth = 0.7;
-      context.strokeRect(x - size / 2, y - size / 2, size, size);
     });
 
     droids.forEach((droid) => {
@@ -2739,20 +2750,21 @@
       const x = projectX(droid[2]);
       const y = projectY(droid[3]);
       context.globalAlpha = 0.4 + health / 150;
-      context.beginPath();
-      context.arc(x, y, radius, 0, Math.PI * 2);
-      context.fillStyle = battlefieldPlayerColour(player);
-      context.fill();
       if (sprite) {
         context.save();
         context.translate(x, y);
         context.rotate(battlefieldDirectionRadians(droid[7]));
         context.drawImage(sprite, -radius, -radius, radius * 2, radius * 2);
         context.restore();
+      } else {
+        context.beginPath();
+        context.arc(x, y, radius, 0, Math.PI * 2);
+        context.fillStyle = battlefieldPlayerColour(player);
+        context.fill();
+        context.strokeStyle = "rgba(255, 255, 255, 0.7)";
+        context.lineWidth = 0.65;
+        context.stroke();
       }
-      context.strokeStyle = "rgba(255, 255, 255, 0.7)";
-      context.lineWidth = 0.65;
-      context.stroke();
     });
     context.globalAlpha = 1;
     context.restore();

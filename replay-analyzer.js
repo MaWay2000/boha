@@ -177,6 +177,7 @@
   let battlefieldStructureDefinitions = new Map();
   let battlefieldModelLibraryPromise = null;
   const battlefieldSpriteCache = new Map();
+  const battlefieldTintedSpriteCache = new WeakMap();
   const battlefieldHiddenPlayers = new Set();
   const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
   let battlefieldPan = null;
@@ -2546,6 +2547,39 @@
     return battlefieldSpriteCache.get(key);
   }
 
+  function battlefieldPlayerSprite(sprite, colour) {
+    let colourSprites = battlefieldTintedSpriteCache.get(sprite);
+    if (!colourSprites) {
+      colourSprites = new Map();
+      battlefieldTintedSpriteCache.set(sprite, colourSprites);
+    }
+    if (!colourSprites.has(colour)) {
+      const tinted = document.createElement("canvas");
+      tinted.width = sprite.width;
+      tinted.height = sprite.height;
+      const tintedContext = tinted.getContext("2d");
+      tintedContext.drawImage(sprite, 0, 0);
+      tintedContext.globalCompositeOperation = "source-atop";
+      tintedContext.globalAlpha = 0.52;
+      tintedContext.fillStyle = colour;
+      tintedContext.fillRect(0, 0, tinted.width, tinted.height);
+      colourSprites.set(colour, tinted);
+    }
+    return colourSprites.get(colour);
+  }
+
+  function drawBattlefieldPlayerSprite(context, sprite, x, y, size, rotation, player) {
+    const colour = battlefieldPlayerColour(player);
+    const tinted = battlefieldPlayerSprite(sprite, colour);
+    context.save();
+    context.translate(x, y);
+    context.rotate(rotation);
+    context.shadowColor = colour;
+    context.shadowBlur = Math.max(2, 4 / battlefieldView.scale);
+    context.drawImage(tinted, -size / 2, -size / 2, size, size);
+    context.restore();
+  }
+
   function battlefieldDirectionRadians(value) {
     let direction = Number(value) || 0;
     if (Math.abs(direction) > 360) direction = direction * 360 / 65536;
@@ -2737,11 +2771,10 @@
       const y = projectY(structure[3]);
       context.globalAlpha = 0.35 + health / 155;
       if (sprite) {
-        context.save();
-        context.translate(x, y);
-        context.rotate(battlefieldDirectionRadians(structure[7]));
-        context.drawImage(sprite, -size / 2, -size / 2, size, size);
-        context.restore();
+        drawBattlefieldPlayerSprite(
+          context, sprite, x, y, size,
+          battlefieldDirectionRadians(structure[7]), player
+        );
       } else {
         context.fillStyle = battlefieldPlayerColour(player);
         context.fillRect(x - size / 2, y - size / 2, size, size);
@@ -2764,11 +2797,10 @@
       const y = projectY(droid[3]);
       context.globalAlpha = 0.4 + health / 150;
       if (sprite) {
-        context.save();
-        context.translate(x, y);
-        context.rotate(battlefieldDirectionRadians(droid[7]));
-        context.drawImage(sprite, -size / 2, -size / 2, size, size);
-        context.restore();
+        drawBattlefieldPlayerSprite(
+          context, sprite, x, y, size,
+          battlefieldDirectionRadians(droid[7]), player
+        );
       } else {
         context.beginPath();
         context.arc(x, y, size / 2, 0, Math.PI * 2);

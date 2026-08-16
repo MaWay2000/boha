@@ -20,9 +20,8 @@ $script:settingsPath = Join-Path $script:dataDirectory 'interface-settings.json'
 $script:workerProcess = $null
 $script:lastLogWriteUtc = [DateTime]::MinValue
 $script:lastQueueCheckUtc = [DateTime]::MinValue
-$script:lastWorkerProcessCheckUtc = [DateTime]::MinValue
 $script:lastAutomaticCheckUtc = [DateTime]::MinValue
-$script:externalWorkerRunning = $false
+$script:automaticEnabled = $false
 $script:queueStatus = $null
 
 $script:priorityProfiles = @{
@@ -47,41 +46,41 @@ function Get-WorkerRunning {
         $script:workerProcess = $null
     }
 
-    $analyzerTask = Get-AnalyzerTask
-    if ($null -ne $analyzerTask -and $analyzerTask.State -eq 'Running') {
-        return $true
-    }
-    if (([DateTime]::UtcNow - $script:lastWorkerProcessCheckUtc).TotalSeconds -ge 5) {
-        try {
-            $script:externalWorkerRunning = $null -ne (Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object {
-                $_.Name -eq 'node.exe' -and $_.CommandLine -like '*replay-worker.mjs*'
-            } | Select-Object -First 1)
-        } catch {
-            $script:externalWorkerRunning = $false
-        }
-        $script:lastWorkerProcessCheckUtc = [DateTime]::UtcNow
-    }
-    return $script:externalWorkerRunning
+    return $false
 }
 
 function Start-AutomaticWorkerIfNeeded {
-    $analyzerTask = Get-AnalyzerTask
-    if ($null -eq $analyzerTask -or $analyzerTask.State -eq 'Disabled' -or $analyzerTask.State -eq 'Running') {
+    if (-not $script:automaticEnabled -or (Get-WorkerRunning)) {
         return
     }
-    if (-not (Get-WorkerRunning)) {
-        Start-ScheduledTask -TaskName $script:taskName
+    Start-AppWorker
+}
+
+function Get-InterfaceSettings {
+    if (Test-Path -LiteralPath $script:settingsPath) {
+        try {
+            return Get-Content -LiteralPath $script:settingsPath -Raw | ConvertFrom-Json
+        } catch {
+        }
     }
+    return $null
+}
+
+function Save-InterfaceSettings {
+    if (-not (Test-Path -LiteralPath $script:dataDirectory)) {
+        New-Item -ItemType Directory -Path $script:dataDirectory -Force | Out-Null
+    }
+    @{
+        priority = Get-SelectedPriority
+        automaticEnabled = $script:automaticEnabled
+    } | ConvertTo-Json | Set-Content -LiteralPath $script:settingsPath -Encoding UTF8
 }
 
 function Get-SelectedPriority {
-    if (Test-Path -LiteralPath $script:settingsPath) {
-        try {
-            $savedSettings = Get-Content -LiteralPath $script:settingsPath -Raw | ConvertFrom-Json
-            if ($script:priorityProfiles.ContainsKey([string] $savedSettings.priority)) {
-                return [string] $savedSettings.priority
-            }
-        } catch {
+    $savedSettings = Get-InterfaceSettings
+    if ($null -ne $savedSettings) {
+        if ($script:priorityProfiles.ContainsKey([string] $savedSettings.priority)) {
+            return [string] $savedSettings.priority
         }
     }
 
@@ -103,7 +102,10 @@ function Set-AnalyzerPriority([string] $priorityName) {
     if (-not (Test-Path -LiteralPath $script:dataDirectory)) {
         New-Item -ItemType Directory -Path $script:dataDirectory -Force | Out-Null
     }
-    @{ priority = $priorityName } | ConvertTo-Json | Set-Content -LiteralPath $script:settingsPath -Encoding UTF8
+    @{
+        priority = $priorityName
+        automaticEnabled = $script:automaticEnabled
+    } | ConvertTo-Json | Set-Content -LiteralPath $script:settingsPath -Encoding UTF8
 
     $profile = $script:priorityProfiles[$priorityName]
     $targetProcesses = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
@@ -241,6 +243,58 @@ function Stop-ManualWorker {
     }
     $script:workerProcess = $null
 }
+
+function Stop-OrphanWorkers {
+    $analyzerTask = Get-AnalyzerTask
+    if ($null -ne $analyzerTask) {
+        if ($analyzerTask.State -eq 'Running') {
+            Stop-ScheduledTask -TaskName $script:taskName -ErrorAction SilentlyContinue
+        }
+        if ($analyzerTask.State -ne 'Disabled') {
+            Disable-ScheduledTask -TaskName $script:taskName -ErrorAction SilentlyContinue | Out-Null
+        }
+    }
+
+    Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -eq 'node.exe' -and $_.CommandLine -like '*replay-worker.mjs*'
+    } | ForEach-Object {
+        try {
+            Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\taskkill.exe') `
+                -ArgumentList @('/PID', $_.ProcessId, '/T', '/F') `
+                -WindowStyle Hidden -Wait | Out-Null
+        } catch {
+        }
+    }
+}
+
+function Start-AppWorker([switch] $Once) {
+    if (Get-WorkerRunning) {
+        return
+    }
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $script:nodePath
+    $startInfo.Arguments = '"' + $script:workerPath + '"' + $(if ($Once) { ' --once' } else { '' })
+    $startInfo.WorkingDirectory = $PSScriptRoot
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    $script:workerProcess = [System.Diagnostics.Process]::Start($startInfo)
+    try {
+        $profile = $script:priorityProfiles[(Get-SelectedPriority)]
+        $script:workerProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::$($profile.ProcessPriority)
+    } catch {
+    }
+}
+
+$savedInterfaceSettings = Get-InterfaceSettings
+$installedTask = Get-AnalyzerTask
+$script:automaticEnabled = if ($null -ne $savedInterfaceSettings -and $null -ne $savedInterfaceSettings.automaticEnabled) {
+    [bool] $savedInterfaceSettings.automaticEnabled
+} else {
+    $null -ne $installedTask -and $installedTask.State -ne 'Disabled'
+}
+Stop-OrphanWorkers
+Save-InterfaceSettings
 
 if ($SmokeTest) {
     $smokeTask = Get-AnalyzerTask
@@ -455,8 +509,7 @@ function Update-Dashboard([switch] $ForceLog) {
         $script:lastAutomaticCheckUtc = [DateTime]::UtcNow
     }
     $isRunning = Get-WorkerRunning
-    $analyzerTask = Get-AnalyzerTask
-    $isEnabled = ($null -ne $analyzerTask -and $analyzerTask.State -ne 'Disabled')
+    $isEnabled = $script:automaticEnabled
 
     $progress = Read-AnalyzerProgress
     if ($ForceLog -or ([DateTime]::UtcNow - $script:lastQueueCheckUtc).TotalSeconds -ge 30) {
@@ -507,12 +560,7 @@ function Update-Dashboard([switch] $ForceLog) {
         $progressLabel.Text = 'Game time: waiting for replay'
     }
 
-    if ($null -eq $analyzerTask) {
-        $automaticLabel.Text = 'Not installed'
-        $automaticLabel.ForeColor = $warning
-        $automaticButton.Text = 'Install task first'
-        $automaticButton.Enabled = $false
-    } elseif ($isEnabled) {
+    if ($isEnabled) {
         $automaticLabel.Text = 'Enabled'
         $automaticLabel.ForeColor = $success
         $automaticButton.Text = 'Disable automatic'
@@ -548,23 +596,7 @@ function Update-Dashboard([switch] $ForceLog) {
 
 $analyzeButton.Add_Click({
     try {
-        if (Get-WorkerRunning) {
-            return
-        }
-        $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-        $startInfo.FileName = $script:nodePath
-        $startInfo.Arguments = '"' + $script:workerPath + '" --once'
-        $startInfo.WorkingDirectory = $PSScriptRoot
-        $startInfo.UseShellExecute = $false
-        $startInfo.CreateNoWindow = $true
-        $startInfo.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
-        $script:workerProcess = [System.Diagnostics.Process]::Start($startInfo)
-        try {
-            $selectedPriority = Get-SelectedPriority
-            $profile = $script:priorityProfiles[$selectedPriority]
-            $script:workerProcess.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::$($profile.ProcessPriority)
-        } catch {
-        }
+        Start-AppWorker -Once
         Update-Dashboard -ForceLog
     } catch {
         [System.Windows.Forms.MessageBox]::Show($form, $_.Exception.Message, 'Could not start analyzer', 'OK', 'Error') | Out-Null
@@ -572,30 +604,21 @@ $analyzeButton.Add_Click({
 })
 
 $stopButton.Add_Click({
-    $analyzerTask = Get-AnalyzerTask
-    if ($null -ne $analyzerTask -and $analyzerTask.State -eq 'Running') {
-        Stop-ScheduledTask -TaskName $script:taskName -ErrorAction SilentlyContinue
-    }
     Stop-ManualWorker
     Update-Dashboard -ForceLog
 })
 
 $automaticButton.Add_Click({
     try {
-        $analyzerTask = Get-AnalyzerTask
-        if ($null -eq $analyzerTask) {
-            throw 'The scheduled task is not installed. Run install-replay-worker.ps1 first.'
-        }
-
-        if ($analyzerTask.State -eq 'Disabled') {
-            Enable-ScheduledTask -TaskName $script:taskName | Out-Null
-            Start-ScheduledTask -TaskName $script:taskName
+        if (-not $script:automaticEnabled) {
+            $script:automaticEnabled = $true
+            Save-InterfaceSettings
+            Start-AutomaticWorkerIfNeeded
             $footerLabel.Text = 'Automatic mode enabled. Queued replays will run continuously.'
         } else {
-            if ($analyzerTask.State -eq 'Running') {
-                Stop-ScheduledTask -TaskName $script:taskName -ErrorAction SilentlyContinue
-            }
-            Disable-ScheduledTask -TaskName $script:taskName | Out-Null
+            $script:automaticEnabled = $false
+            Save-InterfaceSettings
+            Stop-ManualWorker
             $footerLabel.Text = 'Automatic mode disabled.'
         }
         Update-Dashboard -ForceLog
@@ -727,27 +750,7 @@ $refreshTimer.Add_Tick({ Update-Dashboard })
 $refreshTimer.Start()
 
 $form.Add_FormClosing({
-    param($sender, $eventArgs)
-    if (-not (Get-WorkerRunning)) {
-        return
-    }
-
-    $choice = [System.Windows.Forms.MessageBox]::Show(
-        $form,
-        'An analysis is still running. Stop it before closing?',
-        'Analyzer is running',
-        'YesNoCancel',
-        'Question'
-    )
-    if ($choice -eq 'Cancel') {
-        $eventArgs.Cancel = $true
-    } elseif ($choice -eq 'Yes') {
-        $analyzerTask = Get-AnalyzerTask
-        if ($null -ne $analyzerTask -and $analyzerTask.State -eq 'Running') {
-            Stop-ScheduledTask -TaskName $script:taskName -ErrorAction SilentlyContinue
-        }
-        Stop-ManualWorker
-    }
+    Stop-ManualWorker
 })
 
 Update-Dashboard -ForceLog

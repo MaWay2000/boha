@@ -2467,6 +2467,8 @@
     } else {
       const structure = library.structureNames.get(normalizeBattlefieldModelName(definition.name));
       if (!structure) return null;
+      definition.width = Math.max(1, Number(structure.width) || 1);
+      definition.breadth = Math.max(1, Number(structure.breadth) || 1);
       const models = Array.isArray(structure.structureModel)
         ? structure.structureModel
         : (structure.structureModel ? [structure.structureModel] : []);
@@ -2515,6 +2517,10 @@
     spriteContext.imageSmoothingEnabled = true;
     spriteContext.imageSmoothingQuality = "high";
     spriteContext.drawImage(renderer.domElement, 0, 0);
+    if (kind === "structure") {
+      sprite.structureWidth = definition.width;
+      sprite.structureBreadth = definition.breadth;
+    }
     disposeBattlefieldModel(group);
     return sprite;
   }
@@ -2720,8 +2726,13 @@
       }
       visibleStructures += 1;
       const health = Math.max(0, Math.min(100, Number(structure[4]) || 0));
-      const size = Math.max(7, Math.min(18, fieldWidth / map.width * 3));
       const sprite = showDetailedModels ? battlefieldModelSprite("structure", structure) : null;
+      const footprint = sprite?.structureWidth
+        ? Math.max(sprite.structureWidth, sprite.structureBreadth)
+        : 3;
+      const size = sprite?.structureWidth
+        ? Math.max(3, Math.min(18, fieldWidth / map.width * footprint))
+        : Math.max(7, Math.min(18, fieldWidth / map.width * footprint));
       const x = projectX(structure[2]);
       const y = projectY(structure[3]);
       context.globalAlpha = 0.35 + health / 155;

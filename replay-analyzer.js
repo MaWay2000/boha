@@ -34,15 +34,20 @@
   const battlefieldDroids = document.getElementById("replayBattlefieldDroids");
   const battlefieldStructures = document.getElementById("replayBattlefieldStructures");
   const battlefieldBackground = document.getElementById("replayBattlefieldBackground");
+  const battlefieldViewMode = document.getElementById("replayBattlefieldViewMode");
   const battlefieldZoomOut = document.getElementById("replayBattlefieldZoomOut");
   const battlefieldZoomIn = document.getElementById("replayBattlefieldZoomIn");
   const battlefieldResetView = document.getElementById("replayBattlefieldResetView");
   const battlefieldFullscreen = document.getElementById("replayBattlefieldFullscreen");
   const battlefieldZoom = document.getElementById("replayBattlefieldZoom");
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
+  const battlefield3dCanvas = document.getElementById("replayBattlefield3dCanvas");
   const battlefieldStage = battlefieldCanvas.closest(".replay-battlefield-stage");
   const battlefieldMinimap = document.getElementById("replayBattlefieldMinimap");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
+  const battlefieldMomentum = document.getElementById("replayBattlefieldMomentum");
+  const battlefieldMomentumChart = document.getElementById("replayBattlefieldMomentumChart");
+  const battlefieldMomentumValue = document.getElementById("replayBattlefieldMomentumValue");
   const battlefieldRange = document.getElementById("replayBattlefieldRange");
   const battlefieldTime = document.getElementById("replayBattlefieldTime");
   const battlefieldDuration = document.getElementById("replayBattlefieldDuration");
@@ -177,9 +182,16 @@
   const battlefieldTintedSpriteCache = new WeakMap();
   const battlefieldHiddenPlayers = new Set();
   const battlefieldPlayerStatElements = new Map();
+  const battlefieldTeamStatElements = new Map();
   let battlefieldRenderedSnapshotTime = null;
+  let battlefieldMomentumSeries = [];
+  let battlefieldMomentumDuration = 0;
   const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
   let battlefieldPan = null;
+  let battlefieldOwnersUsePositions = false;
+  let battlefield3d = null;
+  let battlefield3dInitPromise = null;
+  let battlefield3dGeneration = 0;
 
   class ReplayMessageReader {
     constructor(bytes) {
@@ -311,6 +323,60 @@
     }
   }
 
+  function normalizeTacticalReplayPlayerOwners(engineAnalysis, players) {
+    const tacticalReplay = engineAnalysis?.extended?.tacticalReplay;
+    const positionFrames = tacticalReplay?.positionFrames;
+    if (!Array.isArray(positionFrames) || !Array.isArray(players)) {
+      return;
+    }
+
+    const positionByReplayIndex = new Map();
+    players.forEach((player) => {
+      let rawPlayer = {};
+      try {
+        rawPlayer = typeof player.raw_json === "string"
+          ? JSON.parse(player.raw_json)
+          : (player.raw_json || {});
+      } catch (error) {
+        rawPlayer = {};
+      }
+
+      const replayIndex = Number(player.index ?? rawPlayer.index);
+      const lobbyPosition = Number(player.position ?? player.position_number ?? rawPlayer.position);
+      if (Number.isInteger(replayIndex) && Number.isInteger(lobbyPosition)) {
+        positionByReplayIndex.set(replayIndex, lobbyPosition);
+      }
+    });
+
+    if (!positionByReplayIndex.size) {
+      return;
+    }
+
+    if (![...positionByReplayIndex].some(([replayIndex, lobbyPosition]) => replayIndex !== lobbyPosition)) {
+      tacticalReplay.ownersAreLobbyPositions = true;
+      return;
+    }
+
+    // Position frames use analyzer player indexes; the UI identifies players by lobby position.
+    positionFrames.forEach((frame) => {
+      [frame?.droids, frame?.structures].forEach((objects) => {
+        if (!Array.isArray(objects)) {
+          return;
+        }
+        objects.forEach((object) => {
+          if (!Array.isArray(object)) {
+            return;
+          }
+          const lobbyPosition = positionByReplayIndex.get(Number(object[1]));
+          if (lobbyPosition !== undefined) {
+            object[1] = lobbyPosition;
+          }
+        });
+      });
+    });
+    tacticalReplay.ownersAreLobbyPositions = true;
+  }
+
   async function loadWzstatsResult(replaySha256) {
     if (!replaySha256) {
       return null;
@@ -336,6 +402,10 @@
         const detailPayload = await detailResponse.json();
         detailMatch = detailPayload.match || null;
         await expandCompressedEngineAnalysis(detailMatch?.telemetry?.engineAnalysis);
+        normalizeTacticalReplayPlayerOwners(
+          detailMatch?.telemetry?.engineAnalysis,
+          detailMatch?.players
+        );
       }
     } catch (error) {
       detailMatch = null;
@@ -787,7 +857,9 @@
     const allPlayers = Array.isArray(gameOptions["netplay.players"])
       ? gameOptions["netplay.players"]
       : [];
-    const activePlayers = allPlayers.filter((player) => player && (player.allocated || player.name));
+    const activePlayers = allPlayers
+      .map((player, index) => ({ player, index }))
+      .filter(({ player }) => player && (player.allocated || player.name));
     const game = gameOptions.game || {};
     const decodedCategoryCounts = decodedEvents.reduce((counts, event) => {
       counts[event.category] = (counts[event.category] || 0) + 1;
@@ -822,7 +894,8 @@
         timeLimitMinutes: game.gameTimeLimitMinutes,
         elapsedMilliseconds: endInfo.gameTimeElapsed
       },
-      players: activePlayers.map((player) => ({
+      players: activePlayers.map(({ player, index }) => ({
+        index,
         name: player.name || "Unnamed",
         position: player.position,
         team: player.team,
@@ -2151,15 +2224,502 @@
     return selected;
   }
 
-  function createBattlefieldPlayerStat(label) {
+  function battlefieldPlayerState(extraction, player, position, timeMilliseconds) {
+    const engineAnalysis = extraction.engineAnalysis || {};
+    const departures = engineAnalysis.extended?.recordedNetwork?.playerDepartures || [];
+    const departure = departures.find((event) => (
+      Number(event.player) === Number(position)
+      && Number.isFinite(Number(event.timeMilliseconds))
+      && Number(event.timeMilliseconds) <= timeMilliseconds
+    ));
+    if (departure) {
+      return "LEFT";
+    }
+
+    const state = String(player?.state || "").toLowerCase();
+    const matchEnd = Number(engineAnalysis.game?.elapsedMilliseconds ?? battlefieldRange.max);
+    if (Number.isFinite(matchEnd) && timeMilliseconds >= matchEnd) {
+      const finalPlayer = (engineAnalysis.players || []).find((item) => (
+        Number(item.position) === Number(position)
+      ));
+      const finalState = String(finalPlayer?.state || state).toLowerCase();
+      if (finalState === "winner") {
+        return "WINNER";
+      }
+      if (finalState === "loser") {
+        return "LOSER";
+      }
+    }
+
+    if (state === "loser" || state === "defeated") {
+      return "DEFEATED";
+    }
+
+    if (player?.droidsAlive != null
+        && Number(player.droidsAlive) === 0
+        && battlefieldPlayerHasFactory(position, timeMilliseconds) === false) {
+      return "DEFEATED";
+    }
+
+    return "ACTIVE";
+  }
+
+  function battlefieldPlayerHasFactory(position, timeMilliseconds) {
+    if (!battlefieldFrames.length) {
+      return null;
+    }
+    const frame = battlefieldFramePair(timeMilliseconds).current;
+    let hasIdentifiedStructure = false;
+    const hasFactory = (frame.structures || []).some((structure) => {
+      if (battlefieldPlayerPositionForOwner(structure[1]) !== Number(position)
+          || battlefieldObjectWasDestroyed("structure", structure, timeMilliseconds)) {
+        return false;
+      }
+      const definition = battlefieldStructureDefinitions.get(Number(structure[0]));
+      const description = `${definition?.name || ""} ${definition?.statType ?? structure[5] ?? ""}`;
+      hasIdentifiedStructure = hasIdentifiedStructure || Boolean(description.trim());
+      return /factory/i.test(description) && !/module/i.test(description);
+    });
+    return hasFactory || (hasIdentifiedStructure ? false : null);
+  }
+
+  function createBattlefieldPlayerStat(label, key) {
     const wrapper = document.createElement("span");
-    const caption = document.createElement("small");
     const value = document.createElement("strong");
     wrapper.className = "replay-battlefield-player-stat";
-    caption.textContent = label;
+    wrapper.setAttribute("aria-label", label);
+    wrapper.title = label;
     value.textContent = "--";
-    wrapper.append(caption, value);
-    return { wrapper, value };
+    if (["score", "killDeathRatio", "researchActivity", "droidsAlive", "structuresAlive", "power"].includes(key)) {
+      const bar = document.createElement("span");
+      wrapper.classList.add(
+        key === "score"
+          ? "is-score"
+          : key === "killDeathRatio"
+            ? "is-kd"
+          : key === "researchActivity"
+            ? "is-research"
+            : key === "power" ? "is-power" : "is-alive"
+      );
+      bar.className = "replay-battlefield-score-bar";
+      const averageMarker = key === "researchActivity" ? null : document.createElement("span");
+      if (averageMarker) {
+        averageMarker.className = "replay-battlefield-average-marker";
+        averageMarker.title = "Current average";
+        averageMarker.setAttribute("aria-hidden", "true");
+        wrapper.append(bar, averageMarker, value);
+      } else {
+        wrapper.append(bar, value);
+      }
+      return { wrapper, value, bar, averageMarker };
+    }
+    wrapper.append(value);
+    return { wrapper, value, bar: null };
+  }
+
+  function formatBattlefieldPlayerStat(player, key) {
+    if (key === "killDeathRatio") {
+      const ratio = battlefieldKillDeathRatio(player);
+      if (ratio == null) {
+        return "--";
+      }
+      return ratio === Number.POSITIVE_INFINITY ? "∞" : ratio.toFixed(2);
+    }
+    if (key === "researchActivity") {
+      const activity = battlefieldResearchActivity(player);
+      if (activity == null) {
+        return "--";
+      }
+      return `${activity.toFixed(2)}%`;
+    }
+    return formatStat(player?.[key]) || "--";
+  }
+
+  function battlefieldScoreRatio(score, bestScore) {
+    if (!Number.isFinite(score) || bestScore <= 0) {
+      return 0;
+    }
+    return Math.min(1, Math.max(0, score / bestScore));
+  }
+
+  function battlefieldKillDeathRatio(player) {
+    const kills = Number(player?.kills);
+    const deaths = Number(player?.droidsLost);
+    if (!Number.isFinite(kills) || !Number.isFinite(deaths)) {
+      return null;
+    }
+    if (deaths <= 0) {
+      return kills > 0 ? Number.POSITIVE_INFINITY : 0;
+    }
+    return kills / deaths;
+  }
+
+  function battlefieldKillDeathBarRatio(ratio, bestRatio) {
+    if (ratio === Number.POSITIVE_INFINITY) {
+      return 1;
+    }
+    if (!Number.isFinite(ratio)) {
+      return 0;
+    }
+    return battlefieldScoreRatio(ratio, bestRatio);
+  }
+
+  function battlefieldResearchActivity(player) {
+    const performance = player?.recentResearchPerformance;
+    const potential = player?.recentResearchPotential;
+    if (performance == null || potential == null || Number(potential) <= 0) {
+      return null;
+    }
+    return Math.max(0, Math.min(1, Number(performance) / Number(potential))) * 100;
+  }
+
+  function battlefieldResearchRatio(activity, worstResearch, bestResearch) {
+    if (!Number.isFinite(activity)) {
+      return 0;
+    }
+    const range = bestResearch - worstResearch;
+    if (!Number.isFinite(range) || range <= 0) {
+      return bestResearch > 0 ? 1 : 0;
+    }
+    return Math.max(0, Math.min(1, (activity - worstResearch) / range));
+  }
+
+  function battlefieldAverage(values) {
+    const finiteValues = values.filter(Number.isFinite);
+    if (!finiteValues.length) {
+      return 0;
+    }
+    return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+  }
+
+  function battlefieldTeamMomentumAtSnapshot(snapshot) {
+    const snapshotPlayers = new Map(
+      (snapshot?.players || []).map((player) => [Number(player.position), player])
+    );
+    const teams = [...battlefieldTeamStatElements.entries()].map(([team, fields]) => ({
+      team,
+      value: aggregateBattlefieldTeam(
+        fields.positions.map((position) => snapshotPlayers.get(position)).filter(Boolean)
+      )
+    }));
+    if (teams.length !== 2) {
+      return new Map();
+    }
+
+    const scores = teams.map(({ value }) => Number(value.score) || 0);
+    const bestScore = Math.max(0, ...scores);
+    const killDeathRatios = teams.map(({ value }) => battlefieldKillDeathRatio(value));
+    const finiteKillDeathRatios = killDeathRatios.filter(Number.isFinite);
+    const bestKillDeathRatio = finiteKillDeathRatios.length
+      ? Math.max(...finiteKillDeathRatios)
+      : 0;
+    const bestUnitsAlive = Math.max(0, ...teams.map(({ value }) => Number(value.droidsAlive) || 0));
+    const bestStructuresAlive = Math.max(
+      0,
+      ...teams.map(({ value }) => Number(value.structuresAlive) || 0)
+    );
+    const totalPower = teams.reduce(
+      (sum, { value }) => sum + Math.max(0, Number(value.power) || 0),
+      0
+    );
+
+    return new Map(teams.map(({ team, value }) => [team, battlefieldAverage([
+      battlefieldScoreRatio(Number(value.score), bestScore),
+      battlefieldKillDeathBarRatio(battlefieldKillDeathRatio(value), bestKillDeathRatio),
+      battlefieldScoreRatio(Number(value.droidsAlive), bestUnitsAlive),
+      battlefieldScoreRatio(Number(value.structuresAlive), bestStructuresAlive),
+      battlefieldResearchRatio(battlefieldResearchActivity(value), 70, 100),
+      battlefieldScoreRatio(Number(value.power), totalPower)
+    ])]));
+  }
+
+  function battlefieldMomentumPointAtTime(points, timeMilliseconds) {
+    if (!points.length) {
+      return 0;
+    }
+    let previous = points[0];
+    for (let index = 1; index < points.length; index += 1) {
+      const next = points[index];
+      if (next.time >= timeMilliseconds) {
+        const duration = next.time - previous.time;
+        const ratio = duration > 0
+          ? Math.max(0, Math.min(1, (timeMilliseconds - previous.time) / duration))
+          : 0;
+        return previous.value + (next.value - previous.value) * ratio;
+      }
+      previous = next;
+    }
+    return previous.value;
+  }
+
+  function updateBattlefieldMomentumCursor() {
+    if (!battlefieldMomentumSeries.length || battlefieldMomentumDuration <= 0) {
+      return;
+    }
+    const left = 38;
+    const right = 586;
+    const top = 16;
+    const bottom = 194;
+    const timeRatio = Math.max(
+      0,
+      Math.min(1, battlefieldCurrentTime / battlefieldMomentumDuration)
+    );
+    const x = left + (right - left) * timeRatio;
+    const cursor = battlefieldMomentumChart.querySelector(".replay-battlefield-momentum-cursor");
+    if (cursor) {
+      cursor.setAttribute("x1", String(x));
+      cursor.setAttribute("x2", String(x));
+    }
+    const labels = [];
+    battlefieldMomentumSeries.forEach((series) => {
+      const value = battlefieldMomentumPointAtTime(series.points, battlefieldCurrentTime);
+      const y = bottom - Math.max(0, Math.min(1, value)) * (bottom - top);
+      series.dot.setAttribute("cx", String(x));
+      series.dot.setAttribute("cy", String(y));
+      labels.push(`${series.label.replace("Team ", "")} ${Math.round(value * 100)}%`);
+    });
+    battlefieldMomentumValue.value = labels.join(" · ");
+  }
+
+  function renderBattlefieldMomentum(extraction) {
+    const snapshots = extraction.engineAnalysis?.extended?.snapshots || [];
+    const teams = [...battlefieldTeamStatElements.keys()];
+    battlefieldMomentumSeries = [];
+    battlefieldMomentumDuration = Number(battlefieldRange.max) || 0;
+    battlefieldMomentumChart.replaceChildren();
+    if (snapshots.length < 2 || teams.length !== 2 || battlefieldMomentumDuration <= 0) {
+      battlefieldMomentum.hidden = true;
+      return;
+    }
+
+    battlefieldMomentum.hidden = false;
+    const svgNamespace = "http://www.w3.org/2000/svg";
+    const left = 38;
+    const right = 586;
+    const top = 16;
+    const bottom = 194;
+    const createSvgElement = (name, attributes = {}) => {
+      const element = document.createElementNS(svgNamespace, name);
+      Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
+      return element;
+    };
+    [0, 0.5, 1].forEach((value) => {
+      const y = bottom - value * (bottom - top);
+      const line = createSvgElement("line", {
+        class: "replay-battlefield-momentum-grid",
+        x1: left,
+        x2: right,
+        y1: y,
+        y2: y
+      });
+      const label = createSvgElement("text", {
+        class: "replay-battlefield-momentum-axis",
+        x: 2,
+        y: y + 4
+      });
+      label.textContent = `${Math.round(value * 100)}%`;
+      battlefieldMomentumChart.append(line, label);
+    });
+
+    const seriesPoints = new Map(teams.map((team) => [team, []]));
+    snapshots.forEach((snapshot) => {
+      const time = Math.max(0, Number(snapshot.timeMilliseconds) || 0);
+      const values = battlefieldTeamMomentumAtSnapshot(snapshot);
+      teams.forEach((team) => {
+        if (values.has(team)) {
+          seriesPoints.get(team).push({ time, value: values.get(team) });
+        }
+      });
+    });
+
+    const colours = ["#6de8ff", "#ffb84d"];
+    teams.forEach((team, index) => {
+      const points = seriesPoints.get(team);
+      if (!points.length) {
+        return;
+      }
+      if (points[0].time > 0) {
+        points.unshift({ time: 0, value: points[0].value });
+      }
+      if (points[points.length - 1].time < battlefieldMomentumDuration) {
+        points.push({
+          time: battlefieldMomentumDuration,
+          value: points[points.length - 1].value
+        });
+      }
+      const coordinates = points.map((point) => ({
+        x: left + Math.min(1, point.time / battlefieldMomentumDuration) * (right - left),
+        y: bottom - Math.max(0, Math.min(1, point.value)) * (bottom - top)
+      }));
+      const lineData = coordinates
+        .map((point, pointIndex) => `${pointIndex ? "L" : "M"}${point.x},${point.y}`)
+        .join(" ");
+      const areaData = `${lineData} L${coordinates[coordinates.length - 1].x},${bottom}`
+        + ` L${coordinates[0].x},${bottom} Z`;
+      const area = createSvgElement("path", {
+        class: "replay-battlefield-momentum-area",
+        d: areaData,
+        fill: colours[index]
+      });
+      const line = createSvgElement("path", {
+        class: "replay-battlefield-momentum-line",
+        d: lineData,
+        stroke: colours[index]
+      });
+      const dot = createSvgElement("circle", {
+        class: "replay-battlefield-momentum-dot",
+        r: 5,
+        fill: colours[index]
+      });
+      battlefieldMomentumChart.append(area, line);
+      battlefieldMomentumSeries.push({
+        label: `Team ${String.fromCharCode(65 + index)}`,
+        points,
+        dot
+      });
+    });
+    battlefieldMomentumChart.append(createSvgElement("line", {
+      class: "replay-battlefield-momentum-cursor",
+      x1: left,
+      x2: left,
+      y1: top,
+      y2: bottom
+    }));
+    battlefieldMomentumSeries.forEach((series) => battlefieldMomentumChart.append(series.dot));
+    updateBattlefieldMomentumCursor();
+  }
+
+  function updateBattlefieldAverageMarker(marker, ratio) {
+    if (!marker) {
+      return;
+    }
+    marker.style.left = `${Math.max(0, Math.min(1, Number(ratio) || 0)) * 100}%`;
+  }
+
+  function updateBattlefieldStatFields(
+    fields,
+    player,
+    bestScore,
+    bestKillDeathRatio,
+    worstResearch,
+    bestResearch,
+    bestUnitsAlive,
+    bestStructuresAlive,
+    totalPower,
+    barContext = {},
+    stateLabel = null
+  ) {
+    const displayedState = stateLabel || player?.state || "--";
+    const performanceRatios = [];
+    fields.state.textContent = displayedState;
+    if (fields.button) {
+      const normalizedState = String(displayedState).toUpperCase();
+      fields.button.classList.toggle(
+        "is-status-active",
+        normalizedState === "ACTIVE" || normalizedState === "WINNER"
+      );
+      fields.button.classList.toggle(
+        "is-status-inactive",
+        normalizedState === "DEFEATED" || normalizedState === "LEFT" || normalizedState === "LOSER"
+      );
+    }
+    fields.values.forEach(({ key, value, bar, averageMarker }) => {
+      value.textContent = formatBattlefieldPlayerStat(player, key);
+      if (key === "score" && bar) {
+        const ratio = battlefieldScoreRatio(Number(player?.score), bestScore);
+        performanceRatios.push(ratio);
+        const visibleRatio = Math.max(0.04, ratio);
+        bar.style.width = `${visibleRatio * 100}%`;
+        bar.style.setProperty("--battlefield-score-hue", String(Math.round(ratio * 120)));
+        value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
+        updateBattlefieldAverageMarker(averageMarker, barContext.averageScoreRatio);
+        value.parentElement.setAttribute(
+          "aria-label",
+          `Score ${value.textContent}, ${Math.round(ratio * 100)}% of the leading score`
+        );
+      } else if (key === "killDeathRatio" && bar) {
+        const ratio = battlefieldKillDeathBarRatio(
+          battlefieldKillDeathRatio(player),
+          bestKillDeathRatio
+        );
+        performanceRatios.push(ratio);
+        const visibleRatio = Math.max(0.04, ratio);
+        bar.style.width = `${visibleRatio * 100}%`;
+        bar.style.setProperty("--battlefield-kd-hue", String(Math.round(ratio * 120)));
+        value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
+        updateBattlefieldAverageMarker(averageMarker, barContext.averageKillDeathRatio);
+        value.parentElement.setAttribute(
+          "aria-label",
+          `K/D ${value.textContent}, ${Math.round(ratio * 100)}% of the leading K/D`
+        );
+      } else if (key === "researchActivity" && bar) {
+        const research = battlefieldResearchActivity(player);
+        const ratio = battlefieldResearchRatio(research, worstResearch, bestResearch);
+        performanceRatios.push(ratio);
+        const visibleRatio = Math.max(0.04, ratio);
+        bar.style.width = `${visibleRatio * 100}%`;
+        bar.style.setProperty("--battlefield-research-hue", String(Math.round(ratio * 120)));
+        value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
+        value.parentElement.setAttribute(
+          "aria-label",
+          `Research ${value.textContent}, ${Math.round(ratio * 100)}% of the match research range`
+        );
+      } else if ((key === "droidsAlive" || key === "structuresAlive") && bar) {
+        const bestAlive = key === "droidsAlive" ? bestUnitsAlive : bestStructuresAlive;
+        const ratio = battlefieldScoreRatio(Number(player?.[key]), bestAlive);
+        performanceRatios.push(ratio);
+        bar.style.width = `${ratio * 100}%`;
+        bar.style.setProperty("--battlefield-alive-hue", String(Math.round(ratio * 120)));
+        value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
+        updateBattlefieldAverageMarker(
+          averageMarker,
+          key === "droidsAlive"
+            ? barContext.averageUnitsRatio
+            : barContext.averageStructuresRatio
+        );
+        value.parentElement.setAttribute(
+          "aria-label",
+          `${key === "droidsAlive" ? "Units" : "Buildings"} alive ${value.textContent}, `
+            + `${Math.round(ratio * 100)}% of the leading count`
+        );
+      } else if (key === "power" && bar) {
+        const ratio = battlefieldScoreRatio(Number(player?.power), totalPower);
+        performanceRatios.push(ratio);
+        bar.style.width = `${ratio * 100}%`;
+        bar.style.setProperty("--battlefield-power-hue", String(Math.round(ratio * 120)));
+        value.parentElement.classList.toggle(
+          "is-metric-leader",
+          Number(player?.power) > 0 && Number(player?.power) >= Number(barContext.bestPower)
+        );
+        updateBattlefieldAverageMarker(averageMarker, barContext.averagePowerRatio);
+        value.parentElement.setAttribute(
+          "aria-label",
+          `Power ${value.textContent}, ${Math.round(ratio * 100)}% of all player power`
+        );
+      }
+    });
+    if (fields.overallBar) {
+      const ratio = battlefieldAverage(performanceRatios);
+      fields.overallBar.style.width = `${Math.max(0.04, ratio) * 100}%`;
+      fields.overallBar.style.setProperty("--battlefield-overall-hue", String(Math.round(ratio * 120)));
+      fields.overallBar.parentElement.setAttribute(
+        "aria-label",
+        `${fields.overallBar.parentElement.textContent.trim()}, ${Math.round(ratio * 100)}% overall performance`
+      );
+    }
+  }
+
+  function aggregateBattlefieldTeam(players) {
+    const totalKeys = [
+      "score", "kills", "droidsAlive", "droidsLost", "droidsBuilt",
+      "structuresAlive", "structuresLost", "structuresBuilt", "power",
+      "recentResearchPerformance", "recentResearchPotential"
+    ];
+    const team = { state: "team total" };
+    totalKeys.forEach((key) => {
+      team[key] = players.reduce((sum, player) => sum + (Number(player?.[key]) || 0), 0);
+    });
+    return team;
   }
 
   function updateBattlefieldPlayerStats(force = false) {
@@ -2168,18 +2728,137 @@
     }
     const snapshot = battlefieldSnapshotAtTime(battlefieldExtraction, battlefieldCurrentTime);
     const snapshotTime = Number(snapshot?.timeMilliseconds ?? -1);
-    if (!force && snapshotTime === battlefieldRenderedSnapshotTime) {
+    const frameTime = Number(battlefieldFramePair(battlefieldCurrentTime).current?.time ?? -1);
+    const departureCount = (battlefieldExtraction.engineAnalysis?.extended?.recordedNetwork?.playerDepartures || [])
+      .filter((event) => Number(event.timeMilliseconds) <= battlefieldCurrentTime).length;
+    const renderKey = `${snapshotTime}:${frameTime}:${departureCount}:${battlefieldCurrentTime >= Number(battlefieldRange.max)}`;
+    if (!force && renderKey === battlefieldRenderedSnapshotTime) {
       return;
     }
-    const snapshotPlayers = new Map((snapshot?.players || []).map((player) => [Number(player.position), player]));
+    const players = snapshot?.players || [];
+    const snapshotPlayers = new Map(players.map((player) => [Number(player.position), player]));
+    const displayedPlayers = [...battlefieldPlayerStatElements.keys()]
+      .map((position) => snapshotPlayers.get(position))
+      .filter(Boolean);
+    const scores = displayedPlayers
+      .map((player) => Number(player.score))
+      .filter(Number.isFinite);
+    const bestScore = scores.length ? Math.max(...scores) : 0;
+    const killDeathRatios = displayedPlayers
+      .map(battlefieldKillDeathRatio)
+      .filter((ratio) => ratio != null);
+    const finiteKillDeathRatios = killDeathRatios.filter(Number.isFinite);
+    const bestKillDeathRatio = finiteKillDeathRatios.length
+      ? Math.max(...finiteKillDeathRatios)
+      : 0;
+    const researchValues = displayedPlayers
+      .map(battlefieldResearchActivity)
+      .filter(Number.isFinite);
+    const worstResearch = researchValues.length ? Math.min(...researchValues) : 0;
+    const bestResearch = researchValues.length ? Math.max(...researchValues) : 0;
+    const bestUnitsAlive = Math.max(0, ...displayedPlayers.map((player) => Number(player.droidsAlive) || 0));
+    const bestStructuresAlive = Math.max(
+      0,
+      ...displayedPlayers.map((player) => Number(player.structuresAlive) || 0)
+    );
+    const totalPower = displayedPlayers.reduce(
+      (sum, player) => sum + Math.max(0, Number(player.power) || 0),
+      0
+    );
+    const playerBarContext = {
+      averageScoreRatio: battlefieldScoreRatio(battlefieldAverage(scores), bestScore),
+      averageKillDeathRatio: battlefieldKillDeathBarRatio(
+        battlefieldAverage(killDeathRatios),
+        bestKillDeathRatio
+      ),
+      averageUnitsRatio: battlefieldScoreRatio(
+        battlefieldAverage(displayedPlayers.map((player) => Number(player.droidsAlive) || 0)),
+        bestUnitsAlive
+      ),
+      averageStructuresRatio: battlefieldScoreRatio(
+        battlefieldAverage(displayedPlayers.map((player) => Number(player.structuresAlive) || 0)),
+        bestStructuresAlive
+      ),
+      averagePowerRatio: battlefieldScoreRatio(
+        battlefieldAverage(displayedPlayers.map((player) => Math.max(0, Number(player.power) || 0))),
+        totalPower
+      ),
+      bestPower: Math.max(0, ...displayedPlayers.map((player) => Number(player.power) || 0))
+    };
     battlefieldPlayerStatElements.forEach((fields, position) => {
       const player = snapshotPlayers.get(position);
-      fields.state.textContent = player?.state || "--";
-      fields.values.forEach(({ key, value }) => {
-        value.textContent = formatStat(player?.[key]) || "--";
-      });
+      updateBattlefieldStatFields(
+        fields,
+        player,
+        bestScore,
+        bestKillDeathRatio,
+        worstResearch,
+        bestResearch,
+        bestUnitsAlive,
+        bestStructuresAlive,
+        totalPower,
+        playerBarContext,
+        battlefieldPlayerState(battlefieldExtraction, player, position, battlefieldCurrentTime)
+      );
     });
-    battlefieldRenderedSnapshotTime = snapshotTime;
+    const teamSnapshots = new Map();
+    battlefieldTeamStatElements.forEach((fields, team) => {
+      const members = fields.positions.map((position) => snapshotPlayers.get(position)).filter(Boolean);
+      teamSnapshots.set(team, aggregateBattlefieldTeam(members));
+    });
+    const teamScores = [...teamSnapshots.values()].map((team) => Number(team.score));
+    const bestTeamScore = teamScores.length ? Math.max(...teamScores) : 0;
+    const teamKillDeathRatios = [...teamSnapshots.values()]
+      .map(battlefieldKillDeathRatio)
+      .filter((ratio) => ratio != null);
+    const finiteTeamKillDeathRatios = teamKillDeathRatios.filter(Number.isFinite);
+    const bestTeamKillDeathRatio = finiteTeamKillDeathRatios.length
+      ? Math.max(...finiteTeamKillDeathRatios)
+      : 0;
+    const bestTeamUnitsAlive = Math.max(
+      0,
+      ...[...teamSnapshots.values()].map((team) => Number(team.droidsAlive) || 0)
+    );
+    const bestTeamStructuresAlive = Math.max(
+      0,
+      ...[...teamSnapshots.values()].map((team) => Number(team.structuresAlive) || 0)
+    );
+    const teamValues = [...teamSnapshots.values()];
+    const teamBarContext = {
+      averageScoreRatio: battlefieldScoreRatio(battlefieldAverage(teamScores), bestTeamScore),
+      averageKillDeathRatio: battlefieldKillDeathBarRatio(
+        battlefieldAverage(teamKillDeathRatios),
+        bestTeamKillDeathRatio
+      ),
+      averageUnitsRatio: battlefieldScoreRatio(
+        battlefieldAverage(teamValues.map((team) => Number(team.droidsAlive) || 0)),
+        bestTeamUnitsAlive
+      ),
+      averageStructuresRatio: battlefieldScoreRatio(
+        battlefieldAverage(teamValues.map((team) => Number(team.structuresAlive) || 0)),
+        bestTeamStructuresAlive
+      ),
+      averagePowerRatio: battlefieldScoreRatio(
+        battlefieldAverage(teamValues.map((team) => Math.max(0, Number(team.power) || 0))),
+        totalPower
+      ),
+      bestPower: Math.max(0, ...teamValues.map((team) => Number(team.power) || 0))
+    };
+    battlefieldTeamStatElements.forEach((fields, team) => {
+      updateBattlefieldStatFields(
+        fields,
+        teamSnapshots.get(team),
+        bestTeamScore,
+        bestTeamKillDeathRatio,
+        70,
+        100,
+        bestTeamUnitsAlive,
+        bestTeamStructuresAlive,
+        totalPower,
+        teamBarContext
+      );
+    });
+    battlefieldRenderedSnapshotTime = renderKey;
   }
 
   function renderResearchTimeline(extraction) {
@@ -2220,12 +2899,31 @@
     }
   }
 
-  function battlefieldPlayerColour(playerPosition) {
-    const player = battlefieldExtraction?.players.find((item) => (
-      Number(item.position) === Number(playerPosition)
-    ));
+  function battlefieldPlayerForOwner(owner) {
+    const ownerNumber = Number(owner);
+    const players = battlefieldExtraction?.players || [];
+    if (battlefieldOwnersUsePositions) {
+      return players.find((item) => Number(item.position) === ownerNumber) || null;
+    }
+    return players.find((item) => Number(item.index) === ownerNumber)
+      || players.find((item) => Number(item.position) === ownerNumber)
+      || null;
+  }
+
+  function battlefieldPlayerPositionForOwner(owner) {
+    const player = battlefieldPlayerForOwner(owner);
+    const position = Number(player?.position);
+    return Number.isFinite(position) ? position : Number(owner);
+  }
+
+  function battlefieldOwnerIsHidden(owner) {
+    return battlefieldHiddenPlayers.has(battlefieldPlayerPositionForOwner(owner));
+  }
+
+  function battlefieldPlayerColour(owner) {
+    const player = battlefieldPlayerForOwner(owner);
     return playerColours[Number(player?.colour)]?.value
-      || playerColours[Math.abs(Number(playerPosition)) % playerColours.length].value;
+      || playerColours[Math.abs(Number(owner)) % playerColours.length].value;
   }
 
   function battlefieldFramePair(timeMilliseconds) {
@@ -2371,6 +3069,7 @@
       });
       return {
         THREE, renderer, buildDroidGroup: droidModule.buildDroidGroup,
+        updateDroidAnimations: droidModule.updateDroidAnimations,
         buildStructureGroup: structureModule.buildStructureGroup,
         bodyDefs, propDefs, weaponDefs, templateDefs, templateNames,
         constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs,
@@ -2447,11 +3146,13 @@
   }
 
   function disposeBattlefieldModel(group) {
+    if (!group) return;
     group.traverse((item) => {
       item.geometry?.dispose?.();
       const materials = Array.isArray(item.material) ? item.material : [item.material];
       materials.filter(Boolean).forEach((material) => {
         material.map?.dispose?.();
+        material.userData?.teamColorMask?.dispose?.();
         material.dispose?.();
       });
     });
@@ -2499,16 +3200,16 @@
     });
   }
 
-  async function createBattlefieldModelSprite(kind, definition, colour) {
-    const library = await loadBattlefieldModelLibrary();
-    const { THREE, renderer } = library;
+  async function createBattlefieldModelGroup(kind, definition, colour, library = null) {
+    const modelLibrary = library || await loadBattlefieldModelLibrary();
+    const { THREE } = modelLibrary;
     let group;
     if (kind === "droid") {
-      const parts = battlefieldDroidParts(definition, library);
+      const parts = battlefieldDroidParts(definition, modelLibrary);
       if (parts.length <= 1) return null;
-      group = await library.buildDroidGroup(parts);
+      group = await modelLibrary.buildDroidGroup(parts);
     } else {
-      const structure = library.structureNames.get(normalizeBattlefieldModelName(definition.name));
+      const structure = modelLibrary.structureNames.get(normalizeBattlefieldModelName(definition.name));
       if (!structure) return null;
       definition.width = Math.max(1, Number(structure.width) || 1);
       definition.breadth = Math.max(1, Number(structure.breadth) || 1);
@@ -2519,7 +3220,7 @@
       const mainModel = nonModules.find((model) => !/^tr/i.test(model));
       const turretPieces = nonModules.filter((model) => /^tr/i.test(model));
       const pies = [structure.baseModel, mainModel, ...turretPieces].filter(Boolean);
-      group = await library.buildStructureGroup({
+      group = await modelLibrary.buildStructureGroup({
         ...structure,
         pies,
         alignPiesByOrigin: Boolean(structure.baseModel),
@@ -2527,6 +3228,14 @@
       }, 0, structure.width || 1, structure.breadth || 1);
     }
     applyBattlefieldModelPlayerColour(group, colour, THREE);
+    return group;
+  }
+
+  async function createBattlefieldModelSprite(kind, definition, colour) {
+    const library = await loadBattlefieldModelLibrary();
+    const { THREE, renderer } = library;
+    const group = await createBattlefieldModelGroup(kind, definition, colour, library);
+    if (!group) return null;
     await waitForBattlefieldModelTextures(group);
     group.traverse((item) => {
       const materials = Array.isArray(item.material) ? item.material : [item.material];
@@ -2569,16 +3278,26 @@
     return sprite;
   }
 
-  function battlefieldModelSprite(kind, object) {
+  function battlefieldModelDefinition(kind, object) {
     const id = Number(object[0]);
-    const definition = kind === "droid"
+    return kind === "droid"
       ? battlefieldDroidDefinitions.get(id)
       : battlefieldStructureDefinitions.get(id);
+  }
+
+  function battlefieldModelKey(kind, object, definition = battlefieldModelDefinition(kind, object)) {
     if (!definition) return null;
     const colour = battlefieldPlayerColour(Number(object[1]));
-    const key = kind === "droid"
+    return kind === "droid"
       ? `${kind}:${definition.body}:${definition.propulsion}:${definition.weapons.join(",")}:${definition.droidType}:${colour}`
       : `${kind}:${normalizeBattlefieldModelName(definition.name)}:${definition.statType}:${colour}`;
+  }
+
+  function battlefieldModelSprite(kind, object) {
+    const definition = battlefieldModelDefinition(kind, object);
+    if (!definition) return null;
+    const colour = battlefieldPlayerColour(Number(object[1]));
+    const key = battlefieldModelKey(kind, object, definition);
     if (!battlefieldSpriteCache.has(key)) {
       battlefieldSpriteCache.set(key, null);
       createBattlefieldModelSprite(kind, definition, colour)
@@ -2698,6 +3417,476 @@
     return { ...terrain, canvas };
   }
 
+  function battlefield3dIsActive() {
+    return Boolean(
+      battlefieldViewMode?.value === "3d"
+      && battlefield3dCanvas
+      && !battlefield3dCanvas.hidden
+      && battlefield3d
+    );
+  }
+
+  async function ensureBattlefield3d() {
+    if (battlefield3d) {
+      return battlefield3d;
+    }
+    if (!battlefield3dCanvas) {
+      throw new Error("The 3D battlefield canvas is unavailable.");
+    }
+    if (battlefield3dInitPromise) {
+      return battlefield3dInitPromise;
+    }
+
+    battlefield3dInitPromise = (async () => {
+      const library = await loadBattlefieldModelLibrary();
+      if (battlefield3d) return battlefield3d;
+      const { THREE } = library;
+      const renderer = new THREE.WebGLRenderer({
+        canvas: battlefield3dCanvas,
+        antialias: true
+      });
+      renderer.setClearColor(0x071016, 1);
+      if ("outputColorSpace" in renderer && THREE.SRGBColorSpace) {
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+      }
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x071016);
+      const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 5000);
+      const terrainRoot = new THREE.Group();
+      const objectRoot = new THREE.Group();
+      terrainRoot.name = "Replay terrain";
+      objectRoot.name = "Replay objects";
+      scene.add(terrainRoot, objectRoot);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.86));
+      const keyLight = new THREE.DirectionalLight(0xffffff, 0.78);
+      keyLight.position.set(90, 180, 120);
+      scene.add(keyLight);
+      const fillLight = new THREE.DirectionalLight(0x6de8ff, 0.24);
+      fillLight.position.set(-100, 80, -70);
+      scene.add(fillLight);
+
+      const droidGeometry = new THREE.ConeGeometry(0.34, 0.76, 4);
+      droidGeometry.rotateY(Math.PI / 4);
+      const structureGeometry = new THREE.BoxGeometry(0.9, 0.64, 0.9);
+      const markerGeometry = new THREE.RingGeometry(0.38, 0.52, 20);
+      markerGeometry.rotateX(-Math.PI / 2);
+      battlefield3d = {
+        THREE,
+        library,
+        renderer,
+        scene,
+        camera,
+        terrainRoot,
+        objectRoot,
+        terrainSource: null,
+        terrainMapWidth: 0,
+        terrainMapHeight: 0,
+        terrainMesh: null,
+        objects: new Map(),
+        prototypes: new Map(),
+        prototypePromises: new Map(),
+        fallbackGeometries: { droid: droidGeometry, structure: structureGeometry, marker: markerGeometry },
+        fallbackMaterials: new Map(),
+        markerMaterials: new Map(),
+        pixelRatio: 0,
+        width: 0,
+        height: 0
+      };
+      return battlefield3d;
+    })();
+
+    try {
+      return await battlefield3dInitPromise;
+    } catch (error) {
+      battlefield3dInitPromise = null;
+      throw error;
+    }
+  }
+
+  function clearBattlefield3dRoot(root) {
+    if (!root) return;
+    while (root.children.length) {
+      root.remove(root.children[root.children.length - 1]);
+    }
+  }
+
+  function resetBattlefield3dReplay() {
+    battlefield3dGeneration += 1;
+    if (!battlefield3d) return;
+    clearBattlefield3dRoot(battlefield3d.objectRoot);
+    battlefield3d.objects.clear();
+    battlefield3d.prototypePromises.clear();
+    battlefield3d.prototypes.forEach((group) => disposeBattlefieldModel(group));
+    battlefield3d.prototypes.clear();
+    battlefield3d.terrainRoot.children.slice().forEach((child) => {
+      battlefield3d.terrainRoot.remove(child);
+      disposeBattlefieldModel(child);
+    });
+    battlefield3d.terrainSource = null;
+    battlefield3d.terrainMapWidth = 0;
+    battlefield3d.terrainMapHeight = 0;
+    battlefield3d.terrainMesh = null;
+    battlefield3d.renderer.renderLists?.dispose?.();
+  }
+
+  function battlefield3dMaterial(state, kind, colour) {
+    const key = `${kind}:${colour}`;
+    if (!state.fallbackMaterials.has(key)) {
+      state.fallbackMaterials.set(key, new state.THREE.MeshLambertMaterial({
+        color: new state.THREE.Color(colour)
+      }));
+    }
+    return state.fallbackMaterials.get(key);
+  }
+
+  function battlefield3dMarkerMaterial(state, colour) {
+    if (!state.markerMaterials.has(colour)) {
+      state.markerMaterials.set(colour, new state.THREE.MeshBasicMaterial({
+        color: new state.THREE.Color(colour),
+        transparent: true,
+        opacity: 0.9,
+        depthWrite: false,
+        side: state.THREE.DoubleSide
+      }));
+    }
+    return state.markerMaterials.get(colour);
+  }
+
+  function addBattlefield3dMarker(state, root, kind, colour, definition) {
+    const marker = new state.THREE.Mesh(
+      state.fallbackGeometries.marker,
+      battlefield3dMarkerMaterial(state, colour)
+    );
+    const footprint = kind === "structure"
+      ? Math.max(1, Number(definition?.width) || 1, Number(definition?.breadth) || 1)
+      : 1;
+    marker.scale.setScalar(kind === "structure" ? footprint * 0.78 : 0.8);
+    marker.position.y = 0.035;
+    marker.renderOrder = 2;
+    root.add(marker);
+    root.userData.battlefieldMarker = marker;
+  }
+
+  function createBattlefield3dFallback(state, kind, colour, definition) {
+    const root = new state.THREE.Group();
+    const geometry = kind === "droid"
+      ? state.fallbackGeometries.droid
+      : state.fallbackGeometries.structure;
+    const mesh = new state.THREE.Mesh(geometry, battlefield3dMaterial(state, kind, colour));
+    mesh.position.y = kind === "droid" ? 0.38 : 0.32;
+    if (kind === "structure") {
+      mesh.scale.set(
+        Math.max(1, Number(definition?.width) || 1),
+        1,
+        Math.max(1, Number(definition?.breadth) || 1)
+      );
+    }
+    root.add(mesh);
+    addBattlefield3dMarker(state, root, kind, colour, definition);
+    return root;
+  }
+
+  function createBattlefield3dModelInstance(state, prototype, kind, colour, definition) {
+    const root = new state.THREE.Group();
+    const model = prototype.clone(true);
+    model.updateMatrixWorld(true);
+    const box = new state.THREE.Box3().setFromObject(model);
+    if (!box.isEmpty()) {
+      const center = box.getCenter(new state.THREE.Vector3());
+      model.position.x -= center.x;
+      model.position.y -= box.min.y;
+      model.position.z -= center.z;
+    }
+    root.add(model);
+    root.userData.battlefieldModel = model;
+    addBattlefield3dMarker(state, root, kind, colour, definition);
+    return root;
+  }
+
+  function battlefield3dRequestPrototype(state, entry, kind, object, definition, modelKey) {
+    if (!definition || !modelKey || state.prototypes.has(modelKey)
+        || entry.requestedModelKey === modelKey) return;
+    entry.requestedModelKey = modelKey;
+    let promise = state.prototypePromises.get(modelKey);
+    if (!promise) {
+      const generation = battlefield3dGeneration;
+      const colour = battlefieldPlayerColour(Number(object[1]));
+      promise = createBattlefieldModelGroup(kind, definition, colour, state.library)
+        .then((group) => {
+          if (!group) return null;
+          if (battlefield3d !== state || generation !== battlefield3dGeneration) {
+            disposeBattlefieldModel(group);
+            return null;
+          }
+          state.prototypes.set(modelKey, group);
+          return group;
+        })
+        .catch(() => null);
+      state.prototypePromises.set(modelKey, promise);
+    }
+    promise.then((prototype) => {
+      if (!prototype || battlefield3d !== state) return;
+      const current = state.objects.get(entry.objectKey);
+      if (current !== entry || entry.requestedModelKey !== modelKey) return;
+      const colour = battlefieldPlayerColour(entry.owner);
+      const replacement = createBattlefield3dModelInstance(
+        state, prototype, kind, colour, definition
+      );
+      replacement.position.copy(entry.root.position);
+      replacement.rotation.copy(entry.root.rotation);
+      replacement.visible = entry.root.visible;
+      state.objectRoot.remove(entry.root);
+      state.objectRoot.add(replacement);
+      entry.root = replacement;
+      drawBattlefield();
+    });
+  }
+
+  function battlefield3dHeightAt(x, y) {
+    if (!battlefieldTerrain?.heights?.length) return 0;
+    const width = Number(battlefieldTerrain.width) || 1;
+    const height = Number(battlefieldTerrain.height) || 1;
+    const sampleX = Math.max(0, Math.min(width - 1, Number(x) || 0));
+    const sampleY = Math.max(0, Math.min(height - 1, Number(y) || 0));
+    const x0 = Math.floor(sampleX);
+    const y0 = Math.floor(sampleY);
+    const x1 = Math.min(width - 1, x0 + 1);
+    const y1 = Math.min(height - 1, y0 + 1);
+    const ratioX = sampleX - x0;
+    const ratioY = sampleY - y0;
+    const at = (sampleColumn, sampleRow) => Number(
+      battlefieldTerrain.heights[sampleRow * width + sampleColumn]
+    ) || 0;
+    const north = at(x0, y0) + (at(x1, y0) - at(x0, y0)) * ratioX;
+    const south = at(x0, y1) + (at(x1, y1) - at(x0, y1)) * ratioX;
+    return (north + (south - north) * ratioY) * 0.015;
+  }
+
+  function ensureBattlefield3dTerrain(state, map) {
+    if (state.terrainSource === battlefieldTerrain
+        && state.terrainMapWidth === map.width
+        && state.terrainMapHeight === map.height) {
+      if (state.terrainMesh) state.terrainMesh.visible = battlefieldBackground.checked;
+      return;
+    }
+
+    state.terrainRoot.children.slice().forEach((child) => {
+      state.terrainRoot.remove(child);
+      disposeBattlefieldModel(child);
+    });
+    state.terrainSource = battlefieldTerrain;
+    state.terrainMapWidth = map.width;
+    state.terrainMapHeight = map.height;
+    state.terrainMesh = null;
+    const { THREE } = state;
+    const width = Math.max(1, Math.round(map.width));
+    const height = Math.max(1, Math.round(map.height));
+    const groundGeometry = new THREE.PlaneGeometry(width, height);
+    groundGeometry.rotateX(-Math.PI / 2);
+    const ground = new THREE.Mesh(
+      groundGeometry,
+      new THREE.MeshLambertMaterial({ color: 0x18242b })
+    );
+    ground.position.set(width / 2, -0.025, height / 2);
+    state.terrainRoot.add(ground);
+
+    if (battlefieldTerrain?.heights?.length) {
+      const positions = [];
+      const uvs = [];
+      const indices = [];
+      const heightWidth = Number(battlefieldTerrain.width) || width;
+      const heightHeight = Number(battlefieldTerrain.height) || height;
+      const heightAt = (column, row) => {
+        const sourceX = Math.max(0, Math.min(heightWidth - 1, column));
+        const sourceY = Math.max(0, Math.min(heightHeight - 1, row));
+        return (Number(battlefieldTerrain.heights[sourceY * heightWidth + sourceX]) || 0) * 0.015;
+      };
+      for (let row = 0; row <= height; row += 1) {
+        for (let column = 0; column <= width; column += 1) {
+          positions.push(column, heightAt(column, row), row);
+          uvs.push(column / width, 1 - row / height);
+        }
+      }
+      const rowWidth = width + 1;
+      for (let row = 0; row < height; row += 1) {
+        for (let column = 0; column < width; column += 1) {
+          const northwest = row * rowWidth + column;
+          const northeast = northwest + 1;
+          const southwest = northwest + rowWidth;
+          const southeast = southwest + 1;
+          indices.push(northwest, southwest, northeast, northeast, southwest, southeast);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      const texture = new THREE.CanvasTexture(battlefieldTerrain.canvas);
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipMapLinearFilter;
+      if ("colorSpace" in texture && THREE.SRGBColorSpace) {
+        texture.colorSpace = THREE.SRGBColorSpace;
+      }
+      const material = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
+      state.terrainMesh = new THREE.Mesh(geometry, material);
+      state.terrainMesh.visible = battlefieldBackground.checked;
+      state.terrainRoot.add(state.terrainMesh);
+    }
+
+    const grid = new THREE.GridHelper(
+      Math.max(width, height), 10, 0x6de8ff, 0x26434c
+    );
+    grid.position.set(width / 2, 0.045, height / 2);
+    grid.material.transparent = true;
+    grid.material.opacity = battlefieldTerrain ? 0.16 : 0.3;
+    state.terrainRoot.add(grid);
+  }
+
+  function updateBattlefield3dObject(state, kind, object) {
+    const objectKey = `${kind}:${Number(object[0])}`;
+    const definition = battlefieldModelDefinition(kind, object);
+    const colour = battlefieldPlayerColour(Number(object[1]));
+    const modelKey = battlefieldModelKey(kind, object, definition);
+    const visualKey = modelKey || `${kind}:fallback:${colour}`;
+    let entry = state.objects.get(objectKey);
+    if (!entry || entry.visualKey !== visualKey) {
+      if (entry) state.objectRoot.remove(entry.root);
+      const prototype = modelKey ? state.prototypes.get(modelKey) : null;
+      const root = prototype
+        ? createBattlefield3dModelInstance(state, prototype, kind, colour, definition)
+        : createBattlefield3dFallback(state, kind, colour, definition);
+      entry = {
+        objectKey,
+        visualKey,
+        owner: Number(object[1]),
+        root,
+        requestedModelKey: null
+      };
+      state.objects.set(objectKey, entry);
+      state.objectRoot.add(root);
+    }
+    entry.owner = Number(object[1]);
+    entry.root.visible = true;
+    entry.root.position.set(
+      Number(object[2]) || 0,
+      battlefield3dHeightAt(object[2], object[3]),
+      Number(object[3]) || 0
+    );
+    entry.root.rotation.y = -battlefieldDirectionRadians(object[7]);
+    battlefield3dRequestPrototype(state, entry, kind, object, definition, modelKey);
+    return entry;
+  }
+
+  function updateBattlefield3dCamera(state, map, rect) {
+    const scale = Math.max(0.75, battlefieldView.scale);
+    const targetX = map.width / 2
+      - battlefieldView.offsetX / Math.max(1, rect.width * scale) * map.width;
+    const targetZ = map.height / 2
+      - battlefieldView.offsetY / Math.max(1, rect.height * scale) * map.height;
+    const span = Math.max(map.width, map.height, 8);
+    const distance = Math.max(8, span * 1.9 / scale);
+    const azimuth = Math.PI / 4;
+    const elevation = Math.PI * 0.34;
+    const horizontal = Math.cos(elevation) * distance;
+    state.camera.position.set(
+      targetX + Math.sin(azimuth) * horizontal,
+      Math.sin(elevation) * distance,
+      targetZ + Math.cos(azimuth) * horizontal
+    );
+    state.camera.near = Math.max(0.05, distance / 2000);
+    state.camera.far = Math.max(1000, distance * 8);
+    state.camera.aspect = rect.width / rect.height;
+    state.camera.updateProjectionMatrix();
+    state.camera.lookAt(targetX, 0, targetZ);
+  }
+
+  function drawBattlefield3d() {
+    if (!battlefield3d || !battlefieldFrames.length || !battlefieldExtraction
+        || battlefieldPanel.hidden || !battlefield3dCanvas) {
+      return;
+    }
+    const state = battlefield3d;
+    const rect = battlefield3dCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const pair = battlefieldFramePair(battlefieldCurrentTime);
+    const map = battlefieldMapSize(pair.current);
+    const structures = battlefieldStructures.checked
+      ? interpolateBattlefieldObjects(pair.current.structures || [], pair.next.structures || [], pair.ratio)
+        .filter((structure) => !battlefieldObjectWasDestroyed("structure", structure, battlefieldCurrentTime))
+      : [];
+    const droids = battlefieldDroids.checked
+      ? interpolateBattlefieldObjects(pair.current.droids || [], pair.next.droids || [], pair.ratio)
+        .filter((droid) => !battlefieldObjectWasDestroyed("droid", droid, battlefieldCurrentTime))
+      : [];
+    ensureBattlefield3dTerrain(state, map);
+    state.objects.forEach((entry) => { entry.root.visible = false; });
+    let visibleStructures = 0;
+    let visibleDroids = 0;
+    structures.forEach((structure) => {
+      if (battlefieldOwnerIsHidden(structure[1])) return;
+      visibleStructures += 1;
+      updateBattlefield3dObject(state, "structure", structure);
+    });
+    droids.forEach((droid) => {
+      if (battlefieldOwnerIsHidden(droid[1])) return;
+      visibleDroids += 1;
+      updateBattlefield3dObject(state, "droid", droid);
+    });
+
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    if (state.pixelRatio !== pixelRatio) {
+      state.pixelRatio = pixelRatio;
+      state.renderer.setPixelRatio(pixelRatio);
+    }
+    if (state.width !== Math.round(rect.width) || state.height !== Math.round(rect.height)) {
+      state.width = Math.round(rect.width);
+      state.height = Math.round(rect.height);
+      state.renderer.setSize(state.width, state.height, false);
+    }
+    updateBattlefield3dCamera(state, map, rect);
+    state.library.updateDroidAnimations?.(state.objectRoot, battlefieldCurrentTime);
+    state.renderer.render(state.scene, state.camera);
+
+    const fieldWidth = Math.max(1, rect.width - 24);
+    const fieldHeight = Math.max(1, rect.height - 24);
+    drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight);
+    battlefieldTime.value = formatDuration(battlefieldCurrentTime);
+    battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
+    updateBattlefieldMomentumCursor();
+    updateBattlefieldPlayerStats();
+    battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
+    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · 3D view`;
+  }
+
+  async function setBattlefieldViewMode(mode) {
+    const use3d = mode === "3d";
+    if (!use3d || !battlefield3dCanvas) {
+      if (battlefieldViewMode && !battlefield3dCanvas) battlefieldViewMode.value = "2d";
+      battlefieldCanvas.hidden = false;
+      if (battlefield3dCanvas) battlefield3dCanvas.hidden = true;
+      requestAnimationFrame(drawBattlefield);
+      return;
+    }
+
+    battlefieldCanvas.hidden = false;
+    battlefield3dCanvas.hidden = true;
+    try {
+      await ensureBattlefield3d();
+      if (battlefieldViewMode?.value !== "3d") return;
+      battlefieldCanvas.hidden = true;
+      battlefield3dCanvas.hidden = false;
+      requestAnimationFrame(drawBattlefield);
+    } catch (error) {
+      console.warn("Unable to start the 3D battlefield.", error);
+      if (battlefieldViewMode) battlefieldViewMode.value = "2d";
+      battlefieldCanvas.hidden = false;
+      battlefield3dCanvas.hidden = true;
+      battlefieldStatus.textContent = "3D view unavailable · showing 2D battlefield";
+      requestAnimationFrame(drawBattlefield);
+    }
+  }
+
   function battlefieldMapSize(frame) {
     if (battlefieldTerrain) {
       return { width: battlefieldTerrain.width, height: battlefieldTerrain.height };
@@ -2714,7 +3903,7 @@
     };
   }
 
-  function drawBattlefield() {
+  function drawBattlefield2d() {
     if (!battlefieldFrames.length || !battlefieldExtraction || battlefieldPanel.hidden) {
       return;
     }
@@ -2801,7 +3990,7 @@
 
     structures.forEach((structure) => {
       const player = Number(structure[1]);
-      if (battlefieldHiddenPlayers.has(player)) {
+      if (battlefieldOwnerIsHidden(player)) {
         return;
       }
       visibleStructures += 1;
@@ -2826,7 +4015,7 @@
 
     droids.forEach((droid) => {
       const player = Number(droid[1]);
-      if (battlefieldHiddenPlayers.has(player)) {
+      if (battlefieldOwnerIsHidden(player)) {
         return;
       }
       visibleDroids += 1;
@@ -2849,9 +4038,18 @@
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
     battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
+    updateBattlefieldMomentumCursor();
     updateBattlefieldPlayerStats();
     battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
     battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`;
+  }
+
+  function drawBattlefield() {
+    if (battlefield3dIsActive()) {
+      drawBattlefield3d();
+      return;
+    }
+    drawBattlefield2d();
   }
 
   function drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight) {
@@ -2878,13 +4076,13 @@
     const projectY = (y) => margin + Math.max(0, Math.min(map.height, Number(y))) / map.height * mapHeight;
     structures.forEach((structure) => {
       const player = Number(structure[1]);
-      if (battlefieldHiddenPlayers.has(player)) return;
+      if (battlefieldOwnerIsHidden(player)) return;
       context.fillStyle = battlefieldPlayerColour(player);
       context.fillRect(projectX(structure[2]) - 1.5, projectY(structure[3]) - 1.5, 3, 3);
     });
     droids.forEach((droid) => {
       const player = Number(droid[1]);
-      if (battlefieldHiddenPlayers.has(player)) return;
+      if (battlefieldOwnerIsHidden(player)) return;
       context.fillStyle = battlefieldPlayerColour(player);
       context.fillRect(projectX(droid[2]) - 1, projectY(droid[3]) - 1, 2, 2);
     });
@@ -2911,7 +4109,8 @@
     if (scale === previousScale) {
       return;
     }
-    const rect = battlefieldCanvas.getBoundingClientRect();
+    const activeCanvas = battlefield3dIsActive() ? battlefield3dCanvas : battlefieldCanvas;
+    const rect = activeCanvas.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
     const x = anchorX == null ? centerX : anchorX;
@@ -2953,29 +4152,152 @@
     battlefieldAnimationFrame = requestAnimationFrame(animateBattlefield);
   }
 
+  function battlefieldTeamStartY(players) {
+    const positions = new Set(players.map((player) => Number(player.position)));
+    const firstFrame = battlefieldFrames[0] || {};
+    const structures = (firstFrame.structures || [])
+      .filter((structure) => positions.has(battlefieldPlayerPositionForOwner(structure[1])));
+    const droids = (firstFrame.droids || [])
+      .filter((droid) => positions.has(battlefieldPlayerPositionForOwner(droid[1])));
+    const objects = structures.length ? structures : droids;
+    const values = objects
+      .map((object) => Number(object[3]))
+      .filter(Number.isFinite)
+      .sort((left, right) => left - right);
+    if (!values.length) {
+      return null;
+    }
+    const middle = Math.floor(values.length / 2);
+    return values.length % 2
+      ? values[middle]
+      : (values[middle - 1] + values[middle]) / 2;
+  }
+
+  function syncBattlefieldVisibilityButtons() {
+    battlefieldPlayerStatElements.forEach(({ button }, position) => {
+      button.setAttribute(
+        "aria-pressed",
+        String(!battlefieldHiddenPlayers.has(Number(position)))
+      );
+    });
+    battlefieldTeamStatElements.forEach(({ button, positions }) => {
+      const hiddenPlayers = positions.filter((position) => (
+        battlefieldHiddenPlayers.has(position)
+      )).length;
+      const state = hiddenPlayers === 0
+        ? "true"
+        : hiddenPlayers === positions.length
+          ? "false"
+          : "mixed";
+      button.setAttribute("aria-pressed", state);
+    });
+  }
+
   function populateBattlefieldLegend(extraction) {
     battlefieldLegend.replaceChildren();
     battlefieldPlayerStatElements.clear();
+    battlefieldTeamStatElements.clear();
     const statDefinitions = [
       ["score", "Score"],
-      ["kills", "Kills"],
-      ["droidsBuilt", "U built"],
-      ["droidsLost", "U lost"],
-      ["droidsAlive", "U alive"],
-      ["structuresBuilt", "S built"],
-      ["structuresLost", "S lost"],
-      ["structuresAlive", "S alive"],
-      ["researchComplete", "Research"],
-      ["power", "Power"],
-      ["oilRigs", "Oil"]
+      ["killDeathRatio", "K/D"],
+      ["droidsAlive", "Alive"],
+      ["structuresAlive", "Alive"],
+      ["researchActivity", "Research"],
+      ["power", "Power"]
     ];
-    extraction.players
+    const competitors = extraction.players
       .filter((player) => !player.spectator)
-      .sort((left, right) => Number(left.position) - Number(right.position))
+      .sort((left, right) => Number(left.position) - Number(right.position));
+    const teams = new Map();
+    competitors.forEach((player) => {
+      const team = Number(player.team);
+      if (!teams.has(team)) {
+        teams.set(team, []);
+      }
+      teams.get(team).push(player);
+    });
+    const teamOrder = [...teams.keys()].sort((left, right) => {
+      const leftY = battlefieldTeamStartY(teams.get(left));
+      const rightY = battlefieldTeamStartY(teams.get(right));
+      if (leftY != null && rightY != null && leftY !== rightY) {
+        return leftY - rightY;
+      }
+      return left - right;
+    });
+    const showTeamRows = teamOrder.length === 2;
+    const appendedTeams = new Set();
+    const orderedCompetitors = showTeamRows
+      ? teamOrder.flatMap((team) => teams.get(team))
+      : competitors;
+    orderedCompetitors
       .forEach((player) => {
+        const team = Number(player.team);
+        if (showTeamRows && !appendedTeams.has(team)) {
+          const teamButton = document.createElement("button");
+          const teamMarker = document.createElement("span");
+          const teamIdentity = document.createElement("span");
+          const teamOverallBar = document.createElement("span");
+          const teamName = document.createElement("span");
+          const teamState = document.createElement("span");
+          const teamStats = document.createElement("span");
+          const teamPlayers = teams.get(team);
+          const teamIndex = teamOrder.indexOf(team);
+          const teamLabel = `Team ${String.fromCharCode(65 + teamIndex)}`;
+          const teamColours = teamPlayers.map((item) => (
+            playerColours[Number(item.colour)]?.value
+              || playerColours[Math.abs(Number(item.position)) % playerColours.length].value
+          ));
+          teamButton.type = "button";
+          teamButton.className = "replay-battlefield-player is-team";
+          teamButton.setAttribute("aria-pressed", "true");
+          teamButton.title = `Show or hide ${teamLabel}`;
+          teamMarker.className = "replay-battlefield-player-marker";
+          teamMarker.style.background = `linear-gradient(90deg, ${teamColours.join(", ")})`;
+          teamIdentity.className = "replay-battlefield-player-identity";
+          teamOverallBar.className = "replay-battlefield-player-overall-bar";
+          teamOverallBar.setAttribute("aria-hidden", "true");
+          teamName.className = "replay-battlefield-player-name";
+          teamName.textContent = teamLabel;
+          teamState.className = "replay-battlefield-player-state";
+          teamState.textContent = "team total";
+          teamStats.className = "replay-battlefield-player-stats";
+          const teamValues = statDefinitions.map(([key, label]) => {
+            const field = createBattlefieldPlayerStat(label, key);
+            teamStats.append(field.wrapper);
+            return { key, value: field.value, bar: field.bar, averageMarker: field.averageMarker };
+          });
+          teamIdentity.append(teamOverallBar, teamMarker, teamName, teamState);
+          teamButton.append(teamIdentity, teamStats);
+          const positions = teamPlayers.map((item) => Number(item.position));
+          battlefieldTeamStatElements.set(
+            team,
+            {
+              button: teamButton,
+              state: teamState,
+              values: teamValues,
+              positions,
+              overallBar: teamOverallBar
+            }
+          );
+          teamButton.addEventListener("click", () => {
+            const teamHidden = positions.every((position) => battlefieldHiddenPlayers.has(position));
+            positions.forEach((position) => {
+              if (teamHidden) {
+                battlefieldHiddenPlayers.delete(position);
+              } else {
+                battlefieldHiddenPlayers.add(position);
+              }
+            });
+            syncBattlefieldVisibilityButtons();
+            drawBattlefield();
+          });
+          battlefieldLegend.append(teamButton);
+          appendedTeams.add(team);
+        }
         const button = document.createElement("button");
         const marker = document.createElement("span");
         const identity = document.createElement("span");
+        const overallBar = document.createElement("span");
         const name = document.createElement("span");
         const state = document.createElement("span");
         const stats = document.createElement("span");
@@ -2985,21 +4307,26 @@
         button.title = `Show or hide ${player.name}`;
         marker.className = "replay-battlefield-player-marker";
         marker.style.backgroundColor = playerColours[Number(player.colour)]?.value
-          || battlefieldPlayerColour(player.position);
+          || playerColours[Math.abs(Number(player.position)) % playerColours.length].value;
         identity.className = "replay-battlefield-player-identity";
+        overallBar.className = "replay-battlefield-player-overall-bar";
+        overallBar.setAttribute("aria-hidden", "true");
         name.className = "replay-battlefield-player-name";
         name.textContent = player.name;
         state.className = "replay-battlefield-player-state";
         state.textContent = "--";
         stats.className = "replay-battlefield-player-stats";
         const values = statDefinitions.map(([key, label]) => {
-          const field = createBattlefieldPlayerStat(label);
+          const field = createBattlefieldPlayerStat(label, key);
           stats.append(field.wrapper);
-          return { key, value: field.value };
+          return { key, value: field.value, bar: field.bar, averageMarker: field.averageMarker };
         });
-        identity.append(marker, name, state);
+        identity.append(overallBar, marker, name, state);
         button.append(identity, stats);
-        battlefieldPlayerStatElements.set(Number(player.position), { state, values });
+        battlefieldPlayerStatElements.set(
+          Number(player.position),
+          { button, state, values, overallBar }
+        );
         button.addEventListener("click", () => {
           const position = Number(player.position);
           if (battlefieldHiddenPlayers.has(position)) {
@@ -3007,7 +4334,7 @@
           } else {
             battlefieldHiddenPlayers.add(position);
           }
-          button.setAttribute("aria-pressed", String(!battlefieldHiddenPlayers.has(position)));
+          syncBattlefieldVisibilityButtons();
           drawBattlefield();
         });
         battlefieldLegend.append(button);
@@ -3018,9 +4345,11 @@
 
   function renderBattlefield(extraction, tacticalReplay) {
     stopBattlefieldPlayback();
+    resetBattlefield3dReplay();
     const telemetryFrames = tacticalReplay.positionFrames;
     battlefieldFrames = telemetryFrames.filter((frame) => !frame.eventsOnly);
     battlefieldExtraction = extraction;
+    battlefieldOwnersUsePositions = Boolean(tacticalReplay.ownersAreLobbyPositions);
     battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
     collectBattlefieldObjectDefinitions(telemetryFrames);
     battlefieldSpriteCache.clear();
@@ -3045,6 +4374,7 @@
     battlefieldBackground.checked = Boolean(battlefieldTerrain);
     battlefieldBackground.disabled = !battlefieldTerrain;
     populateBattlefieldLegend(extraction);
+    renderBattlefieldMomentum(extraction);
     requestAnimationFrame(drawBattlefield);
   }
 
@@ -3063,12 +4393,18 @@
       renderBattlefield(extraction, tacticalReplay);
     } else {
       stopBattlefieldPlayback();
+      resetBattlefield3dReplay();
       battlefieldFrames = [];
       battlefieldExtraction = null;
+      battlefieldOwnersUsePositions = false;
       battlefieldTerrain = null;
       battlefieldDroidDefinitions = new Map();
       battlefieldStructureDefinitions = new Map();
       battlefieldDestroyedAt = new Map();
+      battlefieldMomentumSeries = [];
+      battlefieldMomentumDuration = 0;
+      battlefieldMomentum.hidden = true;
+      battlefieldMomentumChart.replaceChildren();
       battlefieldSpriteCache.clear();
     }
 
@@ -3445,54 +4781,74 @@
   });
   document.addEventListener("fullscreenchange", () => {
     const active = document.fullscreenElement === battlefieldStage;
-    battlefieldFullscreen.textContent = active ? "Exit full screen" : "Full screen";
+    const fullscreenLabel = active ? "Exit full screen" : "Full screen";
+    battlefieldFullscreen.setAttribute("aria-label", fullscreenLabel);
+    battlefieldFullscreen.dataset.tooltip = fullscreenLabel;
     battlefieldFullscreen.setAttribute("aria-pressed", String(active));
     requestAnimationFrame(drawBattlefield);
   });
-  battlefieldCanvas.addEventListener("wheel", (event) => {
-    event.preventDefault();
-    const rect = battlefieldCanvas.getBoundingClientRect();
-    setBattlefieldZoom(
-      battlefieldView.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15),
-      event.clientX - rect.left,
-      event.clientY - rect.top
-    );
-  }, { passive: false });
-  battlefieldCanvas.addEventListener("pointerdown", (event) => {
-    battlefieldPan = {
-      pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      offsetX: battlefieldView.offsetX,
-      offsetY: battlefieldView.offsetY
-    };
-    battlefieldCanvas.setPointerCapture(event.pointerId);
-    battlefieldCanvas.classList.add("is-panning");
-  });
-  battlefieldCanvas.addEventListener("pointermove", (event) => {
-    if (!battlefieldPan || battlefieldPan.pointerId !== event.pointerId) {
-      return;
-    }
-    battlefieldView.offsetX = battlefieldPan.offsetX + event.clientX - battlefieldPan.x;
-    battlefieldView.offsetY = battlefieldPan.offsetY + event.clientY - battlefieldPan.y;
-    drawBattlefield();
-  });
-  battlefieldCanvas.addEventListener("pointerup", (event) => {
-    if (battlefieldPan?.pointerId === event.pointerId) {
+  if (battlefieldViewMode) {
+    battlefieldViewMode.value = "2d";
+    battlefieldViewMode.addEventListener("change", () => {
+      setBattlefieldViewMode(battlefieldViewMode.value);
+    });
+  }
+  battlefieldCanvas.hidden = false;
+  if (battlefield3dCanvas) battlefield3dCanvas.hidden = true;
+
+  function bindBattlefieldCanvas(canvas) {
+    if (!canvas) return;
+    canvas.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      setBattlefieldZoom(
+        battlefieldView.scale * (event.deltaY < 0 ? 1.15 : 1 / 1.15),
+        event.clientX - rect.left,
+        event.clientY - rect.top
+      );
+    }, { passive: false });
+    canvas.addEventListener("pointerdown", (event) => {
+      battlefieldPan = {
+        canvas,
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        offsetX: battlefieldView.offsetX,
+        offsetY: battlefieldView.offsetY
+      };
+      canvas.setPointerCapture(event.pointerId);
+      canvas.classList.add("is-panning");
+    });
+    canvas.addEventListener("pointermove", (event) => {
+      if (!battlefieldPan || battlefieldPan.canvas !== canvas
+          || battlefieldPan.pointerId !== event.pointerId) {
+        return;
+      }
+      battlefieldView.offsetX = battlefieldPan.offsetX + event.clientX - battlefieldPan.x;
+      battlefieldView.offsetY = battlefieldPan.offsetY + event.clientY - battlefieldPan.y;
+      drawBattlefield();
+    });
+    const stopPanning = (event) => {
+      if (!battlefieldPan || battlefieldPan.canvas !== canvas
+          || (event?.pointerId !== undefined && battlefieldPan.pointerId !== event.pointerId)) {
+        return;
+      }
       battlefieldPan = null;
-      battlefieldCanvas.classList.remove("is-panning");
-    }
-  });
-  battlefieldCanvas.addEventListener("pointercancel", () => {
-    battlefieldPan = null;
-    battlefieldCanvas.classList.remove("is-panning");
-  });
-  battlefieldCanvas.addEventListener("dblclick", resetBattlefieldView);
+      canvas.classList.remove("is-panning");
+    };
+    canvas.addEventListener("pointerup", stopPanning);
+    canvas.addEventListener("pointercancel", stopPanning);
+    canvas.addEventListener("dblclick", resetBattlefieldView);
+  }
+
+  bindBattlefieldCanvas(battlefieldCanvas);
+  bindBattlefieldCanvas(battlefield3dCanvas);
   battlefieldMinimap.style.pointerEvents = "auto";
   battlefieldMinimap.style.cursor = "crosshair";
   battlefieldMinimap.addEventListener("click", (event) => {
     const minimapRect = battlefieldMinimap.getBoundingClientRect();
-    const canvasRect = battlefieldCanvas.getBoundingClientRect();
+    const activeCanvas = battlefield3dIsActive() ? battlefield3dCanvas : battlefieldCanvas;
+    const canvasRect = activeCanvas.getBoundingClientRect();
     const margin = 5;
     const x = (event.clientX - minimapRect.left) / minimapRect.width * battlefieldMinimap.width;
     const y = (event.clientY - minimapRect.top) / minimapRect.height * battlefieldMinimap.height;
@@ -3507,7 +4863,7 @@
 
   if (typeof ResizeObserver === "function") {
     const battlefieldResizeObserver = new ResizeObserver(() => drawBattlefield());
-    battlefieldResizeObserver.observe(battlefieldCanvas);
+    battlefieldResizeObserver.observe(battlefieldStage);
   } else {
     window.addEventListener("resize", drawBattlefield);
   }

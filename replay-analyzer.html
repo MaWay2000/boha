@@ -468,6 +468,8 @@
     }
 
     .replay-battlefield-sidebar {
+      display: flex;
+      flex-direction: column;
       padding: 8px;
       background: rgba(2, 8, 13, 0.84);
       border: 1px solid rgba(109, 232, 255, 0.18);
@@ -501,6 +503,10 @@
       user-select: none;
     }
 
+    .replay-battlefield-canvas[hidden] {
+      display: none;
+    }
+
     .replay-battlefield-canvas.is-panning {
       cursor: grabbing;
     }
@@ -509,6 +515,207 @@
       display: grid;
       gap: 4px;
       align-content: start;
+    }
+
+    .replay-battlefield-momentum {
+      display: flex;
+      flex: 1 0 220px;
+      min-height: 220px;
+      margin-top: 16px;
+      padding: 12px;
+      flex-direction: column;
+      background:
+        linear-gradient(180deg, rgba(13, 31, 43, 0.56), rgba(2, 8, 13, 0.32)),
+        rgba(2, 8, 13, 0.48);
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      border-radius: 12px;
+    }
+
+    .replay-battlefield-momentum[hidden] {
+      display: none;
+    }
+
+    .replay-battlefield-momentum-heading {
+      display: flex;
+      gap: 12px;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .replay-battlefield-momentum-heading h5 {
+      margin: 0;
+      color: var(--text);
+      font: 700 0.75rem "Oxanium", sans-serif;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .replay-battlefield-momentum-heading output {
+      color: var(--muted);
+      font: 700 0.62rem "Oxanium", sans-serif;
+      white-space: nowrap;
+    }
+
+    .replay-battlefield-momentum-chart {
+      display: block;
+      width: 100%;
+      min-height: 170px;
+      flex: 1;
+      overflow: visible;
+    }
+
+    .replay-battlefield-momentum-grid {
+      stroke: rgba(109, 232, 255, 0.12);
+      stroke-width: 1;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .replay-battlefield-momentum-axis {
+      fill: #718ca0;
+      font: 700 10px "Oxanium", sans-serif;
+    }
+
+    .replay-battlefield-momentum-area {
+      opacity: 0.1;
+    }
+
+    .replay-battlefield-momentum-line {
+      fill: none;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .replay-battlefield-momentum-cursor {
+      stroke: rgba(255, 255, 255, 0.58);
+      stroke-width: 1;
+      stroke-dasharray: 4 4;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .replay-battlefield-momentum-dot {
+      stroke: #071016;
+      stroke-width: 2;
+      vector-effect: non-scaling-stroke;
+    }
+
+    .replay-battlefield-momentum-legend {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      margin-top: 5px;
+      color: var(--muted);
+      font: 700 0.62rem "Oxanium", sans-serif;
+      text-transform: uppercase;
+    }
+
+    .replay-battlefield-momentum-legend span::before {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 5px;
+      content: "";
+      background: var(--momentum-colour);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--momentum-colour);
+    }
+
+    .replay-battlefield-stat-groups {
+      display: grid;
+      grid-template-columns: minmax(120px, 0.55fr) minmax(0, 2fr);
+      gap: 8px;
+      padding: 0 6px;
+    }
+
+    .replay-battlefield-stat-group-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(48px, 1fr));
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .replay-battlefield-stat-group {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px 6px;
+      color: #6de8ff;
+      background: rgba(13, 31, 43, 0.72);
+      border: 1px solid rgba(109, 232, 255, 0.2);
+      border-radius: 5px;
+      font: 700 0.58rem "Oxanium", sans-serif;
+      letter-spacing: 0.08em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    .replay-battlefield-stat-group.has-subgroups {
+      display: grid;
+      grid-template-rows: auto auto;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .replay-battlefield-stat-group-label {
+      padding: 2px 6px;
+    }
+
+    .replay-battlefield-stat-subgroups {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      border-top: 1px solid rgba(109, 232, 255, 0.2);
+      color: #9fc8e7;
+      font-size: 0.52rem;
+    }
+
+    .replay-battlefield-stat-subgroups.single {
+      grid-template-columns: 1fr;
+    }
+
+    .replay-battlefield-stat-subgroups span {
+      padding: 2px 3px;
+    }
+
+    .replay-battlefield-stat-subgroups span + span {
+      border-left: 1px solid rgba(109, 232, 255, 0.14);
+    }
+
+    .replay-battlefield-stat-subgroups .alive {
+      color: #7ee787;
+    }
+
+    .replay-battlefield-stat-subgroups .lost {
+      color: #ff6b6b;
+    }
+
+    .replay-battlefield-stat-subgroups .built {
+      color: #aab6c2;
+    }
+
+    .replay-battlefield-stat-group.units {
+      grid-column: 3;
+    }
+
+    .replay-battlefield-stat-group.buildings {
+      grid-column: 4;
+    }
+
+    .replay-battlefield-stat-group.score {
+      grid-column: 1;
+    }
+
+    .replay-battlefield-stat-group.kd {
+      grid-column: 2;
+    }
+
+    .replay-battlefield-stat-group.research {
+      grid-column: 5;
+    }
+
+    .replay-battlefield-stat-group.power {
+      grid-column: 6;
     }
 
     .replay-battlefield-player {
@@ -527,11 +734,83 @@
       text-align: left;
     }
 
+    .replay-battlefield-player.is-team {
+      margin-top: 0;
+      min-height: 46px;
+      padding: 8px;
+      background: linear-gradient(90deg, rgba(9, 29, 39, 0.94), rgba(5, 18, 27, 0.9));
+      border-color: rgba(109, 232, 255, 0.3);
+    }
+
+    .replay-battlefield-player + .replay-battlefield-player.is-team {
+      margin-top: 18px;
+    }
+
+    .replay-battlefield-player.is-team .replay-battlefield-player-name {
+      color: #6de8ff;
+      font-family: "Oxanium", sans-serif;
+      font-size: 0.9rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .replay-battlefield-player.is-team .replay-battlefield-player-stat {
+      min-height: 30px;
+      padding: 6px;
+      align-content: center;
+    }
+
+    .replay-battlefield-player.is-status-active {
+      background: linear-gradient(90deg, rgba(46, 160, 67, 0.22), rgba(4, 12, 20, 0.58) 30%);
+      border-color: rgba(126, 231, 135, 0.42);
+    }
+
+    .replay-battlefield-player.is-status-active .replay-battlefield-player-name,
+    .replay-battlefield-player.is-status-active .replay-battlefield-player-state {
+      color: #7ee787;
+    }
+
+    .replay-battlefield-player.is-status-inactive {
+      background: linear-gradient(90deg, rgba(218, 54, 51, 0.22), rgba(4, 12, 20, 0.58) 30%);
+      border-color: rgba(255, 107, 107, 0.44);
+    }
+
+    .replay-battlefield-player.is-status-inactive .replay-battlefield-player-name,
+    .replay-battlefield-player.is-status-inactive .replay-battlefield-player-state {
+      color: #ff6b6b;
+    }
+
     .replay-battlefield-player-identity {
+      position: relative;
       display: flex;
       gap: 5px;
       align-items: center;
       min-width: 0;
+      min-height: 22px;
+      overflow: hidden;
+      border-radius: 5px;
+      isolation: isolate;
+    }
+
+    .replay-battlefield-player-overall-bar {
+      position: absolute;
+      z-index: 0;
+      inset: 0 auto 0 0;
+      width: 0;
+      background: linear-gradient(
+        90deg,
+        hsla(var(--battlefield-overall-hue, 0), 72%, 30%, 0.34),
+        hsla(var(--battlefield-overall-hue, 0), 82%, 48%, 0.58)
+      );
+      border-right: 1px solid hsla(var(--battlefield-overall-hue, 0), 88%, 72%, 0.72);
+      border-radius: 5px;
+      transition: width 180ms ease-out;
+      pointer-events: none;
+    }
+
+    .replay-battlefield-player-identity > :not(.replay-battlefield-player-overall-bar) {
+      position: relative;
+      z-index: 1;
     }
 
     .replay-battlefield-player-name {
@@ -549,7 +828,7 @@
 
     .replay-battlefield-player-stats {
       display: grid;
-      grid-template-columns: repeat(11, minmax(48px, 1fr));
+      grid-template-columns: repeat(6, minmax(48px, 1fr));
       gap: 3px;
       min-width: 0;
     }
@@ -563,17 +842,106 @@
       border-radius: 5px;
     }
 
-    .replay-battlefield-player-stat small {
+    .replay-battlefield-player-stat.is-score,
+    .replay-battlefield-player-stat.is-research,
+    .replay-battlefield-player-stat.is-alive,
+    .replay-battlefield-player-stat.is-power,
+    .replay-battlefield-player-stat.is-kd {
+      position: relative;
       overflow: hidden;
-      color: var(--muted);
-      font: 600 0.48rem "Oxanium", sans-serif;
-      letter-spacing: 0.04em;
-      text-overflow: ellipsis;
-      text-transform: uppercase;
-      white-space: nowrap;
+      isolation: isolate;
+    }
+
+    .replay-battlefield-score-bar {
+      position: absolute;
+      z-index: 0;
+      inset: 0 auto 0 0;
+      width: 0;
+      background: linear-gradient(90deg, rgba(30, 150, 177, 0.42), rgba(109, 232, 255, 0.68));
+      border-right: 1px solid rgba(151, 241, 255, 0.82);
+      border-radius: 5px;
+      opacity: 0.68;
+      filter: saturate(0.72) brightness(0.88);
+      transition: width 180ms ease-out;
+    }
+
+    .replay-battlefield-player-stat.is-metric-leader .replay-battlefield-score-bar {
+      opacity: 1;
+      filter: saturate(1.08) brightness(1.04);
+    }
+
+    .replay-battlefield-player.is-team .replay-battlefield-score-bar {
+      opacity: 0.52;
+      filter: saturate(0.48) brightness(0.72);
+    }
+
+    .replay-battlefield-player.is-team .replay-battlefield-player-stat.is-metric-leader
+      .replay-battlefield-score-bar {
+      opacity: 0.7;
+      filter: saturate(0.66) brightness(0.82);
+    }
+
+    .replay-battlefield-average-marker {
+      position: absolute;
+      z-index: 2;
+      top: 3px;
+      bottom: 3px;
+      width: 1px;
+      background: rgba(225, 244, 250, 0.62);
+      box-shadow: 0 0 3px rgba(0, 0, 0, 0.82);
+      opacity: 0.72;
+      pointer-events: none;
+      transform: translateX(-1px);
+    }
+
+    .replay-battlefield-player-stat.is-score .replay-battlefield-score-bar {
+      background: linear-gradient(
+        90deg,
+        hsla(var(--battlefield-score-hue, 0), 72%, 36%, 0.5),
+        hsla(var(--battlefield-score-hue, 0), 86%, 58%, 0.82)
+      );
+      border-right-color: hsla(var(--battlefield-score-hue, 0), 92%, 76%, 0.92);
+    }
+
+    .replay-battlefield-player-stat.is-research .replay-battlefield-score-bar {
+      background: linear-gradient(
+        90deg,
+        hsla(var(--battlefield-research-hue, 0), 72%, 36%, 0.5),
+        hsla(var(--battlefield-research-hue, 0), 86%, 58%, 0.82)
+      );
+      border-right-color: hsla(var(--battlefield-research-hue, 0), 92%, 76%, 0.92);
+    }
+
+    .replay-battlefield-player-stat.is-alive .replay-battlefield-score-bar {
+      background: linear-gradient(
+        90deg,
+        hsla(var(--battlefield-alive-hue, 0), 72%, 36%, 0.5),
+        hsla(var(--battlefield-alive-hue, 0), 86%, 58%, 0.82)
+      );
+      border-right-color: hsla(var(--battlefield-alive-hue, 0), 92%, 76%, 0.92);
+    }
+
+    .replay-battlefield-player-stat.is-power .replay-battlefield-score-bar {
+      background: linear-gradient(
+        90deg,
+        hsla(var(--battlefield-power-hue, 0), 72%, 36%, 0.5),
+        hsla(var(--battlefield-power-hue, 0), 86%, 58%, 0.82)
+      );
+      border-right-color: hsla(var(--battlefield-power-hue, 0), 92%, 76%, 0.92);
+    }
+
+    .replay-battlefield-player-stat.is-kd .replay-battlefield-score-bar {
+      background: linear-gradient(
+        90deg,
+        hsla(var(--battlefield-kd-hue, 0), 72%, 36%, 0.5),
+        hsla(var(--battlefield-kd-hue, 0), 86%, 58%, 0.82)
+      );
+      border-right-color: hsla(var(--battlefield-kd-hue, 0), 92%, 76%, 0.92);
     }
 
     .replay-battlefield-player-stat strong {
+      position: relative;
+      z-index: 3;
       overflow: hidden;
       color: var(--text);
       font: 700 0.62rem "Space Grotesk", sans-serif;
@@ -587,9 +955,87 @@
       align-items: center;
     }
 
+    .replay-battlefield-map-controls {
+      display: flex;
+      justify-content: center;
+      margin-top: 8px;
+    }
+
+    .replay-battlefield-map-controls .replay-control-tooltip::before {
+      top: auto;
+      bottom: calc(100% + 4px);
+      border-top-color: rgba(109, 232, 255, 0.7);
+      border-bottom-color: transparent;
+    }
+
+    .replay-battlefield-map-controls .replay-control-tooltip::after {
+      top: auto;
+      bottom: calc(100% + 14px);
+    }
+
     .replay-battlefield-zoom .replay-action {
       min-width: 30px;
       padding-inline: 7px;
+    }
+
+    .replay-battlefield-zoom .replay-radio-control {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      min-width: 32px;
+      height: 30px;
+      min-height: 30px;
+      padding: 0;
+      color: #fff;
+      background: linear-gradient(180deg, rgba(78, 88, 103, 0.98) 0%, rgba(43, 50, 60, 0.98) 45%, rgba(23, 28, 35, 0.98) 100%);
+      border: 1px solid rgba(125, 180, 255, 0.22);
+      border-radius: 9px;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.45),
+        0 3px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .replay-battlefield-zoom .replay-radio-control:hover,
+    .replay-battlefield-zoom .replay-radio-control:focus-visible {
+      border-color: rgba(145, 210, 255, 0.38);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 -3px 6px rgba(0, 0, 0, 0.45),
+        0 0 12px rgba(0, 180, 255, 0.12),
+        0 3px 10px rgba(0, 0, 0, 0.25);
+    }
+
+    .replay-battlefield-zoom .replay-radio-control svg {
+      width: 12px;
+      height: 12px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2;
+    }
+
+    .replay-control-tooltip::before {
+      top: calc(100% + 4px);
+      bottom: auto;
+      border-top-color: transparent;
+      border-bottom-color: rgba(109, 232, 255, 0.7);
+    }
+
+    .replay-control-tooltip::after {
+      top: calc(100% + 14px);
+      bottom: auto;
+      max-width: none;
+      padding: 4px 9px;
+      border-radius: 999px;
+      font: 700 0.62rem/1 "Oxanium", sans-serif;
+      letter-spacing: 0.08em;
+      text-align: center;
+      text-transform: uppercase;
+      white-space: nowrap;
     }
 
     .replay-battlefield-zoom output {
@@ -601,6 +1047,10 @@
 
     .replay-battlefield-player[aria-pressed="false"] {
       opacity: 0.4;
+    }
+
+    .replay-battlefield-player[aria-pressed="mixed"] {
+      opacity: 0.7;
     }
 
     .replay-battlefield-player-marker {
@@ -684,15 +1134,14 @@
     }
 
     .replay-battlefield-status {
-      margin: 9px 0 0;
-      text-align: center;
+      display: none;
     }
 
     @media (min-width: 901px) {
       #replayBattlefieldPanel {
         display: grid;
         grid-template-columns: minmax(520px, 1fr) minmax(420px, 34vw);
-        grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+        grid-template-rows: auto auto minmax(0, 1fr) auto auto auto;
         gap: 0 16px;
         height: calc(100vh - 28px);
         min-height: 680px;
@@ -722,7 +1171,7 @@
         grid-column: 2;
         grid-row: 1 / 6;
         min-height: 0;
-        margin-bottom: -22px;
+        margin-bottom: 0;
         padding: 0;
         align-items: center;
         background: none;
@@ -740,6 +1189,11 @@
       #replayBattlefieldPanel > .replay-battlefield-footer {
         grid-column: 1;
         grid-row: 4;
+      }
+
+      #replayBattlefieldPanel > .replay-battlefield-map-controls {
+        grid-column: 2;
+        grid-row: 6;
       }
 
       #replayBattlefieldPanel > .replay-battlefield-status {
@@ -1063,6 +1517,10 @@
         width: 100%;
       }
 
+      .replay-battlefield-stat-groups {
+        display: none;
+      }
+
       .replay-battlefield-canvas {
         height: min(60vh, 560px);
       }
@@ -1156,8 +1614,15 @@
 
           <article class="data-card replay-results-section" id="replayBattlefieldPanel" hidden>
             <div class="replay-extended-heading replay-battlefield-heading">
-              <h3>2D battlefield</h3>
+              <h3>Battlefield</h3>
               <div class="replay-battlefield-controls">
+                <label class="replay-battlefield-option" for="replayBattlefieldViewMode">
+                  View
+                  <select id="replayBattlefieldViewMode">
+                    <option value="2d" selected>2D</option>
+                    <option value="3d">3D</option>
+                  </select>
+                </label>
                 <label class="replay-battlefield-option" for="replayBattlefieldSpeed">
                   Speed
                   <select id="replayBattlefieldSpeed">
@@ -1179,20 +1644,52 @@
                   <input id="replayBattlefieldBackground" type="checkbox" checked>
                   Map background
                 </label>
-                <span class="replay-battlefield-zoom" aria-label="Battlefield zoom controls">
-                  <button class="replay-action" id="replayBattlefieldZoomOut" type="button" aria-label="Zoom out">−</button>
-                  <output id="replayBattlefieldZoom">100%</output>
-                  <button class="replay-action" id="replayBattlefieldZoomIn" type="button" aria-label="Zoom in">+</button>
-                  <button class="replay-action" id="replayBattlefieldResetView" type="button">Reset view</button>
-                  <button class="replay-action" id="replayBattlefieldFullscreen" type="button">Full screen</button>
-                </span>
               </div>
               <p id="replayBattlefieldMeta"></p>
             </div>
             <div class="replay-battlefield-layout">
               <aside class="replay-battlefield-sidebar">
                 <h4>Players</h4>
+                <div class="replay-battlefield-stat-groups" aria-hidden="true">
+                  <span></span>
+                  <span class="replay-battlefield-stat-group-grid">
+                    <span class="replay-battlefield-stat-group score">Score</span>
+                    <span class="replay-battlefield-stat-group kd">K/D</span>
+                    <span class="replay-battlefield-stat-group units has-subgroups">
+                      <span class="replay-battlefield-stat-group-label">Units</span>
+                      <span class="replay-battlefield-stat-subgroups single">
+                        <span class="alive">Alive</span>
+                      </span>
+                    </span>
+                    <span class="replay-battlefield-stat-group buildings has-subgroups">
+                      <span class="replay-battlefield-stat-group-label">Buildings</span>
+                      <span class="replay-battlefield-stat-subgroups single">
+                        <span class="alive">Alive</span>
+                      </span>
+                    </span>
+                    <span class="replay-battlefield-stat-group research">Research</span>
+                    <span class="replay-battlefield-stat-group power">Power</span>
+                  </span>
+                </div>
                 <div class="replay-battlefield-legend" id="replayBattlefieldLegend"></div>
+                <section class="replay-battlefield-momentum" id="replayBattlefieldMomentum" hidden>
+                  <div class="replay-battlefield-momentum-heading">
+                    <h5>Team momentum</h5>
+                    <output id="replayBattlefieldMomentumValue">A 0% · B 0%</output>
+                  </div>
+                  <svg
+                    class="replay-battlefield-momentum-chart"
+                    id="replayBattlefieldMomentumChart"
+                    viewBox="0 0 600 220"
+                    preserveAspectRatio="none"
+                    role="img"
+                    aria-label="Team momentum throughout the replay"
+                  ></svg>
+                  <div class="replay-battlefield-momentum-legend" aria-hidden="true">
+                    <span style="--momentum-colour: #6de8ff;">Team A</span>
+                    <span style="--momentum-colour: #ffb84d;">Team B</span>
+                  </div>
+                </section>
               </aside>
               <div class="replay-battlefield-stage">
                 <canvas
@@ -1203,6 +1700,14 @@
                   aria-label="Animated top-down battlefield replay. Use the mouse wheel to zoom and drag to pan."
                 ></canvas>
                 <canvas
+                  class="replay-battlefield-canvas"
+                  id="replayBattlefield3dCanvas"
+                  width="900"
+                  height="600"
+                  aria-label="Animated three-dimensional tactical battlefield replay. Use the mouse wheel to zoom and drag to pan."
+                  hidden
+                ></canvas>
+                <canvas
                   class="replay-battlefield-minimap"
                   id="replayBattlefieldMinimap"
                   width="180"
@@ -1210,6 +1715,23 @@
                   aria-label="Battlefield minimap showing the visible area."
                 ></canvas>
               </div>
+            </div>
+            <div class="replay-battlefield-map-controls">
+              <span class="replay-battlefield-zoom" aria-label="Battlefield zoom controls">
+                <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldZoomOut" type="button" aria-label="Zoom out" data-tooltip="Zoom out">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg>
+                </button>
+                <output id="replayBattlefieldZoom">100%</output>
+                <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldZoomIn" type="button" aria-label="Zoom in" data-tooltip="Zoom in">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M8 3v10"/></svg>
+                </button>
+                <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldResetView" type="button" aria-label="Reset view" data-tooltip="Reset view">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 5V2m0 0h-3m3 0-2.2 2.2A5 5 0 1 0 13 9"/></svg>
+                </button>
+                <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldFullscreen" type="button" aria-label="Full screen" data-tooltip="Full screen">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v3m7-3h3v3M6 13H3v-3m7 3h3v-3"/></svg>
+                </button>
+              </span>
             </div>
             <div class="replay-battlefield-footer">
               <button
@@ -1326,7 +1848,7 @@
     </main>
   </div>
 
-  <script src="replay-analyzer.js?v=20260816-1"></script>
+  <script src="replay-analyzer.js?v=20260816-29"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

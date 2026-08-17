@@ -334,6 +334,19 @@
       display: none;
     }
 
+    #replayBattlefieldPanel {
+      background:
+        radial-gradient(circle at 15% 0, rgba(18, 145, 181, 0.1), transparent 30%),
+        linear-gradient(180deg, #06111d, #02080e);
+      border-color: rgba(67, 222, 255, 0.5);
+      border-radius: 2px;
+      clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
+      box-shadow:
+        inset 0 1px 0 rgba(184, 248, 255, 0.14),
+        inset 0 -2px 0 rgba(0, 119, 161, 0.24),
+        0 16px 42px rgba(0, 0, 0, 0.34);
+    }
+
     .replay-snapshot-control {
       display: grid;
       grid-template-columns: minmax(180px, 1fr) auto;
@@ -378,25 +391,78 @@
       display: inline-flex;
       gap: 7px;
       align-items: center;
-      min-height: 32px;
-      padding: 4px 7px;
-      color: var(--muted);
-      background: rgba(4, 12, 20, 0.58);
-      border: 1px solid rgba(109, 232, 255, 0.16);
-      border-radius: 9px;
+      min-height: 34px;
+      padding: 4px 9px;
+      color: #a9c4d4;
+      background:
+        linear-gradient(180deg, rgba(18, 47, 65, 0.88), rgba(3, 12, 21, 0.96) 58%),
+        #030b13;
+      border: 1px solid rgba(62, 220, 255, 0.44);
+      border-radius: 2px;
+      clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px);
+      box-shadow:
+        inset 0 1px 0 rgba(176, 246, 255, 0.2),
+        inset 0 -1px 0 rgba(0, 126, 169, 0.28);
       font-size: 0.7rem;
+      text-shadow: 0 0 8px rgba(75, 222, 255, 0.22);
+      transition: border-color 140ms ease, filter 140ms ease;
+    }
+
+    .replay-battlefield-option:hover {
+      border-color: rgba(94, 235, 255, 0.76);
+      filter: brightness(1.12);
     }
 
     .replay-battlefield-option select {
       color: var(--text);
-      background: #07131d;
-      border: 1px solid rgba(109, 232, 255, 0.22);
-      border-radius: 8px;
+      background: rgba(1, 9, 16, 0.9);
+      border: 1px solid rgba(86, 224, 255, 0.4);
+      border-radius: 2px;
       font: inherit;
     }
 
     .replay-battlefield-option input {
       accent-color: var(--cyan);
+    }
+
+    .replay-battlefield-speed-slider {
+      width: 72px;
+      height: 16px;
+      margin: 0;
+      appearance: none;
+      background:
+        radial-gradient(circle at 6px 50%, var(--cyan) 0 2px, transparent 2.5px),
+        radial-gradient(circle at calc(33.333% + 2px) 50%, var(--cyan) 0 2px, transparent 2.5px),
+        radial-gradient(circle at calc(66.667% - 2px) 50%, var(--cyan) 0 2px, transparent 2.5px),
+        radial-gradient(circle at calc(100% - 6px) 50%, var(--cyan) 0 2px, transparent 2.5px),
+        linear-gradient(transparent 7px, rgba(109, 232, 255, 0.34) 7px 9px, transparent 9px);
+      cursor: pointer;
+    }
+
+    .replay-battlefield-speed-slider::-webkit-slider-thumb {
+      width: 12px;
+      height: 12px;
+      appearance: none;
+      background: var(--cyan);
+      border: 2px solid #d7fbff;
+      border-radius: 50%;
+      box-shadow: 0 0 7px rgba(109, 232, 255, 0.7);
+    }
+
+    .replay-battlefield-speed-slider::-moz-range-thumb {
+      width: 9px;
+      height: 9px;
+      background: var(--cyan);
+      border: 2px solid #d7fbff;
+      border-radius: 50%;
+      box-shadow: 0 0 7px rgba(109, 232, 255, 0.7);
+    }
+
+    .replay-battlefield-speed-value {
+      min-width: 19px;
+      color: var(--text);
+      font-weight: 700;
+      text-align: right;
     }
 
     .replay-battlefield-stage {
@@ -407,10 +473,14 @@
       padding: 14px;
       overflow: hidden;
       background:
-        radial-gradient(circle at 50% 45%, rgba(31, 89, 100, 0.18), transparent 62%),
-        rgba(2, 8, 13, 0.84);
-      border: 1px solid rgba(109, 232, 255, 0.18);
-      border-radius: 16px;
+        radial-gradient(circle at 50% 42%, rgba(24, 150, 186, 0.14), transparent 62%),
+        linear-gradient(180deg, rgba(7, 27, 41, 0.98), rgba(1, 7, 13, 0.99));
+      border: 1px solid rgba(65, 222, 255, 0.52);
+      border-radius: 2px;
+      clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 13px, 100% calc(100% - 13px), calc(100% - 13px) 100%, 13px 100%, 0 calc(100% - 13px), 0 13px);
+      box-shadow:
+        inset 0 1px 0 rgba(178, 246, 255, 0.18),
+        inset 0 -2px 0 rgba(0, 122, 167, 0.25);
     }
 
     .replay-battlefield-minimap {
@@ -419,10 +489,13 @@
       bottom: 14px;
       width: min(170px, 30%);
       height: auto;
-      background: rgba(2, 8, 13, 0.92);
-      border: 1px solid rgba(109, 232, 255, 0.72);
-      border-radius: 8px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.42);
+      background: rgba(2, 8, 13, 0.96);
+      border: 1px solid rgba(91, 233, 255, 0.82);
+      border-radius: 2px;
+      clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px);
+      box-shadow:
+        0 6px 20px rgba(0, 0, 0, 0.42),
+        0 0 12px rgba(57, 217, 249, 0.18);
       pointer-events: none;
     }
 
@@ -574,12 +647,36 @@
       align-items: center;
       gap: 8px;
       min-width: 0;
+      padding: 6px 9px 7px;
+      background:
+        radial-gradient(circle at 15% 0, rgba(20, 177, 220, 0.13), transparent 34%),
+        linear-gradient(180deg, rgba(7, 25, 39, 0.96), rgba(1, 8, 15, 0.98));
+      border: 1px solid rgba(56, 218, 255, 0.5);
+      clip-path: polygon(11px 0, calc(100% - 11px) 0, 100% 11px, 100% calc(100% - 11px), calc(100% - 11px) 100%, 11px 100%, 0 calc(100% - 11px), 0 11px);
+      box-shadow:
+        inset 0 1px 0 rgba(166, 244, 255, 0.16),
+        inset 0 -2px 0 rgba(0, 130, 177, 0.2);
     }
 
     .replay-battlefield-heading h3 {
       flex: 0 0 auto;
       margin: 0;
       white-space: nowrap;
+    }
+
+    .replay-battlefield-logo-frame {
+      display: block;
+      width: 160px;
+      height: 35px;
+      overflow: hidden;
+    }
+
+    .replay-battlefield-logo {
+      display: block;
+      width: 160px;
+      max-width: none;
+      height: auto;
+      transform: translateY(-8px);
     }
 
     .replay-battlefield-layout {
@@ -592,10 +689,16 @@
     .replay-battlefield-sidebar {
       display: flex;
       flex-direction: column;
-      padding: 8px;
-      background: rgba(2, 8, 13, 0.84);
-      border: 1px solid rgba(109, 232, 255, 0.18);
-      border-radius: 16px;
+      padding: 9px;
+      background:
+        radial-gradient(circle at 20% 0, rgba(19, 150, 185, 0.1), transparent 32%),
+        linear-gradient(180deg, rgba(5, 21, 33, 0.98), rgba(1, 7, 13, 0.99));
+      border: 1px solid rgba(62, 220, 255, 0.48);
+      border-radius: 2px;
+      clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px), calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px);
+      box-shadow:
+        inset 0 1px 0 rgba(184, 248, 255, 0.15),
+        inset 0 -2px 0 rgba(0, 120, 163, 0.22);
     }
 
     .replay-battlefield-sidebar h4 {
@@ -617,9 +720,11 @@
       height: min(68vh, 720px);
       max-height: 720px;
       background: #071016;
-      border: 1px solid rgba(109, 232, 255, 0.32);
-      border-radius: 8px;
-      box-shadow: 0 0 24px rgba(35, 194, 219, 0.08);
+      border: 1px solid rgba(109, 232, 255, 0.5);
+      border-radius: 2px;
+      box-shadow:
+        0 0 24px rgba(35, 194, 219, 0.11),
+        inset 0 0 18px rgba(2, 8, 13, 0.35);
       cursor: grab;
       touch-action: none;
       user-select: none;
@@ -647,10 +752,14 @@
       padding: 12px;
       flex-direction: column;
       background:
-        linear-gradient(180deg, rgba(13, 31, 43, 0.56), rgba(2, 8, 13, 0.32)),
-        rgba(2, 8, 13, 0.48);
-      border: 1px solid rgba(109, 232, 255, 0.16);
-      border-radius: 12px;
+        linear-gradient(180deg, rgba(12, 42, 57, 0.76), rgba(2, 9, 15, 0.82)),
+        rgba(2, 8, 13, 0.72);
+      border: 1px solid rgba(68, 221, 255, 0.42);
+      border-radius: 2px;
+      clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 9px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0 calc(100% - 9px), 0 9px);
+      box-shadow:
+        inset 0 1px 0 rgba(184, 248, 255, 0.14),
+        inset 0 -2px 0 rgba(0, 117, 158, 0.2);
     }
 
     .replay-battlefield-momentum[hidden] {
@@ -727,7 +836,7 @@
       display: grid;
       grid-template-columns: minmax(120px, 0.42fr) minmax(64px, 0.13fr) minmax(0, 2fr);
       gap: 5px 8px;
-      padding: 0 6px;
+      padding: 7px 6px 3px;
     }
 
     .replay-battlefield-stat-groups > .replay-battlefield-stat-group {
@@ -743,22 +852,44 @@
 
     .replay-battlefield-stat-group {
       display: flex;
+      position: relative;
       align-items: center;
       justify-content: center;
-      padding: 2px 6px;
-      color: #6de8ff;
-      background: rgba(13, 31, 43, 0.72);
-      border: 1px solid rgba(109, 232, 255, 0.2);
-      border-radius: 5px;
+      min-height: 38px;
+      padding: 3px 6px;
+      overflow: hidden;
+      color: #9cefff;
+      background:
+        linear-gradient(180deg, rgba(17, 53, 70, 0.88), rgba(3, 14, 23, 0.96) 62%),
+        #030b13;
+      border: 1px solid rgba(66, 221, 255, 0.5);
+      border-radius: 2px;
+      clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+      box-shadow:
+        inset 0 1px 0 rgba(188, 248, 255, 0.2),
+        inset 0 -2px 0 rgba(0, 118, 165, 0.3);
       font: 700 0.58rem "Oxanium", sans-serif;
       letter-spacing: 0.08em;
       text-align: center;
+      text-shadow: 0 0 8px rgba(75, 222, 255, 0.55);
       text-transform: uppercase;
+    }
+
+    .replay-battlefield-stat-group::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 15%;
+      left: 15%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #5be9ff, transparent);
+      box-shadow: 0 0 7px rgba(91, 233, 255, 0.75);
     }
 
     .replay-battlefield-stat-group.has-subgroups {
       display: grid;
       grid-template-rows: auto auto;
+      min-height: 38px;
       padding: 0;
       overflow: hidden;
     }
@@ -829,15 +960,20 @@
 
     .replay-battlefield-player {
       display: grid;
+      position: relative;
       grid-template-columns: minmax(120px, 0.42fr) minmax(64px, 0.13fr) minmax(0, 2fr);
       gap: 5px 8px;
       align-items: center;
       min-height: 0;
       padding: 4px 6px;
       color: var(--text);
-      background: rgba(4, 12, 20, 0.58);
-      border: 1px solid rgba(109, 232, 255, 0.16);
-      border-radius: 8px;
+      background: linear-gradient(90deg, rgba(8, 27, 39, 0.88), rgba(2, 10, 17, 0.94));
+      border: 1px solid rgba(88, 225, 255, 0.3);
+      border-radius: 2px;
+      clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+      box-shadow:
+        inset 0 1px 0 rgba(171, 244, 255, 0.08),
+        inset 0 -1px 0 rgba(0, 114, 155, 0.15);
       cursor: pointer;
       font: 600 0.76rem "Space Grotesk", sans-serif;
       text-align: left;
@@ -847,8 +983,13 @@
       margin-top: 0;
       min-height: 46px;
       padding: 8px;
-      background: linear-gradient(90deg, rgba(9, 29, 39, 0.94), rgba(5, 18, 27, 0.9));
-      border-color: rgba(109, 232, 255, 0.3);
+      background:
+        linear-gradient(90deg, rgba(16, 63, 79, 0.86), rgba(3, 16, 25, 0.96) 48%),
+        #030c14;
+      border-color: rgba(87, 231, 255, 0.58);
+      box-shadow:
+        inset 0 1px 0 rgba(184, 248, 255, 0.16),
+        inset 0 -2px 0 rgba(0, 137, 181, 0.24);
     }
 
     .replay-battlefield-player + .replay-battlefield-player.is-team {
@@ -870,7 +1011,7 @@
     }
 
     .replay-battlefield-player.is-status-active {
-      background: linear-gradient(90deg, rgba(46, 160, 67, 0.22), rgba(4, 12, 20, 0.58) 30%);
+      background: linear-gradient(90deg, rgba(46, 160, 67, 0.2), rgba(3, 14, 22, 0.94) 28%);
       border-color: rgba(126, 231, 135, 0.42);
     }
 
@@ -880,7 +1021,7 @@
     }
 
     .replay-battlefield-player.is-status-inactive {
-      background: linear-gradient(90deg, rgba(218, 54, 51, 0.22), rgba(4, 12, 20, 0.58) 30%);
+      background: linear-gradient(90deg, rgba(218, 54, 51, 0.2), rgba(3, 14, 22, 0.94) 28%);
       border-color: rgba(255, 107, 107, 0.44);
     }
 
@@ -1280,11 +1421,22 @@
         grid-row: 1 / 6;
         min-height: 0;
         margin-bottom: 0;
-        padding: 0;
+        padding: 9px;
         align-items: center;
-        background: none;
+        background:
+          radial-gradient(circle at 50% 42%, rgba(24, 150, 186, 0.14), transparent 62%),
+          linear-gradient(180deg, rgba(7, 27, 41, 0.98), rgba(1, 7, 13, 0.99));
+        border: 1px solid rgba(65, 222, 255, 0.52);
+        border-radius: 2px;
+      }
+
+      #replayBattlefieldPanel .replay-battlefield-stage:fullscreen {
+        padding: 0;
+        background: #071016;
         border: 0;
         border-radius: 0;
+        clip-path: none;
+        box-shadow: none;
       }
 
       #replayBattlefieldPanel .replay-battlefield-canvas {
@@ -1735,7 +1887,11 @@
 
           <article class="data-card replay-results-section" id="replayBattlefieldPanel" hidden>
             <div class="replay-extended-heading replay-battlefield-heading">
-              <h3>Battlefield</h3>
+              <h3 aria-label="Battlefield">
+                <span class="replay-battlefield-logo-frame">
+                  <img class="replay-battlefield-logo" src="assets/battlefield-logo-v3.png" alt="Battlefield">
+                </span>
+              </h3>
               <div class="replay-battlefield-controls">
                 <label class="replay-battlefield-option" for="replayBattlefieldViewMode">
                   View
@@ -1746,12 +1902,17 @@
                 </label>
                 <label class="replay-battlefield-option" for="replayBattlefieldSpeed">
                   Speed
-                  <select id="replayBattlefieldSpeed">
-                    <option value="1">1×</option>
-                    <option value="2">2×</option>
-                    <option value="4" selected>4×</option>
-                    <option value="8">8×</option>
-                  </select>
+                  <input
+                    class="replay-battlefield-speed-slider"
+                    id="replayBattlefieldSpeed"
+                    type="range"
+                    min="0"
+                    max="3"
+                    step="1"
+                    value="2"
+                    aria-label="Playback speed"
+                  >
+                  <output class="replay-battlefield-speed-value" id="replayBattlefieldSpeedValue" for="replayBattlefieldSpeed">4×</output>
                 </label>
                 <label class="replay-battlefield-option" for="replayBattlefieldDroids">
                   <input id="replayBattlefieldDroids" type="checkbox" checked>
@@ -1764,6 +1925,19 @@
                 <label class="replay-battlefield-option" for="replayBattlefieldBackground">
                   <input id="replayBattlefieldBackground" type="checkbox" checked>
                   Map background
+                </label>
+                <label class="replay-battlefield-option" for="replayBattlefieldTiles">
+                  <input id="replayBattlefieldTiles" type="checkbox" checked disabled>
+                  Tiles
+                </label>
+                <label class="replay-battlefield-option" for="replayBattlefieldTileQuality">
+                  Quality
+                  <select id="replayBattlefieldTileQuality" disabled>
+                    <option value="low" selected>Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="ultra">Ultra</option>
+                  </select>
                 </label>
               </div>
               <p id="replayBattlefieldMeta"></p>

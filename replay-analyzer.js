@@ -31,9 +31,12 @@
   const battlefieldMeta = document.getElementById("replayBattlefieldMeta");
   const battlefieldPlay = document.getElementById("replayBattlefieldPlay");
   const battlefieldSpeed = document.getElementById("replayBattlefieldSpeed");
+  const battlefieldSpeedValue = document.getElementById("replayBattlefieldSpeedValue");
   const battlefieldDroids = document.getElementById("replayBattlefieldDroids");
   const battlefieldStructures = document.getElementById("replayBattlefieldStructures");
   const battlefieldBackground = document.getElementById("replayBattlefieldBackground");
+  const battlefieldTiles = document.getElementById("replayBattlefieldTiles");
+  const battlefieldTileQuality = document.getElementById("replayBattlefieldTileQuality");
   const battlefieldViewMode = document.getElementById("replayBattlefieldViewMode");
   const battlefieldRotateLeft = document.getElementById("replayBattlefieldRotateLeft");
   const battlefieldRotateRight = document.getElementById("replayBattlefieldRotateRight");
@@ -179,6 +182,7 @@
   let battlefieldLastTick = 0;
   let battlefieldLastDraw = 0;
   let battlefieldTerrain = null;
+  const battlefieldTileImageCache = new Map();
   let battlefieldDroidDefinitions = new Map();
   let battlefieldStructureDefinitions = new Map();
   let battlefieldDestroyedAt = new Map();
@@ -1050,7 +1054,7 @@
     const version = mapView.getUint32(4, true);
     const width = mapView.getUint32(8, true);
     const height = mapView.getUint32(12, true);
-    const tileBytes = version >= 40 ? 4 : 3;
+    const tileBytes = version >= 39 ? 4 : 3;
     const tileCount = width * height;
     if (version <= 9 || version > 40 || width <= 1 || height <= 1
         || width > 256 || height > 256 || 16 + tileCount * tileBytes > mapBytes.length) {
@@ -1068,22 +1072,36 @@
 
     const heights = new Uint16Array(tileCount);
     const terrainTypes = new Uint8Array(tileCount);
+    const tileIds = new Uint16Array(tileCount);
+    const tileRotations = new Uint8Array(tileCount);
+    const tileXFlips = new Uint8Array(tileCount);
+    const tileYFlips = new Uint8Array(tileCount);
     let minimumHeight = Number.MAX_SAFE_INTEGER;
     let maximumHeight = 0;
     let offset = 16;
     for (let index = 0; index < tileCount; index += 1) {
-      const texture = mapView.getUint16(offset, true) & 0x01ff;
-      const tileHeight = version >= 40
+      const tile = mapView.getUint16(offset, true);
+      const texture = tile & 0x01ff;
+      const tileHeight = version >= 39
         ? mapView.getUint16(offset + 2, true)
         : mapView.getUint8(offset + 2) * 2;
       heights[index] = tileHeight;
       terrainTypes[index] = textureTerrain[texture] || 0;
+      tileIds[index] = texture;
+      tileRotations[index] = (tile & 0x3000) >> 12;
+      tileXFlips[index] = (tile & 0x8000) ? 1 : 0;
+      tileYFlips[index] = (tile & 0x4000) ? 1 : 0;
       minimumHeight = Math.min(minimumHeight, tileHeight);
       maximumHeight = Math.max(maximumHeight, tileHeight);
       offset += tileBytes;
     }
 
-    let tileset = "arizona";
+    const tilesetCode = terrainBytes.length >= 14
+      ? (terrainBytes[12] << 8) | terrainBytes[13]
+      : 0x0100;
+    let tileset = tilesetCode === 0x0200
+      ? "urban"
+      : tilesetCode === 0x0000 ? "rockies" : "arizona";
     const levelBytes = entries.get("level.json");
     if (levelBytes) {
       try {
@@ -1092,7 +1110,22 @@
         tileset = "arizona";
       }
     }
-    return { width, height, heights, terrainTypes, minimumHeight, maximumHeight, tileset };
+    if (tileset.includes("urban")) tileset = "urban";
+    else if (tileset.includes("rock")) tileset = "rockies";
+    else tileset = "arizona";
+    return {
+      width,
+      height,
+      heights,
+      terrainTypes,
+      tileIds,
+      tileRotations,
+      tileXFlips,
+      tileYFlips,
+      minimumHeight,
+      maximumHeight,
+      tileset
+    };
   }
 
   async function loadEmbeddedMapTerrain(extraction) {
@@ -2820,6 +2853,10 @@
     return team;
   }
 
+  function battlefieldPlaybackSpeed() {
+    return [1, 2, 4, 8][Number(battlefieldSpeed.value)] || 1;
+  }
+
   function updateBattlefieldPlayerStats(force = false) {
     if (!battlefieldExtraction) {
       return;
@@ -2827,7 +2864,7 @@
     battlefieldPanel.style.setProperty(
       "--battlefield-stat-transition-duration",
       battlefieldPlaying
-        ? `${4000 / Math.max(1, Number(battlefieldSpeed.value) || 1)}ms`
+        ? `${4000 / battlefieldPlaybackSpeed()}ms`
         : "180ms"
     );
     const displaySnapshot = battlefieldDisplaySnapshotAtTime(
@@ -3634,7 +3671,201 @@
       }
     }
     context.putImageData(image, 0, 0);
-    return { ...terrain, canvas };
+    return { ...terrain, canvas, tileCanvas: null, combinedCanvas: null };
+  }
+
+  function battlefieldTerrainCanvas() {
+    if (!battlefieldTerrain) return null;
+    const showBackground = Boolean(battlefieldBackground.checked);
+    const showTiles = Boolean(battlefieldTiles?.checked && battlefieldTerrain.tileCanvas);
+    if (showBackground && showTiles) return battlefieldTerrain.combinedCanvas;
+    if (showTiles) return battlefieldTerrain.tileCanvas;
+    return showBackground ? battlefieldTerrain.canvas : null;
+  }
+
+  function battlefieldTileConfig(tileset) {
+    if (tileset === "urban") {
+      return { folder: "tertilesc2hw-128", count: 81 };
+    }
+    if (tileset === "rockies") {
+      return { folder: "tertilesc3hw-128", count: 80 };
+    }
+    return { folder: "tertilesc1hw-128", count: 78 };
+  }
+
+  function loadBattlefieldTileImage(tileset, tileId) {
+    const config = battlefieldTileConfig(tileset);
+    if (tileId < 0 || tileId >= config.count) return Promise.resolve(null);
+    const key = `${tileset}:${tileId}`;
+    if (battlefieldTileImageCache.has(key)) {
+      return battlefieldTileImageCache.get(key);
+    }
+    const promise = new Promise((resolve) => {
+      const image = new Image();
+      image.decoding = "async";
+      image.onload = () => resolve(image);
+      image.onerror = () => resolve(null);
+      const name = String(tileId).padStart(2, "0");
+      image.src = new URL(
+        `mapmaker/classic/texpages/${config.folder}/tile-${name}.png`,
+        document.baseURI
+      ).href;
+    });
+    battlefieldTileImageCache.set(key, promise);
+    return promise;
+  }
+
+  function drawBattlefieldTileImage(context, image, x, y, size, rotation, xFlip, yFlip) {
+    const corners = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const swap = (a, b) => {
+      const value = corners[a];
+      corners[a] = corners[b];
+      corners[b] = value;
+    };
+    if (xFlip) {
+      swap(0, 1);
+      swap(2, 3);
+    }
+    if (yFlip) {
+      swap(0, 3);
+      swap(1, 2);
+    }
+    if ((rotation & 3) === 1) {
+      const value = corners[0];
+      corners[0] = corners[3];
+      corners[3] = corners[2];
+      corners[2] = corners[1];
+      corners[1] = value;
+    } else if ((rotation & 3) === 2) {
+      swap(0, 2);
+      swap(3, 1);
+    } else if ((rotation & 3) === 3) {
+      const value = corners[0];
+      corners[0] = corners[1];
+      corners[1] = corners[2];
+      corners[2] = corners[3];
+      corners[3] = value;
+    }
+    const destinations = [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
+    const sourceToDestination = new Map();
+    corners.forEach((source, index) => {
+      sourceToDestination.set(`${source[0]},${source[1]}`, destinations[index]);
+    });
+    const origin = sourceToDestination.get("0,0");
+    const right = sourceToDestination.get("1,0");
+    const down = sourceToDestination.get("0,1");
+    context.save();
+    context.setTransform(
+      (right[0] - origin[0]) / size,
+      (right[1] - origin[1]) / size,
+      (down[0] - origin[0]) / size,
+      (down[1] - origin[1]) / size,
+      origin[0],
+      origin[1]
+    );
+    context.drawImage(image, 0, 0, size, size);
+    context.restore();
+  }
+
+  async function loadBattlefieldTerrainTiles(terrain) {
+    if (!terrain?.tileIds?.length) return null;
+    const tileIds = [...new Set(terrain.tileIds)];
+    const images = new Map(await Promise.all(tileIds.map(async (tileId) => [
+      tileId,
+      await loadBattlefieldTileImage(terrain.tileset, tileId)
+    ])));
+    if (![...images.values()].some(Boolean)) return null;
+
+    const quality = battlefieldTileQuality?.value || "low";
+    const qualitySettings = {
+      low: { maximumTileSize: 16, maximumTextureSize: 2048 },
+      medium: { maximumTileSize: 32, maximumTextureSize: 4096 },
+      high: { maximumTileSize: 64, maximumTextureSize: 8192 },
+      ultra: { maximumTileSize: 128, maximumTextureSize: 16384 }
+    };
+    const { maximumTileSize, maximumTextureSize } = qualitySettings[quality] || qualitySettings.low;
+    const tileSize = Math.max(
+      4,
+      Math.min(maximumTileSize, Math.floor(maximumTextureSize / Math.max(terrain.width, terrain.height)))
+    );
+    const tileCanvas = document.createElement("canvas");
+    tileCanvas.width = terrain.width * tileSize;
+    tileCanvas.height = terrain.height * tileSize;
+    const tileContext = tileCanvas.getContext("2d");
+    const combinedCanvas = document.createElement("canvas");
+    combinedCanvas.width = tileCanvas.width;
+    combinedCanvas.height = tileCanvas.height;
+    const combinedContext = combinedCanvas.getContext("2d");
+    if (!tileContext || !combinedContext) return null;
+    tileContext.imageSmoothingEnabled = true;
+    tileContext.imageSmoothingQuality = "high";
+    tileContext.fillStyle = "#18242b";
+    tileContext.fillRect(0, 0, tileCanvas.width, tileCanvas.height);
+    combinedContext.imageSmoothingEnabled = true;
+    combinedContext.imageSmoothingQuality = "high";
+    combinedContext.drawImage(terrain.canvas, 0, 0, combinedCanvas.width, combinedCanvas.height);
+    for (let row = 0; row < terrain.height; row += 1) {
+      for (let column = 0; column < terrain.width; column += 1) {
+        const index = row * terrain.width + column;
+        const image = images.get(terrain.tileIds[index]);
+        if (!image) continue;
+        drawBattlefieldTileImage(
+          tileContext,
+          image,
+          column * tileSize,
+          row * tileSize,
+          tileSize,
+          terrain.tileRotations[index],
+          terrain.tileXFlips[index],
+          terrain.tileYFlips[index]
+        );
+        drawBattlefieldTileImage(
+          combinedContext,
+          image,
+          column * tileSize,
+          row * tileSize,
+          tileSize,
+          terrain.tileRotations[index],
+          terrain.tileXFlips[index],
+          terrain.tileYFlips[index]
+        );
+      }
+    }
+    return { tileCanvas, combinedCanvas };
+  }
+
+  function refreshBattlefieldTerrain() {
+    if (battlefield3d) battlefield3d.terrainSource = null;
+    requestAnimationFrame(drawBattlefield);
+  }
+
+  function prepareBattlefieldTerrainTiles(terrain, preserveSelection = false) {
+    if (!battlefieldTiles || !terrain?.tileIds?.length) return;
+    const tilesWereChecked = battlefieldTiles.checked;
+    if (!preserveSelection) battlefieldTiles.checked = true;
+    battlefieldTiles.disabled = true;
+    if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
+    battlefieldTiles.title = "Loading map tiles";
+    loadBattlefieldTerrainTiles(terrain)
+      .then((canvases) => {
+        if (battlefieldTerrain !== terrain) return;
+        terrain.tileCanvas = canvases?.tileCanvas || null;
+        terrain.combinedCanvas = canvases?.combinedCanvas || null;
+        battlefieldTiles.disabled = !terrain.tileCanvas;
+        battlefieldTiles.checked = Boolean(terrain.tileCanvas && (!preserveSelection || tilesWereChecked));
+        if (battlefieldTileQuality) battlefieldTileQuality.disabled = !terrain.tileCanvas;
+        battlefieldTiles.title = terrain.tileCanvas
+          ? `Use ${terrain.tileset} map tiles`
+          : "Map tiles are unavailable";
+        refreshBattlefieldTerrain();
+      })
+      .catch(() => {
+        if (battlefieldTerrain !== terrain) return;
+        battlefieldTiles.checked = false;
+        battlefieldTiles.disabled = true;
+        if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
+        battlefieldTiles.title = "Map tiles are unavailable";
+      });
   }
 
   function battlefield3dIsActive() {
@@ -3935,7 +4166,7 @@
     const material = state.terrainMesh?.material;
     if (!material) return;
     const texture = material.userData?.battlefieldTexture || null;
-    const showTexture = Boolean(battlefieldBackground.checked && texture);
+    const showTexture = Boolean(texture);
     material.map = showTexture ? texture : null;
     material.color.setHex(showTexture ? 0xffffff : 0x18242b);
     material.needsUpdate = true;
@@ -4002,11 +4233,14 @@
       geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
-      const texture = new THREE.CanvasTexture(battlefieldTerrain.canvas);
-      texture.magFilter = THREE.LinearFilter;
-      texture.minFilter = THREE.LinearMipMapLinearFilter;
-      if ("colorSpace" in texture && THREE.SRGBColorSpace) {
-        texture.colorSpace = THREE.SRGBColorSpace;
+      const terrainCanvas = battlefieldTerrainCanvas();
+      const texture = terrainCanvas ? new THREE.CanvasTexture(terrainCanvas) : null;
+      if (texture) {
+        texture.magFilter = THREE.LinearFilter;
+        texture.minFilter = THREE.LinearMipMapLinearFilter;
+        if ("colorSpace" in texture && THREE.SRGBColorSpace) {
+          texture.colorSpace = THREE.SRGBColorSpace;
+        }
       }
       const material = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
       material.userData.battlefieldTexture = texture;
@@ -4021,6 +4255,7 @@
     grid.position.set(width / 2, 0.045, height / 2);
     grid.material.transparent = true;
     grid.material.opacity = battlefieldTerrain ? 0.16 : 0.3;
+    grid.visible = !battlefieldBackground.checked && !battlefieldTiles.checked;
     state.terrainRoot.add(grid);
   }
 
@@ -4295,28 +4530,29 @@
     context.translate(-fieldCenterX, -fieldCenterY);
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = "high";
-    if (battlefieldBackground.checked && battlefieldTerrain) {
+    const terrainCanvas = battlefieldTerrainCanvas();
+    if (terrainCanvas) {
       context.globalAlpha = 0.9;
-      context.drawImage(battlefieldTerrain.canvas, margin, margin, fieldWidth, fieldHeight);
+      context.drawImage(terrainCanvas, margin, margin, fieldWidth, fieldHeight);
       context.globalAlpha = 1;
       context.fillStyle = "rgba(2, 8, 13, 0.12)";
       context.fillRect(margin, margin, fieldWidth, fieldHeight);
     }
-    context.strokeStyle = battlefieldBackground.checked && battlefieldTerrain
-      ? "rgba(109, 232, 255, 0.17)"
-      : "rgba(109, 232, 255, 0.11)";
-    context.lineWidth = 1;
-    for (let index = 0; index <= 10; index += 1) {
-      const x = margin + fieldWidth * index / 10;
-      const y = margin + fieldHeight * index / 10;
-      context.beginPath();
-      context.moveTo(x, margin);
-      context.lineTo(x, margin + fieldHeight);
-      context.stroke();
-      context.beginPath();
-      context.moveTo(margin, y);
-      context.lineTo(margin + fieldWidth, y);
-      context.stroke();
+    if (!battlefieldBackground.checked && !battlefieldTiles.checked) {
+      context.strokeStyle = "rgba(109, 232, 255, 0.11)";
+      context.lineWidth = 1;
+      for (let index = 0; index <= 10; index += 1) {
+        const x = margin + fieldWidth * index / 10;
+        const y = margin + fieldHeight * index / 10;
+        context.beginPath();
+        context.moveTo(x, margin);
+        context.lineTo(x, margin + fieldHeight);
+        context.stroke();
+        context.beginPath();
+        context.moveTo(margin, y);
+        context.lineTo(margin + fieldWidth, y);
+        context.stroke();
+      }
     }
     context.strokeStyle = "rgba(109, 232, 255, 0.38)";
     context.strokeRect(margin, margin, fieldWidth, fieldHeight);
@@ -4423,9 +4659,10 @@
     context.clearRect(0, 0, width, height);
     context.fillStyle = "#071016";
     context.fillRect(0, 0, width, height);
-    if (battlefieldBackground.checked && battlefieldTerrain) {
+    const terrainCanvas = battlefieldTerrainCanvas();
+    if (terrainCanvas) {
       context.globalAlpha = 0.78;
-      context.drawImage(battlefieldTerrain.canvas, margin, margin, mapWidth, mapHeight);
+      context.drawImage(terrainCanvas, margin, margin, mapWidth, mapHeight);
       context.globalAlpha = 1;
     }
     const projectX = (x) => margin + Math.max(0, Math.min(map.width, Number(x))) / map.width * mapWidth;
@@ -4532,7 +4769,7 @@
     battlefieldLastTick = timestamp;
     battlefieldCurrentTime = Math.min(
       Number(battlefieldRange.max),
-      battlefieldCurrentTime + elapsed * Number(battlefieldSpeed.value || 1)
+      battlefieldCurrentTime + elapsed * battlefieldPlaybackSpeed()
     );
     if (timestamp - battlefieldLastDraw >= 30 || battlefieldCurrentTime >= Number(battlefieldRange.max)) {
       battlefieldLastDraw = timestamp;
@@ -4771,6 +5008,13 @@
     battlefieldStructures.checked = true;
     battlefieldBackground.checked = Boolean(battlefieldTerrain);
     battlefieldBackground.disabled = !battlefieldTerrain;
+    battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length);
+    battlefieldTiles.disabled = true;
+    if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
+    battlefieldTiles.title = battlefieldTerrain
+      ? "Loading map tiles"
+      : "Map tiles are unavailable";
+    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain);
     populateBattlefieldLegend(extraction);
     renderBattlefieldMomentum(extraction);
     requestAnimationFrame(drawBattlefield);
@@ -5160,7 +5404,14 @@
 
   battlefieldDroids.addEventListener("change", drawBattlefield);
   battlefieldStructures.addEventListener("change", drawBattlefield);
-  battlefieldBackground.addEventListener("change", drawBattlefield);
+  battlefieldSpeed.addEventListener("input", () => {
+    battlefieldSpeedValue.value = `${battlefieldPlaybackSpeed()}×`;
+  });
+  battlefieldBackground.addEventListener("change", refreshBattlefieldTerrain);
+  battlefieldTiles.addEventListener("change", refreshBattlefieldTerrain);
+  battlefieldTileQuality?.addEventListener("change", () => {
+    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
+  });
   battlefieldZoomOut.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale / 1.25));
   battlefieldZoomIn.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale * 1.25));
   battlefieldRotateLeft?.addEventListener("click", () => rotateBattlefield(-1));

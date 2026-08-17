@@ -483,6 +483,66 @@
       width: min(210px, 28%);
     }
 
+    .replay-battlefield-stage:fullscreen::after {
+      content: "";
+      position: absolute;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 5;
+      height: 64px;
+      pointer-events: none;
+      background: linear-gradient(180deg, transparent, rgba(4, 10, 15, 0.94));
+    }
+
+    .replay-battlefield-stage:fullscreen .replay-battlefield-footer {
+      position: absolute;
+      right: 330px;
+      bottom: 10px;
+      left: 16px;
+      z-index: 6;
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      gap: 8px;
+      margin: 0;
+    }
+
+    .replay-battlefield-stage:fullscreen .replay-battlefield-play-toggle {
+      width: 40px;
+      height: 40px;
+      min-height: 40px;
+      border-radius: 10px;
+    }
+
+    .replay-battlefield-stage:fullscreen .replay-battlefield-map-controls {
+      position: absolute;
+      right: 16px;
+      bottom: 10px;
+      left: auto;
+      z-index: 6;
+      display: flex;
+      width: max-content;
+      justify-content: flex-end;
+      margin: 0;
+    }
+
+    @media (max-width: 800px) {
+      .replay-battlefield-stage:fullscreen::after {
+        height: 104px;
+      }
+
+      .replay-battlefield-stage:fullscreen .replay-battlefield-footer {
+        right: 10px;
+        bottom: 56px;
+        left: 10px;
+      }
+
+      .replay-battlefield-stage:fullscreen .replay-battlefield-map-controls {
+        right: 10px;
+        bottom: 8px;
+      }
+    }
+
     .replay-battlefield-heading {
       flex-wrap: nowrap;
       justify-content: flex-start;
@@ -638,32 +698,15 @@
       vector-effect: non-scaling-stroke;
     }
 
-    .replay-battlefield-momentum-legend {
-      display: flex;
-      gap: 14px;
-      justify-content: center;
-      margin-top: 5px;
-      color: var(--muted);
-      font: 700 0.62rem "Oxanium", sans-serif;
-      text-transform: uppercase;
-    }
-
-    .replay-battlefield-momentum-legend span::before {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      margin-right: 5px;
-      content: "";
-      background: var(--momentum-colour);
-      border-radius: 50%;
-      box-shadow: 0 0 8px var(--momentum-colour);
-    }
-
     .replay-battlefield-stat-groups {
       display: grid;
-      grid-template-columns: minmax(120px, 0.55fr) minmax(0, 2fr);
-      gap: 8px;
+      grid-template-columns: minmax(120px, 0.42fr) minmax(64px, 0.13fr) minmax(0, 2fr);
+      gap: 5px 8px;
       padding: 0 6px;
+    }
+
+    .replay-battlefield-stat-groups > .replay-battlefield-stat-group {
+      min-width: 0;
     }
 
     .replay-battlefield-stat-group-grid {
@@ -757,7 +800,7 @@
 
     .replay-battlefield-player {
       display: grid;
-      grid-template-columns: minmax(120px, 0.55fr) minmax(0, 2fr);
+      grid-template-columns: minmax(120px, 0.42fr) minmax(64px, 0.13fr) minmax(0, 2fr);
       gap: 5px 8px;
       align-items: center;
       min-height: 0;
@@ -857,9 +900,9 @@
     }
 
     .replay-battlefield-player-state {
-      margin-left: auto;
       color: var(--muted);
       font: 600 0.58rem "Oxanium", sans-serif;
+      text-align: center;
       text-transform: uppercase;
     }
 
@@ -1225,7 +1268,16 @@
 
       #replayBattlefieldPanel > .replay-battlefield-footer {
         grid-column: 1;
-        grid-row: 4;
+        grid-row: 6;
+        grid-template-columns: 32px minmax(0, 1fr);
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      #replayBattlefieldPanel .replay-battlefield-play-toggle {
+        width: 32px;
+        height: 30px;
+        border-radius: 9px;
       }
 
       #replayBattlefieldPanel > .replay-battlefield-map-controls {
@@ -1550,8 +1602,12 @@
       }
 
       .replay-battlefield-player {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(120px, 1fr) auto;
         width: 100%;
+      }
+
+      .replay-battlefield-player-stats {
+        grid-column: 1 / -1;
       }
 
       .replay-battlefield-stat-groups {
@@ -1686,9 +1742,9 @@
             </div>
             <div class="replay-battlefield-layout">
               <aside class="replay-battlefield-sidebar">
-                <h4>Players</h4>
                 <div class="replay-battlefield-stat-groups" aria-hidden="true">
-                  <span></span>
+                  <span class="replay-battlefield-stat-group">Players</span>
+                  <span class="replay-battlefield-stat-group">Status</span>
                   <span class="replay-battlefield-stat-group-grid">
                     <span class="replay-battlefield-stat-group score">Score</span>
                     <span class="replay-battlefield-stat-group kd">K/D</span>
@@ -1722,10 +1778,6 @@
                     role="img"
                     aria-label="Team momentum throughout the replay"
                   ></svg>
-                  <div class="replay-battlefield-momentum-legend" aria-hidden="true">
-                    <span style="--momentum-colour: #6de8ff;">Team A</span>
-                    <span style="--momentum-colour: #ffb84d;">Team B</span>
-                  </div>
                 </section>
               </aside>
               <div class="replay-battlefield-stage">
@@ -1765,6 +1817,12 @@
             </div>
             <div class="replay-battlefield-map-controls">
               <span class="replay-battlefield-zoom" aria-label="Battlefield zoom controls">
+                <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldRotateLeft" type="button" aria-label="Rotate map left" data-tooltip="Rotate map left">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3 3 6l3 3M3 6h5a5 5 0 1 1-4.4 7.4"/></svg>
+                </button>
+                <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldRotateRight" type="button" aria-label="Rotate map right" data-tooltip="Rotate map right">
+                  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m10 3 3 3-3 3m3-3H8a5 5 0 1 0-4.4 7.4"/></svg>
+                </button>
                 <button class="replay-action replay-radio-control replay-tooltip replay-control-tooltip" id="replayBattlefieldZoomOut" type="button" aria-label="Zoom out" data-tooltip="Zoom out">
                   <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg>
                 </button>

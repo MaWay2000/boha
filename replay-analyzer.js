@@ -35,6 +35,8 @@
   const battlefieldStructures = document.getElementById("replayBattlefieldStructures");
   const battlefieldBackground = document.getElementById("replayBattlefieldBackground");
   const battlefieldViewMode = document.getElementById("replayBattlefieldViewMode");
+  const battlefieldRotateLeft = document.getElementById("replayBattlefieldRotateLeft");
+  const battlefieldRotateRight = document.getElementById("replayBattlefieldRotateRight");
   const battlefieldZoomOut = document.getElementById("replayBattlefieldZoomOut");
   const battlefieldZoomIn = document.getElementById("replayBattlefieldZoomIn");
   const battlefieldResetView = document.getElementById("replayBattlefieldResetView");
@@ -43,6 +45,8 @@
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
   const battlefield3dCanvas = document.getElementById("replayBattlefield3dCanvas");
   const battlefieldStage = battlefieldCanvas.closest(".replay-battlefield-stage");
+  const battlefieldMapControls = battlefieldPanel.querySelector(".replay-battlefield-map-controls");
+  const battlefieldFooter = battlefieldPanel.querySelector(".replay-battlefield-footer");
   const battlefieldLoading = document.getElementById("replayBattlefieldLoading");
   const battlefieldMinimap = document.getElementById("replayBattlefieldMinimap");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
@@ -184,10 +188,11 @@
   const battlefieldHiddenPlayers = new Set();
   const battlefieldPlayerStatElements = new Map();
   const battlefieldTeamStatElements = new Map();
+  const battlefieldTeamColours = ["#6de8ff", "#ffb84d"];
   let battlefieldRenderedSnapshotTime = null;
   let battlefieldMomentumSeries = [];
   let battlefieldMomentumDuration = 0;
-  const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0 };
+  const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
   let battlefieldPan = null;
   let battlefieldOwnersUsePositions = false;
   let battlefield3d = null;
@@ -2536,7 +2541,7 @@
       });
     });
 
-    const colours = ["#6de8ff", "#ffb84d"];
+    const colours = battlefieldTeamColours;
     teams.forEach((team, index) => {
       const points = seriesPoints.get(team);
       if (!points.length) {
@@ -2917,7 +2922,7 @@
   }
 
   function setBattlefield3dLoading(isLoading) {
-    const nextLoading = Boolean(isLoading && battlefieldViewMode?.value === "3d");
+    const nextLoading = Boolean(isLoading);
     if (nextLoading === battlefield3dLoading) return;
     battlefield3dLoading = nextLoading;
     battlefieldStage.setAttribute("aria-busy", String(nextLoading));
@@ -3353,12 +3358,20 @@
       battlefieldSpriteCache.set(key, null);
       createBattlefieldModelSprite(kind, definition, colour)
         .then((sprite) => {
-          if (sprite) battlefieldSpriteCache.set(key, sprite);
+          battlefieldSpriteCache.set(key, sprite || false);
           drawBattlefield();
         })
-        .catch(() => {});
+        .catch(() => {
+          battlefieldSpriteCache.set(key, false);
+          drawBattlefield();
+        });
     }
     return battlefieldSpriteCache.get(key);
+  }
+
+  function battlefieldModelSpriteIsPending(kind, object) {
+    const key = battlefieldModelKey(kind, object);
+    return key !== null && battlefieldSpriteCache.get(key) === null;
   }
 
   function battlefieldPlayerSprite(sprite, colour) {
@@ -3816,7 +3829,7 @@
     entry.root.visible = true;
     entry.root.position.set(
       Number(object[2]) || 0,
-      battlefield3dHeightAt(object[2], object[3]),
+      battlefield3dHeightAt(object[2], object[3]) + (kind === "structure" ? 0.02 : 0),
       Number(object[3]) || 0
     );
     entry.root.rotation.y = -battlefieldDirectionRadians(object[7]);
@@ -3833,7 +3846,7 @@
     const span = Math.max(map.width, map.height, 8);
     const isFullscreen = document.fullscreenElement === battlefieldStage;
     const distance = Math.max(8, span * (isFullscreen ? 1.55 : 1.9) / scale);
-    const azimuth = Math.PI / 4;
+    const azimuth = Math.PI / 4 + battlefieldView.rotation;
     const elevation = Math.PI * 0.34;
     const horizontal = Math.cos(elevation) * distance;
     state.camera.position.set(
@@ -3948,6 +3961,7 @@
     const use3d = mode === "3d";
     if (!use3d || !battlefield3dCanvas) {
       setBattlefield3dLoading(false);
+      syncBattlefieldRotationControls(false);
       if (battlefieldViewMode && !battlefield3dCanvas) battlefieldViewMode.value = "2d";
       battlefieldCanvas.hidden = false;
       if (battlefield3dCanvas) battlefield3dCanvas.hidden = true;
@@ -3963,9 +3977,20 @@
       if (battlefieldViewMode?.value !== "3d") return;
       battlefieldCanvas.hidden = true;
       battlefield3dCanvas.hidden = false;
-      requestAnimationFrame(drawBattlefield);
+      syncBattlefieldRotationControls(true);
+      if (battlefield3d) {
+        battlefield3d.width = 0;
+        battlefield3d.height = 0;
+      }
+      requestAnimationFrame(() => {
+        drawBattlefield();
+        requestAnimationFrame(() => {
+          if (battlefield3dIsActive()) drawBattlefield();
+        });
+      });
     } catch (error) {
       setBattlefield3dLoading(false);
+      syncBattlefieldRotationControls(false);
       console.warn("Unable to start the 3D battlefield.", error);
       if (battlefieldViewMode) battlefieldViewMode.value = "2d";
       battlefieldCanvas.hidden = false;
@@ -3993,6 +4018,7 @@
 
   function drawBattlefield2d() {
     if (!battlefieldFrames.length || !battlefieldExtraction || battlefieldPanel.hidden) {
+      setBattlefield3dLoading(false);
       return;
     }
 
@@ -4074,6 +4100,7 @@
       : [];
     let visibleStructures = 0;
     let visibleDroids = 0;
+    let pendingModels = 0;
     const showDetailedModels = true;
 
     structures.forEach((structure) => {
@@ -4084,6 +4111,9 @@
       visibleStructures += 1;
       const health = Math.max(0, Math.min(100, Number(structure[4]) || 0));
       const sprite = showDetailedModels ? battlefieldModelSprite("structure", structure) : null;
+      if (showDetailedModels && battlefieldModelSpriteIsPending("structure", structure)) {
+        pendingModels += 1;
+      }
       const footprint = sprite?.structureWidth
         ? Math.max(sprite.structureWidth, sprite.structureBreadth)
         : 3;
@@ -4110,6 +4140,9 @@
       const health = Math.max(0, Math.min(100, Number(droid[4]) || 0));
       const size = Math.max(3, Math.min(8, fieldWidth / map.width));
       const sprite = showDetailedModels ? battlefieldModelSprite("droid", droid) : null;
+      if (showDetailedModels && battlefieldModelSpriteIsPending("droid", droid)) {
+        pendingModels += 1;
+      }
       const x = projectX(droid[2]);
       const y = projectY(droid[3]);
       context.globalAlpha = 0.4 + health / 150;
@@ -4122,6 +4155,7 @@
     });
     context.globalAlpha = 1;
     context.restore();
+    setBattlefield3dLoading(pendingModels > 0);
     drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight);
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
@@ -4236,7 +4270,21 @@
     battlefieldView.scale = 1;
     battlefieldView.offsetX = 0;
     battlefieldView.offsetY = 0;
+    battlefieldView.rotation = 0;
     drawBattlefield();
+  }
+
+  function rotateBattlefield(direction) {
+    const fullTurn = Math.PI * 2;
+    battlefieldView.rotation = (
+      battlefieldView.rotation + direction * Math.PI / 4 + fullTurn
+    ) % fullTurn;
+    drawBattlefield();
+  }
+
+  function syncBattlefieldRotationControls(use3d = battlefieldViewMode?.value === "3d") {
+    if (battlefieldRotateLeft) battlefieldRotateLeft.disabled = !use3d;
+    if (battlefieldRotateRight) battlefieldRotateRight.disabled = !use3d;
   }
 
   function animateBattlefield(timestamp) {
@@ -4355,19 +4403,18 @@
           const teamPlayers = teams.get(team);
           const teamIndex = teamOrder.indexOf(team);
           const teamLabel = `Team ${String.fromCharCode(65 + teamIndex)}`;
-          const teamColours = teamPlayers.map((item) => (
-            playerColours[Number(item.colour)]?.value
-              || playerColours[Math.abs(Number(item.position)) % playerColours.length].value
-          ));
+          const teamDisplayColour = battlefieldTeamColours[teamIndex % battlefieldTeamColours.length];
           teamButton.type = "button";
           teamButton.className = "replay-battlefield-player is-team";
           teamButton.setAttribute("aria-pressed", "true");
           teamButton.title = `Show or hide ${teamLabel}`;
           teamMarker.className = "replay-battlefield-player-marker";
-          teamMarker.style.background = `linear-gradient(90deg, ${teamColours.join(", ")})`;
+          teamMarker.style.background = teamDisplayColour;
           teamIdentity.className = "replay-battlefield-player-identity";
           teamOverallBar.className = "replay-battlefield-player-overall-bar";
           teamOverallBar.setAttribute("aria-hidden", "true");
+          teamOverallBar.style.background = `linear-gradient(90deg, ${teamDisplayColour}57, ${teamDisplayColour}94)`;
+          teamOverallBar.style.borderRightColor = `${teamDisplayColour}b8`;
           teamName.className = "replay-battlefield-player-name";
           teamName.textContent = teamLabel;
           teamState.className = "replay-battlefield-player-state";
@@ -4378,8 +4425,8 @@
             teamStats.append(field.wrapper);
             return { key, value: field.value, bar: field.bar, averageMarker: field.averageMarker };
           });
-          teamIdentity.append(teamOverallBar, teamMarker, teamName, teamState);
-          teamButton.append(teamIdentity, teamStats);
+          teamIdentity.append(teamOverallBar, teamMarker, teamName);
+          teamButton.append(teamIdentity, teamState, teamStats);
           const positions = teamPlayers.map((item) => Number(item.position));
           battlefieldTeamStatElements.set(
             team,
@@ -4433,8 +4480,8 @@
           stats.append(field.wrapper);
           return { key, value: field.value, bar: field.bar, averageMarker: field.averageMarker };
         });
-        identity.append(overallBar, marker, name, state);
-        button.append(identity, stats);
+        identity.append(overallBar, marker, name);
+        button.append(identity, state, stats);
         battlefieldPlayerStatElements.set(
           Number(player.position),
           { button, state, values, overallBar }
@@ -4875,24 +4922,59 @@
   battlefieldBackground.addEventListener("change", drawBattlefield);
   battlefieldZoomOut.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale / 1.25));
   battlefieldZoomIn.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale * 1.25));
+  battlefieldRotateLeft?.addEventListener("click", () => rotateBattlefield(-1));
+  battlefieldRotateRight?.addEventListener("click", () => rotateBattlefield(1));
   battlefieldResetView.addEventListener("click", resetBattlefieldView);
+  let battlefieldFullscreenControlSlots = null;
+
+  function mountBattlefieldFullscreenControls() {
+    if (battlefieldFullscreenControlSlots || !battlefieldStage) return;
+    battlefieldFullscreenControlSlots = [battlefieldFooter, battlefieldMapControls]
+      .filter(Boolean)
+      .map((element) => {
+        const placeholder = document.createComment("battlefield fullscreen control");
+        element.parentNode.insertBefore(placeholder, element);
+        battlefieldStage.appendChild(element);
+        return { element, placeholder };
+      });
+  }
+
+  function restoreBattlefieldFullscreenControls() {
+    if (!battlefieldFullscreenControlSlots) return;
+    battlefieldFullscreenControlSlots.forEach(({ element, placeholder }) => {
+      if (placeholder.parentNode) {
+        placeholder.parentNode.replaceChild(element, placeholder);
+      }
+    });
+    battlefieldFullscreenControlSlots = null;
+  }
+
   battlefieldFullscreen.addEventListener("click", async () => {
     if (document.fullscreenElement === battlefieldStage) {
       await document.exitFullscreen();
     } else {
-      await battlefieldStage.requestFullscreen();
+      mountBattlefieldFullscreenControls();
+      try {
+        await battlefieldStage.requestFullscreen();
+      } catch (error) {
+        restoreBattlefieldFullscreenControls();
+        console.error("Unable to enter battlefield full screen.", error);
+      }
     }
   });
   document.addEventListener("fullscreenchange", () => {
     const active = document.fullscreenElement === battlefieldStage;
+    if (!active) restoreBattlefieldFullscreenControls();
     const fullscreenLabel = active ? "Exit full screen" : "Full screen";
     battlefieldFullscreen.setAttribute("aria-label", fullscreenLabel);
     battlefieldFullscreen.dataset.tooltip = fullscreenLabel;
     battlefieldFullscreen.setAttribute("aria-pressed", String(active));
     requestAnimationFrame(drawBattlefield);
   });
+  document.addEventListener("fullscreenerror", restoreBattlefieldFullscreenControls);
   if (battlefieldViewMode) {
     battlefieldViewMode.value = "2d";
+    syncBattlefieldRotationControls(false);
     battlefieldViewMode.addEventListener("change", () => {
       setBattlefieldViewMode(battlefieldViewMode.value);
     });

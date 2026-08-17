@@ -217,6 +217,15 @@ export async function buildDroidGroup(pieFiles) {
   return group;
 }
 
+function restoreAnimationVector(value) {
+  if (value?.isVector3) return value;
+  return new THREE.Vector3(
+    Number(value?.x) || 0,
+    Number(value?.y) || 0,
+    Number(value?.z) || 0
+  );
+}
+
 export function updateDroidAnimations(root, timeMs = 0) {
   if (!root) return;
   const seconds = timeMs / 1000;
@@ -225,6 +234,10 @@ export function updateDroidAnimations(root, timeMs = 0) {
     if (spin) obj.rotation.y = seconds * spin;
     const anim = obj.userData?.droidWeaponAnim;
     if (anim) {
+      // Object3D.clone() JSON-copies userData, turning stored Vector3 values into plain objects.
+      anim.bodyConnector = restoreAnimationVector(anim.bodyConnector);
+      anim.mountConnector = restoreAnimationVector(anim.mountConnector);
+      anim.weaponConnector = restoreAnimationVector(anim.weaponConnector);
       const yaw = anim.rotateSpeed ? Math.sin(seconds * 0.75 + anim.phase) * 0.35 : 0;
       const pitch = Math.sin(seconds * 1.1 + anim.phase) * 0.12;
       const cycle = (seconds * 1000 / Math.max(120, anim.firePause * 80) + anim.slot * 0.37) % 1;

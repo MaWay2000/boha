@@ -184,6 +184,10 @@
   let battlefieldDestroyedAt = new Map();
   let battlefieldModelLibraryPromise = null;
   const battlefieldSpriteCache = new Map();
+  let battlefieldSpriteBufferFrameIndex = 0;
+  let battlefieldSpriteBufferTarget = 0;
+  let battlefieldSpriteBufferScheduled = false;
+  let battlefieldSpriteBufferGeneration = 0;
   const battlefieldTintedSpriteCache = new WeakMap();
   const battlefieldHiddenPlayers = new Set();
   const battlefieldPlayerStatElements = new Map();
@@ -2923,6 +2927,10 @@
 
   function setBattlefield3dLoading(isLoading) {
     const nextLoading = Boolean(isLoading);
+    battlefieldLoading?.classList.toggle(
+      "is-view-switch",
+      nextLoading && battlefieldViewMode?.value === "3d"
+    );
     if (nextLoading === battlefield3dLoading) return;
     battlefield3dLoading = nextLoading;
     battlefieldStage.setAttribute("aria-busy", String(nextLoading));
@@ -3223,7 +3231,7 @@
         if (material.userData?.teamColorMask) textures.add(material.userData.teamColorMask);
       });
     });
-    if (!textures.size) return;
+    if (!textures.size) return true;
 
     const startedAt = performance.now();
     const textureReady = (texture) => {
@@ -3238,6 +3246,7 @@
         && performance.now() - startedAt < timeoutMilliseconds) {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
+    return [...textures].every(textureReady);
   }
 
   function applyBattlefieldModelPlayerColour(group, colour, THREE) {
@@ -3372,6 +3381,45 @@
   function battlefieldModelSpriteIsPending(kind, object) {
     const key = battlefieldModelKey(kind, object);
     return key !== null && battlefieldSpriteCache.get(key) === null;
+  }
+
+  function bufferBattlefieldModelSprites(timeMilliseconds) {
+    const lookAheadMilliseconds = 120000;
+    const replayEnd = Number(battlefieldRange.max) || 0;
+    battlefieldSpriteBufferTarget = Math.max(
+      battlefieldSpriteBufferTarget,
+      Math.min(replayEnd, timeMilliseconds + lookAheadMilliseconds)
+    );
+    if (battlefieldSpriteBufferScheduled) return;
+
+    const generation = battlefieldSpriteBufferGeneration;
+    const schedule = typeof window.requestIdleCallback === "function"
+      ? (callback) => window.requestIdleCallback(callback, { timeout: 250 })
+      : (callback) => setTimeout(callback, 16);
+    battlefieldSpriteBufferScheduled = true;
+    schedule(() => {
+      if (generation !== battlefieldSpriteBufferGeneration) return;
+      battlefieldSpriteBufferScheduled = false;
+      while (battlefieldSpriteBufferFrameIndex < battlefieldFrames.length
+          && Number(battlefieldFrames[battlefieldSpriteBufferFrameIndex].time || 0) < timeMilliseconds) {
+        battlefieldSpriteBufferFrameIndex += 1;
+      }
+
+      let processedFrames = 0;
+      while (battlefieldSpriteBufferFrameIndex < battlefieldFrames.length && processedFrames < 2) {
+        const frame = battlefieldFrames[battlefieldSpriteBufferFrameIndex];
+        if (Number(frame.time || 0) > battlefieldSpriteBufferTarget) break;
+        (frame.structures || []).forEach((structure) => battlefieldModelSprite("structure", structure));
+        (frame.droids || []).forEach((droid) => battlefieldModelSprite("droid", droid));
+        battlefieldSpriteBufferFrameIndex += 1;
+        processedFrames += 1;
+      }
+
+      if (battlefieldSpriteBufferFrameIndex < battlefieldFrames.length
+          && Number(battlefieldFrames[battlefieldSpriteBufferFrameIndex].time || 0) <= battlefieldSpriteBufferTarget) {
+        bufferBattlefieldModelSprites(timeMilliseconds);
+      }
+    });
   }
 
   function battlefieldPlayerSprite(sprite, colour) {
@@ -3547,6 +3595,9 @@
         objects: new Map(),
         prototypes: new Map(),
         prototypePromises: new Map(),
+        bufferFrameIndex: 0,
+        bufferTarget: 0,
+        bufferScheduled: false,
         fallbackGeometries: { droid: droidGeometry, structure: structureGeometry },
         fallbackMaterials: new Map(),
         pixelRatio: 0,
@@ -3577,6 +3628,9 @@
     clearBattlefield3dRoot(battlefield3d.objectRoot);
     battlefield3d.objects.clear();
     battlefield3d.prototypePromises.clear();
+    battlefield3d.bufferFrameIndex = 0;
+    battlefield3d.bufferTarget = 0;
+    battlefield3d.bufferScheduled = false;
     battlefield3d.prototypes.forEach((group) => disposeBattlefieldModel(group));
     battlefield3d.prototypes.clear();
     battlefield3d.terrainRoot.children.slice().forEach((child) => {
@@ -3634,18 +3688,25 @@
     return root;
   }
 
-  function battlefield3dRequestPrototype(state, entry, kind, object, definition, modelKey) {
-    if (!definition || !modelKey || state.prototypes.has(modelKey)
-        || entry.requestedModelKey === modelKey || entry.failedModelKey === modelKey) return;
-    entry.requestedModelKey = modelKey;
+  function battlefield3dPrototypePromise(state, kind, object, definition, modelKey) {
+    if (!definition || !modelKey || state.prototypes.has(modelKey)) return null;
     let promise = state.prototypePromises.get(modelKey);
     if (!promise) {
       const generation = battlefield3dGeneration;
       const colour = battlefieldPlayerColour(Number(object[1]));
       promise = createBattlefieldModelGroup(kind, definition, colour, state.library)
-        .then((group) => {
+        .then(async (group) => {
           if (!group) return null;
           if (battlefield3d !== state || generation !== battlefield3dGeneration) {
+            disposeBattlefieldModel(group);
+            return null;
+          }
+          const texturesReady = await waitForBattlefieldModelTextures(group, 15000);
+          if (battlefield3d !== state || generation !== battlefield3dGeneration) {
+            disposeBattlefieldModel(group);
+            return null;
+          }
+          if (!texturesReady) {
             disposeBattlefieldModel(group);
             return null;
           }
@@ -3658,6 +3719,15 @@
         });
       state.prototypePromises.set(modelKey, promise);
     }
+    return promise;
+  }
+
+  function battlefield3dRequestPrototype(state, entry, kind, object, definition, modelKey) {
+    if (!definition || !modelKey || state.prototypes.has(modelKey)
+        || entry.requestedModelKey === modelKey || entry.failedModelKey === modelKey) return;
+    entry.requestedModelKey = modelKey;
+    const promise = battlefield3dPrototypePromise(state, kind, object, definition, modelKey);
+    if (!promise) return;
     promise.then((prototype) => {
       if (!prototype) {
         if (entry.requestedModelKey === modelKey) {
@@ -3683,6 +3753,53 @@
       entry.loadedModelKey = modelKey;
       entry.requestedModelKey = null;
       drawBattlefield();
+    });
+  }
+
+  function bufferBattlefield3dModels(state, timeMilliseconds) {
+    const lookAheadMilliseconds = 120000;
+    const replayEnd = Number(battlefieldRange.max) || 0;
+    state.bufferTarget = Math.max(
+      state.bufferTarget,
+      Math.min(replayEnd, timeMilliseconds + lookAheadMilliseconds)
+    );
+    if (state.bufferScheduled) return;
+
+    const generation = battlefield3dGeneration;
+    const schedule = typeof window.requestIdleCallback === "function"
+      ? (callback) => window.requestIdleCallback(callback, { timeout: 250 })
+      : (callback) => setTimeout(callback, 16);
+    state.bufferScheduled = true;
+    schedule(() => {
+      if (battlefield3d !== state || generation !== battlefield3dGeneration) return;
+      state.bufferScheduled = false;
+      while (state.bufferFrameIndex < battlefieldFrames.length
+          && Number(battlefieldFrames[state.bufferFrameIndex].time || 0) < timeMilliseconds) {
+        state.bufferFrameIndex += 1;
+      }
+
+      let processedFrames = 0;
+      while (state.bufferFrameIndex < battlefieldFrames.length && processedFrames < 2) {
+        const frame = battlefieldFrames[state.bufferFrameIndex];
+        if (Number(frame.time || 0) > state.bufferTarget) break;
+        [
+          ["structure", frame.structures || []],
+          ["droid", frame.droids || []]
+        ].forEach(([kind, objects]) => {
+          objects.forEach((object) => {
+            const definition = battlefieldModelDefinition(kind, object);
+            const modelKey = battlefieldModelKey(kind, object, definition);
+            battlefield3dPrototypePromise(state, kind, object, definition, modelKey);
+          });
+        });
+        state.bufferFrameIndex += 1;
+        processedFrames += 1;
+      }
+
+      if (state.bufferFrameIndex < battlefieldFrames.length
+          && Number(battlefieldFrames[state.bufferFrameIndex].time || 0) <= state.bufferTarget) {
+        bufferBattlefield3dModels(state, timeMilliseconds);
+      }
     });
   }
 
@@ -3931,6 +4048,7 @@
       state.objects.delete(objectKey);
     });
     setBattlefield3dLoading(pendingModels > 0);
+    bufferBattlefield3dModels(state, battlefieldCurrentTime);
 
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
     if (state.pixelRatio !== pixelRatio) {
@@ -3965,7 +4083,12 @@
       if (battlefieldViewMode && !battlefield3dCanvas) battlefieldViewMode.value = "2d";
       battlefieldCanvas.hidden = false;
       if (battlefield3dCanvas) battlefield3dCanvas.hidden = true;
-      requestAnimationFrame(drawBattlefield);
+      requestAnimationFrame(() => {
+        drawBattlefield();
+        requestAnimationFrame(() => {
+          if (battlefieldViewMode?.value !== "3d") drawBattlefield();
+        });
+      });
       return;
     }
 
@@ -3973,6 +4096,8 @@
     battlefield3dCanvas.hidden = true;
     setBattlefield3dLoading(true);
     try {
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      if (battlefieldViewMode?.value !== "3d") return;
       await ensureBattlefield3d();
       if (battlefieldViewMode?.value !== "3d") return;
       battlefieldCanvas.hidden = true;
@@ -4156,6 +4281,7 @@
     context.globalAlpha = 1;
     context.restore();
     setBattlefield3dLoading(pendingModels > 0);
+    bufferBattlefieldModelSprites(battlefieldCurrentTime);
     drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight);
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
@@ -4512,6 +4638,10 @@
     battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
     collectBattlefieldObjectDefinitions(telemetryFrames);
     battlefieldSpriteCache.clear();
+    battlefieldSpriteBufferFrameIndex = 0;
+    battlefieldSpriteBufferTarget = 0;
+    battlefieldSpriteBufferScheduled = false;
+    battlefieldSpriteBufferGeneration += 1;
     battlefieldCurrentTime = 0;
     battlefieldRenderedSnapshotTime = null;
     battlefieldLastDraw = 0;
@@ -4565,6 +4695,8 @@
       battlefieldMomentum.hidden = true;
       battlefieldMomentumChart.replaceChildren();
       battlefieldSpriteCache.clear();
+      battlefieldSpriteBufferGeneration += 1;
+      battlefieldSpriteBufferScheduled = false;
     }
 
     researchPanel.hidden = timeline.length === 0;

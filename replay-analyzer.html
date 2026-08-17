@@ -441,6 +441,27 @@
       display: none;
     }
 
+    .replay-battlefield-loading.is-view-switch {
+      position: fixed;
+      z-index: 10000;
+      background: rgba(2, 8, 13, 0.94);
+    }
+
+    .replay-battlefield-loading-message {
+      display: grid;
+      gap: 4px;
+    }
+
+    .replay-battlefield-loading-message strong {
+      color: #fff;
+      font-size: 1.15rem;
+    }
+
+    .replay-battlefield-loading-message small {
+      color: var(--cyan);
+      font: inherit;
+    }
+
     .replay-battlefield-loading-spinner {
       width: 34px;
       height: 34px;
@@ -1804,7 +1825,10 @@
                   hidden
                 >
                   <span class="replay-battlefield-loading-spinner" aria-hidden="true"></span>
-                  <span>Loading…</span>
+                  <span class="replay-battlefield-loading-message">
+                    <strong>Please wait</strong>
+                    <small>Loading…</small>
+                  </span>
                 </div>
                 <canvas
                   class="replay-battlefield-minimap"

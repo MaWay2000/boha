@@ -3519,8 +3519,6 @@
       const droidGeometry = new THREE.ConeGeometry(0.34, 0.76, 4);
       droidGeometry.rotateY(Math.PI / 4);
       const structureGeometry = new THREE.BoxGeometry(0.9, 0.64, 0.9);
-      const markerGeometry = new THREE.RingGeometry(0.38, 0.52, 20);
-      markerGeometry.rotateX(-Math.PI / 2);
       battlefield3d = {
         THREE,
         library,
@@ -3536,9 +3534,8 @@
         objects: new Map(),
         prototypes: new Map(),
         prototypePromises: new Map(),
-        fallbackGeometries: { droid: droidGeometry, structure: structureGeometry, marker: markerGeometry },
+        fallbackGeometries: { droid: droidGeometry, structure: structureGeometry },
         fallbackMaterials: new Map(),
-        markerMaterials: new Map(),
         pixelRatio: 0,
         width: 0,
         height: 0
@@ -3590,34 +3587,6 @@
     return state.fallbackMaterials.get(key);
   }
 
-  function battlefield3dMarkerMaterial(state, colour) {
-    if (!state.markerMaterials.has(colour)) {
-      state.markerMaterials.set(colour, new state.THREE.MeshBasicMaterial({
-        color: new state.THREE.Color(colour),
-        transparent: true,
-        opacity: 0.9,
-        depthWrite: false,
-        side: state.THREE.DoubleSide
-      }));
-    }
-    return state.markerMaterials.get(colour);
-  }
-
-  function addBattlefield3dMarker(state, root, kind, colour, definition) {
-    const marker = new state.THREE.Mesh(
-      state.fallbackGeometries.marker,
-      battlefield3dMarkerMaterial(state, colour)
-    );
-    const footprint = kind === "structure"
-      ? Math.max(1, Number(definition?.width) || 1, Number(definition?.breadth) || 1)
-      : 1;
-    marker.scale.setScalar(kind === "structure" ? footprint * 0.78 : 0.8);
-    marker.position.y = 0.035;
-    marker.renderOrder = 2;
-    root.add(marker);
-    root.userData.battlefieldMarker = marker;
-  }
-
   function createBattlefield3dFallback(state, kind, colour, definition) {
     const root = new state.THREE.Group();
     const geometry = kind === "droid"
@@ -3633,7 +3602,6 @@
       );
     }
     root.add(mesh);
-    addBattlefield3dMarker(state, root, kind, colour, definition);
     return root;
   }
 
@@ -3650,7 +3618,6 @@
     }
     root.add(model);
     root.userData.battlefieldModel = model;
-    addBattlefield3dMarker(state, root, kind, colour, definition);
     return root;
   }
 

@@ -3047,7 +3047,7 @@
       const [THREE, droidModule, structureModule, bodyDefs, propDefs, weaponDefs, templateDefs,
         constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs, structureDefs] = await Promise.all([
         import("./mapmaker/js/three.module.js"),
-        import("./mapmaker/js/droidGroup.js?v=battlefield-player-colours"),
+        import("./mapmaker/js/droidGroup.js?v=cloned-animation-connectors"),
         import("./mapmaker/js/structureGroup.js"),
         fetchBattlefieldJson("mapmaker/pies/components/bodies/body.json"),
         fetchBattlefieldJson("mapmaker/pies/components/prop/propulsion.json"),

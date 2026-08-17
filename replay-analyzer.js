@@ -2237,6 +2237,75 @@
     return selected;
   }
 
+  function battlefieldDisplaySnapshotAtTime(extraction, timeMilliseconds) {
+    const snapshots = extraction.engineAnalysis?.extended?.snapshots || [];
+    const current = battlefieldSnapshotAtTime(extraction, timeMilliseconds);
+    if (!current || snapshots.length < 2) {
+      return { snapshot: current, transitionKey: "" };
+    }
+    if (timeMilliseconds >= Number(battlefieldRange.max)) {
+      return { snapshot: current, transitionKey: "" };
+    }
+
+    const transitionBefore = 1000;
+    const transitionAfter = 3000;
+    const transitionDuration = transitionBefore + transitionAfter;
+    const targetIndex = snapshots.findIndex((snapshot, index) => (
+      index > 0
+      && timeMilliseconds <= Number(snapshot.timeMilliseconds) + transitionAfter
+    ));
+    if (targetIndex < 1) {
+      return { snapshot: current, transitionKey: "" };
+    }
+
+    const previous = snapshots[targetIndex - 1];
+    const target = snapshots[targetIndex];
+    const targetTime = Number(target.timeMilliseconds);
+    const linearRatio = Math.max(
+      0,
+      Math.min(1, (timeMilliseconds - (targetTime - transitionBefore)) / transitionDuration)
+    );
+    if (linearRatio <= 0 || linearRatio >= 1) {
+      return { snapshot: current, transitionKey: "" };
+    }
+
+    const ratio = linearRatio * linearRatio * (3 - 2 * linearRatio);
+    const numericKeys = [
+      "score", "kills", "droidsAlive", "droidsLost", "droidsBuilt",
+      "structuresAlive", "structuresLost", "structuresBuilt", "power",
+      "recentResearchPerformance", "recentResearchPotential"
+    ];
+    const currentPlayers = new Map(
+      (current.players || []).map((player) => [Number(player.position), player])
+    );
+    const previousPlayers = new Map(
+      (previous.players || []).map((player) => [Number(player.position), player])
+    );
+    const targetPlayers = new Map(
+      (target.players || []).map((player) => [Number(player.position), player])
+    );
+    const positions = new Set([...previousPlayers.keys(), ...targetPlayers.keys()]);
+    const players = [...positions].map((position) => {
+      const displayed = {
+        ...(currentPlayers.get(position) || previousPlayers.get(position) || targetPlayers.get(position))
+      };
+      const from = previousPlayers.get(position);
+      const to = targetPlayers.get(position);
+      numericKeys.forEach((key) => {
+        const fromValue = Number(from?.[key]);
+        const toValue = Number(to?.[key]);
+        if (Number.isFinite(fromValue) && Number.isFinite(toValue)) {
+          displayed[key] = fromValue + (toValue - fromValue) * ratio;
+        }
+      });
+      return displayed;
+    });
+    return {
+      snapshot: { ...current, players },
+      transitionKey: `${targetIndex}:${Math.round(timeMilliseconds / 50)}`
+    };
+  }
+
   function battlefieldPlayerState(extraction, player, position, timeMilliseconds) {
     const engineAnalysis = extraction.engineAnalysis || {};
     const departures = engineAnalysis.extended?.recordedNetwork?.playerDepartures || [];
@@ -2303,13 +2372,15 @@
     wrapper.setAttribute("aria-label", label);
     wrapper.title = label;
     value.textContent = "--";
-    if (["score", "killDeathRatio", "researchActivity", "droidsAlive", "structuresAlive", "power"].includes(key)) {
+    if (["score", "killDeathRatio", "kills", "researchActivity", "droidsAlive", "structuresAlive", "power"].includes(key)) {
       const bar = document.createElement("span");
       wrapper.classList.add(
         key === "score"
           ? "is-score"
           : key === "killDeathRatio"
             ? "is-kd"
+          : key === "kills"
+            ? "is-kills"
           : key === "researchActivity"
             ? "is-research"
             : key === "power" ? "is-power" : "is-alive"
@@ -2345,7 +2416,8 @@
       }
       return `${activity.toFixed(2)}%`;
     }
-    return formatStat(player?.[key]) || "--";
+    const value = Number(player?.[key]);
+    return formatStat(Number.isFinite(value) ? Math.round(value) : player?.[key]) || "--";
   }
 
   function battlefieldScoreRatio(score, bestScore) {
@@ -2614,6 +2686,7 @@
     player,
     bestScore,
     bestKillDeathRatio,
+    bestKills,
     worstResearch,
     bestResearch,
     bestUnitsAlive,
@@ -2664,6 +2737,18 @@
         value.parentElement.setAttribute(
           "aria-label",
           `K/D ${value.textContent}, ${Math.round(ratio * 100)}% of the leading K/D`
+        );
+      } else if (key === "kills" && bar) {
+        const ratio = battlefieldScoreRatio(Number(player?.kills), bestKills);
+        performanceRatios.push(ratio);
+        const visibleRatio = Math.max(0.04, ratio);
+        bar.style.width = `${visibleRatio * 100}%`;
+        bar.style.setProperty("--battlefield-kills-hue", String(Math.round(ratio * 120)));
+        value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
+        updateBattlefieldAverageMarker(averageMarker, barContext.averageKillsRatio);
+        value.parentElement.setAttribute(
+          "aria-label",
+          `Kills ${value.textContent}, ${Math.round(ratio * 100)}% of the leading kill count`
         );
       } else if (key === "researchActivity" && bar) {
         const research = battlefieldResearchActivity(player);
@@ -2739,12 +2824,23 @@
     if (!battlefieldExtraction) {
       return;
     }
-    const snapshot = battlefieldSnapshotAtTime(battlefieldExtraction, battlefieldCurrentTime);
+    battlefieldPanel.style.setProperty(
+      "--battlefield-stat-transition-duration",
+      battlefieldPlaying
+        ? `${4000 / Math.max(1, Number(battlefieldSpeed.value) || 1)}ms`
+        : "180ms"
+    );
+    const displaySnapshot = battlefieldDisplaySnapshotAtTime(
+      battlefieldExtraction,
+      battlefieldCurrentTime
+    );
+    const snapshot = displaySnapshot.snapshot;
     const snapshotTime = Number(snapshot?.timeMilliseconds ?? -1);
     const frameTime = Number(battlefieldFramePair(battlefieldCurrentTime).current?.time ?? -1);
     const departureCount = (battlefieldExtraction.engineAnalysis?.extended?.recordedNetwork?.playerDepartures || [])
       .filter((event) => Number(event.timeMilliseconds) <= battlefieldCurrentTime).length;
-    const renderKey = `${snapshotTime}:${frameTime}:${departureCount}:${battlefieldCurrentTime >= Number(battlefieldRange.max)}`;
+    const renderKey = `${snapshotTime}:${frameTime}:${departureCount}:${displaySnapshot.transitionKey}:`
+      + `${battlefieldCurrentTime >= Number(battlefieldRange.max)}`;
     if (!force && renderKey === battlefieldRenderedSnapshotTime) {
       return;
     }
@@ -2764,6 +2860,8 @@
     const bestKillDeathRatio = finiteKillDeathRatios.length
       ? Math.max(...finiteKillDeathRatios)
       : 0;
+    const kills = displayedPlayers.map((player) => Math.max(0, Number(player.kills) || 0));
+    const bestKills = Math.max(0, ...kills);
     const researchValues = displayedPlayers
       .map(battlefieldResearchActivity)
       .filter(Number.isFinite);
@@ -2784,6 +2882,7 @@
         battlefieldAverage(killDeathRatios),
         bestKillDeathRatio
       ),
+      averageKillsRatio: battlefieldScoreRatio(battlefieldAverage(kills), bestKills),
       averageUnitsRatio: battlefieldScoreRatio(
         battlefieldAverage(displayedPlayers.map((player) => Number(player.droidsAlive) || 0)),
         bestUnitsAlive
@@ -2805,6 +2904,7 @@
         player,
         bestScore,
         bestKillDeathRatio,
+        bestKills,
         worstResearch,
         bestResearch,
         bestUnitsAlive,
@@ -2828,6 +2928,9 @@
     const bestTeamKillDeathRatio = finiteTeamKillDeathRatios.length
       ? Math.max(...finiteTeamKillDeathRatios)
       : 0;
+    const teamKills = [...teamSnapshots.values()]
+      .map((team) => Math.max(0, Number(team.kills) || 0));
+    const bestTeamKills = Math.max(0, ...teamKills);
     const bestTeamUnitsAlive = Math.max(
       0,
       ...[...teamSnapshots.values()].map((team) => Number(team.droidsAlive) || 0)
@@ -2842,6 +2945,10 @@
       averageKillDeathRatio: battlefieldKillDeathBarRatio(
         battlefieldAverage(teamKillDeathRatios),
         bestTeamKillDeathRatio
+      ),
+      averageKillsRatio: battlefieldScoreRatio(
+        battlefieldAverage(teamKills),
+        bestTeamKills
       ),
       averageUnitsRatio: battlefieldScoreRatio(
         battlefieldAverage(teamValues.map((team) => Number(team.droidsAlive) || 0)),
@@ -2863,6 +2970,7 @@
         teamSnapshots.get(team),
         bestTeamScore,
         bestTeamKillDeathRatio,
+        bestTeamKills,
         70,
         100,
         bestTeamUnitsAlive,
@@ -4486,6 +4594,7 @@
     const statDefinitions = [
       ["score", "Score"],
       ["killDeathRatio", "K/D"],
+      ["kills", "Kills"],
       ["droidsAlive", "Alive"],
       ["structuresAlive", "Alive"],
       ["researchActivity", "Research"],

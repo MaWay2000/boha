@@ -40,12 +40,40 @@ function resetCounts(PDO $pdo): array
     ];
 }
 
+function outdatedAnalysisWhere(): string
+{
+    return "m.replay_id IS NOT NULL
+        AND JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.status') IS NOT NULL
+        AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.analyzerVersion')), '') <> :target_version";
+}
+
+function outdatedCounts(PDO $pdo, string $targetVersion): array
+{
+    $matches = $pdo->prepare('SELECT COUNT(*) FROM matches m WHERE ' . outdatedAnalysisWhere());
+    $matches->execute(['target_version' => $targetVersion]);
+    $players = $pdo->prepare(
+        'SELECT COUNT(*) FROM match_players mp JOIN matches m ON m.id = mp.match_id
+         WHERE ' . outdatedAnalysisWhere() . " AND mp.stats_source = 'replay-engine'"
+    );
+    $players->execute(['target_version' => $targetVersion]);
+    return [
+        'matches' => (int) $matches->fetchColumn(),
+        'replayEnginePlayers' => (int) $players->fetchColumn(),
+    ];
+}
+
 $pdo = null;
 $locked = false;
 try {
     $config = wzstats_config();
     $targetVersion = (string) ($config['worker']['analyzer_version'] ?? '3.3.0');
-    $confirmation = 'RESET-REPLAY-ANALYSIS-' . $targetVersion;
+    $scope = $isCli
+        ? (in_array('--outdated-only', $argv, true) ? 'outdated' : 'all')
+        : (string) ($_GET['scope'] ?? 'all');
+    if (!in_array($scope, ['all', 'outdated'], true)) {
+        resetRespond(['error' => 'Unknown reset scope.'], 422);
+    }
+    $confirmation = ($scope === 'outdated' ? 'HIDE-OUTDATED-ANALYSIS-' : 'RESET-REPLAY-ANALYSIS-') . $targetVersion;
 
     if (!$isCli) {
         $authorization = (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? '');
@@ -69,14 +97,16 @@ try {
         : (string) ($_GET['confirm'] ?? '');
 
     $pdo = Database::connect($config['db']);
-    $before = resetCounts($pdo);
+    $before = $scope === 'outdated' ? outdatedCounts($pdo, $targetVersion) : resetCounts($pdo);
     if (!$execute) {
         resetRespond([
             'mode' => 'preview',
+            'scope' => $scope,
             'targetAnalyzerVersion' => $targetVersion,
             'requiredConfirmation' => $confirmation,
             'counts' => $before,
             'preserves' => ['sources', 'remote_replays', 'replays', 'replay_analysis', 'matches', 'player identities'],
+            'deferredReanalysis' => $scope === 'outdated',
         ]);
     }
     if ($providedConfirmation !== $confirmation) {
@@ -92,6 +122,9 @@ try {
 
     $pdo->beginTransaction();
     try {
+        $playerWhere = $scope === 'outdated'
+            ? outdatedAnalysisWhere() . " AND mp.stats_source = 'replay-engine'"
+            : 'm.replay_id IS NOT NULL';
         $playerReset = $pdo->prepare(
             "UPDATE match_players mp JOIN matches m ON m.id = mp.match_id
              SET mp.result = NULL, mp.score = NULL, mp.kills = NULL,
@@ -100,23 +133,27 @@ try {
                  mp.structures_destroyed = NULL, mp.research_complete = NULL,
                  mp.power = NULL, mp.oil_rigs = NULL, mp.remaining_droids = NULL,
                  mp.remaining_structures = NULL, mp.stats_source = 'replay', mp.raw_json = NULL
-             WHERE m.replay_id IS NOT NULL"
+             WHERE " . $playerWhere
         );
-        $playerReset->execute();
+        $playerReset->execute($scope === 'outdated' ? ['target_version' => $targetVersion] : []);
 
-        $analysisReset = $pdo->prepare(
-            "UPDATE matches
-             SET telemetry_json = CASE
-                 WHEN JSON_LENGTH(JSON_REMOVE(telemetry_json, '$.engineAnalysis')) = 0 THEN NULL
-                 ELSE JSON_REMOVE(telemetry_json, '$.engineAnalysis')
-             END
-             WHERE replay_id IS NOT NULL
-               AND JSON_EXTRACT(telemetry_json, '$.engineAnalysis.status') IS NOT NULL"
-        );
-        $analysisReset->execute();
+        $analysisReset = null;
+        $legacyReset = null;
+        if ($scope === 'all') {
+            $analysisReset = $pdo->prepare(
+                "UPDATE matches
+                 SET telemetry_json = CASE
+                     WHEN JSON_LENGTH(JSON_REMOVE(telemetry_json, '$.engineAnalysis')) = 0 THEN NULL
+                     ELSE JSON_REMOVE(telemetry_json, '$.engineAnalysis')
+                 END
+                 WHERE replay_id IS NOT NULL
+                   AND JSON_EXTRACT(telemetry_json, '$.engineAnalysis.status') IS NOT NULL"
+            );
+            $analysisReset->execute();
 
-        $legacyReset = $pdo->prepare('DELETE FROM match_outcome_facts');
-        $legacyReset->execute();
+            $legacyReset = $pdo->prepare('DELETE FROM match_outcome_facts');
+            $legacyReset->execute();
+        }
         $pdo->commit();
     } catch (Throwable $error) {
         if ($pdo->inTransaction()) {
@@ -129,14 +166,16 @@ try {
     $publication = (new Publisher($pdo, dirname(__DIR__) . '/data'))->publish();
     resetRespond([
         'mode' => 'executed',
+        'scope' => $scope,
         'targetAnalyzerVersion' => $targetVersion,
         'before' => $before,
         'reset' => [
             'players' => $playerReset->rowCount(),
-            'engineAnalyses' => $analysisReset->rowCount(),
-            'legacyOutcomeFacts' => $legacyReset->rowCount(),
+            'engineAnalyses' => $analysisReset?->rowCount() ?? 0,
+            'legacyOutcomeFacts' => $legacyReset?->rowCount() ?? 0,
         ],
-        'after' => resetCounts($pdo),
+        'after' => $scope === 'outdated' ? outdatedCounts($pdo, $targetVersion) : resetCounts($pdo),
+        'deferredReanalysis' => $scope === 'outdated',
         'leaderboards' => $leaderboards,
         'publication' => $publication,
     ]);

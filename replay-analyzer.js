@@ -3822,7 +3822,8 @@
     const targetZ = map.height / 2
       - battlefieldView.offsetY / Math.max(1, rect.height * scale) * map.height;
     const span = Math.max(map.width, map.height, 8);
-    const distance = Math.max(8, span * 1.9 / scale);
+    const isFullscreen = document.fullscreenElement === battlefieldStage;
+    const distance = Math.max(8, span * (isFullscreen ? 1.55 : 1.9) / scale);
     const azimuth = Math.PI / 4;
     const elevation = Math.PI * 0.34;
     const horizontal = Math.cos(elevation) * distance;

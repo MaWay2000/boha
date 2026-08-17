@@ -422,6 +422,39 @@
       pointer-events: none;
     }
 
+    .replay-battlefield-loading {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: grid;
+      place-content: center;
+      gap: 10px;
+      color: var(--cyan);
+      background: rgba(2, 8, 13, 0.76);
+      font: 700 1rem "Oxanium", sans-serif;
+      letter-spacing: 0.08em;
+      text-align: center;
+      backdrop-filter: blur(2px);
+    }
+
+    .replay-battlefield-loading[hidden] {
+      display: none;
+    }
+
+    .replay-battlefield-loading-spinner {
+      width: 34px;
+      height: 34px;
+      margin: auto;
+      border: 3px solid rgba(109, 232, 255, 0.2);
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: replay-battlefield-loading-spin 0.8s linear infinite;
+    }
+
+    @keyframes replay-battlefield-loading-spin {
+      to { transform: rotate(360deg); }
+    }
+
     .replay-battlefield-stage:fullscreen {
       width: 100vw;
       height: 100vh;
@@ -1711,6 +1744,16 @@
                   aria-label="Animated three-dimensional tactical battlefield replay. Use the mouse wheel to zoom and drag to pan."
                   hidden
                 ></canvas>
+                <div
+                  class="replay-battlefield-loading"
+                  id="replayBattlefieldLoading"
+                  role="status"
+                  aria-live="polite"
+                  hidden
+                >
+                  <span class="replay-battlefield-loading-spinner" aria-hidden="true"></span>
+                  <span>Loading…</span>
+                </div>
                 <canvas
                   class="replay-battlefield-minimap"
                   id="replayBattlefieldMinimap"
@@ -1852,7 +1895,7 @@
     </main>
   </div>
 
-  <script src="replay-analyzer.js?v=20260817-01"></script>
+  <script src="replay-analyzer.js?v=20260817-02"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

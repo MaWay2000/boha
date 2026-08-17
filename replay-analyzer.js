@@ -43,6 +43,7 @@
   const battlefieldCanvas = document.getElementById("replayBattlefieldCanvas");
   const battlefield3dCanvas = document.getElementById("replayBattlefield3dCanvas");
   const battlefieldStage = battlefieldCanvas.closest(".replay-battlefield-stage");
+  const battlefieldLoading = document.getElementById("replayBattlefieldLoading");
   const battlefieldMinimap = document.getElementById("replayBattlefieldMinimap");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
   const battlefieldMomentum = document.getElementById("replayBattlefieldMomentum");
@@ -192,6 +193,8 @@
   let battlefield3d = null;
   let battlefield3dInitPromise = null;
   let battlefield3dGeneration = 0;
+  let battlefield3dLoading = false;
+  let battlefield3dResumeAfterLoading = false;
 
   class ReplayMessageReader {
     constructor(bytes) {
@@ -2900,6 +2903,37 @@
     }
   }
 
+  function startBattlefieldPlayback() {
+    if (!battlefieldFrames.length || battlefield3dLoading) return;
+    if (battlefieldCurrentTime >= Number(battlefieldRange.max)) {
+      battlefieldCurrentTime = 0;
+    }
+    battlefieldPlaying = true;
+    battlefieldPlay.classList.add("is-playing");
+    battlefieldPlay.setAttribute("aria-label", "Pause replay");
+    battlefieldPlay.title = "Pause replay";
+    battlefieldLastTick = 0;
+    battlefieldAnimationFrame = requestAnimationFrame(animateBattlefield);
+  }
+
+  function setBattlefield3dLoading(isLoading) {
+    const nextLoading = Boolean(isLoading && battlefieldViewMode?.value === "3d");
+    if (nextLoading === battlefield3dLoading) return;
+    battlefield3dLoading = nextLoading;
+    battlefieldStage.setAttribute("aria-busy", String(nextLoading));
+    if (battlefieldLoading) battlefieldLoading.hidden = !nextLoading;
+    battlefieldPlay.disabled = nextLoading;
+    if (nextLoading) {
+      if (battlefieldPlaying) battlefield3dResumeAfterLoading = true;
+      stopBattlefieldPlayback();
+      return;
+    }
+    if (battlefield3dResumeAfterLoading) {
+      battlefield3dResumeAfterLoading = false;
+      startBattlefieldPlayback();
+    }
+  }
+
   function battlefieldPlayerForOwner(owner) {
     const ownerNumber = Number(owner);
     const players = battlefieldExtraction?.players || [];
@@ -3622,7 +3656,7 @@
 
   function battlefield3dRequestPrototype(state, entry, kind, object, definition, modelKey) {
     if (!definition || !modelKey || state.prototypes.has(modelKey)
-        || entry.requestedModelKey === modelKey) return;
+        || entry.requestedModelKey === modelKey || entry.failedModelKey === modelKey) return;
     entry.requestedModelKey = modelKey;
     let promise = state.prototypePromises.get(modelKey);
     if (!promise) {
@@ -3640,14 +3674,17 @@
         })
         .catch(() => {
           state.prototypePromises.delete(modelKey);
-          if (entry.requestedModelKey === modelKey) entry.requestedModelKey = null;
           return null;
         });
       state.prototypePromises.set(modelKey, promise);
     }
     promise.then((prototype) => {
       if (!prototype) {
-        if (entry.requestedModelKey === modelKey) entry.requestedModelKey = null;
+        if (entry.requestedModelKey === modelKey) {
+          entry.requestedModelKey = null;
+          entry.failedModelKey = modelKey;
+          drawBattlefield();
+        }
         return;
       }
       if (battlefield3d !== state) return;
@@ -3663,6 +3700,8 @@
       state.objectRoot.remove(entry.root);
       state.objectRoot.add(replacement);
       entry.root = replacement;
+      entry.loadedModelKey = modelKey;
+      entry.requestedModelKey = null;
       drawBattlefield();
     });
   }
@@ -3796,9 +3835,12 @@
       entry = {
         objectKey,
         visualKey,
+        modelKey,
         owner: Number(object[1]),
         root,
-        requestedModelKey: null
+        requestedModelKey: null,
+        loadedModelKey: prototype ? modelKey : null,
+        failedModelKey: null
       };
       state.objects.set(objectKey, entry);
       state.objectRoot.add(root);
@@ -3866,6 +3908,7 @@
   function drawBattlefield3d() {
     if (!battlefield3d || !battlefieldFrames.length || !battlefieldExtraction
         || battlefieldPanel.hidden || !battlefield3dCanvas) {
+      setBattlefield3dLoading(false);
       return;
     }
     const state = battlefield3d;
@@ -3883,6 +3926,7 @@
       : [];
     ensureBattlefield3dTerrain(state, map);
     const visibleObjectKeys = new Set();
+    let pendingModels = 0;
     let visibleStructures = 0;
     let visibleDroids = 0;
     structures.forEach((structure) => {
@@ -3890,18 +3934,23 @@
       visibleStructures += 1;
       const entry = updateBattlefield3dObject(state, "structure", structure);
       visibleObjectKeys.add(entry.objectKey);
+      if (entry.modelKey && entry.loadedModelKey !== entry.modelKey
+          && entry.failedModelKey !== entry.modelKey) pendingModels += 1;
     });
     droids.forEach((droid) => {
       if (battlefieldOwnerIsHidden(droid[1])) return;
       visibleDroids += 1;
       const entry = updateBattlefield3dObject(state, "droid", droid);
       visibleObjectKeys.add(entry.objectKey);
+      if (entry.modelKey && entry.loadedModelKey !== entry.modelKey
+          && entry.failedModelKey !== entry.modelKey) pendingModels += 1;
     });
     state.objects.forEach((entry, objectKey) => {
       if (visibleObjectKeys.has(objectKey)) return;
       state.objectRoot.remove(entry.root);
       state.objects.delete(objectKey);
     });
+    setBattlefield3dLoading(pendingModels > 0);
 
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
     if (state.pixelRatio !== pixelRatio) {
@@ -3931,6 +3980,7 @@
   async function setBattlefieldViewMode(mode) {
     const use3d = mode === "3d";
     if (!use3d || !battlefield3dCanvas) {
+      setBattlefield3dLoading(false);
       if (battlefieldViewMode && !battlefield3dCanvas) battlefieldViewMode.value = "2d";
       battlefieldCanvas.hidden = false;
       if (battlefield3dCanvas) battlefield3dCanvas.hidden = true;
@@ -3940,6 +3990,7 @@
 
     battlefieldCanvas.hidden = false;
     battlefield3dCanvas.hidden = true;
+    setBattlefield3dLoading(true);
     try {
       await ensureBattlefield3d();
       if (battlefieldViewMode?.value !== "3d") return;
@@ -3947,6 +3998,7 @@
       battlefield3dCanvas.hidden = false;
       requestAnimationFrame(drawBattlefield);
     } catch (error) {
+      setBattlefield3dLoading(false);
       console.warn("Unable to start the 3D battlefield.", error);
       if (battlefieldViewMode) battlefieldViewMode.value = "2d";
       battlefieldCanvas.hidden = false;
@@ -4237,6 +4289,7 @@
       battlefieldLastDraw = timestamp;
       drawBattlefield();
     }
+    if (!battlefieldPlaying) return;
     if (battlefieldCurrentTime >= Number(battlefieldRange.max)) {
       stopBattlefieldPlayback();
       return;
@@ -4841,15 +4894,7 @@
       stopBattlefieldPlayback();
       return;
     }
-    if (battlefieldCurrentTime >= Number(battlefieldRange.max)) {
-      battlefieldCurrentTime = 0;
-    }
-    battlefieldPlaying = true;
-    battlefieldPlay.classList.add("is-playing");
-    battlefieldPlay.setAttribute("aria-label", "Pause replay");
-    battlefieldPlay.title = "Pause replay";
-    battlefieldLastTick = 0;
-    battlefieldAnimationFrame = requestAnimationFrame(animateBattlefield);
+    startBattlefieldPlayback();
   });
 
   battlefieldRange.addEventListener("input", () => {

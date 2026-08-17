@@ -326,7 +326,8 @@
   function normalizeTacticalReplayPlayerOwners(engineAnalysis, players) {
     const tacticalReplay = engineAnalysis?.extended?.tacticalReplay;
     const positionFrames = tacticalReplay?.positionFrames;
-    if (!Array.isArray(positionFrames) || !Array.isArray(players)) {
+    if (tacticalReplay?.ownersAreLobbyPositions
+        || !Array.isArray(positionFrames) || !Array.isArray(players)) {
       return;
     }
 
@@ -3028,6 +3029,14 @@
     return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
   }
 
+  async function fetchBattlefieldJson(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Unable to load battlefield model data (${response.status}): ${url}`);
+    }
+    return response.json();
+  }
+
   async function loadBattlefieldModelLibrary() {
     if (battlefieldModelLibraryPromise) {
       return battlefieldModelLibraryPromise;
@@ -3040,16 +3049,16 @@
         import("./mapmaker/js/three.module.js"),
         import("./mapmaker/js/droidGroup.js?v=battlefield-player-colours"),
         import("./mapmaker/js/structureGroup.js"),
-        fetch("mapmaker/pies/components/bodies/body.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/prop/propulsion.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/weapons/weapons.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/templates.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/construction.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/repair.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/sensor.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/brain.json").then((response) => response.json()),
-        fetch("mapmaker/pies/components/ecm.json").then((response) => response.json()),
-        fetch("mapmaker/structure.json").then((response) => response.json())
+        fetchBattlefieldJson("mapmaker/pies/components/bodies/body.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/prop/propulsion.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/weapons/weapons.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/templates.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/construction.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/repair.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/sensor.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/brain.json"),
+        fetchBattlefieldJson("mapmaker/pies/components/ecm.json"),
+        fetchBattlefieldJson("mapmaker/structure.json")
       ]);
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true });
       renderer.setPixelRatio(1);
@@ -3076,7 +3085,12 @@
         structureDefs, structureNames
       };
     })();
-    return battlefieldModelLibraryPromise;
+    try {
+      return await battlefieldModelLibraryPromise;
+    } catch (error) {
+      battlefieldModelLibraryPromise = null;
+      throw error;
+    }
   }
 
   function battlefieldPiePath(value, prefix = "") {
@@ -3151,8 +3165,11 @@
       item.geometry?.dispose?.();
       const materials = Array.isArray(item.material) ? item.material : [item.material];
       materials.filter(Boolean).forEach((material) => {
-        material.map?.dispose?.();
-        material.userData?.teamColorMask?.dispose?.();
+        new Set([
+          material.map,
+          material.userData?.teamColorMask,
+          material.userData?.battlefieldTexture
+        ].filter(Boolean)).forEach((texture) => texture.dispose?.());
         material.dispose?.();
       });
     });
@@ -3621,11 +3638,19 @@
           state.prototypes.set(modelKey, group);
           return group;
         })
-        .catch(() => null);
+        .catch(() => {
+          state.prototypePromises.delete(modelKey);
+          if (entry.requestedModelKey === modelKey) entry.requestedModelKey = null;
+          return null;
+        });
       state.prototypePromises.set(modelKey, promise);
     }
     promise.then((prototype) => {
-      if (!prototype || battlefield3d !== state) return;
+      if (!prototype) {
+        if (entry.requestedModelKey === modelKey) entry.requestedModelKey = null;
+        return;
+      }
+      if (battlefield3d !== state) return;
       const current = state.objects.get(entry.objectKey);
       if (current !== entry || entry.requestedModelKey !== modelKey) return;
       const colour = battlefieldPlayerColour(entry.owner);
@@ -3662,11 +3687,22 @@
     return (north + (south - north) * ratioY) * 0.015;
   }
 
+  function updateBattlefield3dTerrainStyle(state) {
+    const material = state.terrainMesh?.material;
+    if (!material) return;
+    const texture = material.userData?.battlefieldTexture || null;
+    const showTexture = Boolean(battlefieldBackground.checked && texture);
+    material.map = showTexture ? texture : null;
+    material.color.setHex(showTexture ? 0xffffff : 0x18242b);
+    material.needsUpdate = true;
+    state.terrainMesh.visible = true;
+  }
+
   function ensureBattlefield3dTerrain(state, map) {
     if (state.terrainSource === battlefieldTerrain
         && state.terrainMapWidth === map.width
         && state.terrainMapHeight === map.height) {
-      if (state.terrainMesh) state.terrainMesh.visible = battlefieldBackground.checked;
+      updateBattlefield3dTerrainStyle(state);
       return;
     }
 
@@ -3729,8 +3765,9 @@
         texture.colorSpace = THREE.SRGBColorSpace;
       }
       const material = new THREE.MeshLambertMaterial({ map: texture, side: THREE.DoubleSide });
+      material.userData.battlefieldTexture = texture;
       state.terrainMesh = new THREE.Mesh(geometry, material);
-      state.terrainMesh.visible = battlefieldBackground.checked;
+      updateBattlefield3dTerrainStyle(state);
       state.terrainRoot.add(state.terrainMesh);
     }
 
@@ -3801,6 +3838,30 @@
     state.camera.lookAt(targetX, 0, targetZ);
   }
 
+  function battlefield3dGroundPoint(canvasX, canvasY, canvas = battlefield3dCanvas) {
+    if (!battlefield3d || !canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    const { THREE, camera } = battlefield3d;
+    camera.updateMatrixWorld(true);
+    const point = new THREE.Vector3(
+      canvasX / rect.width * 2 - 1,
+      -(canvasY / rect.height) * 2 + 1,
+      0.5
+    ).unproject(camera);
+    const direction = point.sub(camera.position).normalize();
+    if (Math.abs(direction.y) < 0.000001) return null;
+    const distance = -camera.position.y / direction.y;
+    if (distance < 0) return null;
+    return camera.position.clone().add(direction.multiplyScalar(distance));
+  }
+
+  function moveBattlefield3dTarget(deltaX, deltaZ, rect, map) {
+    if (!rect.width || !rect.height || !map.width || !map.height) return;
+    battlefieldView.offsetX -= deltaX / map.width * rect.width * battlefieldView.scale;
+    battlefieldView.offsetY -= deltaZ / map.height * rect.height * battlefieldView.scale;
+  }
+
   function drawBattlefield3d() {
     if (!battlefield3d || !battlefieldFrames.length || !battlefieldExtraction
         || battlefieldPanel.hidden || !battlefield3dCanvas) {
@@ -3820,18 +3881,25 @@
         .filter((droid) => !battlefieldObjectWasDestroyed("droid", droid, battlefieldCurrentTime))
       : [];
     ensureBattlefield3dTerrain(state, map);
-    state.objects.forEach((entry) => { entry.root.visible = false; });
+    const visibleObjectKeys = new Set();
     let visibleStructures = 0;
     let visibleDroids = 0;
     structures.forEach((structure) => {
       if (battlefieldOwnerIsHidden(structure[1])) return;
       visibleStructures += 1;
-      updateBattlefield3dObject(state, "structure", structure);
+      const entry = updateBattlefield3dObject(state, "structure", structure);
+      visibleObjectKeys.add(entry.objectKey);
     });
     droids.forEach((droid) => {
       if (battlefieldOwnerIsHidden(droid[1])) return;
       visibleDroids += 1;
-      updateBattlefield3dObject(state, "droid", droid);
+      const entry = updateBattlefield3dObject(state, "droid", droid);
+      visibleObjectKeys.add(entry.objectKey);
+    });
+    state.objects.forEach((entry, objectKey) => {
+      if (visibleObjectKeys.has(objectKey)) return;
+      state.objectRoot.remove(entry.root);
+      state.objects.delete(objectKey);
     });
 
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -4089,8 +4157,13 @@
     const scale = battlefieldView.scale;
     const visibleWidth = Math.min(1, 1 / scale);
     const visibleHeight = Math.min(1, 1 / scale);
-    const centerX = 0.5 - battlefieldView.offsetX / (fieldWidth * scale);
-    const centerY = 0.5 - battlefieldView.offsetY / (fieldHeight * scale);
+    const active3dRect = battlefield3dIsActive()
+      ? battlefield3dCanvas?.getBoundingClientRect()
+      : null;
+    const offsetWidth = active3dRect?.width || fieldWidth;
+    const offsetHeight = active3dRect?.height || fieldHeight;
+    const centerX = 0.5 - battlefieldView.offsetX / (offsetWidth * scale);
+    const centerY = 0.5 - battlefieldView.offsetY / (offsetHeight * scale);
     const left = Math.max(0, Math.min(1 - visibleWidth, centerX - visibleWidth / 2));
     const top = Math.max(0, Math.min(1 - visibleHeight, centerY - visibleHeight / 2));
     context.strokeStyle = "#6de8ff";
@@ -4115,9 +4188,27 @@
     const centerY = rect.height / 2;
     const x = anchorX == null ? centerX : anchorX;
     const y = anchorY == null ? centerY : anchorY;
-    battlefieldView.offsetX = x - centerX - (x - centerX - battlefieldView.offsetX) * scale / previousScale;
-    battlefieldView.offsetY = y - centerY - (y - centerY - battlefieldView.offsetY) * scale / previousScale;
+    const use3d = battlefield3dIsActive();
+    const groundBefore = use3d ? battlefield3dGroundPoint(x, y, activeCanvas) : null;
+    if (!use3d) {
+      battlefieldView.offsetX = x - centerX - (x - centerX - battlefieldView.offsetX) * scale / previousScale;
+      battlefieldView.offsetY = y - centerY - (y - centerY - battlefieldView.offsetY) * scale / previousScale;
+    }
     battlefieldView.scale = scale;
+    if (groundBefore && battlefieldFrames.length) {
+      const pair = battlefieldFramePair(battlefieldCurrentTime);
+      const map = battlefieldMapSize(pair.current);
+      updateBattlefield3dCamera(battlefield3d, map, rect);
+      const groundAfter = battlefield3dGroundPoint(x, y, activeCanvas);
+      if (groundAfter) {
+        moveBattlefield3dTarget(
+          groundBefore.x - groundAfter.x,
+          groundBefore.z - groundAfter.z,
+          rect,
+          map
+        );
+      }
+    }
     drawBattlefield();
   }
 
@@ -4808,13 +4899,19 @@
       );
     }, { passive: false });
     canvas.addEventListener("pointerdown", (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const groundAnchor = canvas === battlefield3dCanvas && battlefield3dIsActive()
+        ? battlefield3dGroundPoint(event.clientX - rect.left, event.clientY - rect.top, canvas)
+        : null;
       battlefieldPan = {
         canvas,
         pointerId: event.pointerId,
         x: event.clientX,
         y: event.clientY,
         offsetX: battlefieldView.offsetX,
-        offsetY: battlefieldView.offsetY
+        offsetY: battlefieldView.offsetY,
+        groundX: groundAnchor?.x,
+        groundZ: groundAnchor?.z
       };
       canvas.setPointerCapture(event.pointerId);
       canvas.classList.add("is-panning");
@@ -4822,6 +4919,27 @@
     canvas.addEventListener("pointermove", (event) => {
       if (!battlefieldPan || battlefieldPan.canvas !== canvas
           || battlefieldPan.pointerId !== event.pointerId) {
+        return;
+      }
+      if (battlefieldPan.groundX !== undefined && battlefieldPan.groundZ !== undefined
+          && battlefieldFrames.length) {
+        const rect = canvas.getBoundingClientRect();
+        const groundPoint = battlefield3dGroundPoint(
+          event.clientX - rect.left,
+          event.clientY - rect.top,
+          canvas
+        );
+        if (groundPoint) {
+          const pair = battlefieldFramePair(battlefieldCurrentTime);
+          const map = battlefieldMapSize(pair.current);
+          moveBattlefield3dTarget(
+            battlefieldPan.groundX - groundPoint.x,
+            battlefieldPan.groundZ - groundPoint.z,
+            rect,
+            map
+          );
+          drawBattlefield();
+        }
         return;
       }
       battlefieldView.offsetX = battlefieldPan.offsetX + event.clientX - battlefieldPan.x;
@@ -4854,10 +4972,15 @@
     const y = (event.clientY - minimapRect.top) / minimapRect.height * battlefieldMinimap.height;
     const mapX = Math.max(0, Math.min(1, (x - margin) / (battlefieldMinimap.width - margin * 2)));
     const mapY = Math.max(0, Math.min(1, (y - margin) / (battlefieldMinimap.height - margin * 2)));
-    const fieldWidth = Math.max(1, canvasRect.width - 24);
-    const fieldHeight = Math.max(1, canvasRect.height - 24);
-    battlefieldView.offsetX = (0.5 - mapX) * fieldWidth * battlefieldView.scale;
-    battlefieldView.offsetY = (0.5 - mapY) * fieldHeight * battlefieldView.scale;
+    if (battlefield3dIsActive()) {
+      battlefieldView.offsetX = (0.5 - mapX) * canvasRect.width * battlefieldView.scale;
+      battlefieldView.offsetY = (0.5 - mapY) * canvasRect.height * battlefieldView.scale;
+    } else {
+      const fieldWidth = Math.max(1, canvasRect.width - 24);
+      const fieldHeight = Math.max(1, canvasRect.height - 24);
+      battlefieldView.offsetX = (0.5 - mapX) * fieldWidth * battlefieldView.scale;
+      battlefieldView.offsetY = (0.5 - mapY) * fieldHeight * battlefieldView.scale;
+    }
     drawBattlefield();
   });
 

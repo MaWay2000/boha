@@ -3454,8 +3454,12 @@ function startLiveSync() {
   });
 
   eventSource.onmessage = (event) => {
-    sawSignal = true;
-    resultsData.results.push(JSON.parse(event.data));
+    try {
+      sawSignal = true;
+      resultsData.results.push(JSON.parse(event.data));
+    } catch (error) {
+      console.warn("Unable to parse live results event.", error);
+    }
   };
 
   eventSource.addEventListener("synced", () => {

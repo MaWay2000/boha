@@ -12,6 +12,10 @@ export function parsePie(data) {
   let texWidth = null;
   let texHeight = null;
   let currentLevel = 1;
+  const nextLine = () => {
+    i += 1;
+    return i < lines.length ? lines[i] : null;
+  };
   while (i < lines.length) {
     const line = lines[i].trim();
     if (line.startsWith('TYPE')) {
@@ -32,28 +36,59 @@ export function parsePie(data) {
       const parts = line.split(/\s+/);
       const count = parseInt(parts[1], 10);
       for (let j = 0; j < count; j++) {
-        i++;
-        const coords = lines[i].trim().split(/\s+/).map(parseFloat);
-        if (currentLevel === 1) {
+        const pointLine = nextLine();
+        if (!pointLine || currentLevel !== 1) {
+          continue;
+        }
+        const coords = pointLine.trim().split(/\s+/).map(Number);
+        if (coords.length >= 3) {
           points.push([coords[0] / 128, coords[1] / 128, coords[2] / 128]);
         }
       }
     } else if (line.startsWith('POLYGONS')) {
       const count = parseInt(line.split(/\s+/)[1], 10);
+      const isValidPolygonLine = (values) => (
+        Array.isArray(values)
+          && values.length >= 2
+          && Number.isFinite(values[1])
+          && values[1] >= 3
+      );
       for (let j = 0; j < count; j++) {
-        i++;
+        const polygonLine = nextLine();
+        if (currentLevel !== 1 || !polygonLine) {
+          continue;
+        }
+        const nums = polygonLine.trim().split(/\s+/).map(Number);
+        if (!isValidPolygonLine(nums)) {
+          continue;
+        }
+        const vertCount = Math.floor(nums[1]);
+        const uvNeeded = 2 + (vertCount * 3);
+        if (nums.length < uvNeeded) {
+          continue;
+        }
         if (currentLevel !== 1) continue;
-        const nums = lines[i].trim().split(/\s+/).map(Number);
-        if (nums.length < 3) continue;
-        const vertCount = nums[1];
         const startIdx = 2;
         const indices = nums.slice(startIdx, startIdx + vertCount);
         const uvStart = startIdx + vertCount;
         const uvPairs = nums.slice(uvStart);
+        const isNumberIndex = (value) => Number.isFinite(value) && Number.isInteger(value);
+        const isValidUVPair = (index) => (
+          index * 2 + 1 < uvPairs.length
+          && Number.isFinite(uvPairs[index * 2])
+          && Number.isFinite(uvPairs[(index * 2) + 1])
+        );
+
         for (let k = 1; k < vertCount - 1; k++) {
           const a = indices[0];
           const b = indices[k];
           const c = indices[k + 1];
+          if (![a, b, c].every((vertex) => isNumberIndex(vertex) && points[vertex])) {
+            continue;
+          }
+          if (!isValidUVPair(0) || !isValidUVPair(k) || !isValidUVPair(k + 1)) {
+            continue;
+          }
           triIndices.push([a, b, c]);
           const uvA = [uvPairs[0], uvPairs[1]];
           const uvB = [uvPairs[2 * k], uvPairs[2 * k + 1]];
@@ -64,8 +99,11 @@ export function parsePie(data) {
     } else if (line.startsWith('CONNECTORS')) {
       const count = parseInt(line.split(/\s+/)[1], 10);
       for (let j = 0; j < count; j++) {
-        i++;
-        const coords = lines[i].trim().split(/\s+/).map(parseFloat);
+        const pointLine = nextLine();
+        if (!pointLine) {
+          continue;
+        }
+        const coords = pointLine.trim().split(/\s+/).map(Number);
         if (currentLevel === 1 && coords.length >= 3) {
           connectors.push([coords[0] / 128, coords[1] / 128, coords[2] / 128]);
         }
@@ -82,10 +120,19 @@ export function parsePie(data) {
   };
   triIndices.forEach((face, idx) => {
     const uvSet = triUVs[idx];
+    if (!face || !uvSet) {
+      return;
+    }
+    if (face.length !== 3 || uvSet.length !== 3) {
+      return;
+    }
     for (let j = 0; j < 3; j++) {
       const p = points[face[j]];
-      positions.push(p[0], p[1], p[2]);
       const uv = uvSet[j];
+      if (!p || !uv || !Number.isFinite(uv[0]) || !Number.isFinite(uv[1])) {
+        return;
+      }
+      positions.push(p[0], p[1], p[2]);
       const u = normalizeUv(uv[0], texWidth);
       const v = 1 - normalizeUv(uv[1], texHeight);
       uvs.push(u, v);

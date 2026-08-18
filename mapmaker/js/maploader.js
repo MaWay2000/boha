@@ -145,6 +145,9 @@ export async function loadMapUnified(input) {
     buffer = await input.arrayBuffer();
   } else if (typeof input === "string") {
     const res = await fetch(input);
+    if (!res.ok) {
+      throw new Error(`Unable to load map file (${res.status}): ${input}`);
+    }
     buffer = await res.arrayBuffer();
   } else {
     throw new Error("Unsupported input type");
@@ -185,6 +188,11 @@ export async function getTilesetIndexFromTtp(zip, TTP_TILESET_MAP) {
   if (!ttpFileName) return 0;
 
   const ttpData = await zip.files[ttpFileName].async("uint8array");
+  if (!ttpData || ttpData.length < 14) {
+    console.warn(`Unable to parse ${ttpFileName}; invalid payload size ${ttpData?.length || 0}.`);
+    return 0;
+  }
+
   const code = (ttpData[12] << 8) | ttpData[13];
   const idx = TTP_TILESET_MAP[code] ?? 0;
   console.log(`Tileset code from ${ttpFileName}: 0x${code.toString(16).padStart(4, '0')} => idx ${idx}`);

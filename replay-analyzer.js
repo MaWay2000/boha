@@ -19,8 +19,10 @@
   const results = document.getElementById("replayResults");
   const summary = document.getElementById("replaySummary");
   const matchSummary = document.getElementById("replayMatchSummary");
+  const playersTables = document.getElementById("replayPlayerTables");
   const playersBody = document.getElementById("replayPlayers");
-  const playersHead = playersBody.closest("table").querySelector("thead");
+  const playersBodyB = document.getElementById("replayPlayersB");
+  const playersHead = document.getElementById("replayPlayersHeadA");
   const messagesBody = document.getElementById("replayMessages");
   const eventsBody = document.getElementById("replayEvents");
   const eventsNote = document.getElementById("replayEventsNote");
@@ -34,7 +36,9 @@
   const battlefieldSpeedValue = document.getElementById("replayBattlefieldSpeedValue");
   const battlefieldDroids = document.getElementById("replayBattlefieldDroids");
   const battlefieldStructures = document.getElementById("replayBattlefieldStructures");
+  const battlefieldBattleMarkers = document.getElementById("replayBattlefieldBattleMarkers");
   const battlefieldBackground = document.getElementById("replayBattlefieldBackground");
+  const battlefieldBackgroundOption = battlefieldBackground.closest(".replay-battlefield-option");
   const battlefieldTiles = document.getElementById("replayBattlefieldTiles");
   const battlefieldTileQuality = document.getElementById("replayBattlefieldTileQuality");
   const battlefieldViewMode = document.getElementById("replayBattlefieldViewMode");
@@ -42,6 +46,7 @@
   const battlefieldRotateRight = document.getElementById("replayBattlefieldRotateRight");
   const battlefieldZoomOut = document.getElementById("replayBattlefieldZoomOut");
   const battlefieldZoomIn = document.getElementById("replayBattlefieldZoomIn");
+  const battlefieldZoomSlider = document.getElementById("replayBattlefieldZoomSlider");
   const battlefieldResetView = document.getElementById("replayBattlefieldResetView");
   const battlefieldFullscreen = document.getElementById("replayBattlefieldFullscreen");
   const battlefieldZoom = document.getElementById("replayBattlefieldZoom");
@@ -52,10 +57,13 @@
   const battlefieldFooter = battlefieldPanel.querySelector(".replay-battlefield-footer");
   const battlefieldLoading = document.getElementById("replayBattlefieldLoading");
   const battlefieldMinimap = document.getElementById("replayBattlefieldMinimap");
+  const battlefieldMinimapToggle = document.getElementById("replayBattlefieldMinimapToggle");
   const battlefieldLegend = document.getElementById("replayBattlefieldLegend");
   const battlefieldMomentum = document.getElementById("replayBattlefieldMomentum");
   const battlefieldMomentumChart = document.getElementById("replayBattlefieldMomentumChart");
   const battlefieldMomentumValue = document.getElementById("replayBattlefieldMomentumValue");
+  const battlefieldMomentumTitle = document.getElementById("replayBattlefieldMomentumTitle");
+  const battlefieldMomentumMetrics = document.getElementById("replayBattlefieldMomentumMetrics");
   const battlefieldRange = document.getElementById("replayBattlefieldRange");
   const battlefieldTime = document.getElementById("replayBattlefieldTime");
   const battlefieldDuration = document.getElementById("replayBattlefieldDuration");
@@ -71,6 +79,74 @@
   playerStoryPopup.className = "replay-player-story-popup";
   playerStoryPopup.hidden = true;
   document.body.append(playerStoryPopup);
+  const battlefieldPlayerTooltip = document.createElement("div");
+  battlefieldPlayerTooltip.className = "replay-battlefield-player-tooltip";
+  battlefieldPlayerTooltip.id = "replayBattlefieldPlayerTooltip";
+  battlefieldPlayerTooltip.setAttribute("role", "tooltip");
+  battlefieldPlayerTooltip.hidden = true;
+  document.body.append(battlefieldPlayerTooltip);
+  const fixedTooltipPopup = document.createElement("div");
+  let fixedTooltipTarget = null;
+  fixedTooltipPopup.className = "replay-fixed-tooltip-popup";
+  fixedTooltipPopup.setAttribute("role", "tooltip");
+  fixedTooltipPopup.hidden = true;
+  document.body.append(fixedTooltipPopup);
+
+  function setFixedTooltip(element, text) {
+    if (!element) return;
+    element.classList.add("replay-fixed-tooltip");
+    element.dataset.tooltip = text;
+    element.removeAttribute("title");
+  }
+
+  function positionFixedTooltip(target) {
+    const targetRect = target.getBoundingClientRect();
+    const popupRect = fixedTooltipPopup.getBoundingClientRect();
+    const viewportPadding = 8;
+    const centeredLeft = targetRect.left + (targetRect.width / 2) - (popupRect.width / 2);
+    const left = Math.max(viewportPadding, Math.min(centeredLeft, window.innerWidth - popupRect.width - viewportPadding));
+    const fitsAbove = targetRect.top >= popupRect.height + 14;
+    const top = fitsAbove
+      ? targetRect.top - popupRect.height - 10
+      : targetRect.bottom + 10;
+    const arrowLeft = Math.max(9, Math.min(targetRect.left + (targetRect.width / 2) - left, popupRect.width - 9));
+    fixedTooltipPopup.classList.toggle("is-below", !fitsAbove);
+    fixedTooltipPopup.style.left = `${left}px`;
+    fixedTooltipPopup.style.top = `${top}px`;
+    fixedTooltipPopup.style.setProperty("--tooltip-arrow-left", `${arrowLeft}px`);
+  }
+
+  function showFixedTooltip(target) {
+    const text = target?.dataset.tooltip;
+    if (!text) return;
+    fixedTooltipTarget = target;
+    fixedTooltipPopup.textContent = text;
+    fixedTooltipPopup.hidden = false;
+    positionFixedTooltip(target);
+  }
+
+  function hideFixedTooltip(target = null) {
+    if (target && target !== fixedTooltipTarget) return;
+    fixedTooltipTarget = null;
+    fixedTooltipPopup.hidden = true;
+  }
+
+  document.addEventListener("pointerover", (event) => {
+    const target = event.target.closest?.(".replay-fixed-tooltip[data-tooltip]");
+    if (target && target !== fixedTooltipTarget) showFixedTooltip(target);
+  });
+  document.addEventListener("pointerout", (event) => {
+    if (fixedTooltipTarget && !fixedTooltipTarget.contains(event.relatedTarget)) hideFixedTooltip(fixedTooltipTarget);
+  });
+  document.addEventListener("focusin", (event) => {
+    const target = event.target.closest?.(".replay-fixed-tooltip[data-tooltip]");
+    if (target) showFixedTooltip(target);
+  });
+  document.addEventListener("focusout", (event) => {
+    if (fixedTooltipTarget && !fixedTooltipTarget.contains(event.relatedTarget)) hideFixedTooltip();
+  });
+  window.addEventListener("scroll", () => hideFixedTooltip(), true);
+  window.addEventListener("resize", () => hideFixedTooltip());
 
   const textDecoder = new TextDecoder("utf-8", { fatal: true });
   const displayedEventLimit = 500;
@@ -196,11 +272,14 @@
   const battlefieldHiddenPlayers = new Set();
   const battlefieldPlayerStatElements = new Map();
   const battlefieldTeamStatElements = new Map();
-  const battlefieldTeamColours = ["#6de8ff", "#ffb84d"];
+  const battlefieldTeamColours = ["#ffffff", "#000000"];
   let battlefieldRenderedSnapshotTime = null;
   let battlefieldMomentumSeries = [];
   let battlefieldMomentumDuration = 0;
-  const battlefieldView = { scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
+  let battlefieldMomentumMetric = "momentum";
+  let battlefieldMomentumScaleMinimum = 0;
+  let battlefieldMomentumScaleMaximum = 1;
+  const battlefieldView = { scale: 1.5625, offsetX: 0, offsetY: 0, rotation: -Math.PI / 4 };
   let battlefieldPan = null;
   let battlefieldOwnersUsePositions = false;
   let battlefield3d = null;
@@ -208,6 +287,58 @@
   let battlefield3dGeneration = 0;
   let battlefield3dLoading = false;
   let battlefield3dResumeAfterLoading = false;
+  let battlefield3dLoadingStartedAt = 0;
+  let battlefield3dLoadingHideTimer = 0;
+  let battlefieldSelectedPlayer = null;
+  let battlefieldEventMarkers = [];
+  const battlefieldSettingsKey = "replayBattlefieldSettingsV1";
+
+  function loadBattlefieldSettings() {
+    try {
+      return JSON.parse(localStorage.getItem(battlefieldSettingsKey) || "{}") || {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveBattlefieldSettings() {
+    try {
+      localStorage.setItem(battlefieldSettingsKey, JSON.stringify({
+        view: battlefieldViewMode?.value || "3d",
+        speed: Number(battlefieldSpeed?.value) || 0,
+        quality: battlefieldTileQuality?.value || "high",
+        droids: Boolean(battlefieldDroids?.checked),
+        structures: Boolean(battlefieldStructures?.checked),
+        battleMarkers: Boolean(battlefieldBattleMarkers?.checked),
+        background: Boolean(battlefieldBackground?.checked),
+        tiles: Boolean(battlefieldTiles?.checked),
+        minimapCollapsed: Boolean(battlefieldStage?.classList.contains("is-minimap-collapsed"))
+      }));
+    } catch (_) {
+      // Storage may be unavailable in privacy modes; replay controls still work normally.
+    }
+  }
+
+  function syncBattlefieldBackgroundOption() {
+    battlefieldBackgroundOption.hidden = battlefieldTiles.checked;
+  }
+
+  const battlefieldSettings = loadBattlefieldSettings();
+  battlefieldViewMode.value = ["2d", "3d"].includes(battlefieldSettings.view)
+    ? battlefieldSettings.view
+    : "3d";
+  battlefieldSpeed.value = String(Math.max(0, Math.min(3, Number(battlefieldSettings.speed ?? 2))));
+  battlefieldSpeedValue.value = `${battlefieldPlaybackSpeed()}×`;
+  battlefieldTileQuality.value = ["low", "medium", "high", "ultra"].includes(battlefieldSettings.quality)
+    ? battlefieldSettings.quality
+    : "high";
+  battlefieldDroids.checked = battlefieldSettings.droids !== false;
+  battlefieldStructures.checked = battlefieldSettings.structures !== false;
+  battlefieldBattleMarkers.checked = battlefieldSettings.battleMarkers !== false;
+  battlefieldBackground.checked = battlefieldSettings.background !== false;
+  battlefieldTiles.checked = battlefieldSettings.tiles !== false;
+  syncBattlefieldBackgroundOption();
+  battlefieldStage.classList.toggle("is-minimap-collapsed", battlefieldSettings.minimapCollapsed === true);
 
   class ReplayMessageReader {
     constructor(bytes) {
@@ -1209,10 +1340,17 @@
     return cell;
   }
 
-  function createPlayerSlotCell(player) {
+  function createPlayerSlotCell(player, teamLabel) {
     const cell = document.createElement("td");
     const identity = document.createElement("span");
     identity.className = "replay-player-identity";
+
+    const teamBadge = document.createElement("span");
+    teamBadge.className = "replay-player-table-team-badge";
+    teamBadge.textContent = teamLabel;
+    setFixedTooltip(teamBadge, `Team ${teamLabel}`);
+    teamBadge.setAttribute("aria-label", `Team ${teamLabel}`);
+    identity.append(teamBadge);
 
     const colourId = player.spectator ? 10 : Number(player.colour);
     const colour = playerColours[colourId];
@@ -1220,12 +1358,13 @@
       const marker = document.createElement("span");
       marker.className = "replay-player-colour";
       marker.style.backgroundColor = colour.value;
-      marker.title = player.spectator ? "Spectator" : `${colour.name} (colour ${colourId})`;
+      setFixedTooltip(marker, player.spectator ? "Spectator" : `${colour.name} (colour ${colourId})`);
       marker.setAttribute("aria-label", player.spectator ? "Spectator" : colour.name);
       identity.append(marker);
     }
 
     const slotNumber = document.createElement("span");
+    slotNumber.className = "replay-player-table-slot-badge";
     slotNumber.textContent = player.position == null ? "—" : String(player.position);
     identity.append(slotNumber);
     cell.append(identity);
@@ -1898,8 +2037,32 @@
     playerStoryPopup.hidden = true;
   }
 
+  function showBattlefieldPlayerTooltip(button, anchor) {
+    battlefieldPlayerTooltip.textContent = button.dataset.tooltip || "";
+    battlefieldPlayerTooltip.hidden = false;
+    const anchorRect = anchor.getBoundingClientRect();
+    const tooltipRect = battlefieldPlayerTooltip.getBoundingClientRect();
+    const showBelow = anchorRect.top < tooltipRect.height + 14;
+    const left = Math.min(
+      Math.max(12, anchorRect.left + anchorRect.width / 2 - tooltipRect.width / 2),
+      window.innerWidth - tooltipRect.width - 12
+    );
+    const top = showBelow
+      ? anchorRect.bottom + 10
+      : anchorRect.top - tooltipRect.height - 10;
+    battlefieldPlayerTooltip.classList.toggle("is-below", showBelow);
+    battlefieldPlayerTooltip.style.left = `${left}px`;
+    battlefieldPlayerTooltip.style.top = `${top}px`;
+  }
+
+  function hideBattlefieldPlayerTooltip() {
+    battlefieldPlayerTooltip.hidden = true;
+  }
+
   window.addEventListener("scroll", hidePlayerStory, true);
   window.addEventListener("resize", hidePlayerStory);
+  window.addEventListener("scroll", hideBattlefieldPlayerTooltip, true);
+  window.addEventListener("resize", hideBattlefieldPlayerTooltip);
 
   function calculateResearchActivity(players, events, matchDuration) {
     return new Map(players.map((player) => {
@@ -2069,7 +2232,7 @@
   }
 
   function updatePlayerSortIndicators() {
-    playersHead.querySelectorAll(".stats-sort-button[data-player-sort-key]").forEach((button) => {
+    playersTables.querySelectorAll(".stats-sort-button[data-player-sort-key]").forEach((button) => {
       const active = button.dataset.playerSortKey === playerSortState.key;
       button.dataset.direction = active ? playerSortState.direction : "";
       button.classList.toggle("is-active", active);
@@ -2087,7 +2250,7 @@
     button.className = "stats-sort-button stats-sort-button-compact";
     button.dataset.playerSortKey = key;
     button.textContent = label;
-    button.title = `Sort players by ${label}`;
+    setFixedTooltip(button, `Sort players by ${label}`);
     button.addEventListener("click", () => {
       if (playerSortState.key === key) {
         playerSortState.direction = playerSortState.direction === "asc" ? "desc" : "asc";
@@ -2104,7 +2267,7 @@
     return cell;
   }
 
-  function createPlayerRow(player, players, events, awards, researchActivity) {
+  function createPlayerRow(player, players, events, awards, researchActivity, teamLabel) {
     const row = document.createElement("tr");
     const result = formatPlayerResult(player);
     if (result === "Won") {
@@ -2115,9 +2278,8 @@
 
     const stats = player.summary || {};
     row.append(
-      createPlayerSlotCell(player),
+      createPlayerSlotCell(player, teamLabel),
       createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
-      createPlayerAwardsCell(awards),
       createCell(formatStat(stats.score)),
       createCell(formatTotalKd(player)),
       createResearchCell(researchActivity),
@@ -2130,7 +2292,8 @@
       createCell(formatStat(stats.structuresLost)),
       createCell(formatStat(stats.structuresDestroyed)),
       createCell(formatStat(stats.remainingStructures)),
-      createCell(formatStructureKd(player))
+      createCell(formatStructureKd(player)),
+      createPlayerAwardsCell(awards)
     );
     return row;
   }
@@ -2216,7 +2379,7 @@
       const badge = document.createElement("span");
       badge.className = "replay-upset-badge";
       badge.textContent = "Upset victory";
-      badge.title = "The winning team finished with a lower combined replay score than the strongest opposing team.";
+      setFixedTooltip(badge, "The winning team finished with a lower combined replay score than the strongest opposing team.");
       heading.append(badge);
     }
 
@@ -2237,9 +2400,9 @@
       itemLabel.textContent = label;
       itemValue.textContent = value;
       if (label === "Combat race") {
-        item.title = `${totalKills.toLocaleString()} total kills across ${formatDuration(extraction.match.elapsedMilliseconds)}.`;
+        setFixedTooltip(item, `${totalKills.toLocaleString()} total kills across ${formatDuration(extraction.match.elapsedMilliseconds)}.`);
       } else if (label === "Team power difference") {
-        item.title = "Difference between the winning team and strongest opposing team by combined replay score.";
+        setFixedTooltip(item, "Difference between the winning team and strongest opposing team by combined replay score.");
       }
       item.append(itemLabel, itemValue);
       grid.append(item);
@@ -2403,7 +2566,7 @@
     const value = document.createElement("strong");
     wrapper.className = "replay-battlefield-player-stat";
     wrapper.setAttribute("aria-label", label);
-    wrapper.title = label;
+    setFixedTooltip(wrapper, label);
     value.textContent = "--";
     if (["score", "killDeathRatio", "kills", "researchActivity", "droidsAlive", "structuresAlive", "power"].includes(key)) {
       const bar = document.createElement("span");
@@ -2419,10 +2582,15 @@
             : key === "power" ? "is-power" : "is-alive"
       );
       bar.className = "replay-battlefield-score-bar";
-      const averageMarker = key === "researchActivity" ? null : document.createElement("span");
+      const averageMarker = document.createElement("span");
       if (averageMarker) {
         averageMarker.className = "replay-battlefield-average-marker";
-        averageMarker.title = "Current average";
+        if (key === "researchActivity") {
+          setFixedTooltip(averageMarker, "Opponent team research");
+          averageMarker.hidden = true;
+        } else {
+          setFixedTooltip(averageMarker, "Current average");
+        }
         averageMarker.setAttribute("aria-hidden", "true");
         wrapper.append(bar, averageMarker, value);
       } else {
@@ -2470,6 +2638,15 @@
       return kills > 0 ? Number.POSITIVE_INFINITY : 0;
     }
     return kills / deaths;
+  }
+
+  function battlefieldGraphKillDeathRatio(player) {
+    const deaths = Number(player?.droidsLost);
+    // Ignore unstable opening ratios where one early loss can create a large visual spike.
+    if (!Number.isFinite(deaths) || deaths < 5) {
+      return 0;
+    }
+    return battlefieldKillDeathRatio(player) ?? 0;
   }
 
   function battlefieldKillDeathBarRatio(ratio, bestRatio) {
@@ -2541,6 +2718,28 @@
       0
     );
 
+    if (battlefieldMomentumMetric !== "momentum") {
+      return new Map(teams.map(({ team, value }) => {
+        let metricValue = 0;
+        if (battlefieldMomentumMetric === "score") {
+          metricValue = Number(value.score) || 0;
+        } else if (battlefieldMomentumMetric === "kd") {
+          metricValue = battlefieldGraphKillDeathRatio(value);
+        } else if (battlefieldMomentumMetric === "kills") {
+          metricValue = Number(value.kills) || 0;
+        } else if (battlefieldMomentumMetric === "units") {
+          metricValue = Number(value.droidsAlive) || 0;
+        } else if (battlefieldMomentumMetric === "buildings") {
+          metricValue = Number(value.structuresAlive) || 0;
+        } else if (battlefieldMomentumMetric === "research") {
+          metricValue = Math.max(0, Math.min(1, (battlefieldResearchActivity(value) || 0) / 100));
+        } else if (battlefieldMomentumMetric === "power") {
+          metricValue = battlefieldScoreRatio(Number(value.power), totalPower);
+        }
+        return [team, metricValue];
+      }));
+    }
+
     return new Map(teams.map(({ team, value }) => [team, battlefieldAverage([
       battlefieldScoreRatio(Number(value.score), bestScore),
       battlefieldKillDeathBarRatio(battlefieldKillDeathRatio(value), bestKillDeathRatio),
@@ -2563,11 +2762,36 @@
         const ratio = duration > 0
           ? Math.max(0, Math.min(1, (timeMilliseconds - previous.time) / duration))
           : 0;
+        if (!Number.isFinite(previous.value) || !Number.isFinite(next.value)) {
+          return ratio < 0.5 ? previous.value : next.value;
+        }
         return previous.value + (next.value - previous.value) * ratio;
       }
       previous = next;
     }
     return previous.value;
+  }
+
+  function battlefieldMomentumUsesRawValues() {
+    return ["score", "kd", "kills", "units", "buildings"].includes(battlefieldMomentumMetric);
+  }
+
+  function battlefieldMomentumPlotRatio(value) {
+    if (value === Number.POSITIVE_INFINITY) return 1;
+    if (!Number.isFinite(value)) return 0;
+    const range = battlefieldMomentumScaleMaximum - battlefieldMomentumScaleMinimum;
+    if (range <= 0) return 0;
+    return Math.max(0, Math.min(1, (value - battlefieldMomentumScaleMinimum) / range));
+  }
+
+  function formatBattlefieldMomentumValue(value) {
+    if (!battlefieldMomentumUsesRawValues()) {
+      return `${Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100)}%`;
+    }
+    if (value === Number.POSITIVE_INFINITY) return "∞";
+    if (!Number.isFinite(value)) return "0";
+    if (battlefieldMomentumMetric === "kd") return value.toFixed(2);
+    return Math.round(value).toLocaleString();
   }
 
   function updateBattlefieldMomentumCursor() {
@@ -2591,12 +2815,32 @@
     const labels = [];
     battlefieldMomentumSeries.forEach((series) => {
       const value = battlefieldMomentumPointAtTime(series.points, battlefieldCurrentTime);
-      const y = bottom - Math.max(0, Math.min(1, value)) * (bottom - top);
+      const y = bottom - battlefieldMomentumPlotRatio(value) * (bottom - top);
       series.dot.setAttribute("cx", String(x));
       series.dot.setAttribute("cy", String(y));
-      labels.push(`${series.label.replace("Team ", "")} ${Math.round(value * 100)}%`);
+      labels.push(`${series.label.replace("Team ", "")} ${formatBattlefieldMomentumValue(value)}`);
     });
     battlefieldMomentumValue.value = labels.join(" · ");
+  }
+
+  function alignBattlefieldMomentumToTimeline() {
+    if (battlefieldMomentum.hidden) {
+      return;
+    }
+    battlefieldMomentumChart.style.setProperty("--battlefield-momentum-timeline-inset", "0px");
+    const chartRect = battlefieldMomentumChart.getBoundingClientRect();
+    const rangeRect = battlefieldRange.getBoundingClientRect();
+    if (chartRect.width <= 0 || rangeRect.width <= 0) {
+      return;
+    }
+    const plotLeftRatio = 38 / 600;
+    const inset = (rangeRect.left - chartRect.left - chartRect.width * plotLeftRatio)
+      / (1 - plotLeftRatio);
+    const maximumInset = chartRect.width * 0.4;
+    battlefieldMomentumChart.style.setProperty(
+      "--battlefield-momentum-timeline-inset",
+      `${Math.max(0, Math.min(maximumInset, inset))}px`
+    );
   }
 
   function renderBattlefieldMomentum(extraction) {
@@ -2621,6 +2865,29 @@
       Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
       return element;
     };
+
+    const seriesPoints = new Map(teams.map((team) => [team, []]));
+    snapshots.forEach((snapshot) => {
+      const time = Math.max(0, Number(snapshot.timeMilliseconds) || 0);
+      const values = battlefieldTeamMomentumAtSnapshot(snapshot);
+      teams.forEach((team) => {
+        if (values.has(team)) {
+          seriesPoints.get(team).push({ time, value: values.get(team) });
+        }
+      });
+    });
+    if (battlefieldMomentumUsesRawValues()) {
+      const finiteValues = [...seriesPoints.values()]
+        .flatMap((points) => points.map((point) => point.value))
+        .filter(Number.isFinite);
+      battlefieldMomentumScaleMinimum = battlefieldMomentumMetric === "score"
+        ? Math.min(0, ...finiteValues)
+        : 0;
+      battlefieldMomentumScaleMaximum = Math.max(1, ...finiteValues);
+    } else {
+      battlefieldMomentumScaleMinimum = 0;
+      battlefieldMomentumScaleMaximum = 1;
+    }
     [0, 0.5, 1].forEach((value) => {
       const y = bottom - value * (bottom - top);
       const line = createSvgElement("line", {
@@ -2635,19 +2902,10 @@
         x: 2,
         y: y + 4
       });
-      label.textContent = `${Math.round(value * 100)}%`;
+      const axisValue = battlefieldMomentumScaleMinimum
+        + value * (battlefieldMomentumScaleMaximum - battlefieldMomentumScaleMinimum);
+      label.textContent = formatBattlefieldMomentumValue(axisValue);
       battlefieldMomentumChart.append(line, label);
-    });
-
-    const seriesPoints = new Map(teams.map((team) => [team, []]));
-    snapshots.forEach((snapshot) => {
-      const time = Math.max(0, Number(snapshot.timeMilliseconds) || 0);
-      const values = battlefieldTeamMomentumAtSnapshot(snapshot);
-      teams.forEach((team) => {
-        if (values.has(team)) {
-          seriesPoints.get(team).push({ time, value: values.get(team) });
-        }
-      });
     });
 
     const colours = battlefieldTeamColours;
@@ -2667,7 +2925,7 @@
       }
       const coordinates = points.map((point) => ({
         x: left + Math.min(1, point.time / battlefieldMomentumDuration) * (right - left),
-        y: bottom - Math.max(0, Math.min(1, point.value)) * (bottom - top)
+        y: bottom - battlefieldMomentumPlotRatio(point.value) * (bottom - top)
       }));
       const lineData = coordinates
         .map((point, pointIndex) => `${pointIndex ? "L" : "M"}${point.x},${point.y}`)
@@ -2679,16 +2937,21 @@
         d: areaData,
         fill: colours[index]
       });
+      area.style.opacity = colours[index] === "#000000" ? "0.48" : "0.22";
       const line = createSvgElement("path", {
         class: "replay-battlefield-momentum-line",
         d: lineData,
         stroke: colours[index]
       });
+      if (colours[index] === "#000000") {
+        line.style.filter = "drop-shadow(0 0 1px rgba(255, 255, 255, 0.95))";
+      }
       const dot = createSvgElement("circle", {
         class: "replay-battlefield-momentum-dot",
         r: 5,
         fill: colours[index]
       });
+      dot.style.stroke = colours[index] === "#000000" ? "#ffffff" : "#071016";
       battlefieldMomentumChart.append(area, line);
       battlefieldMomentumSeries.push({
         label: `Team ${String.fromCharCode(65 + index)}`,
@@ -2705,13 +2968,50 @@
     }));
     battlefieldMomentumSeries.forEach((series) => battlefieldMomentumChart.append(series.dot));
     updateBattlefieldMomentumCursor();
+    requestAnimationFrame(alignBattlefieldMomentumToTimeline);
   }
+
+  battlefieldMomentumMetrics?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-metric]");
+    if (!button || !battlefieldMomentumMetrics.contains(button)) return;
+    const metric = button.dataset.metric;
+    if (!metric || metric === battlefieldMomentumMetric) return;
+    battlefieldMomentumMetric = metric;
+    battlefieldMomentumMetrics.querySelectorAll("[data-metric]").forEach((metricButton) => {
+      metricButton.setAttribute("aria-pressed", String(metricButton === button));
+    });
+    if (battlefieldMomentumTitle) {
+      const label = button.textContent.trim();
+      battlefieldMomentumTitle.textContent = metric === "momentum" ? "Team momentum" : `Team ${label}`;
+    }
+    if (battlefieldExtraction) renderBattlefieldMomentum(battlefieldExtraction);
+  });
 
   function updateBattlefieldAverageMarker(marker, ratio) {
     if (!marker) {
       return;
     }
     marker.style.left = `${Math.max(0, Math.min(1, Number(ratio) || 0)) * 100}%`;
+  }
+
+  function updateBattlefieldMetricMarker(marker, comparisonRatio, averageRatio) {
+    if (!marker) {
+      return false;
+    }
+    const normalizedComparison = Number(comparisonRatio);
+    const normalizedAverage = Number(averageRatio);
+    const hasComparison = comparisonRatio != null && Number.isFinite(normalizedComparison);
+    const hasAverage = averageRatio != null && Number.isFinite(normalizedAverage);
+    marker.hidden = !hasComparison && !hasAverage;
+    marker.classList.toggle("is-opponent-comparison", hasComparison);
+    setFixedTooltip(marker, hasComparison ? "Opponent team value" : "Current average");
+    if (hasComparison || hasAverage) {
+      updateBattlefieldAverageMarker(
+        marker,
+        hasComparison ? normalizedComparison : normalizedAverage
+      );
+    }
+    return hasComparison;
   }
 
   function updateBattlefieldStatFields(
@@ -2751,7 +3051,11 @@
         bar.style.width = `${visibleRatio * 100}%`;
         bar.style.setProperty("--battlefield-score-hue", String(Math.round(ratio * 120)));
         value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
-        updateBattlefieldAverageMarker(averageMarker, barContext.averageScoreRatio);
+        updateBattlefieldMetricMarker(
+          averageMarker,
+          barContext.comparisonScoreRatio,
+          barContext.averageScoreRatio
+        );
         value.parentElement.setAttribute(
           "aria-label",
           `Score ${value.textContent}, ${Math.round(ratio * 100)}% of the leading score`
@@ -2766,7 +3070,11 @@
         bar.style.width = `${visibleRatio * 100}%`;
         bar.style.setProperty("--battlefield-kd-hue", String(Math.round(ratio * 120)));
         value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
-        updateBattlefieldAverageMarker(averageMarker, barContext.averageKillDeathRatio);
+        updateBattlefieldMetricMarker(
+          averageMarker,
+          barContext.comparisonKillDeathRatio,
+          barContext.averageKillDeathRatio
+        );
         value.parentElement.setAttribute(
           "aria-label",
           `K/D ${value.textContent}, ${Math.round(ratio * 100)}% of the leading K/D`
@@ -2778,7 +3086,11 @@
         bar.style.width = `${visibleRatio * 100}%`;
         bar.style.setProperty("--battlefield-kills-hue", String(Math.round(ratio * 120)));
         value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
-        updateBattlefieldAverageMarker(averageMarker, barContext.averageKillsRatio);
+        updateBattlefieldMetricMarker(
+          averageMarker,
+          barContext.comparisonKillsRatio,
+          barContext.averageKillsRatio
+        );
         value.parentElement.setAttribute(
           "aria-label",
           `Kills ${value.textContent}, ${Math.round(ratio * 100)}% of the leading kill count`
@@ -2791,9 +3103,18 @@
         bar.style.width = `${visibleRatio * 100}%`;
         bar.style.setProperty("--battlefield-research-hue", String(Math.round(ratio * 120)));
         value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
+        const comparisonRatio = Number(barContext.comparisonResearchRatio);
+        const hasComparison = updateBattlefieldMetricMarker(
+          averageMarker,
+          barContext.comparisonResearchRatio,
+          null
+        );
         value.parentElement.setAttribute(
           "aria-label",
           `Research ${value.textContent}, ${Math.round(ratio * 100)}% of the match research range`
+            + (hasComparison
+              ? `; opponent marker at ${Math.round(comparisonRatio * 100)}%`
+              : "")
         );
       } else if ((key === "droidsAlive" || key === "structuresAlive") && bar) {
         const bestAlive = key === "droidsAlive" ? bestUnitsAlive : bestStructuresAlive;
@@ -2802,8 +3123,11 @@
         bar.style.width = `${ratio * 100}%`;
         bar.style.setProperty("--battlefield-alive-hue", String(Math.round(ratio * 120)));
         value.parentElement.classList.toggle("is-metric-leader", ratio >= 0.999);
-        updateBattlefieldAverageMarker(
+        updateBattlefieldMetricMarker(
           averageMarker,
+          key === "droidsAlive"
+            ? barContext.comparisonUnitsRatio
+            : barContext.comparisonStructuresRatio,
           key === "droidsAlive"
             ? barContext.averageUnitsRatio
             : barContext.averageStructuresRatio
@@ -2822,7 +3146,11 @@
           "is-metric-leader",
           Number(player?.power) > 0 && Number(player?.power) >= Number(barContext.bestPower)
         );
-        updateBattlefieldAverageMarker(averageMarker, barContext.averagePowerRatio);
+        updateBattlefieldMetricMarker(
+          averageMarker,
+          barContext.comparisonPowerRatio,
+          barContext.averagePowerRatio
+        );
         value.parentElement.setAttribute(
           "aria-label",
           `Power ${value.textContent}, ${Math.round(ratio * 100)}% of all player power`
@@ -3002,6 +3330,8 @@
       bestPower: Math.max(0, ...teamValues.map((team) => Number(team.power) || 0))
     };
     battlefieldTeamStatElements.forEach((fields, team) => {
+      const opponentTeam = [...teamSnapshots.entries()]
+        .find(([opponent]) => opponent !== team)?.[1];
       updateBattlefieldStatFields(
         fields,
         teamSnapshots.get(team),
@@ -3013,7 +3343,33 @@
         bestTeamUnitsAlive,
         bestTeamStructuresAlive,
         totalPower,
-        teamBarContext
+        {
+          ...teamBarContext,
+          comparisonScoreRatio: opponentTeam
+            ? battlefieldScoreRatio(Number(opponentTeam.score), bestTeamScore)
+            : null,
+          comparisonKillDeathRatio: opponentTeam
+            ? battlefieldKillDeathBarRatio(
+                battlefieldKillDeathRatio(opponentTeam),
+                bestTeamKillDeathRatio
+              )
+            : null,
+          comparisonKillsRatio: opponentTeam
+            ? battlefieldScoreRatio(Number(opponentTeam.kills), bestTeamKills)
+            : null,
+          comparisonUnitsRatio: opponentTeam
+            ? battlefieldScoreRatio(Number(opponentTeam.droidsAlive), bestTeamUnitsAlive)
+            : null,
+          comparisonStructuresRatio: opponentTeam
+            ? battlefieldScoreRatio(Number(opponentTeam.structuresAlive), bestTeamStructuresAlive)
+            : null,
+          comparisonResearchRatio: opponentTeam
+            ? battlefieldResearchRatio(battlefieldResearchActivity(opponentTeam), 70, 100)
+            : null,
+          comparisonPowerRatio: opponentTeam
+            ? battlefieldScoreRatio(Number(opponentTeam.power), totalPower)
+            : null
+        }
       );
     });
     battlefieldRenderedSnapshotTime = renderKey;
@@ -3049,7 +3405,7 @@
     battlefieldPlaying = false;
     battlefieldPlay.classList.remove("is-playing");
     battlefieldPlay.setAttribute("aria-label", "Play replay");
-    battlefieldPlay.title = "Play replay";
+    battlefieldPlay.dataset.tooltip = "Play replay";
     battlefieldLastTick = 0;
     if (battlefieldAnimationFrame) {
       cancelAnimationFrame(battlefieldAnimationFrame);
@@ -3065,17 +3421,42 @@
     battlefieldPlaying = true;
     battlefieldPlay.classList.add("is-playing");
     battlefieldPlay.setAttribute("aria-label", "Pause replay");
-    battlefieldPlay.title = "Pause replay";
+    battlefieldPlay.dataset.tooltip = "Pause replay";
     battlefieldLastTick = 0;
     battlefieldAnimationFrame = requestAnimationFrame(animateBattlefield);
   }
 
   function setBattlefield3dLoading(isLoading) {
     const nextLoading = Boolean(isLoading);
-    battlefieldLoading?.classList.toggle(
-      "is-view-switch",
-      nextLoading && battlefieldViewMode?.value === "3d"
-    );
+    if (nextLoading) {
+      if (battlefield3dLoadingHideTimer) {
+        clearTimeout(battlefield3dLoadingHideTimer);
+        battlefield3dLoadingHideTimer = 0;
+      }
+      if (!battlefield3dLoading) battlefield3dLoadingStartedAt = performance.now();
+      battlefieldStage.setAttribute("aria-busy", "true");
+      if (battlefieldLoading) battlefieldLoading.hidden = false;
+      battlefieldPlay.disabled = true;
+    } else if (battlefield3dLoading) {
+      const remaining = battlefieldViewMode?.value === "3d"
+        ? 1400 - (performance.now() - battlefield3dLoadingStartedAt)
+        : 0;
+      if (remaining > 0) {
+        if (battlefield3dLoadingHideTimer) clearTimeout(battlefield3dLoadingHideTimer);
+        battlefield3dLoadingHideTimer = window.setTimeout(() => {
+          battlefield3dLoadingHideTimer = 0;
+          setBattlefield3dLoading(false);
+        }, remaining);
+        return;
+      }
+    }
+    const isViewSwitch = nextLoading && battlefieldViewMode?.value === "3d";
+    if (battlefieldLoading) {
+      battlefieldLoading.classList.toggle("is-view-switch", isViewSwitch);
+      if (battlefieldLoading.parentElement !== battlefieldStage) {
+        battlefieldStage.appendChild(battlefieldLoading);
+      }
+    }
     if (nextLoading === battlefield3dLoading) return;
     battlefield3dLoading = nextLoading;
     battlefieldStage.setAttribute("aria-busy", String(nextLoading));
@@ -3184,6 +3565,7 @@
     battlefieldDroidDefinitions = new Map();
     battlefieldStructureDefinitions = new Map();
     battlefieldDestroyedAt = new Map();
+    battlefieldEventMarkers = [];
     frames.forEach((frame) => {
       (frame.droidDefinitions || []).forEach((definition) => {
         battlefieldDroidDefinitions.set(Number(definition[0]), {
@@ -3208,7 +3590,93 @@
         if (Number.isFinite(time) && (!battlefieldDestroyedAt.has(key) || time < battlefieldDestroyedAt.get(key))) {
           battlefieldDestroyedAt.set(key, time);
         }
+        const x = Number(event[4]);
+        const y = Number(event[5]);
+        if (Number.isFinite(time) && Number.isFinite(x) && Number.isFinite(y)) {
+          battlefieldEventMarkers.push({
+            id: `destroyed:${event[1]}:${Number(event[2])}:${time}`,
+            time,
+            type: event[1] === "structure" ? "structure" : "kill",
+            owner: battlefieldPlayerPositionForOwner(event[3]),
+            x,
+            y
+          });
+        }
       });
+    });
+
+    const researchTimeline = battlefieldExtraction?.engineAnalysis?.extended?.researchTimeline || [];
+    researchTimeline.forEach((event, index) => {
+      const time = Number(event.timeMilliseconds);
+      if (!Number.isFinite(time)) return;
+      let nearestFrame = frames.find((frame) => !frame.eventsOnly) || null;
+      for (const frame of frames) {
+        if (Number(frame.time || 0) > time) break;
+        if (!frame.eventsOnly) nearestFrame = frame;
+      }
+      const structureId = Number(event.structureId);
+      const structure = (nearestFrame?.structures || []).find((item) => (
+        Number.isFinite(structureId) && Number(item[0]) === structureId
+      ));
+      const playerObjects = [
+        ...(nearestFrame?.structures || []),
+        ...(nearestFrame?.droids || [])
+      ].filter((item) => (
+        battlefieldPlayerPositionForOwner(item[1]) === Number(event.position)
+      ));
+      const x = structure
+        ? Number(structure[2])
+        : playerObjects.length ? battlefieldAverage(playerObjects.map((item) => Number(item[2]))) : NaN;
+      const y = structure
+        ? Number(structure[3])
+        : playerObjects.length ? battlefieldAverage(playerObjects.map((item) => Number(item[3]))) : NaN;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      battlefieldEventMarkers.push({
+        id: `research:${index}:${time}`,
+        time,
+        type: "research",
+        owner: Number(event.position),
+        x,
+        y
+      });
+    });
+    battlefieldEventMarkers.sort((left, right) => left.time - right.time);
+  }
+
+  function activeBattlefieldEventMarkers() {
+    if (!battlefieldBattleMarkers.checked) return [];
+    const lifetime = Math.max(4000, battlefieldPlaybackSpeed() * 3000);
+    return battlefieldEventMarkers.filter((event) => (
+      event.type !== "research"
+      && event.time <= battlefieldCurrentTime
+      && battlefieldCurrentTime - event.time <= lifetime
+      && !battlefieldHiddenPlayers.has(Number(event.owner))
+    )).map((event) => ({
+      ...event,
+      progress: Math.max(0, Math.min(1, (battlefieldCurrentTime - event.time) / lifetime))
+    }));
+  }
+
+  function drawBattlefieldEventMarkers2d(context, projectX, projectY) {
+    activeBattlefieldEventMarkers().forEach((event) => {
+      const x = projectX(event.x);
+      const y = projectY(event.y);
+      const colour = event.type === "research"
+        ? "#6de8ff"
+        : event.type === "structure" ? "#ffb84d" : "#ff6262";
+      const radius = 6 + event.progress * 10;
+      context.save();
+      context.globalAlpha = 1 - event.progress * 0.72;
+      context.strokeStyle = colour;
+      context.fillStyle = colour;
+      context.lineWidth = 2 / Math.max(0.75, battlefieldView.scale);
+      context.beginPath();
+      context.arc(x, y, radius, 0, Math.PI * 2);
+      context.stroke();
+      context.beginPath();
+      context.arc(x, y, 2.4, 0, Math.PI * 2);
+      context.fill();
+      context.restore();
     });
   }
 
@@ -3528,6 +3996,28 @@
     return key !== null && battlefieldSpriteCache.get(key) === null;
   }
 
+  function updateBattlefieldTimelineProgress() {
+    const duration = Number(battlefieldRange.max) || 0;
+    const played = duration > 0
+      ? Math.max(0, Math.min(100, battlefieldCurrentTime / duration * 100))
+      : 0;
+    const frameIndex = battlefield3dIsActive() && battlefield3d
+      ? battlefield3d.bufferFrameIndex
+      : battlefieldSpriteBufferFrameIndex;
+    const bufferedTime = frameIndex >= battlefieldFrames.length
+      ? duration
+      : Number(battlefieldFrames[Math.max(0, frameIndex - 1)]?.time || 0);
+    const buffered = duration > 0
+      ? Math.max(played, Math.min(100, bufferedTime / duration * 100))
+      : 0;
+    battlefieldRange.style.setProperty("--battlefield-play-progress", `${played}%`);
+    battlefieldRange.style.setProperty("--battlefield-buffer-progress", `${buffered}%`);
+    battlefieldRange.setAttribute(
+      "aria-valuetext",
+      `${formatDuration(battlefieldCurrentTime)} of ${formatDuration(duration)}, buffered to ${formatDuration(bufferedTime)}`
+    );
+  }
+
   function bufferBattlefieldModelSprites(timeMilliseconds) {
     const lookAheadMilliseconds = 120000;
     const replayEnd = Number(battlefieldRange.max) || 0;
@@ -3559,6 +4049,7 @@
         battlefieldSpriteBufferFrameIndex += 1;
         processedFrames += 1;
       }
+      updateBattlefieldTimelineProgress();
 
       if (battlefieldSpriteBufferFrameIndex < battlefieldFrames.length
           && Number(battlefieldFrames[battlefieldSpriteBufferFrameIndex].time || 0) <= battlefieldSpriteBufferTarget) {
@@ -3835,6 +4326,7 @@
   }
 
   function refreshBattlefieldTerrain() {
+    if (battlefield3dIsActive()) setBattlefield3dLoading(true);
     if (battlefield3d) battlefield3d.terrainSource = null;
     requestAnimationFrame(drawBattlefield);
   }
@@ -3845,7 +4337,7 @@
     if (!preserveSelection) battlefieldTiles.checked = true;
     battlefieldTiles.disabled = true;
     if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
-    battlefieldTiles.title = "Loading map tiles";
+    setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), "Loading map tiles");
     loadBattlefieldTerrainTiles(terrain)
       .then((canvases) => {
         if (battlefieldTerrain !== terrain) return;
@@ -3854,9 +4346,9 @@
         battlefieldTiles.disabled = !terrain.tileCanvas;
         battlefieldTiles.checked = Boolean(terrain.tileCanvas && (!preserveSelection || tilesWereChecked));
         if (battlefieldTileQuality) battlefieldTileQuality.disabled = !terrain.tileCanvas;
-        battlefieldTiles.title = terrain.tileCanvas
+        setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), terrain.tileCanvas
           ? `Use ${terrain.tileset} map tiles`
-          : "Map tiles are unavailable";
+          : "Map tiles are unavailable");
         refreshBattlefieldTerrain();
       })
       .catch(() => {
@@ -3864,7 +4356,7 @@
         battlefieldTiles.checked = false;
         battlefieldTiles.disabled = true;
         if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
-        battlefieldTiles.title = "Map tiles are unavailable";
+        setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), "Map tiles are unavailable");
       });
   }
 
@@ -3905,9 +4397,11 @@
       const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 5000);
       const terrainRoot = new THREE.Group();
       const objectRoot = new THREE.Group();
+      const eventRoot = new THREE.Group();
       terrainRoot.name = "Replay terrain";
       objectRoot.name = "Replay objects";
-      scene.add(terrainRoot, objectRoot);
+      eventRoot.name = "Replay events";
+      scene.add(terrainRoot, objectRoot, eventRoot);
       scene.add(new THREE.AmbientLight(0xffffff, 0.86));
       const keyLight = new THREE.DirectionalLight(0xffffff, 0.78);
       keyLight.position.set(90, 180, 120);
@@ -3927,6 +4421,10 @@
         camera,
         terrainRoot,
         objectRoot,
+        eventRoot,
+        eventMarkers: new Map(),
+        selectionMarkers: new Map(),
+        hasPresentedFrame: false,
         terrainSource: null,
         terrainMapWidth: 0,
         terrainMapHeight: 0,
@@ -3961,10 +4459,23 @@
     }
   }
 
+  function clearBattlefield3dEventRoot(root) {
+    if (!root) return;
+    root.children.slice().forEach((child) => {
+      root.remove(child);
+      child.geometry?.dispose?.();
+      child.material?.dispose?.();
+    });
+  }
+
   function resetBattlefield3dReplay() {
     battlefield3dGeneration += 1;
     if (!battlefield3d) return;
     clearBattlefield3dRoot(battlefield3d.objectRoot);
+    clearBattlefield3dEventRoot(battlefield3d.eventRoot);
+    battlefield3d.eventMarkers.clear();
+    battlefield3d.selectionMarkers.clear();
+    battlefield3d.hasPresentedFrame = false;
     battlefield3d.objects.clear();
     battlefield3d.prototypePromises.clear();
     battlefield3d.bufferFrameIndex = 0;
@@ -4134,6 +4645,7 @@
         state.bufferFrameIndex += 1;
         processedFrames += 1;
       }
+      updateBattlefieldTimelineProgress();
 
       if (state.bufferFrameIndex < battlefieldFrames.length
           && Number(battlefieldFrames[state.bufferFrameIndex].time || 0) <= state.bufferTarget) {
@@ -4385,12 +4897,82 @@
       if (entry.modelKey && entry.loadedModelKey !== entry.modelKey
           && entry.failedModelKey !== entry.modelKey) pendingModels += 1;
     });
+    const activeSelectionKeys = new Set();
+    if (battlefieldSelectedPlayer !== null) {
+      droids.forEach((droid) => {
+        if (battlefieldOwnerIsHidden(droid[1])
+            || battlefieldPlayerPositionForOwner(droid[1]) !== battlefieldSelectedPlayer) return;
+        const selectionKey = Number(droid[0]);
+        activeSelectionKeys.add(selectionKey);
+        let marker = state.selectionMarkers.get(selectionKey);
+        if (!marker) {
+          marker = new state.THREE.Mesh(
+            new state.THREE.RingGeometry(0.48, 0.64, 24),
+            new state.THREE.MeshBasicMaterial({
+              color: 0x7df3ff,
+              transparent: true,
+              opacity: 0.92,
+              side: state.THREE.DoubleSide,
+              depthWrite: false,
+              depthTest: false
+            })
+          );
+          marker.rotation.x = -Math.PI / 2;
+          marker.renderOrder = 10;
+          state.selectionMarkers.set(selectionKey, marker);
+          state.eventRoot.add(marker);
+        }
+        marker.position.set(
+          Number(droid[2]),
+          battlefield3dHeightAt(droid[2], droid[3]) + 0.16,
+          Number(droid[3])
+        );
+      });
+    }
+    state.selectionMarkers.forEach((marker, selectionKey) => {
+      if (activeSelectionKeys.has(selectionKey)) return;
+      state.eventRoot.remove(marker);
+      marker.geometry.dispose();
+      marker.material.dispose();
+      state.selectionMarkers.delete(selectionKey);
+    });
+    const activeEventKeys = new Set();
+    activeBattlefieldEventMarkers().forEach((event) => {
+      activeEventKeys.add(event.id);
+      const colour = event.type === "research"
+        ? 0x6de8ff
+        : event.type === "structure" ? 0xffb84d : 0xff6262;
+      let marker = state.eventMarkers.get(event.id);
+      if (!marker) {
+        marker = new state.THREE.Mesh(
+          new state.THREE.RingGeometry(0.52, 0.68, 24),
+          new state.THREE.MeshBasicMaterial({
+            color: colour,
+            transparent: true,
+            side: state.THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        marker.rotation.x = -Math.PI / 2;
+        state.eventMarkers.set(event.id, marker);
+        state.eventRoot.add(marker);
+      }
+      marker.material.opacity = 1 - event.progress * 0.72;
+      marker.position.set(event.x, battlefield3dHeightAt(event.x, event.y) + 0.34, event.y);
+      marker.scale.setScalar(1 + event.progress * 2.2);
+    });
+    state.eventMarkers.forEach((marker, eventId) => {
+      if (activeEventKeys.has(eventId)) return;
+      state.eventRoot.remove(marker);
+      marker.geometry.dispose();
+      marker.material.dispose();
+      state.eventMarkers.delete(eventId);
+    });
     state.objects.forEach((entry, objectKey) => {
       if (visibleObjectKeys.has(objectKey)) return;
       state.objectRoot.remove(entry.root);
       state.objects.delete(objectKey);
     });
-    setBattlefield3dLoading(pendingModels > 0);
     bufferBattlefield3dModels(state, battlefieldCurrentTime);
 
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -4406,15 +4988,30 @@
     updateBattlefield3dCamera(state, map, rect);
     state.library.updateDroidAnimations?.(state.objectRoot, battlefieldCurrentTime);
     state.renderer.render(state.scene, state.camera);
+    const waitingForFirstFrame = !state.hasPresentedFrame;
+    state.hasPresentedFrame = true;
+    const waitingForTiles = Boolean(
+      battlefieldTiles.checked
+      && battlefieldTiles.disabled
+      && battlefieldTerrain?.tileIds?.length
+    );
+    setBattlefield3dLoading(waitingForFirstFrame || pendingModels > 0 || waitingForTiles);
+    if (waitingForFirstFrame) {
+      requestAnimationFrame(() => {
+        if (battlefield3dIsActive()) drawBattlefield();
+      });
+    }
 
     const fieldWidth = Math.max(1, rect.width - 24);
     const fieldHeight = Math.max(1, rect.height - 24);
     drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight);
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
     battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
+    updateBattlefieldTimelineProgress();
     updateBattlefieldMomentumCursor();
     updateBattlefieldPlayerStats();
     battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
+    battlefieldZoomSlider.value = String(Math.round(battlefieldView.scale * 100));
     battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · 3D view`;
   }
 
@@ -4439,7 +5036,9 @@
     battlefield3dCanvas.hidden = true;
     setBattlefield3dLoading(true);
     try {
-      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve));
+      });
       if (battlefieldViewMode?.value !== "3d") return;
       await ensureBattlefield3d();
       if (battlefieldViewMode?.value !== "3d") return;
@@ -4449,6 +5048,7 @@
       if (battlefield3d) {
         battlefield3d.width = 0;
         battlefield3d.height = 0;
+        battlefield3d.hasPresentedFrame = false;
       }
       requestAnimationFrame(() => {
         drawBattlefield();
@@ -4622,6 +5222,23 @@
         );
       }
     });
+    if (battlefieldSelectedPlayer !== null) {
+      context.save();
+      context.globalAlpha = 0.94;
+      context.strokeStyle = "#7df3ff";
+      context.lineWidth = 2 / Math.max(0.75, battlefieldView.scale);
+      context.shadowColor = "rgba(56, 220, 255, 0.82)";
+      context.shadowBlur = 5 / Math.max(0.75, battlefieldView.scale);
+      droids.forEach((droid) => {
+        if (battlefieldOwnerIsHidden(droid[1])
+            || battlefieldPlayerPositionForOwner(droid[1]) !== battlefieldSelectedPlayer) return;
+        context.beginPath();
+        context.arc(projectX(droid[2]), projectY(droid[3]), 5, 0, Math.PI * 2);
+        context.stroke();
+      });
+      context.restore();
+    }
+    drawBattlefieldEventMarkers2d(context, projectX, projectY);
     context.globalAlpha = 1;
     context.restore();
     setBattlefield3dLoading(pendingModels > 0);
@@ -4630,9 +5247,11 @@
 
     battlefieldTime.value = formatDuration(battlefieldCurrentTime);
     battlefieldRange.value = String(Math.round(battlefieldCurrentTime));
+    updateBattlefieldTimelineProgress();
     updateBattlefieldMomentumCursor();
     updateBattlefieldPlayerStats();
     battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
+    battlefieldZoomSlider.value = String(Math.round(battlefieldView.scale * 100));
     battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`;
   }
 
@@ -4642,6 +5261,24 @@
       return;
     }
     drawBattlefield2d();
+  }
+
+  function positionBattlefieldMinimapToggle() {
+    if (!battlefieldMinimapToggle || !battlefieldStage || !battlefieldMinimap) return;
+    if (battlefieldStage.classList.contains("is-minimap-collapsed")) {
+      battlefieldMinimapToggle.style.right = "14px";
+      battlefieldMinimapToggle.style.bottom = "14px";
+      return;
+    }
+    const stageRect = battlefieldStage.getBoundingClientRect();
+    const minimapRect = battlefieldMinimap.getBoundingClientRect();
+    if (!stageRect.width || !minimapRect.height) return;
+    const inset = 7;
+    battlefieldMinimapToggle.style.right = `${Math.max(0, stageRect.right - minimapRect.right + inset)}px`;
+    battlefieldMinimapToggle.style.bottom = `${Math.max(
+      0,
+      stageRect.bottom - minimapRect.top - battlefieldMinimapToggle.offsetHeight - inset
+    )}px`;
   }
 
   function drawBattlefieldMinimap(map, structures, droids, fieldWidth, fieldHeight) {
@@ -4678,7 +5315,26 @@
       if (battlefieldOwnerIsHidden(player)) return;
       context.fillStyle = battlefieldPlayerColour(player);
       context.fillRect(projectX(droid[2]) - 1, projectY(droid[3]) - 1, 2, 2);
+      if (battlefieldSelectedPlayer !== null
+          && battlefieldPlayerPositionForOwner(player) === battlefieldSelectedPlayer) {
+        context.strokeStyle = "#7df3ff";
+        context.lineWidth = 1.2;
+        context.beginPath();
+        context.arc(projectX(droid[2]), projectY(droid[3]), 3, 0, Math.PI * 2);
+        context.stroke();
+      }
     });
+    activeBattlefieldEventMarkers().forEach((event) => {
+      context.strokeStyle = event.type === "research"
+        ? "#6de8ff"
+        : event.type === "structure" ? "#ffb84d" : "#ff6262";
+      context.globalAlpha = 1 - event.progress * 0.68;
+      context.lineWidth = 1.5;
+      context.beginPath();
+      context.arc(projectX(event.x), projectY(event.y), 3 + event.progress * 3, 0, Math.PI * 2);
+      context.stroke();
+    });
+    context.globalAlpha = 1;
     const scale = battlefieldView.scale;
     const visibleWidth = Math.min(1, 1 / scale);
     const visibleHeight = Math.min(1, 1 / scale);
@@ -4699,6 +5355,7 @@
       visibleWidth * mapWidth,
       visibleHeight * mapHeight
     );
+    positionBattlefieldMinimapToggle();
   }
 
   function setBattlefieldZoom(nextScale, anchorX = null, anchorY = null) {
@@ -4738,10 +5395,55 @@
   }
 
   function resetBattlefieldView() {
-    battlefieldView.scale = 1;
+    battlefieldView.scale = 1.5625;
     battlefieldView.offsetX = 0;
     battlefieldView.offsetY = 0;
-    battlefieldView.rotation = 0;
+    battlefieldView.rotation = -Math.PI / 4;
+    drawBattlefield();
+  }
+
+  function focusBattlefieldPlayer(position) {
+    if (!battlefieldFrames.length) return;
+    const pair = battlefieldFramePair(battlefieldCurrentTime);
+    const playerPosition = Number(position);
+    const playerObjects = (kind) => interpolateBattlefieldObjects(
+      pair.current[kind] || [],
+      pair.next[kind] || [],
+      pair.ratio
+    ).filter((object) => (
+      battlefieldPlayerPositionForOwner(object[1]) === playerPosition
+      && !battlefieldObjectWasDestroyed(
+        kind === "droids" ? "droid" : "structure",
+        object,
+        battlefieldCurrentTime
+      )
+    ));
+    const droids = playerObjects("droids");
+    const objects = droids.length ? droids : playerObjects("structures");
+    if (!objects.length) return;
+    const map = battlefieldMapSize(pair.current);
+    const armyCenter = (coordinateIndex) => {
+      const coordinates = objects
+        .map((object) => Number(object[coordinateIndex]))
+        .filter(Number.isFinite)
+        .sort((left, right) => left - right);
+      const trim = coordinates.length >= 8 ? Math.floor(coordinates.length * 0.15) : 0;
+      return battlefieldAverage(coordinates.slice(trim, coordinates.length - trim));
+    };
+    const centerX = armyCenter(2);
+    const centerY = armyCenter(3);
+    const activeCanvas = battlefield3dIsActive() ? battlefield3dCanvas : battlefieldCanvas;
+    const rect = activeCanvas.getBoundingClientRect();
+    const use3d = battlefield3dIsActive();
+    const viewWidth = use3d ? rect.width : Math.max(1, rect.width - 24);
+    const viewHeight = use3d ? rect.height : Math.max(1, rect.height - 24);
+    battlefieldView.scale = 2;
+    battlefieldView.offsetX = (0.5 - centerX / map.width) * viewWidth * battlefieldView.scale;
+    battlefieldView.offsetY = (0.5 - centerY / map.height) * viewHeight * battlefieldView.scale;
+    battlefieldSelectedPlayer = playerPosition;
+    battlefieldPlayerStatElements.forEach(({ button }, playerPosition) => {
+      button.classList.toggle("is-selected", Number(playerPosition) === battlefieldSelectedPlayer);
+    });
     drawBattlefield();
   }
 
@@ -4876,19 +5578,24 @@
           const teamIndex = teamOrder.indexOf(team);
           const teamLabel = `Team ${String.fromCharCode(65 + teamIndex)}`;
           const teamDisplayColour = battlefieldTeamColours[teamIndex % battlefieldTeamColours.length];
+          const teamBarColour = teamDisplayColour === "#ffffff" ? "#000000" : "#ffffff";
           teamButton.type = "button";
           teamButton.className = "replay-battlefield-player is-team";
           teamButton.setAttribute("aria-pressed", "true");
-          teamButton.title = `Show or hide ${teamLabel}`;
+          setFixedTooltip(teamButton, `Show or hide ${teamLabel}`);
           teamMarker.className = "replay-battlefield-player-marker";
           teamMarker.style.background = teamDisplayColour;
           teamIdentity.className = "replay-battlefield-player-identity";
           teamOverallBar.className = "replay-battlefield-player-overall-bar";
           teamOverallBar.setAttribute("aria-hidden", "true");
-          teamOverallBar.style.background = `linear-gradient(90deg, ${teamDisplayColour}57, ${teamDisplayColour}94)`;
-          teamOverallBar.style.borderRightColor = `${teamDisplayColour}b8`;
+          teamOverallBar.style.background = `linear-gradient(90deg, ${teamBarColour}e6, ${teamBarColour}bf)`;
+          teamOverallBar.style.borderRightColor = `${teamBarColour}e6`;
           teamName.className = "replay-battlefield-player-name";
           teamName.textContent = teamLabel;
+          teamName.style.color = teamDisplayColour;
+          teamName.style.textShadow = teamDisplayColour === "#000000"
+            ? "0 0 2px #ffffff, 0 0 2px #ffffff"
+            : "0 0 2px #000000, 0 0 2px #000000";
           teamState.className = "replay-battlefield-player-state";
           teamState.textContent = "team total";
           teamStats.className = "replay-battlefield-player-stats";
@@ -4929,19 +5636,24 @@
         const marker = document.createElement("span");
         const identity = document.createElement("span");
         const overallBar = document.createElement("span");
+        const teamBadge = document.createElement("span");
         const name = document.createElement("span");
         const state = document.createElement("span");
         const stats = document.createElement("span");
         button.type = "button";
         button.className = "replay-battlefield-player";
         button.setAttribute("aria-pressed", "true");
-        button.title = `Show or hide ${player.name}`;
+        button.dataset.tooltip = "Click to focus this army; click again to clear selection";
+        button.setAttribute("aria-describedby", battlefieldPlayerTooltip.id);
         marker.className = "replay-battlefield-player-marker";
         marker.style.backgroundColor = playerColours[Number(player.colour)]?.value
           || playerColours[Math.abs(Number(player.position)) % playerColours.length].value;
         identity.className = "replay-battlefield-player-identity";
         overallBar.className = "replay-battlefield-player-overall-bar";
         overallBar.setAttribute("aria-hidden", "true");
+        teamBadge.className = "replay-battlefield-team-badge";
+        teamBadge.textContent = String.fromCharCode(65 + teamOrder.indexOf(team));
+        teamBadge.setAttribute("aria-hidden", "true");
         name.className = "replay-battlefield-player-name";
         name.textContent = player.name;
         state.className = "replay-battlefield-player-state";
@@ -4952,21 +5664,29 @@
           stats.append(field.wrapper);
           return { key, value: field.value, bar: field.bar, averageMarker: field.averageMarker };
         });
-        identity.append(overallBar, marker, name);
+        identity.append(overallBar, teamBadge, marker, name);
         button.append(identity, state, stats);
+        identity.addEventListener("mouseenter", () => showBattlefieldPlayerTooltip(button, identity));
+        identity.addEventListener("mouseleave", hideBattlefieldPlayerTooltip);
+        button.addEventListener("focus", () => showBattlefieldPlayerTooltip(button, identity));
+        button.addEventListener("blur", hideBattlefieldPlayerTooltip);
         battlefieldPlayerStatElements.set(
           Number(player.position),
           { button, state, values, overallBar }
         );
         button.addEventListener("click", () => {
           const position = Number(player.position);
-          if (battlefieldHiddenPlayers.has(position)) {
-            battlefieldHiddenPlayers.delete(position);
-          } else {
-            battlefieldHiddenPlayers.add(position);
+          if (battlefieldSelectedPlayer === position) {
+            battlefieldSelectedPlayer = null;
+            battlefieldPlayerStatElements.forEach(({ button: playerButton }) => {
+              playerButton.classList.remove("is-selected");
+            });
+            drawBattlefield();
+            return;
           }
+          battlefieldHiddenPlayers.delete(position);
           syncBattlefieldVisibilityButtons();
-          drawBattlefield();
+          focusBattlefieldPlayer(position);
         });
         battlefieldLegend.append(button);
       });
@@ -4992,7 +5712,8 @@
     battlefieldRenderedSnapshotTime = null;
     battlefieldLastDraw = 0;
     battlefieldHiddenPlayers.clear();
-    battlefieldView.scale = 1;
+    battlefieldSelectedPlayer = null;
+    battlefieldView.scale = 1.5625;
     battlefieldView.offsetX = 0;
     battlefieldView.offsetY = 0;
     const lastFrameTime = Number(battlefieldFrames[battlefieldFrames.length - 1]?.time || 0);
@@ -5001,23 +5722,22 @@
     battlefieldRange.min = "0";
     battlefieldRange.max = String(duration);
     battlefieldRange.value = "0";
+    updateBattlefieldTimelineProgress();
     battlefieldDuration.value = formatDuration(duration);
     const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
     battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
-    battlefieldDroids.checked = true;
-    battlefieldStructures.checked = true;
-    battlefieldBackground.checked = Boolean(battlefieldTerrain);
+    battlefieldBackground.checked = Boolean(battlefieldTerrain && battlefieldBackground.checked);
     battlefieldBackground.disabled = !battlefieldTerrain;
-    battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length);
+    battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length && battlefieldTiles.checked);
     battlefieldTiles.disabled = true;
     if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
-    battlefieldTiles.title = battlefieldTerrain
+    setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), battlefieldTerrain
       ? "Loading map tiles"
-      : "Map tiles are unavailable";
-    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain);
+      : "Map tiles are unavailable");
+    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
     populateBattlefieldLegend(extraction);
     renderBattlefieldMomentum(extraction);
-    requestAnimationFrame(drawBattlefield);
+    setBattlefieldViewMode(battlefieldViewMode?.value || "3d");
   }
 
   function renderExtendedAnalysis(extraction) {
@@ -5137,12 +5857,14 @@
   function renderExtraction(extraction) {
     const playerCount = extraction.players.filter((player) => !player.spectator).length;
     const observerCount = extraction.players.length - playerCount;
+    const hostPlayer = extraction.players.find((player) => player.admin);
 
     replaceChildren(summary, [
       renderSummaryItem("Map", extraction.match.map),
       renderSummaryItem("Duration", formatDuration(extraction.match.elapsedMilliseconds)),
       renderSummaryItem("Players / observers", `${playerCount} / ${observerCount}`),
-      renderSummaryItem("Date", formatReplayDate(extraction.publishedStats?.endDate || latestReplayId))
+      renderSummaryItem("Date", formatReplayDate(extraction.publishedStats?.endDate || latestReplayId)),
+      renderSummaryItem("Host", hostPlayer ? hostPlayer.name : "Unknown")
     ]);
 
     const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
@@ -5156,56 +5878,78 @@
     });
     renderCompactMatchSummary(extraction);
     renderExtendedAnalysis(extraction);
+    const competitors = extraction.players.filter((player) => !player.spectator);
+    const teamOrder = [...new Set(competitors.map((player) => Number(player.team)))].sort((left, right) => left - right);
+    const firstTeam = teamOrder[0];
+    const firstTeamPlayers = competitors.filter((player) => Number(player.team) === firstTeam);
+    const secondTeamPlayers = competitors.filter((player) => Number(player.team) !== firstTeam);
     const renderPlayerRows = () => {
       replaceChildren(
         playersBody,
-        sortPlayers(extraction.players, awardsByPlayer).map((player) => (
+        sortPlayers(firstTeamPlayers, awardsByPlayer).map((player) => (
           createPlayerRow(
             player,
             extraction.players,
             extraction.events.records,
             awardsByPlayer.get(player),
-            researchActivityByPlayer.get(player)
+            researchActivityByPlayer.get(player),
+            "A"
+          )
+        ))
+      );
+      replaceChildren(
+        playersBodyB,
+        sortPlayers(secondTeamPlayers, awardsByPlayer).map((player) => (
+          createPlayerRow(
+            player,
+            extraction.players,
+            extraction.events.records,
+            awardsByPlayer.get(player),
+            researchActivityByPlayer.get(player),
+            "B"
           )
         ))
       );
     };
 
-    const playerHeaderGroups = document.createElement("tr");
-    playerHeaderGroups.append(
-      createPlayerSortHeader("Slot", "position", { rowSpan: 2 }, renderPlayerRows),
-      createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
-      createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, renderPlayerRows),
-      createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
-      createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
-      createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
-      createHeaderCell("Units", {
-        colSpan: 5,
-        scope: "colgroup",
-        className: "replay-stat-group"
-      }),
-      createHeaderCell("Structures", {
-        colSpan: 5,
-        scope: "colgroup",
-        className: "replay-stat-group"
-      })
-    );
+    const createPlayerHeaders = () => {
+      const playerHeaderGroups = document.createElement("tr");
+      playerHeaderGroups.append(
+        createPlayerSortHeader("Slot", "position", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
+        createHeaderCell("Units", {
+          colSpan: 5,
+          scope: "colgroup",
+          className: "replay-stat-group"
+        }),
+        createHeaderCell("Structures", {
+          colSpan: 5,
+          scope: "colgroup",
+          className: "replay-stat-group"
+        }),
+        createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, renderPlayerRows)
+      );
 
-    const playerHeaderDetails = document.createElement("tr");
-    playerHeaderDetails.className = "replay-stat-details";
-    playerHeaderDetails.append(
-      createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
-      createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
-      createPlayerSortHeader("Kills", "kills", {}, renderPlayerRows),
-      createPlayerSortHeader("Alive", "remainingDroids", {}, renderPlayerRows),
-      createPlayerSortHeader("KD", "kd", {}, renderPlayerRows),
-      createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
-      createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
-      createPlayerSortHeader("Kills", "structuresDestroyed", {}, renderPlayerRows),
-      createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows),
-      createPlayerSortHeader("KD", "structureKd", {}, renderPlayerRows)
-    );
-    replaceChildren(playersHead, [playerHeaderGroups, playerHeaderDetails]);
+      const playerHeaderDetails = document.createElement("tr");
+      playerHeaderDetails.className = "replay-stat-details";
+      playerHeaderDetails.append(
+        createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
+        createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
+        createPlayerSortHeader("Kills", "kills", {}, renderPlayerRows),
+        createPlayerSortHeader("Alive", "remainingDroids", {}, renderPlayerRows),
+        createPlayerSortHeader("KD", "kd", {}, renderPlayerRows),
+        createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
+        createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
+        createPlayerSortHeader("Kills", "structuresDestroyed", {}, renderPlayerRows),
+        createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows),
+        createPlayerSortHeader("KD", "structureKd", {}, renderPlayerRows)
+      );
+      return [playerHeaderGroups, playerHeaderDetails];
+    };
+    replaceChildren(playersHead, createPlayerHeaders());
     updatePlayerSortIndicators();
     renderPlayerRows();
 
@@ -5402,22 +6146,58 @@
     drawBattlefield();
   });
 
-  battlefieldDroids.addEventListener("change", drawBattlefield);
-  battlefieldStructures.addEventListener("change", drawBattlefield);
+  battlefieldDroids.addEventListener("change", () => {
+    saveBattlefieldSettings();
+    drawBattlefield();
+  });
+  battlefieldStructures.addEventListener("change", () => {
+    saveBattlefieldSettings();
+    drawBattlefield();
+  });
+  battlefieldBattleMarkers.addEventListener("change", () => {
+    saveBattlefieldSettings();
+    drawBattlefield();
+  });
   battlefieldSpeed.addEventListener("input", () => {
     battlefieldSpeedValue.value = `${battlefieldPlaybackSpeed()}×`;
+    saveBattlefieldSettings();
   });
-  battlefieldBackground.addEventListener("change", refreshBattlefieldTerrain);
-  battlefieldTiles.addEventListener("change", refreshBattlefieldTerrain);
+  battlefieldBackground.addEventListener("change", () => {
+    saveBattlefieldSettings();
+    refreshBattlefieldTerrain();
+  });
+  battlefieldTiles.addEventListener("change", () => {
+    syncBattlefieldBackgroundOption();
+    saveBattlefieldSettings();
+    refreshBattlefieldTerrain();
+  });
   battlefieldTileQuality?.addEventListener("change", () => {
+    saveBattlefieldSettings();
     if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
   });
+  battlefieldMinimapToggle?.addEventListener("click", () => {
+    const collapsed = battlefieldStage.classList.toggle("is-minimap-collapsed");
+    battlefieldMinimapToggle.setAttribute("aria-pressed", String(collapsed));
+    battlefieldMinimapToggle.setAttribute("aria-label", collapsed ? "Show minimap" : "Hide minimap");
+    battlefieldMinimapToggle.dataset.tooltip = collapsed ? "Show minimap" : "Hide minimap";
+    positionBattlefieldMinimapToggle();
+    saveBattlefieldSettings();
+  });
+  if (battlefieldMinimapToggle) {
+    const collapsed = battlefieldStage.classList.contains("is-minimap-collapsed");
+    battlefieldMinimapToggle.setAttribute("aria-pressed", String(collapsed));
+    battlefieldMinimapToggle.setAttribute("aria-label", collapsed ? "Show minimap" : "Hide minimap");
+    battlefieldMinimapToggle.dataset.tooltip = collapsed ? "Show minimap" : "Hide minimap";
+    positionBattlefieldMinimapToggle();
+  }
   battlefieldZoomOut.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale / 1.25));
   battlefieldZoomIn.addEventListener("click", () => setBattlefieldZoom(battlefieldView.scale * 1.25));
+  battlefieldZoomSlider.addEventListener("input", () => setBattlefieldZoom(Number(battlefieldZoomSlider.value) / 100));
   battlefieldRotateLeft?.addEventListener("click", () => rotateBattlefield(-1));
   battlefieldRotateRight?.addEventListener("click", () => rotateBattlefield(1));
   battlefieldResetView.addEventListener("click", resetBattlefieldView);
   let battlefieldFullscreenControlSlots = null;
+  let battlefieldFullscreenStats = null;
 
   function mountBattlefieldFullscreenControls() {
     if (battlefieldFullscreenControlSlots || !battlefieldStage) return;
@@ -5429,16 +6209,41 @@
         battlefieldStage.appendChild(element);
         return { element, placeholder };
       });
+    const statElements = [
+      battlefieldPanel.querySelector(".replay-battlefield-stat-groups"),
+      battlefieldLegend
+    ].filter(Boolean);
+    const statsElement = document.createElement("section");
+    statsElement.className = "replay-battlefield-fullscreen-stats";
+    statsElement.setAttribute("aria-label", "Live player statistics");
+    const slots = statElements.map((element) => {
+      const placeholder = document.createComment("battlefield fullscreen stats");
+      element.parentNode.insertBefore(placeholder, element);
+      statsElement.appendChild(element);
+      return { element, placeholder };
+    });
+    battlefieldStage.appendChild(statsElement);
+    battlefieldFullscreenStats = { element: statsElement, slots };
   }
 
   function restoreBattlefieldFullscreenControls() {
-    if (!battlefieldFullscreenControlSlots) return;
-    battlefieldFullscreenControlSlots.forEach(({ element, placeholder }) => {
-      if (placeholder.parentNode) {
-        placeholder.parentNode.replaceChild(element, placeholder);
-      }
-    });
-    battlefieldFullscreenControlSlots = null;
+    if (battlefieldFullscreenControlSlots) {
+      battlefieldFullscreenControlSlots.forEach(({ element, placeholder }) => {
+        if (placeholder.parentNode) {
+          placeholder.parentNode.replaceChild(element, placeholder);
+        }
+      });
+      battlefieldFullscreenControlSlots = null;
+    }
+    if (battlefieldFullscreenStats) {
+      battlefieldFullscreenStats.slots.forEach(({ element, placeholder }) => {
+        if (placeholder.parentNode) {
+          placeholder.parentNode.replaceChild(element, placeholder);
+        }
+      });
+      battlefieldFullscreenStats.element.remove();
+      battlefieldFullscreenStats = null;
+    }
   }
 
   battlefieldFullscreen.addEventListener("click", async () => {
@@ -5465,9 +6270,9 @@
   });
   document.addEventListener("fullscreenerror", restoreBattlefieldFullscreenControls);
   if (battlefieldViewMode) {
-    battlefieldViewMode.value = "2d";
     syncBattlefieldRotationControls(false);
     battlefieldViewMode.addEventListener("change", () => {
+      saveBattlefieldSettings();
       setBattlefieldViewMode(battlefieldViewMode.value);
     });
   }
@@ -5548,9 +6353,42 @@
 
   bindBattlefieldCanvas(battlefieldCanvas);
   bindBattlefieldCanvas(battlefield3dCanvas);
+  battlefieldStage.addEventListener("wheel", (event) => {
+    event.preventDefault();
+  }, { passive: false });
+  window.addEventListener("wheel", (event) => {
+    if (battlefieldStage.matches(":hover")) {
+      event.preventDefault();
+    }
+  }, { capture: true, passive: false });
+  battlefieldStage.addEventListener("pointerenter", () => {
+    document.documentElement.classList.add("replay-battlefield-scroll-lock");
+  });
+  battlefieldStage.addEventListener("pointerleave", () => {
+    document.documentElement.classList.remove("replay-battlefield-scroll-lock");
+  });
+  window.addEventListener("blur", () => {
+    document.documentElement.classList.remove("replay-battlefield-scroll-lock");
+  });
   battlefieldMinimap.style.pointerEvents = "auto";
   battlefieldMinimap.style.cursor = "crosshair";
-  battlefieldMinimap.addEventListener("click", (event) => {
+  battlefieldMinimap.style.touchAction = "none";
+  let battlefieldMinimapPointerId = null;
+
+  battlefieldMinimap.addEventListener("wheel", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const minimapRect = battlefieldMinimap.getBoundingClientRect();
+    const stageRect = battlefieldStage.getBoundingClientRect();
+    const minimumWidth = 100;
+    const maximumWidth = Math.max(minimumWidth, Math.min(420, stageRect.width * 0.55));
+    const scale = event.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const nextWidth = Math.max(minimumWidth, Math.min(maximumWidth, minimapRect.width * scale));
+    battlefieldMinimap.style.width = `${Math.round(nextWidth)}px`;
+    positionBattlefieldMinimapToggle();
+  }, { passive: false });
+
+  const moveBattlefieldFromMinimap = (event) => {
     const minimapRect = battlefieldMinimap.getBoundingClientRect();
     const activeCanvas = battlefield3dIsActive() ? battlefield3dCanvas : battlefieldCanvas;
     const canvasRect = activeCanvas.getBoundingClientRect();
@@ -5569,7 +6407,29 @@
       battlefieldView.offsetY = (0.5 - mapY) * fieldHeight * battlefieldView.scale;
     }
     drawBattlefield();
+  };
+
+  battlefieldMinimap.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    battlefieldMinimapPointerId = event.pointerId;
+    battlefieldMinimap.setPointerCapture(event.pointerId);
+    battlefieldMinimap.style.cursor = "grabbing";
+    moveBattlefieldFromMinimap(event);
   });
+
+  battlefieldMinimap.addEventListener("pointermove", (event) => {
+    if (battlefieldMinimapPointerId !== event.pointerId || !(event.buttons & 1)) return;
+    moveBattlefieldFromMinimap(event);
+  });
+
+  const stopBattlefieldMinimapDrag = (event) => {
+    if (battlefieldMinimapPointerId !== event.pointerId) return;
+    battlefieldMinimapPointerId = null;
+    battlefieldMinimap.style.cursor = "crosshair";
+  };
+  battlefieldMinimap.addEventListener("pointerup", stopBattlefieldMinimapDrag);
+  battlefieldMinimap.addEventListener("pointercancel", stopBattlefieldMinimapDrag);
 
   if (typeof ResizeObserver === "function") {
     const battlefieldResizeObserver = new ResizeObserver(() => drawBattlefield());
@@ -5577,6 +6437,7 @@
   } else {
     window.addEventListener("resize", drawBattlefield);
   }
+  window.addEventListener("resize", alignBattlefieldMomentumToTimeline);
 
   researchPlayer.addEventListener("change", () => {
     if (latestExtraction) {

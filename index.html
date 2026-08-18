@@ -72,7 +72,7 @@
       inset: 0;
       z-index: 2000;
       display: grid;
-      padding: 14px;
+      padding: 0;
       background: rgba(2, 7, 12, 0.88);
       backdrop-filter: blur(6px);
     }
@@ -90,16 +90,11 @@
       min-height: 0;
       place-self: center;
       overflow: hidden;
-      border: 1px solid rgba(67, 222, 255, 0.5);
-      border-radius: 2px;
-      background:
-        radial-gradient(circle at 15% 0, rgba(18, 145, 181, 0.1), transparent 30%),
-        linear-gradient(180deg, #06111d, #02080e);
-      clip-path: polygon(16px 0, calc(100% - 16px) 0, 100% 16px, 100% calc(100% - 16px), calc(100% - 16px) 100%, 16px 100%, 0 calc(100% - 16px), 0 16px);
-      box-shadow:
-        inset 0 1px 0 rgba(184, 248, 255, 0.14),
-        inset 0 -2px 0 rgba(0, 119, 161, 0.24),
-        0 28px 90px rgba(0, 0, 0, 0.78);
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      clip-path: none;
+      box-shadow: none;
     }
 
     .replay-analyzer-modal-frame {
@@ -250,19 +245,72 @@
       const modal = document.getElementById("replayAnalyzerModal");
       const modalFrame = document.getElementById("replayAnalyzerModalFrame");
       let pendingReplayUrl = "";
+      let pendingReplaySource = { label: "", url: "" };
       let previousFocus = null;
+
+      function sourceUrlForLabel(label, explicitUrl = "", replayUrl = "") {
+        const safeHttpUrl = (value) => {
+          if (!value) {
+            return "";
+          }
+          try {
+            const url = new URL(value, window.location.href);
+            return url.protocol === "http:" || url.protocol === "https:" ? url.href : "";
+          } catch (error) {
+            return "";
+          }
+        };
+
+        const linkedUrl = safeHttpUrl(explicitUrl);
+        if (linkedUrl) {
+          return linkedUrl;
+        }
+
+        if (/Bohan|Retropaganda/i.test(label)) {
+          return "https://warzone2100.retropaganda.info/";
+        }
+        if (/Sunshine|wz2100\.uk/i.test(label)) {
+          return "https://wz2100.uk/";
+        }
+
+        const domain = label.match(/(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:\/[^\s]*)?/i)?.[1];
+        if (domain) {
+          return `https://${domain}/`;
+        }
+
+        const replaySource = safeHttpUrl(replayUrl);
+        return replaySource ? new URL(replaySource).origin + "/" : "";
+      }
 
       function closeReplayAnalyzer() {
         modal.hidden = true;
         document.body.classList.remove("replay-analyzer-modal-open");
         pendingReplayUrl = "";
+        pendingReplaySource = { label: "", url: "" };
         modalFrame.src = "about:blank";
         if (previousFocus) {
           previousFocus.focus();
         }
       }
 
-      function openReplayAnalyzer(value) {
+      function replaySourceForUrl(value) {
+        const frameDocument = contentFrame.contentDocument;
+        if (!frameDocument) {
+          return "";
+        }
+
+        const replayLink = Array.from(
+          frameDocument.querySelectorAll(".stats-replay-link[data-replay-analyzer-url]")
+        ).find((link) => link.dataset.replayAnalyzerUrl === value);
+        const sourceElement = replayLink?.closest("tr")?.querySelector(".stats-note");
+        const sourceLink = sourceElement?.closest("a[href]") || sourceElement?.querySelector("a[href]");
+        return {
+          label: sourceElement?.textContent.trim() || "",
+          url: sourceLink?.href || ""
+        };
+      }
+
+      function openReplayAnalyzer(value, source = "") {
         let replayUrl;
         try {
           replayUrl = new URL(value);
@@ -276,9 +324,15 @@
 
         previousFocus = document.activeElement;
         pendingReplayUrl = replayUrl.href;
+        const sourceLabel = typeof source === "string" ? source : source?.label || "";
+        const sourceUrl = typeof source === "object" ? source?.url || "" : "";
+        pendingReplaySource = {
+          label: sourceLabel,
+          url: sourceUrlForLabel(sourceLabel, sourceUrl, replayUrl.href)
+        };
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = `replay-analyzer.html?replay=${encodeURIComponent(pendingReplayUrl)}`;
+        modalFrame.src = `replay-analyzer.html?v=20260818-34&replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 
@@ -294,22 +348,50 @@
 
         const modalStyles = frameDocument.createElement("style");
         modalStyles.textContent = `
+          .page-shell {
+            padding-top: 0;
+          }
+
           .replay-analyzer-intro,
           .replay-analyzer-intro + .data-card {
             display: none;
           }
 
           .replay-summary-grid {
-            grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            grid-template-columns: repeat(5, minmax(0, 1fr)) auto;
             align-items: stretch;
             margin-top: 0;
+            margin-inline: -16px;
+            width: calc(100% + 32px);
+            padding: 4px 0;
+            background:
+              radial-gradient(circle at 15% 0, rgba(20, 177, 220, 0.13), transparent 34%),
+              linear-gradient(180deg, rgba(7, 25, 39, 0.96), rgba(1, 8, 15, 0.98));
+            border: 1px solid rgba(56, 218, 255, 0.5);
+            border-radius: 2px;
+            clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+            box-shadow:
+              inset 0 1px 0 rgba(166, 244, 255, 0.16),
+              inset 0 -2px 0 rgba(0, 130, 177, 0.2),
+              0 8px 20px rgba(0, 0, 0, 0.32);
+            backdrop-filter: blur(8px);
           }
 
           .replay-summary-grid > .replay-summary-card {
-            height: 44px;
-            gap: 8px;
+            height: 22px;
+            gap: 6px;
             align-items: center;
-            padding: 6px 14px;
+            padding: 2px 10px;
+            background: linear-gradient(180deg, rgba(15, 44, 61, 0.9), rgba(3, 12, 21, 0.96));
+            border-color: rgba(62, 220, 255, 0.38);
+            border-radius: 2px;
+            clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
+            box-shadow:
+              inset 0 1px 0 rgba(176, 246, 255, 0.16),
+              inset 0 -1px 0 rgba(0, 126, 169, 0.26);
           }
 
           .replay-summary-grid .replay-summary-label,
@@ -326,6 +408,21 @@
             overflow-wrap: normal;
           }
 
+          .replay-summary-source-link {
+            color: inherit;
+            text-decoration: underline;
+            text-decoration-color: rgba(109, 232, 255, 0.54);
+            text-underline-offset: 2px;
+          }
+
+          .replay-summary-source-link:hover,
+          .replay-summary-source-link:focus-visible {
+            color: #9cefff;
+            text-decoration-color: currentColor;
+            outline: none;
+            text-shadow: 0 0 8px rgba(109, 232, 255, 0.44);
+          }
+
           .replay-results-section:first-of-type > h3 {
             display: none;
           }
@@ -337,25 +434,39 @@
           }
 
           .replay-analyzer-modal-actions > button {
-            height: 44px;
-            padding: 8px 16px;
-            border-radius: 999px;
+            height: 22px;
+            padding: 3px 12px;
+            border-radius: 2px;
+            clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 5px, 100% calc(100% - 5px), calc(100% - 5px) 100%, 5px 100%, 0 calc(100% - 5px), 0 5px);
             cursor: pointer;
-            font: 700 0.85rem/1 "Oxanium", sans-serif;
+            font: 700 0.7rem/1 "Oxanium", sans-serif;
+            letter-spacing: 0.06em;
+            text-shadow: 0 0 8px currentColor;
+            text-transform: uppercase;
+            transition: filter 140ms ease, box-shadow 140ms ease, transform 140ms ease;
           }
 
           .replay-analyzer-modal-download {
             min-width: 104px;
-            color: #06131b;
-            background: var(--cyan);
-            border: 1px solid rgba(162, 244, 255, 0.72);
-            box-shadow: 0 0 16px rgba(109, 232, 255, 0.2);
+            color: #dffbff;
+            background:
+              linear-gradient(180deg, rgba(37, 155, 187, 0.98), rgba(5, 54, 72, 0.98) 58%, rgba(2, 24, 35, 0.99));
+            border: 1px solid rgba(113, 234, 255, 0.88);
+            box-shadow:
+              inset 0 1px 0 rgba(222, 252, 255, 0.38),
+              inset 0 -2px 0 rgba(0, 10, 18, 0.48),
+              0 0 14px rgba(64, 221, 255, 0.28);
           }
 
           .replay-analyzer-modal-download:hover,
           .replay-analyzer-modal-download:focus-visible {
-            background: #a2f4ff;
+            filter: brightness(1.24);
+            box-shadow:
+              inset 0 1px 0 rgba(235, 254, 255, 0.5),
+              inset 0 -2px 0 rgba(0, 10, 18, 0.48),
+              0 0 20px rgba(64, 221, 255, 0.5);
             outline: none;
+            transform: translateY(-1px);
           }
 
           .replay-analyzer-modal-download:disabled {
@@ -365,16 +476,25 @@
 
           .replay-analyzer-modal-close {
             min-width: 82px;
-            color: #061209;
-            background: var(--success);
-            border: 1px solid rgba(165, 243, 166, 0.72);
-            box-shadow: 0 0 16px rgba(141, 233, 142, 0.2);
+            color: #e8ffe9;
+            background:
+              linear-gradient(180deg, rgba(75, 174, 88, 0.98), rgba(18, 82, 35, 0.98) 58%, rgba(5, 35, 17, 0.99));
+            border: 1px solid rgba(154, 245, 163, 0.86);
+            box-shadow:
+              inset 0 1px 0 rgba(229, 255, 231, 0.36),
+              inset 0 -2px 0 rgba(1, 18, 7, 0.5),
+              0 0 14px rgba(102, 233, 115, 0.24);
           }
 
           .replay-analyzer-modal-close:hover,
           .replay-analyzer-modal-close:focus-visible {
-            background: #a5f3a6;
+            filter: brightness(1.24);
+            box-shadow:
+              inset 0 1px 0 rgba(239, 255, 241, 0.5),
+              inset 0 -2px 0 rgba(1, 18, 7, 0.5),
+              0 0 20px rgba(102, 233, 115, 0.46);
             outline: none;
+            transform: translateY(-1px);
           }
 
           @media (max-width: 900px) {
@@ -395,6 +515,13 @@
 
             .replay-summary-grid > .replay-analyzer-modal-actions {
               grid-column: 1;
+            }
+          }
+
+          @media (max-width: 820px) {
+            .replay-summary-grid {
+              margin-inline: -10px;
+              width: calc(100% + 20px);
             }
           }
         `;
@@ -452,6 +579,32 @@
               return false;
             }
 
+            const sourceCard = Array.from(
+              summaryGrid.querySelectorAll(".replay-summary-card")
+            ).find((card) => card.querySelector(".replay-summary-label")?.textContent === "Host");
+            if (sourceCard) {
+              sourceCard.querySelector(".replay-summary-label").textContent = "Source";
+              const sourceValue = sourceCard.querySelector(".replay-summary-value");
+              const sourceText = pendingReplaySource.label || "Unknown";
+              sourceValue.textContent = sourceText;
+              if (sourceText !== "Unknown" && pendingReplaySource.url) {
+                const sourceLink = frameDocument.createElement("a");
+                sourceLink.className = "replay-summary-source-link";
+                sourceLink.href = pendingReplaySource.url;
+                sourceLink.target = "_blank";
+                sourceLink.rel = "noopener noreferrer";
+                sourceLink.textContent = sourceText;
+                sourceValue.replaceChildren(sourceLink);
+              }
+            }
+
+            const dateCard = Array.from(
+              summaryGrid.querySelectorAll(".replay-summary-card")
+            ).find((card) => card.querySelector(".replay-summary-label")?.textContent === "Date");
+            if (dateCard) {
+              summaryGrid.prepend(dateCard);
+            }
+
             summaryGrid.append(modalActions);
             return true;
           };
@@ -476,7 +629,7 @@
           return;
         }
 
-        openReplayAnalyzer(event.data.replayUrl);
+        openReplayAnalyzer(event.data.replayUrl, replaySourceForUrl(event.data.replayUrl));
       });
 
       modal.addEventListener("click", (event) => {

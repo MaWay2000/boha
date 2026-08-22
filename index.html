@@ -269,10 +269,6 @@
         if (/Bohan|Retropaganda/i.test(label)) {
           return "https://warzone2100.retropaganda.info/";
         }
-        if (/Sunshine|wz2100\.uk/i.test(label)) {
-          return "https://wz2100.uk/";
-        }
-
         const domain = label.match(/(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})(?:\/[^\s]*)?/i)?.[1];
         if (domain) {
           return `https://${domain}/`;

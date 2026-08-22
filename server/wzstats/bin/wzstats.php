@@ -30,16 +30,6 @@ try {
         exit(0);
     }
 
-    if ($command === 'sync') {
-        $requestedLimit = isset($argv[2]) ? (int) $argv[2] : (int) ($config['source']['recent_limit'] ?? 10);
-        $limit = max(1, min(50, $requestedLimit));
-        $client = new Wz2100UkClient($config['source']);
-        $importer = new Importer($pdo, $client, $config['storage']['replay_dir']);
-        $result = $importer->sync($limit);
-        fwrite(STDOUT, json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . PHP_EOL);
-        exit($result['errors'] === [] ? 0 : 2);
-    }
-
     if ($command === 'parse') {
         $requestedLimit = isset($argv[2]) ? (int) $argv[2] : 25;
         $processor = new ReplayProcessor($pdo, new ReplayParser());
@@ -48,7 +38,7 @@ try {
         exit($result['errors'] === [] ? 0 : 2);
     }
 
-    fwrite(STDOUT, "Usage:\n  php bin/wzstats.php migrate\n  php bin/wzstats.php status\n  php bin/wzstats.php sync [limit]\n  php bin/wzstats.php parse [limit]\n");
+    fwrite(STDOUT, "Usage:\n  php bin/wzstats.php migrate\n  php bin/wzstats.php status\n  php bin/wzstats.php parse [limit]\n");
     exit($command === 'help' ? 0 : 1);
 } catch (Throwable $error) {
     fwrite(STDERR, '[wzstats] ' . $error->getMessage() . PHP_EOL);

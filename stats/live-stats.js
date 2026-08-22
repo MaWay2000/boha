@@ -12,7 +12,6 @@ const PLAYER_KEYS_URL = USE_REMOTE_MIRROR_JSON
   ? new URL("player-public-keys.json", GITHUB_RAW_STATS_BASE_URL)
   : new URL("./player-public-keys.json", import.meta.url);
 const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
-const WZSTATS_MATCHES_URL = new URL("./published/matches.json", import.meta.url);
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 20;
 const PLAYER_LIMIT_STEP = 100;
@@ -105,8 +104,6 @@ let selectedLeaderboard = "Global";
 let resultsData = { format: 0, results: [] };
 let leaderboardData = null;
 let leaderboardDataSignature = "";
-let wzstatsMatches = [];
-let wzstatsMatchesSignature = "";
 let liveFeedState = "idle";
 let playerPublicKeys = {};
 let upstreamManifest = null;
@@ -418,96 +415,6 @@ async function ensureSnapshot(force = false) {
   resultsData = await readJson(SNAPSHOT_URL, snapshotKey);
   currentSnapshotKey = snapshotKey;
   return true;
-}
-
-function parseWzstatsDate(value) {
-  const timestamp = Date.parse(`${String(value || "").replace(" ", "T")}Z`);
-  return Number.isFinite(timestamp) ? timestamp : 0;
-}
-
-function normalizeWzstatsMatches(payload) {
-  const accounts = new Map();
-  const getAccount = (name) => {
-    const accountKey = String(name || "Unknown").toLowerCase();
-    if (!accounts.has(accountKey)) {
-      accounts.set(accountKey, {
-        name: name || "Unknown",
-        names: new Map([[name || "Unknown", 1]]),
-        publicKeys: new Set(),
-        games: [],
-        winCount: 0,
-        loseCount: 0,
-        drawCount: 0
-      });
-    }
-    return accounts.get(accountKey);
-  };
-
-  return (Array.isArray(payload?.matches) ? payload.matches : [])
-    .filter((match) => match.source === "wz2100.uk")
-    .map((match) => {
-      const players = (Array.isArray(match.players) ? match.players : []).map((player) => ({
-        position: Number(player.position),
-        team: Number(player.team),
-        userType: String(player.result || "").toLowerCase(),
-        account: getAccount(player.name)
-      }));
-      const teamsByNumber = new Map();
-      players.forEach((player) => {
-        if (!teamsByNumber.has(player.team)) {
-          teamsByNumber.set(player.team, { team: player.team, userType: player.userType, players: [] });
-        }
-        teamsByNumber.get(player.team).players.push(player);
-      });
-      const replayUrl = match.replay_url ? new URL(match.replay_url, WZSTATS_MATCHES_URL).href : "";
-      const game = {
-        source: "wz2100.uk",
-        sourceLabel: match.source_label || "Sunshine / wz2100.uk",
-        sourceMatchId: match.source_match_id,
-        replaySha256: match.replay_sha256,
-        replayUrl,
-        endDate: parseWzstatsDate(match.ended_at),
-        duration: Number(match.duration_ms || 0),
-        mapName: match.map || "Unknown",
-        mods: "",
-        cheated: false,
-        players,
-        slots: players,
-        teams: [...teamsByNumber.values()].sort((left, right) => left.team - right.team)
-      };
-      players.forEach((player) => {
-        player.account.games.push(game);
-        if (player.userType === "winner") {
-          player.account.winCount += 1;
-        } else if (player.userType === "loser") {
-          player.account.loseCount += 1;
-        } else {
-          player.account.drawCount += 1;
-        }
-      });
-      return game;
-    });
-}
-
-async function ensureWzstatsMatches(force = false) {
-  if (!matchesElement) {
-    return false;
-  }
-  try {
-    const payload = await readJson(WZSTATS_MATCHES_URL, force ? Date.now().toString() : "wzstats", force);
-    const signature = (payload.matches || [])
-      .map((match) => `${match.id}:${match.replay_sha256 || ""}`)
-      .join("|");
-    if (!force && signature === wzstatsMatchesSignature) {
-      return false;
-    }
-    wzstatsMatches = normalizeWzstatsMatches(payload);
-    wzstatsMatchesSignature = signature;
-    return true;
-  } catch (error) {
-    console.warn("Unable to refresh wz2100.uk matches; keeping the last good copy.", error);
-    return false;
-  }
 }
 
 async function ensureLeaderboardData(force = false) {
@@ -3123,9 +3030,9 @@ function renderMatches(gameList) {
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
           </td>
           <td class="stats-matchup">${renderMatchup(game, {
-            includePlayerPower: game.source !== "wz2100.uk",
-            linkToLeaderboard: game.source !== "wz2100.uk",
-            showTeamStrength: game.source !== "wz2100.uk",
+            includePlayerPower: true,
+            linkToLeaderboard: true,
+            showTeamStrength: true,
             showVersus: false
           })}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
@@ -3301,14 +3208,7 @@ function render() {
 
   const accountList = sortAccounts(accounts.values());
   const gameList = [...games].sort((left, right) => right.endDate - left.endDate);
-  const recentGameList = selectedLeaderboard === "Global"
-    ? [
-        ...gameList,
-        ...wzstatsMatches.filter((game) => !allGames.some((ratedGame) => (
-          ratedGame.source === game.source && String(ratedGame.sourceMatchId) === String(game.sourceMatchId)
-        )))
-      ].sort((left, right) => right.endDate - left.endDate)
-    : gameList;
+  const recentGameList = gameList;
 
   updateStatusText(leaderboardData.games);
   renderButtons();
@@ -3479,9 +3379,8 @@ function startLiveSync() {
 
 async function refreshFromMirror(force = false) {
   const leaderboardChanged = await ensureLeaderboardData(force);
-  const wzstatsChanged = await ensureWzstatsMatches(force);
 
-  if (leaderboardChanged || wzstatsChanged || force) {
+  if (leaderboardChanged || force) {
     render();
   }
 }

@@ -36,38 +36,53 @@ function authorizeWorker(array $config): void
     }
 }
 
-function workerQueueStatus(PDO $pdo, string $targetVersion, bool $reanalysisEnabled): array
+function ensureWorkerStateRows(PDO $pdo): void
 {
+    $pdo->exec(
+        'INSERT IGNORE INTO replay_worker_state (match_id)
+         SELECT m.id FROM matches m JOIN replays r ON r.id = m.replay_id'
+    );
+}
+
+function workerQueueStatus(PDO $pdo, string $targetVersion, bool $reanalysisEnabled, int $maxAnalysisRetries): array
+{
+    ensureWorkerStateRows($pdo);
     $statement = $pdo->prepare(
         "SELECT COUNT(*) AS total,
-                SUM(CASE WHEN JSON_EXTRACT(COALESCE(m.telemetry_json, JSON_OBJECT()), '$.engineAnalysis.status') IS NULL THEN 1 ELSE 0 END) AS unprocessed,
-                SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.status')) = 'confirmed'
-                    AND JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.analyzerVersion')) = :completed_version THEN 1 ELSE 0 END) AS completed,
-                SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.status')) = 'unknown' THEN 1 ELSE 0 END) AS unknown_results,
-                SUM(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.status')) = 'error' THEN 1 ELSE 0 END) AS failed,
-                SUM(CASE WHEN JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.status') IS NOT NULL
-                    AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.analyzerVersion')), '') <> :outdated_version THEN 1 ELSE 0 END) AS outdated
-         FROM matches m JOIN replays r ON r.id = m.replay_id"
+                SUM(CASE WHEN analysis_status IS NULL THEN 1 ELSE 0 END) AS unprocessed,
+                SUM(CASE WHEN analysis_status = 'confirmed' AND analyzer_version = :completed_version THEN 1 ELSE 0 END) AS completed,
+                SUM(CASE WHEN analysis_status = 'unknown' THEN 1 ELSE 0 END) AS unknown_results,
+                SUM(CASE WHEN analysis_status = 'error' THEN 1 ELSE 0 END) AS failed,
+                SUM(CASE WHEN analysis_status IS NOT NULL AND COALESCE(analyzer_version, '') <> :outdated_version THEN 1 ELSE 0 END) AS outdated,
+                SUM(CASE WHEN analysis_status IN ('error', 'unknown')
+                    AND failure_attempts < :max_retry_attempts AND terminal_failure = 0 THEN 1 ELSE 0 END) AS retryable_failed,
+                SUM(CASE WHEN terminal_failure = 1 THEN 1 ELSE 0 END) AS terminal_failed
+         FROM replay_worker_state"
     );
     $statement->execute([
         'completed_version' => $targetVersion,
         'outdated_version' => $targetVersion,
+        'max_retry_attempts' => $maxAnalysisRetries,
     ]);
     $row = $statement->fetch() ?: [];
     $status = [];
     foreach (['total', 'unprocessed', 'completed', 'unknown_results', 'failed', 'outdated'] as $key) {
         $status[$key === 'unknown_results' ? 'unknown' : $key] = (int) ($row[$key] ?? 0);
     }
-    $status['pending'] = $status['unprocessed'] + ($reanalysisEnabled ? $status['outdated'] : 0);
+    $status['retryableFailed'] = (int) ($row['retryable_failed'] ?? 0);
+    $status['terminalFailed'] = (int) ($row['terminal_failed'] ?? 0);
+    $status['pending'] = $status['unprocessed'] + ($reanalysisEnabled ? $status['outdated'] + $status['retryableFailed'] : 0);
     $status['targetAnalyzerVersion'] = $targetVersion;
     $status['reanalysisEnabled'] = $reanalysisEnabled;
     return $status;
 }
 
+$errorStage = 'bootstrap';
 try {
     $config = wzstats_config();
     $targetAnalyzerVersion = (string) ($config['worker']['analyzer_version'] ?? '3.3.0');
     $reanalysisEnabled = (bool) ($config['worker']['reanalysis_enabled'] ?? false);
+    $maxAnalysisRetries = max(1, min(8, (int) ($config['worker']['max_analysis_retries'] ?? 4)));
     applyCors($config['cors_origins'] ?? []);
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
         http_response_code(204);
@@ -79,13 +94,14 @@ try {
     $apiPosition = strpos($requestPath, '/api/');
     $path = $apiPosition === false ? '/' : substr($requestPath, $apiPosition + 4);
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $errorStage = 'routing';
 
     if ($path === '/v1/worker/status') {
         authorizeWorker($config);
         if ($method !== 'GET') {
             respond(['error' => 'Method not allowed.'], 405);
         }
-        respond(['queue' => workerQueueStatus($pdo, $targetAnalyzerVersion, $reanalysisEnabled)]);
+        respond(['queue' => workerQueueStatus($pdo, $targetAnalyzerVersion, $reanalysisEnabled, $maxAnalysisRetries)]);
     }
 
     if ($path === '/v1/worker/jobs') {
@@ -93,42 +109,96 @@ try {
         if ($method !== 'GET') {
             respond(['error' => 'Method not allowed.'], 405);
         }
+        $workerId = (string) ($_GET['workerId'] ?? 'worker-1');
+        if (!preg_match('/^[a-zA-Z0-9_-]{1,40}$/', $workerId)) {
+            respond(['error' => 'Invalid worker ID.'], 400);
+        }
         $limit = max(1, min(5, (int) ($_GET['limit'] ?? 1)));
         $reanalysisFilter = $reanalysisEnabled
-            ? "OR (JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.status') IS NOT NULL
-                AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(m.telemetry_json, '$.engineAnalysis.analyzerVersion')), '') <> :target_version)"
+            ? "OR (
+                rws.analysis_status IN ('error', 'unknown')
+                AND rws.terminal_failure = 0
+                AND rws.failure_attempts < :max_retry_attempts
+                AND rws.updated_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 6 HOUR)
+                )
+                OR (
+                rws.analysis_status NOT IN ('error', 'unknown')
+                AND rws.analysis_status IS NOT NULL
+                AND COALESCE(rws.analyzer_version, '') <> :target_version
+                AND rws.terminal_failure = 0
+            )"
             : '';
-        $statement = $pdo->prepare(
-            "SELECT m.id, s.source_key AS source, m.source_match_id, m.started_at,
-                    m.duration_ms, m.map_name AS map, r.sha256 AS replay_sha256,
-                    r.filename AS replay_filename
-             FROM matches m
-             JOIN sources s ON s.id = m.source_id
-             JOIN replays r ON r.id = m.replay_id
-             WHERE (
-                 EXISTS (
-                     SELECT 1 FROM match_players mp
-                     WHERE mp.match_id = m.id AND mp.stats_source = 'replay' AND mp.score IS NULL
-                 )
-                 AND JSON_EXTRACT(COALESCE(m.telemetry_json, JSON_OBJECT()), '$.engineAnalysis.status') IS NULL
-                 $reanalysisFilter
-             )
-             ORDER BY m.started_at DESC, m.id DESC
-             LIMIT :limit"
-        );
-        if ($reanalysisEnabled) {
-            $statement->bindValue('target_version', $targetAnalyzerVersion);
+        $errorStage = 'worker_jobs_status';
+        $jobQueueStatus = workerQueueStatus($pdo, $targetAnalyzerVersion, $reanalysisEnabled, $maxAnalysisRetries);
+        $claimLockPath = dirname(__DIR__) . '/storage/worker-claim.lock';
+        $claimLock = fopen($claimLockPath, 'c');
+        if ($claimLock === false || !flock($claimLock, LOCK_EX)) {
+            if (is_resource($claimLock)) {
+                fclose($claimLock);
+            }
+            respond(['error' => 'Replay queue is temporarily unavailable.'], 503);
         }
-        $statement->bindValue('limit', $limit, PDO::PARAM_INT);
-        $statement->execute();
-        $jobs = $statement->fetchAll();
+        try {
+            $errorStage = 'worker_jobs_prepare';
+            ensureWorkerStateRows($pdo);
+            $pdo->exec('DELETE FROM replay_worker_claims WHERE expires_at <= UTC_TIMESTAMP()');
+            $errorStage = 'worker_jobs_select';
+            $statement = $pdo->prepare(
+                "SELECT m.id, s.source_key AS source, m.source_match_id, m.started_at,
+                        m.duration_ms, m.map_name AS map, r.sha256 AS replay_sha256,
+                        r.filename AS replay_filename
+                 FROM matches m
+                 JOIN sources s ON s.id = m.source_id
+                 JOIN replays r ON r.id = m.replay_id
+                 JOIN replay_worker_state rws ON rws.match_id = m.id
+                 LEFT JOIN replay_worker_claims rwc ON rwc.match_id = m.id
+                 WHERE (
+                     EXISTS (
+                         SELECT 1 FROM match_players mp
+                         WHERE mp.match_id = m.id AND mp.stats_source = 'replay' AND mp.score IS NULL
+                     )
+                     AND rws.analysis_status IS NULL
+                     $reanalysisFilter
+                 )
+                 AND rwc.match_id IS NULL
+                 ORDER BY CASE WHEN rws.analysis_status IS NULL THEN 0 ELSE 1 END,
+                          m.started_at DESC, m.id DESC
+                 LIMIT :limit"
+            );
+            if ($reanalysisEnabled) {
+                $statement->bindValue('target_version', $targetAnalyzerVersion);
+                $statement->bindValue('max_retry_attempts', $maxAnalysisRetries, PDO::PARAM_INT);
+            }
+            $statement->bindValue('limit', $limit, PDO::PARAM_INT);
+            $statement->execute();
+            $candidates = $statement->fetchAll();
+            usort($candidates, static fn(array $left, array $right): int =>
+                ((int) ($left['duration_ms'] ?? PHP_INT_MAX)) <=> ((int) ($right['duration_ms'] ?? PHP_INT_MAX))
+            );
+            $jobs = $candidates === [] ? [] : [$candidates[0]];
+            if ($jobs !== []) {
+                $errorStage = 'worker_jobs_claim';
+                $claim = $pdo->prepare(
+                    'INSERT INTO replay_worker_claims (match_id, worker_id, claimed_at, expires_at)
+                     VALUES (:match_id, :worker_id, UTC_TIMESTAMP(), :expires_at)'
+                );
+                $claim->execute([
+                    'worker_id' => $workerId,
+                    'expires_at' => gmdate('Y-m-d H:i:s', time() + (45 * 60)),
+                    'match_id' => (int) $jobs[0]['id'],
+                ]);
+            }
+        } finally {
+            flock($claimLock, LOCK_UN);
+            fclose($claimLock);
+        }
         foreach ($jobs as &$job) {
             $job['replay_url'] = 'https://onit.lt/wzstats/api/v1/replays/' . $job['replay_sha256'];
         }
         unset($job);
         respond([
             'jobs' => $jobs,
-            'queue' => workerQueueStatus($pdo, $targetAnalyzerVersion, $reanalysisEnabled),
+            'queue' => $jobQueueStatus,
         ]);
     }
 
@@ -142,10 +212,16 @@ try {
              WHERE JSON_UNQUOTE(JSON_EXTRACT(telemetry_json, '$.engineAnalysis.status')) IN ('error', 'unknown')"
         );
         $statement->execute();
+        $stateReset = $pdo->prepare(
+            "UPDATE replay_worker_state SET analysis_status = NULL, analyzer_version = NULL,
+                    failure_attempts = 0, terminal_failure = 0
+             WHERE analysis_status IN ('error', 'unknown')"
+        );
+        $stateReset->execute();
         respond([
             'accepted' => true,
             'retried' => $statement->rowCount(),
-            'queue' => workerQueueStatus($pdo, $targetAnalyzerVersion, $reanalysisEnabled),
+            'queue' => workerQueueStatus($pdo, $targetAnalyzerVersion, $reanalysisEnabled, $maxAnalysisRetries),
         ]);
     }
 
@@ -194,37 +270,70 @@ try {
         if ($status === 'confirmed' && $players === []) {
             respond(['error' => 'Confirmed result has no players.'], 422);
         }
+        $failureMode = $status === 'error' || $status === 'unknown';
+        $analyzerVersion = (string) ($analysis['analyzerVersion'] ?? '');
+        if ($failureMode && $analyzerVersion === '') {
+            $analyzerVersion = $targetAnalyzerVersion;
+        }
+        if ($status !== 'error' && $analyzerVersion !== $targetAnalyzerVersion) {
+            respond(['error' => 'Analyzer version is not accepted by this server.'], 409);
+        }
         $telemetry = $matchRecord['telemetry_json']
             ? json_decode((string) $matchRecord['telemetry_json'], true, 512, JSON_THROW_ON_ERROR)
             : [];
         $existingAnalysis = is_array($telemetry['engineAnalysis'] ?? null)
             ? $telemetry['engineAnalysis']
             : null;
+        $existingRetryAttempts = (int) ($existingAnalysis['failureAttempts'] ?? 0);
+        $existingTerminal = (bool) ($existingAnalysis['terminalFailure'] ?? false);
+        $payloadRetryAttempts = (int) ($payload['attempts'] ?? 0);
+        $retryAttempts = 0;
+        if ($failureMode) {
+            $retryAttempts = max(
+                1,
+                ($existingAnalysis !== null && ($existingAnalysis['status'] ?? null) === $status)
+                    ? max($existingRetryAttempts + 1, $payloadRetryAttempts)
+                    : max($existingRetryAttempts, $payloadRetryAttempts)
+            );
+            if ($retryAttempts > $maxAnalysisRetries) {
+                $retryAttempts = $maxAnalysisRetries;
+            }
+        }
         if ($existingAnalysis !== null
             && ($existingAnalysis['status'] ?? null) === $status
-            && ($existingAnalysis['analyzerVersion'] ?? null) === ($analysis['analyzerVersion'] ?? null)
+            && ($existingAnalysis['analyzerVersion'] ?? null) === $analyzerVersion
+            && ($failureMode || $existingAnalysis['analyzerVersion'] !== null)
             && hash_equals((string) ($existingAnalysis['replaySha256'] ?? ''), $reportedSha)) {
-            respond([
-                'accepted' => true,
-                'duplicate' => true,
-                'matchId' => $matchId,
-                'status' => $status,
-                'updatedPlayers' => 0,
-                'published' => false,
-            ]);
+            if (!$failureMode || $existingTerminal) {
+                $releaseClaim = $pdo->prepare('DELETE FROM replay_worker_claims WHERE match_id = ?');
+                $releaseClaim->execute([$matchId]);
+                respond([
+                    'accepted' => true,
+                    'duplicate' => true,
+                    'matchId' => $matchId,
+                    'status' => $status,
+                    'updatedPlayers' => 0,
+                    'published' => false,
+                ]);
+            }
         }
         $telemetry['engineAnalysis'] = [
             'status' => $status,
             'evidence' => $analysis['evidence'] ?? null,
             'replaySha256' => $reportedSha,
             'gameVersion' => $analysis['game']['version'] ?? null,
-            'analyzerVersion' => $analysis['analyzerVersion'] ?? null,
+            'analyzerVersion' => $analyzerVersion ?: null,
             'analysisMilliseconds' => $analysis['analysisMilliseconds'] ?? null,
             'analyzedAt' => gmdate('c'),
             'error' => $analysis['error'] ?? null,
             'details' => is_array($analysis['details'] ?? null) ? $analysis['details'] : null,
             'extended' => is_array($analysis['extended'] ?? null) ? $analysis['extended'] : null,
+            'failureAttempts' => $failureMode ? $retryAttempts : 0,
+            'terminalFailure' => $failureMode ? ($retryAttempts >= $maxAnalysisRetries) : false,
         ];
+        if ($failureMode && $telemetry['engineAnalysis']['terminalFailure']) {
+            $telemetry['engineAnalysis']['failureErrorAt'] = gmdate('c');
+        }
 
         $updatedPlayers = 0;
         $pdo->beginTransaction();
@@ -281,6 +390,23 @@ try {
                 json_encode($telemetry, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES),
                 $matchId,
             ]);
+            $updateWorkerState = $pdo->prepare(
+                'INSERT INTO replay_worker_state
+                    (match_id, analysis_status, analyzer_version, failure_attempts, terminal_failure)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE analysis_status = VALUES(analysis_status),
+                    analyzer_version = VALUES(analyzer_version), failure_attempts = VALUES(failure_attempts),
+                    terminal_failure = VALUES(terminal_failure)'
+            );
+            $updateWorkerState->execute([
+                $matchId,
+                $status,
+                $analyzerVersion ?: null,
+                $failureMode ? $retryAttempts : 0,
+                $failureMode && $retryAttempts >= $maxAnalysisRetries ? 1 : 0,
+            ]);
+            $releaseClaim = $pdo->prepare('DELETE FROM replay_worker_claims WHERE match_id = ?');
+            $releaseClaim->execute([$matchId]);
             $pdo->commit();
         } catch (Throwable $error) {
             if ($pdo->inTransaction()) {
@@ -461,10 +587,11 @@ try {
 
     respond(['error' => 'Endpoint not found.'], 404);
 } catch (Throwable $error) {
-    error_log('[wzstats-api] ' . $error->getMessage());
+    $errorContext = ($method ?? '?') . ' ' . ($path ?? '?') . ' [' . ($errorStage ?? 'unknown') . ']';
+    error_log('[wzstats-api] ' . $errorContext . ' ' . $error->getMessage());
     @file_put_contents(
         dirname(__DIR__) . '/storage/logs/api-error.log',
-        '[' . gmdate('c') . '] ' . $error::class . ': ' . $error->getMessage() . PHP_EOL,
+        '[' . gmdate('c') . '] ' . $errorContext . ' ' . $error::class . ': ' . $error->getMessage() . PHP_EOL,
         FILE_APPEND | LOCK_EX
     );
     respond(['error' => 'Service unavailable.'], 503);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { appendFileSync, closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, createWriteStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { constants as osConstants, homedir, setPriority, tmpdir } from 'node:os';
@@ -12,10 +12,19 @@ import { gzipSync } from 'node:zlib';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const once = process.argv.includes('--once');
 const retryFailed = process.argv.includes('--retry-failed');
+const workerIdOption = process.argv.find((argument) => argument.startsWith('--worker-id='));
+const workerId = String(workerIdOption ? workerIdOption.slice('--worker-id='.length) : '1')
+  .replace(/[^a-zA-Z0-9_-]/g, '') || '1';
 const configOption = process.argv.find((argument) => argument.startsWith('--config='));
 const configPath = resolve(configOption
   ? configOption.slice('--config='.length)
   : join(process.env.LOCALAPPDATA || homedir(), 'MaWay2000Wzstats', 'worker.json'));
+
+function parsePositiveInt(value, fallback, minimum = 1) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed < minimum) return fallback;
+  return parsed;
+}
 
 function loadConfig() {
   if (!existsSync(configPath)) {
@@ -32,24 +41,53 @@ function loadConfig() {
     baseUrl: String(config.baseUrl).replace(/\/$/, ''),
     token: String(config.token),
     warzonePath: resolve(String(config.warzonePath)),
-    pollSeconds: Math.max(15, Number(config.pollSeconds) || 300),
-    retrySeconds: Math.max(5, Number(config.retrySeconds) || 30),
+    pollSeconds: Math.max(
+      15,
+      parsePositiveInt(process.env.WZ_POLL_SECONDS, parsePositiveInt(config.pollSeconds, 300, 15), 15)
+    ),
+    retrySeconds: Math.max(
+      5,
+      parsePositiveInt(process.env.WZ_RETRY_SECONDS, parsePositiveInt(config.retrySeconds, 30, 5), 5)
+    ),
   };
 }
 
+const ANALYZER_VERSION = (() => {
+  const source = readFileSync(join(scriptDirectory, 'analyze-replay-outcome.mjs'), 'utf8');
+  const match = source.match(/ANALYZER_VERSION\s*=\s*['"]([^'"]+)['"]/);
+  return match?.[1] ?? '3.3.0';
+})();
 const config = loadConfig();
 const logDirectory = dirname(configPath);
 mkdirSync(logDirectory, { recursive: true });
 const logPath = join(logDirectory, 'worker.log');
-const progressPath = join(logDirectory, 'progress.json');
+const progressPath = join(logDirectory, `progress-${workerId}.json`);
 const interfaceSettingsPath = join(logDirectory, 'interface-settings.json');
-const pendingDirectory = join(logDirectory, 'pending');
-const lockPath = join(logDirectory, 'worker.lock');
+const pendingDirectory = join(logDirectory, workerId === '1' ? 'pending' : `pending-${workerId}`);
+const lockPath = join(logDirectory, `worker-${workerId}.lock`);
+const maxPendingResultAttempts = parsePositiveInt(process.env.WZ_MAX_PENDING_RESULT_ATTEMPTS, 5, 1);
+const maxLogBytes = 5 * 1024 * 1024;
 mkdirSync(pendingDirectory, { recursive: true });
 
+function rotateLogIfNeeded() {
+  if (workerId !== '1') return;
+  try {
+    if (!existsSync(logPath) || statSync(logPath).size < maxLogBytes) return;
+    const backupPath = `${logPath}.1`;
+    rmSync(backupPath, { force: true });
+    renameSync(logPath, backupPath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      process.stderr.write(`Worker log rotation failed: ${error.message}\n`);
+    }
+  }
+}
+
 function log(message, details = undefined) {
-  const line = `[${new Date().toISOString()}] ${message}${details === undefined ? '' : ` ${JSON.stringify(details)}`}`;
+  const workerDetails = { workerId, ...(details || {}) };
+  const line = `[${new Date().toISOString()}] ${message} ${JSON.stringify(workerDetails)}`;
   process.stdout.write(`${line}\n`);
+  rotateLogIfNeeded();
   appendFileSync(logPath, `${line}\n`, 'utf8');
 }
 
@@ -154,6 +192,63 @@ function compressedResultRequest(pendingPath) {
   });
 }
 
+function writeProgressError(errorMessage) {
+  let previous = {};
+  try {
+    previous = JSON.parse(readFileSync(progressPath, 'utf8'));
+    delete previous.updatedAt;
+  } catch {
+  }
+  writeProgress({
+    ...previous,
+    state: 'error',
+    error: errorMessage,
+  });
+}
+
+async function submitPendingResult(pendingPath) {
+  let payload;
+  try {
+    payload = JSON.parse(readFileSync(pendingPath, 'utf8'));
+  } catch (error) {
+    const quarantinedPath = `${pendingPath}.failed`;
+    renameSync(pendingPath, quarantinedPath);
+    return {
+      accepted: null,
+      payload: null,
+      error: error instanceof Error ? error.message : String(error),
+      quarantined: true,
+    };
+  }
+  payload.analysis = compactAnalysis(payload.analysis);
+  payload.attempts = Number(payload.attempts || 0);
+  writeFileSync(pendingPath, JSON.stringify(payload), 'utf8');
+  try {
+    const accepted = await compressedResultRequest(pendingPath);
+    rmSync(pendingPath, { force: true });
+    return { accepted, payload, error: null };
+  } catch (error) {
+    payload.attempts = (Number(payload.attempts || 0) || 0) + 1;
+    if (payload.attempts >= maxPendingResultAttempts) {
+      const quarantinedPath = `${pendingPath}.${payload.attempts}.failed.json`;
+      renameSync(pendingPath, quarantinedPath);
+      return {
+        accepted: null,
+        payload,
+        error: error instanceof Error ? error.message : String(error),
+        quarantined: true,
+      };
+    }
+    writeFileSync(pendingPath, JSON.stringify(payload), 'utf8');
+    return {
+      accepted: null,
+      payload,
+      error: error instanceof Error ? error.message : String(error),
+      quarantined: false,
+    };
+  }
+}
+
 async function downloadReplay(url, destination) {
   const response = await fetch(url, { headers: { 'User-Agent': 'MaWay2000-replay-worker/1.0' } });
   if (!response.ok || !response.body) {
@@ -255,7 +350,7 @@ function compactAnalysis(analysis) {
 }
 
 async function processNextJob() {
-  const response = await request('/jobs?limit=5');
+  const response = await request(`/jobs?limit=5&workerId=${encodeURIComponent(`worker-${workerId}`)}`);
   const jobs = Array.isArray(response.jobs) ? response.jobs : [];
   const queue = response.queue || null;
   const job = jobs.sort((left, right) => Number(left.duration_ms || Infinity) - Number(right.duration_ms || Infinity))[0];
@@ -295,27 +390,49 @@ async function processNextJob() {
         evidence: 'worker_error',
         replay: { sha256: job.replay_sha256 },
         error: error instanceof Error ? error.message : String(error),
+        analyzerVersion: ANALYZER_VERSION,
       };
     }
     const pendingPath = join(pendingDirectory, `${Number(job.id)}.json`);
     const temporaryPendingPath = `${pendingPath}.tmp`;
     analysis = compactAnalysis(analysis);
-    writeFileSync(temporaryPendingPath, JSON.stringify({ matchId: Number(job.id), analysis }), 'utf8');
+    const pendingPayload = { matchId: Number(job.id), attempts: 1, analysis };
+    writeFileSync(temporaryPendingPath, JSON.stringify(pendingPayload), 'utf8');
     renameSync(temporaryPendingPath, pendingPath);
-    const accepted = await compressedResultRequest(pendingPath);
-    rmSync(pendingPath, { force: true });
-    log('Result accepted.', {
-      matchId: Number(job.id),
-      status: analysis.status,
-      players: accepted.updatedPlayers,
-      published: accepted.published,
-    });
-    writeProgress({
-      ...jobProgress,
-      state: 'completed',
-      elapsedMilliseconds: analysis.game?.elapsedMilliseconds ?? jobProgress.totalMilliseconds,
-      phase: 'complete',
-    });
+    const result = await submitPendingResult(pendingPath);
+    if (!result.accepted) {
+      if (result.quarantined) {
+        log('Result quarantined after repeated submit failures.', {
+          matchId: Number(job.id),
+          reason: result.error,
+        });
+      } else {
+        log('Result upload deferred; will retry from pending queue.', {
+          matchId: Number(job.id),
+          reason: result.error,
+          attempts: result.payload?.attempts,
+        });
+      }
+      writeProgress({
+        ...jobProgress,
+        state: 'error',
+        phase: 'finalizing',
+        error: result.error,
+      });
+    } else {
+      log('Result accepted.', {
+        matchId: Number(job.id),
+        status: analysis.status,
+        players: result.accepted.updatedPlayers,
+        published: result.accepted.published,
+      });
+      writeProgress({
+        ...jobProgress,
+        state: 'completed',
+        elapsedMilliseconds: analysis.game?.elapsedMilliseconds ?? jobProgress.totalMilliseconds,
+        phase: 'complete',
+      });
+    }
   } finally {
     const safePrefix = join(tmpdir(), 'maway2000-worker-');
     if (workDirectory.startsWith(safePrefix)) rmSync(workDirectory, { recursive: true, force: true });
@@ -327,16 +444,27 @@ async function submitPendingResults() {
   const pendingFiles = readdirSync(pendingDirectory).filter((name) => /^\d+\.json$/.test(name));
   for (const name of pendingFiles) {
     const pendingPath = join(pendingDirectory, name);
-    const payload = JSON.parse(readFileSync(pendingPath, 'utf8'));
-    payload.analysis = compactAnalysis(payload.analysis);
-    writeFileSync(pendingPath, JSON.stringify(payload), 'utf8');
-    const accepted = await compressedResultRequest(pendingPath);
-    rmSync(pendingPath, { force: true });
+    const result = await submitPendingResult(pendingPath);
+    if (!result.accepted) {
+      if (result.quarantined) {
+        log('Pending result quarantined.', {
+          matchId: Number(result.payload?.matchId || 0),
+          reason: result.error,
+        });
+      } else if (result.error) {
+        log('Pending result still retrying.', {
+          matchId: Number(result.payload?.matchId || 0),
+          attempts: result.payload?.attempts,
+          reason: result.error,
+        });
+      }
+      continue;
+    }
     log('Saved result accepted.', {
-      matchId: Number(payload.matchId),
-      status: payload.analysis?.status,
-      players: accepted.updatedPlayers,
-      published: accepted.published,
+      matchId: Number(result.payload?.matchId || 0),
+      status: result.payload?.analysis?.status,
+      players: result.accepted.updatedPlayers,
+      published: result.accepted.published,
     });
   }
 }
@@ -366,19 +494,25 @@ process.on('exit', releaseWorkerLock);
 process.on('SIGINT', () => process.exit(130));
 process.on('SIGTERM', () => process.exit(143));
 
+let consecutiveFailures = 0;
 do {
   try {
     await submitPendingResults();
     const processed = await processNextJob();
+    consecutiveFailures = 0;
     if (once) break;
     if (!processed) await sleep(config.pollSeconds * 1000);
   } catch (error) {
-    log('Worker cycle failed.', { error: error instanceof Error ? error.message : String(error) });
-    writeProgress({ state: 'error', error: error instanceof Error ? error.message : String(error) });
+    consecutiveFailures += 1;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const retryDelaySeconds = Math.min(600, config.retrySeconds * (2 ** Math.min(4, consecutiveFailures - 1)))
+      + Math.floor(Math.random() * 6);
+    log('Worker cycle failed.', { error: errorMessage, consecutiveFailures, retryDelaySeconds });
+    writeProgressError(errorMessage);
     if (once) {
       process.exitCode = 1;
       break;
     }
-    await sleep(config.retrySeconds * 1000);
+    await sleep(retryDelaySeconds * 1000);
   }
 } while (true);

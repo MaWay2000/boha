@@ -10,7 +10,7 @@ Downloaded files must have a valid `WZrp` header. They are stored by SHA-256, so
 
 After parsing, `ReplayMaterializer` creates normalized match, map, duration and non-spectator player records from replay data. Source totals are not silently promoted into replay-derived fields. Missing replay-native values remain null and can be attached later as explicitly attributed source metadata.
 
-Bohan/Retropaganda is the primary discovery source. Sunshine/wz2100.uk and future servers are additional discovery sources. Source website fields are provenance metadata; the replay file and versioned replay parser are the canonical data path.
+Bohan/Retropaganda is the replay discovery source. Source website fields are provenance metadata; the replay file and versioned replay parser are the canonical data path.
 
 ## GitHub publication
 
@@ -50,10 +50,9 @@ URL cron schedule:
 
 ```cron
 0,30 * * * * cronurl 'https://onit.lt/wzstats/bin/bohan.php?key=BOHAN_CRON_KEY'
-15,45 * * * * cronurl 'https://onit.lt/wzstats/bin/sun.php?key=SUN_CRON_KEY'
 ```
 
-`bohan.php` and `sun.php` scan their complete available listings, compare them with the saved queue, download up to 100 unseen replay files, SHA-256 deduplicate them and parse up to 100 pending files. Normal 30-minute arrivals are fully drained in one run; the initial historical backlog is drained safely across multiple runs. Each URL requires its own secret key and returns 404 without it.
+`bohan.php` scans the complete available listing, compares it with the saved queue, downloads up to 100 unseen replay files, SHA-256 deduplicates them and parses up to 100 pending files. Normal 30-minute arrivals are fully drained in one run; the initial historical backlog is drained safely across multiple runs. The URL requires its own secret key and returns 404 without it.
 
 `tools/build-legacy-outcomes.mjs` creates the private upload artifact `data/legacy-outcomes.json`. `leaderboard.php` imports it, links facts to materialized matches by source ID, and atomically publishes `data/leaderboards.json`. The artifact and generated output are ignored by Git.
 

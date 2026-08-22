@@ -532,7 +532,7 @@
 
     const matchesResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
     if (!matchesResponse.ok) {
-      throw new Error(`Unable to load wz2100.uk match index (${matchesResponse.status}).`);
+      throw new Error(`Unable to load the published match index (${matchesResponse.status}).`);
     }
 
     const matchesPayload = await matchesResponse.json();

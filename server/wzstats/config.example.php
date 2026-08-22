@@ -8,12 +8,6 @@ return [
         'username' => 'CHANGE_ME',
         'password' => 'CHANGE_ME',
     ],
-    'source' => [
-        'base_url' => 'https://wz2100.uk',
-        'recent_limit' => 10,
-        'timeout_seconds' => 30,
-        'user_agent' => 'MaWay2000-wzstats/1.0 (+https://maway2000.github.io/boha/)',
-    ],
     'storage' => [
         'replay_dir' => __DIR__ . '/storage/replays',
     ],

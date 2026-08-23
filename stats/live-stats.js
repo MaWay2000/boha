@@ -455,6 +455,7 @@ function hydratePublishedBoard(name) {
     winCount: Number(player.wins || 0),
     loseCount: Number(player.losses || 0),
     drawCount: Number(player.draws || 0),
+    totalKills: Number(player.totalKills || 0),
     discounted: Boolean(player.discounted)
   }]));
   const gameIds = new Set(board.gameIds || []);
@@ -468,7 +469,7 @@ function hydratePublishedBoard(name) {
           account = {
             mainPublicKey: null, publicKeys: new Set(), name: slot.name || "Unknown",
             names: new Map([[slot.name || "Unknown", 1]]), bot: true, games: [],
-            elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, discounted: true
+            elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, totalKills: 0, discounted: true
           };
           accounts.set(String(slot.id), account);
         }
@@ -1959,10 +1960,15 @@ function renderPlayerComparison(accounts) {
 }
 
 function renderPlayerProfile(account) {
+  const shareButton = document.getElementById("statsProfileShare");
   if (!playerProfileElement || !account) {
     if (playerProfileElement) {
       playerProfileElement.hidden = true;
       playerProfileElement.innerHTML = "";
+    }
+    if (shareButton) {
+      shareButton.hidden = true;
+      shareButton.onclick = null;
     }
     return;
   }
@@ -1991,7 +1997,6 @@ function renderPlayerProfile(account) {
         <span class="stats-detail-label">Player profile</span>
         <strong>${escapeHtml(account.name || "Unknown")}</strong>
       </div>
-      <button class="stats-profile-share" type="button" data-profile-url="${escapeHtml(profileUrl.href)}">Copy profile link</button>
     </div>
     <div class="stats-profile-metrics">
       <article><span>Current ELO</span><strong>${account.discounted ? "Provisional" : account.elo.toFixed(2)}</strong></article>
@@ -2012,16 +2017,19 @@ function renderPlayerProfile(account) {
     </div>
   `;
 
-  const shareButton = playerProfileElement.querySelector("[data-profile-url]");
-  shareButton?.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(shareButton.dataset.profileUrl);
-      shareButton.textContent = "Link copied";
-    } catch {
-      shareButton.textContent = "Copy failed";
-    }
-    window.setTimeout(() => { shareButton.textContent = "Copy profile link"; }, 1400);
-  });
+  if (shareButton) {
+    shareButton.hidden = false;
+    shareButton.dataset.profileUrl = profileUrl.href;
+    shareButton.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(shareButton.dataset.profileUrl);
+        shareButton.textContent = "Link copied";
+      } catch {
+        shareButton.textContent = "Copy failed";
+      }
+      window.setTimeout(() => { shareButton.textContent = "Copy profile link"; }, 1400);
+    };
+  }
 }
 
 function parseOptionalNumber(value) {
@@ -2145,16 +2153,44 @@ function getActiveMatchFilterCount() {
   ].filter(Boolean).length;
 }
 
-function renderPlayerGames(accounts) {
+function renderPlayerGames(accounts, globalAccounts = accounts) {
   if (!playerGamesElement || !playerGamesTitleElement || !playerGamesMetaElement) {
     return;
   }
 
+  const profileHeadingLabel = document.querySelector(".stats-player-profile-heading-line .panel-kicker");
   const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
+  const selectedAccount = globalAccounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
+  if (!activeAccount && selectedAccount) {
+    if (profileHeadingLabel) {
+      profileHeadingLabel.innerHTML = `<span class="stats-player-profile-heading-name">${escapeHtml(selectedAccount.name || "Player")}</span>`;
+    }
+    playerGamesTitleElement.innerHTML = `
+      <span class="stats-player-profile-leaderboard">${escapeHtml(selectedLeaderboard)}</span>
+      <span class="stats-player-profile-state">No data</span>
+    `;
+    playerGamesMetaElement.textContent = `No data for this player in the ${selectedLeaderboard} leaderboard.`;
+    if (playerGamesActionsElement) {
+      playerGamesActionsElement.innerHTML = "";
+    }
+    renderPlayerProfile(selectedAccount);
+    playerProfileElement.innerHTML = `
+      <p class="stats-profile-no-data">No data for ${escapeHtml(selectedAccount.name || "this player")} in the ${escapeHtml(selectedLeaderboard)} leaderboard.</p>
+    `;
+    playerGamesElement.innerHTML = `
+      <tr class="stats-empty-row">
+        <td colspan="5">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>
+      </tr>
+    `;
+    return;
+  }
   if (!activeAccount) {
     activeExpandedAccountKey = null;
     resetPlayerGamesView();
     expandedAccounts.clear();
+    if (profileHeadingLabel) {
+      profileHeadingLabel.textContent = "Player Profile";
+    }
     playerGamesTitleElement.textContent = "Select a player to open their profile";
     playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
     if (playerGamesActionsElement) {
@@ -2192,7 +2228,14 @@ function renderPlayerGames(accounts) {
     activeExpandedPlayerGameKey = null;
   }
 
-  playerGamesTitleElement.textContent = `${activeAccount.name || "Player"} profile`;
+  const playerRank = filterVisibleAccounts(accounts).indexOf(activeAccount) + 1;
+  if (profileHeadingLabel) {
+    profileHeadingLabel.innerHTML = `<span class="stats-player-profile-heading-name">${escapeHtml(activeAccount.name || "Player")}</span>`;
+  }
+  playerGamesTitleElement.innerHTML = `
+    <span class="stats-player-profile-leaderboard">${escapeHtml(selectedLeaderboard)}</span>
+    <span class="stats-player-profile-rank">#${playerRank || "--"}</span>
+  `;
   playerGamesMetaElement.textContent = showingAllPlayerGames
     ? `All ${latestGames.length} matches in the ${selectedLeaderboard} slice.`
     : `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
@@ -2503,22 +2546,25 @@ function renderStatusText() {
   statusElement.classList.toggle("is-stale", mirrorStale);
 
   if (!lastStatsUpdateAt) {
-    statusElement.textContent = "Last update: unavailable";
+    statusElement.innerHTML = `
+      <span class="stats-card-label">Last Updated</span>
+      <strong class="stats-card-value stats-update-value">Unavailable</strong>
+    `;
     statusElement.removeAttribute("title");
     return;
   }
 
   const absoluteLabel = `Last update: ${formatDate(lastStatsUpdateAt)}`;
   const relativeLabel = formatRelativeTime(lastStatsUpdateAt);
-  const absoluteText = document.createElement("span");
-  absoluteText.className = "stats-status-time";
-  absoluteText.textContent = absoluteLabel;
+  const updateLabel = document.createElement("span");
+  updateLabel.className = "stats-card-label";
+  updateLabel.textContent = "Last Updated";
 
-  const relativeText = document.createElement("span");
-  relativeText.className = "stats-status-relative";
-  relativeText.textContent = relativeLabel;
+  const updateLine = document.createElement("strong");
+  updateLine.className = "stats-card-value stats-update-value";
+  updateLine.textContent = relativeLabel.replace(/^Updated\s+/i, "");
 
-  statusElement.replaceChildren(absoluteText, relativeText);
+  statusElement.replaceChildren(updateLabel, updateLine);
   statusElement.title = `${absoluteLabel} (${relativeLabel})`;
 }
 
@@ -2548,9 +2594,14 @@ function renderTrendingPlayers(accountList, gameList = []) {
     summaryElement.insertAdjacentElement("afterend", trendingElement);
   }
 
+  const leaderboardRankedPlayers = accountList.filter((account) => !account.discounted);
+  const topEloAccount = leaderboardRankedPlayers[0] || accountList[0] || null;
+  const topKillsAccount = leaderboardRankedPlayers
+    .filter((account) => account.totalKills > 0)
+    .sort((left, right) => right.totalKills - left.totalKills || right.elo - left.elo)[0] || null;
   const rankedPlayers = filterRecentlyActiveAccounts(accountList, gameList)
     .filter((account) => !account.discounted);
-  if (!rankedPlayers.length) {
+  if (!leaderboardRankedPlayers.length) {
     trendingElement.hidden = true;
     trendingElement.innerHTML = "";
     return;
@@ -2603,11 +2654,19 @@ function renderTrendingPlayers(accountList, gameList = []) {
 
   trendingElement.hidden = false;
   trendingElement.innerHTML = `
-    <div class="stats-trending-heading">
-      <span>Trending players</span>
-      <small>Calculated within the ${escapeHtml(selectedLeaderboard)} slice</small>
-    </div>
     <div class="stats-trending-grid">
+      ${renderTrendingCard(
+        "Top ELO",
+        topEloAccount ? { account: topEloAccount } : null,
+        topEloAccount ? topEloAccount.elo.toFixed(2) : "--",
+        "Highest rating in this leaderboard"
+      )}
+      ${renderTrendingCard(
+        "Total kills",
+        topKillsAccount ? { account: topKillsAccount } : null,
+        topKillsAccount ? `${topKillsAccount.totalKills.toLocaleString()} kills` : "--",
+        "Unit kills + structures destroyed"
+      )}
       ${renderTrendingCard(
         "Biggest ELO gain",
         eloLeader,
@@ -2653,55 +2712,17 @@ function renderSummary(accountList, gameList) {
   }
 
   const rankedPlayers = accountList.filter((account) => !account.discounted);
-  const topPlayer = rankedPlayers[0] || accountList[0];
-  const topPlayerProfileUrl = new URL("index.html", window.location.href);
-  if (topPlayer) {
-    const topPlayerProfileParams = new URLSearchParams({
-      playerSearch: topPlayer.name || "",
-      player: getAccountExpandKey(topPlayer)
-    });
-    if (selectedLeaderboard !== "Global") {
-      topPlayerProfileParams.set("leaderboard", selectedLeaderboard);
-    }
-    topPlayerProfileUrl.search = topPlayerProfileParams.toString();
-  }
-  const activePlayers = filterRecentlyActiveAccounts(accountList, gameList);
-  const activeRankedPlayers = activePlayers.filter((account) => !account.discounted);
-  const topStreakPlayer = (activeRankedPlayers.length ? activeRankedPlayers : activePlayers)
-    .map((account) => ({ account, streak: getCurrentWinStreak(account) }))
-    .filter((entry) => entry.streak > 0)
-    .sort((left, right) => right.streak - left.streak || right.account.elo - left.account.elo)[0];
-  const topStreakProfileUrl = new URL("index.html", window.location.href);
-  if (topStreakPlayer) {
-    const topStreakProfileParams = new URLSearchParams({
-      playerSearch: topStreakPlayer.account.name || "",
-      player: getAccountExpandKey(topStreakPlayer.account)
-    });
-    if (selectedLeaderboard !== "Global") {
-      topStreakProfileParams.set("leaderboard", selectedLeaderboard);
-    }
-    topStreakProfileUrl.search = topStreakProfileParams.toString();
-  }
   const latestMatch = gameList[0];
   const latestReplayUrl = latestMatch?.replayUrl ? normalizeReplayUrl(latestMatch.replayUrl) : "";
 
   summaryElement.innerHTML = `
     <article class="stats-card">
-      <span class="stats-card-label">Ranked Players</span>
-      <strong class="stats-card-value">${rankedPlayers.length}</strong>
-      <span class="stats-player-note">Players above the provisional threshold</span>
-    </article>
-    <article class="stats-card">
       <span class="stats-card-label">Matches</span>
       <strong class="stats-card-value">${gameList.length}</strong>
-      <span class="stats-player-note">In the ${escapeHtml(selectedLeaderboard)} slice</span>
     </article>
     <article class="stats-card">
-      <span class="stats-card-label">Top Elo</span>
-      <strong class="stats-card-value">${topPlayer ? topPlayer.elo.toFixed(2) : "--"}</strong>
-      ${topPlayer
-        ? `<a class="stats-player-note stats-summary-player-link" href="${escapeHtml(topPlayerProfileUrl.href)}" target="_parent" aria-label="Open ${escapeHtml(topPlayer.name || "Unknown player")} profile">${escapeHtml(topPlayer.name || "Unknown player")}</a>`
-        : '<span class="stats-player-note">Unknown player</span>'}
+      <span class="stats-card-label">Ranked Players</span>
+      <strong class="stats-card-value">${rankedPlayers.length}</strong>
     </article>
     <article class="stats-card">
       <span class="stats-card-label">Latest Match</span>
@@ -2710,14 +2731,12 @@ function renderSummary(accountList, gameList) {
         ? `<a class="stats-player-note stats-replay-link" href="${escapeHtml(latestReplayUrl)}" data-replay-analyzer-url="${escapeHtml(latestReplayUrl)}" aria-label="Analyze latest match on ${escapeHtml(latestMatch.mapName || "Unknown map")}">${escapeHtml(latestMatch.mapName || "Unknown map")}</a>`
         : `<span class="stats-player-note">${escapeHtml(latestMatch ? latestMatch.mapName : "Unknown map")}</span>`}
     </article>
-    <article class="stats-card">
-      <span class="stats-card-label">Top Win Streak</span>
-      <strong class="stats-card-value">${topStreakPlayer ? `${topStreakPlayer.streak} ${topStreakPlayer.streak === 1 ? "win" : "wins"}` : "--"}</strong>
-      ${topStreakPlayer
-        ? `<a class="stats-player-note stats-summary-player-link" href="${escapeHtml(topStreakProfileUrl.href)}" target="_parent" aria-label="Open ${escapeHtml(topStreakPlayer.account.name || "Unknown player")} profile">${escapeHtml(topStreakPlayer.account.name || "Unknown player")}</a>`
-        : '<span class="stats-player-note">Unknown player</span>'}
-    </article>
   `;
+  if (statusElement) {
+    statusElement.classList.add("stats-card", "stats-update-card");
+    summaryElement.append(statusElement);
+    renderStatusText();
+  }
   renderTrendingPlayers(accountList, gameList);
 }
 
@@ -2957,32 +2976,33 @@ function renderRankActions(totalPlayers, matchingPlayers = totalPlayers, searchQ
 
   const shownCount = Math.min(visiblePlayerCount, totalPlayers);
   const canLoadMore = shownCount < totalPlayers;
-
-  if (!canLoadMore) {
-    rankActionsElement.innerHTML = `
-      <span class="stats-panel-note">Showing all ${totalPlayers} listed players.</span>
-    `;
-    return;
-  }
-
-  const nextLimit = getNextPlayerLimit(shownCount, totalPlayers);
+  const canShowLess = shownCount > INITIAL_PLAYER_LIMIT;
+  const nextLimit = canLoadMore ? getNextPlayerLimit(shownCount, totalPlayers) : shownCount;
   const actionLabel = shownCount < PLAYER_LIMIT_STEP ? "Show more" : "Load more";
   const targetLabel = nextLimit >= totalPlayers ? `all ${totalPlayers}` : `top ${nextLimit}`;
 
   rankActionsElement.innerHTML = `
-    <span class="stats-panel-note">Showing top ${shownCount} of ${totalPlayers} listed players.</span>
-    <button class="stats-load-more" id="statsLoadMore" type="button">${actionLabel} (${targetLabel})</button>
+    <span class="stats-panel-note">${canLoadMore ? `Showing top ${shownCount} of ${totalPlayers} listed players.` : `Showing all ${totalPlayers} listed players.`}</span>
+    ${canShowLess ? '<button class="stats-load-more" id="statsShowLess" type="button">Show less</button>' : ""}
+    ${canLoadMore ? `<button class="stats-load-more" id="statsLoadMore" type="button">${actionLabel} (${targetLabel})</button>` : ""}
   `;
 
-  const loadMoreButton = rankActionsElement.querySelector(".stats-load-more");
-  if (!loadMoreButton) {
-    return;
+  const showLessButton = rankActionsElement.querySelector("#statsShowLess");
+  if (showLessButton) {
+    showLessButton.addEventListener("click", () => {
+      visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+      render();
+      ranksElement.closest(".stats-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
-  loadMoreButton.addEventListener("click", () => {
-    visiblePlayerCount = nextLimit;
-    render();
-  });
+  const loadMoreButton = rankActionsElement.querySelector("#statsLoadMore");
+  if (loadMoreButton) {
+    loadMoreButton.addEventListener("click", () => {
+      visiblePlayerCount = nextLimit;
+      render();
+    });
+  }
 }
 
 function renderMatches(gameList) {
@@ -3215,7 +3235,7 @@ function render() {
   renderSummary(accountList, gameList);
   renderRanks(accountList);
   renderPlayerComparison(accountList);
-  renderPlayerGames(accountList);
+  renderPlayerGames(accountList, globalAccountList);
   renderMatches(recentGameList);
   updateSortIndicators();
   syncStateToUrl();
@@ -3226,6 +3246,8 @@ function updateActiveButtons() {
     return;
   }
 
+  buttonsElement.closest(".stats-leaderboard-filter-menu")
+    ?.classList.toggle("has-active-filter", selectedLeaderboard !== "Global");
   buttonsElement.querySelectorAll(".stats-filter-button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.leaderboard === selectedLeaderboard);
   });

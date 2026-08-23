@@ -13,6 +13,7 @@ const SCRIPT_DIRECTORY = dirname(fileURLToPath(import.meta.url));
 const ANALYZER_MOD_DIRECTORY = resolve(SCRIPT_DIRECTORY, '..', 'analyzer-mod');
 const SNAPSHOT_INTERVAL_SECONDS = Math.min(60, Math.max(5,
   Number(process.env.WZ_SNAPSHOT_INTERVAL_SECONDS) || 15));
+const GAME_TIME_STALL_SECONDS = 60;
 
 function outputResult(result, pretty = false) {
   const output = `${JSON.stringify(result, null, pretty ? 2 : 0)}\n`;
@@ -131,6 +132,7 @@ async function runWarzone(warzone, args, workDir) {
   let timedOut = false;
   let replayLoadError = null;
   let lastGameTime = -1;
+  let lastProgressAt = startedAt;
 
   child.stderr.on('data', (chunk) => {
     stderr = `${stderr}${chunk.toString('utf8')}`.slice(-4000);
@@ -150,10 +152,15 @@ async function runWarzone(warzone, args, workDir) {
           return;
         }
       }
+      const now = Date.now();
       const gameTime = latestGameTime(logsDir);
       if (Number.isFinite(gameTime) && gameTime !== lastGameTime) {
         lastGameTime = gameTime;
+        lastProgressAt = now;
         writeAnalyzerProgress({ elapsedMilliseconds: gameTime, totalMilliseconds, phase: 'replay' });
+      } else if (lastGameTime >= 0 && now - lastProgressAt >= GAME_TIME_STALL_SECONDS * 1000) {
+        replayLoadError = `Game time was unchanged for ${GAME_TIME_STALL_SECONDS} seconds at ${lastGameTime} ms.`;
+        child.kill();
       } else if (lastGameTime < 0 && Date.now() - startedAt > 2 * 60 * 1000) {
         replayLoadError = 'Warzone did not start replay playback within two minutes.';
         child.kill();

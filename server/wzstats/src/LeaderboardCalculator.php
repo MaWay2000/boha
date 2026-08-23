@@ -78,7 +78,8 @@ final class LeaderboardCalculator
         if ($sourceMatches !== []) {
             $ids = array_map('intval', array_column($sourceMatches, 'id'));
             $statement = $this->pdo->prepare(
-                'SELECT match_id, position_number, player_name, team_number, result, stats_source, raw_json
+                'SELECT match_id, position_number, player_name, team_number, result, kills,
+                        structures_destroyed, stats_source, raw_json
                  FROM match_players WHERE stats_source = \'replay-engine\'
                    AND match_id IN (' . implode(',', array_fill(0, count($ids), '?')) . ')
                  ORDER BY match_id, position_number'
@@ -97,6 +98,7 @@ final class LeaderboardCalculator
                     'position' => (int) $player['position_number'],
                     'team' => (int) $player['team_number'],
                     'usertype' => $player['result'] === null ? null : strtolower((string) $player['result']),
+                    'totalKills' => (int) ($player['kills'] ?? 0) + (int) ($player['structures_destroyed'] ?? 0),
                 ];
                 if ($player['result'] !== null) $resultSources[$matchId] = (string) $player['stats_source'];
             }
@@ -150,6 +152,7 @@ final class LeaderboardCalculator
                         'publicKeys' => [], 'name' => null, 'names' => [], 'bot' => $bot,
                         'allGames' => 0, 'games' => 0, 'elo' => self::ELO_BASE,
                         'wins' => 0, 'losses' => 0, 'draws' => 0, 'discounted' => $discounted,
+                        'totalKills' => 0,
                     ];
                 }
                 if ($publicKey) $accounts[$id]['publicKeys'][$publicKey] = true;
@@ -161,7 +164,7 @@ final class LeaderboardCalculator
                 }
                 $game['teams'][$teamIndex]['slots']++;
                 $userType = $player['usertype'] ?? null;
-                $game['slots'][] = ['id' => $id, 'userType' => $userType];
+                $game['slots'][] = ['id' => $id, 'userType' => $userType, 'totalKills' => (int) ($player['totalKills'] ?? 0)];
                 if (in_array($userType, ['winner', 'loser', 'contender'], true)) {
                     $slot = ['id' => $id, 'userType' => $userType];
                     $game['players'][] = $slot;
@@ -193,7 +196,10 @@ final class LeaderboardCalculator
         }
         unset($account);
         $games = array_values(array_filter($games, fn(array $game): bool => $this->matchesBoard($board, $game)));
-        foreach ($games as $game) foreach ($game['slots'] as $slot) $accounts[$slot['id']]['games']++;
+        foreach ($games as $game) foreach ($game['slots'] as $slot) {
+            $accounts[$slot['id']]['games']++;
+            $accounts[$slot['id']]['totalKills'] += $slot['totalKills'];
+        }
 
         $validMatches = 0;
         $ratingEvents = [];

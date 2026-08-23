@@ -68,6 +68,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 					games: [],
 					elo: eloBase,
 					winCount: 0, loseCount: 0, drawCount: 0,
+					totalKills: 0,
 					discounted: !publicKey
 				};
 				accounts.set(id, account);
@@ -92,6 +93,8 @@ export function gather(results, playerPublicKeys, filterGames) {
 			const slot = {
 				userType: player.usertype,
 				account: account,
+				kills: Number.isFinite(player.kills) ? player.kills : null,
+				structureKills: Number.isFinite(player.structureKills) ? player.structureKills : null,
 				elo: null,
 				eloDelta: null
 			};
@@ -154,6 +157,9 @@ export function gather(results, playerPublicKeys, filterGames) {
 		for (const account of accounts.values())
 			account.games = account.games.filter(game => gameSet.has(game.startDate));
 	}
+	for (const account of accounts.values()) account.totalKills = 0;
+	for (const game of games) for (const slot of game.slots)
+		slot.account.totalKills += (slot.kills ?? 0) + (slot.structureKills ?? 0);
 	{ const accountsWithoutGames = [];
 		for (const [id, account] of accounts) if (!account.games.length) accountsWithoutGames.push(id);
 		for (const id of accountsWithoutGames) accounts.delete(id);

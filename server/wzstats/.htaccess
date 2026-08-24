@@ -1,9 +1,0 @@
-Options -Indexes
-RewriteEngine On
-
-RewriteRule (^|/)\. - [F,L]
-RewriteRule ^bin/(?:bohan|leaderboard|analysis-control)\.php$ - [L,NC]
-RewriteRule ^(?:src|bin|migrations|storage)(?:/|$) - [F,L,NC]
-RewriteRule ^(?:config(?:\.local|\.example)?\.php|README\.md|SOURCE\.md)$ - [F,L,NC]
-RewriteRule ^visitors/?$ public/visitors.php [L,NC]
-RewriteRule ^api(?:/|$) public/index.php [QSA,L]

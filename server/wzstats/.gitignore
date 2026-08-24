@@ -1,7 +1,0 @@
-/config.local.php
-/storage/replays/*
-/storage/logs/*
-/data/*
-!/storage/replays/.gitkeep
-!/storage/logs/.gitkeep
-!/data/.gitkeep

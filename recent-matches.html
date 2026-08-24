@@ -6,7 +6,7 @@
   <title>Warzone 2100 Recent Matches</title>
   <meta
     name="description"
-    content="Recent Warzone 2100 matches with replay links, live mirror updates, and leaderboard slice filters."
+    content="Recent Warzone 2100 matches with replay links and live mirror updates."
   >
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,10 +17,8 @@
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <link rel="stylesheet" href="styles.css?v=20260720-2">
   <style>
-    .stats-reset-filters {
-      flex: 0 0 auto;
-      color: var(--text);
-      border-color: rgba(109, 232, 255, 0.28);
+    .stats-recent-matches-panel {
+      margin-top: clamp(32px, 4vw, 56px);
     }
 
     .stats-table-wrap-matches .stats-table thead th {
@@ -68,13 +66,7 @@
   <div class="page-shell">
     <main id="top">
       <section class="landing-stats stats-shell section-frame">
-        <div class="stats-toolbar-row">
-          <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
-          <button class="stats-filter-button stats-reset-filters" id="statsResetFilters" type="button">Reset filters</button>
-          <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
-        </div>
-
-        <section class="stats-panel">
+        <section class="stats-panel stats-recent-matches-panel">
           <div class="stats-panel-head">
             <div>
               <p class="panel-kicker stats-panel-title-main">Recent Matches</p>
@@ -191,10 +183,5 @@
 
   <script src="embedded-page.js?v=20260720-1"></script>
   <script type="module" src="stats/live-stats.js?v=20260815-1"></script>
-  <script>
-    document.getElementById("statsResetFilters").addEventListener("click", () => {
-      window.location.assign(window.location.pathname);
-    });
-  </script>
 </body>
 </html>

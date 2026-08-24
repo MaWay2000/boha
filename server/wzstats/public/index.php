@@ -20,7 +20,7 @@ function applyCors(array $allowedOrigins): void
     if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin');
-        header('Access-Control-Allow-Methods: GET, OPTIONS');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
         header('Access-Control-Allow-Headers: Content-Type');
         header('Access-Control-Max-Age: 86400');
     }
@@ -95,6 +95,80 @@ try {
     $path = $apiPosition === false ? '/' : substr($requestPath, $apiPosition + 4);
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $errorStage = 'routing';
+
+    if ($path === '/v1/visitors') {
+        if ($method !== 'POST') {
+            respond(['error' => 'Method not allowed.'], 405);
+        }
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 4096) {
+            respond(['error' => 'Request is too large.'], 413);
+        }
+
+        $rawAddress = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+        if (str_starts_with($rawAddress, '::ffff:')) {
+            $mappedAddress = substr($rawAddress, 7);
+            if (filter_var($mappedAddress, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                $rawAddress = $mappedAddress;
+            }
+        }
+        $packedAddress = @inet_pton($rawAddress);
+        $ipAddress = $packedAddress === false ? '' : (string) inet_ntop($packedAddress);
+        if ($ipAddress === '') {
+            respond(['error' => 'Visitor address is unavailable.'], 400);
+        }
+
+        $requestBody = (string) file_get_contents('php://input');
+        $payload = $requestBody === '' ? [] : json_decode($requestBody, true);
+        if (!is_array($payload)) {
+            respond(['error' => 'Invalid request.'], 400);
+        }
+
+        $visitedPath = mb_substr(trim((string) ($payload['path'] ?? '/')), 0, 255);
+        if ($visitedPath === '' || !str_starts_with($visitedPath, '/')) {
+            $visitedPath = '/';
+        }
+        $referrer = mb_substr(trim((string) ($payload['referrer'] ?? '')), 0, 500);
+        $origin = mb_substr(trim((string) ($_SERVER['HTTP_ORIGIN'] ?? '')), 0, 255);
+        $userAgent = mb_substr(trim((string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 0, 500);
+
+        $banStatement = $pdo->prepare(
+            'SELECT id FROM visitor_bans
+             WHERE ip_address = :ip_address AND active = 1
+               AND (expires_at IS NULL OR expires_at > UTC_TIMESTAMP())
+             LIMIT 1'
+        );
+        $banStatement->execute(['ip_address' => $ipAddress]);
+        $isBlocked = (bool) $banStatement->fetchColumn();
+
+        $recentStatement = $pdo->prepare(
+            'SELECT id FROM visitor_access_logs
+             WHERE ip_address = :ip_address
+               AND visited_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 1 MINUTE)
+             LIMIT 1'
+        );
+        $recentStatement->execute(['ip_address' => $ipAddress]);
+        if (!$recentStatement->fetchColumn()) {
+            $logStatement = $pdo->prepare(
+                'INSERT INTO visitor_access_logs
+                    (ip_address, visited_at, request_path, referrer, origin, user_agent, is_blocked)
+                 VALUES (:ip_address, UTC_TIMESTAMP(), :request_path, :referrer, :origin, :user_agent, :is_blocked)'
+            );
+            $logStatement->execute([
+                'ip_address' => $ipAddress,
+                'request_path' => $visitedPath,
+                'referrer' => $referrer !== '' ? $referrer : null,
+                'origin' => $origin !== '' ? $origin : null,
+                'user_agent' => $userAgent !== '' ? $userAgent : null,
+                'is_blocked' => $isBlocked ? 1 : 0,
+            ]);
+        }
+
+        header('Cache-Control: no-store, max-age=0');
+        if ($isBlocked) {
+            respond(['allowed' => false, 'blocked' => true], 403);
+        }
+        respond(['allowed' => true, 'blocked' => false]);
+    }
 
     if ($path === '/v1/worker/status') {
         authorizeWorker($config);

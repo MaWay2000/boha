@@ -22,6 +22,7 @@ const AUTO_REFRESH_MS = 5 * 60_000;
 const STALE_MIRROR_MS = 20 * 60_000;
 const PLAYER_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60_000;
 const COMPACT_COMPARISON_PARAM = "C";
+const COMPACT_PLAYER_PARAM = "p";
 const RATE_SORT_MIN_GAMES = 10;
 const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
 const SORT_DEFAULTS = {
@@ -578,7 +579,9 @@ function applyStateFromUrl() {
     || url.searchParams.get("b")
     || url.searchParams.get("compareB")
     || null;
-  activeExpandedAccountKey = url.searchParams.get("player") || null;
+  activeExpandedAccountKey = parseCompactPlayerValue(url.searchParams.get(COMPACT_PLAYER_PARAM))
+    || url.searchParams.get("player")
+    || null;
   activeExpandedPlayerGameKey = url.searchParams.get("game") || null;
   showingAllPlayerGames = url.searchParams.get("playerGames") === "all";
   rankSortState = parseSortState(url.searchParams.get("ranksSort"), "ranks");
@@ -659,7 +662,10 @@ function buildStateParams() {
   }
 
   if (ranksElement && activeExpandedAccountKey) {
-    params.set("player", activeExpandedAccountKey);
+    const compactPlayerKey = /^p[a-z0-9]+$/i.test(activeExpandedAccountKey)
+      ? activeExpandedAccountKey
+      : getCompactAccountKey(activeExpandedAccountKey);
+    params.set(COMPACT_PLAYER_PARAM, compactPlayerKey.replace(/^p/, ""));
   }
 
   if (playerComparisonElement && comparePlayerAKey && comparePlayerBKey) {
@@ -924,6 +930,31 @@ function getCompactAccountKey(accountKey) {
   }
 
   return `p${(firstHash >>> 0).toString(36)}${(secondHash >>> 0).toString(36)}`;
+}
+
+function parseCompactPlayerValue(value) {
+  const token = String(value || "").trim();
+  if (!/^[a-z0-9]+$/i.test(token)) {
+    return null;
+  }
+
+  return `p${token}`;
+}
+
+function resolveActivePlayerShareKey(accountList) {
+  if (!/^p[a-z0-9]+$/i.test(activeExpandedAccountKey || "")) {
+    return;
+  }
+
+  const matches = accountList.filter((account) => (
+    getCompactAccountKey(getAccountExpandKey(account)) === activeExpandedAccountKey
+  ));
+  if (matches.length !== 1) {
+    return;
+  }
+
+  activeExpandedAccountKey = getAccountExpandKey(matches[0]);
+  expandedAccounts = new Set([activeExpandedAccountKey]);
 }
 
 function parseCompactComparisonValue(value) {
@@ -1988,16 +2019,14 @@ function renderPlayerProfile(account) {
   const opponents = getAccountOpponents(account);
   const teammates = getAccountTeammates(account);
   const profileUrl = new URL("index.html", window.location.href);
-  profileUrl.search = buildStateParams().toString();
+  profileUrl.search = "";
+  profileUrl.searchParams.set(
+    COMPACT_PLAYER_PARAM,
+    getCompactAccountKey(getAccountExpandKey(account)).replace(/^p/, "")
+  );
 
   playerProfileElement.hidden = false;
   playerProfileElement.innerHTML = `
-    <div class="stats-profile-heading">
-      <div>
-        <span class="stats-detail-label">Player profile</span>
-        <strong>${escapeHtml(account.name || "Unknown")}</strong>
-      </div>
-    </div>
     <div class="stats-profile-metrics">
       <article><span>Current ELO</span><strong>${account.discounted ? "Provisional" : account.elo.toFixed(2)}</strong></article>
       <article><span>Peak ELO</span><strong>${peakElo == null ? "--" : peakElo.toFixed(2)}</strong></article>
@@ -2153,6 +2182,113 @@ function getActiveMatchFilterCount() {
   ].filter(Boolean).length;
 }
 
+function getPlayerLeaderboardRanks(account) {
+  if (!account || !leaderboardData?.leaderboards) {
+    return [];
+  }
+
+  const accountKey = getAccountExpandKey(account);
+  const leaderboards = runtime.leaderboards?.length
+    ? runtime.leaderboards
+    : Object.keys(leaderboardData.leaderboards);
+
+  return leaderboards.flatMap((leaderboard) => {
+    const { accounts } = hydratePublishedBoard(leaderboard);
+    const rankedAccounts = filterVisibleAccounts(sortAccounts(accounts.values()));
+    const rankIndex = rankedAccounts.findIndex((candidate) => getAccountExpandKey(candidate) === accountKey);
+    return rankIndex >= 0 ? [{ leaderboard, rank: rankIndex + 1 }] : [];
+  });
+}
+
+function renderPlayerRankMenu(account, currentRank) {
+  const ranks = getPlayerLeaderboardRanks(account);
+  const options = ranks.length
+    ? ranks.map(({ leaderboard, rank }) => `
+        <button
+          class="stats-player-rank-option${leaderboard === selectedLeaderboard ? " is-active" : ""}"
+          type="button"
+          data-player-rank-leaderboard="${escapeHtml(leaderboard)}"
+        >
+          <span>${escapeHtml(leaderboard)}</span>
+          <strong>#${rank}</strong>
+        </button>
+      `).join("")
+    : '<span class="stats-player-rank-empty">No ranked filters</span>';
+
+  return `
+    <span class="stats-player-profile-rank">
+      <span class="stats-player-rank-menu">
+        <button
+          class="stats-player-rank-trigger"
+          type="button"
+          aria-expanded="false"
+          aria-haspopup="menu"
+          aria-label="View ${escapeHtml(account.name || "player")} ranks across filters"
+        >
+          <span class="stats-detail-label stats-player-profile-rank-label">Rank</span>
+          <strong>#${currentRank || "--"}</strong>
+          <span class="stats-player-rank-chevron" aria-hidden="true"></span>
+        </button>
+        <span class="stats-player-rank-popup" role="menu" hidden>${options}</span>
+      </span>
+    </span>
+  `;
+}
+
+function bindPlayerRankMenu() {
+  const rankMenu = playerGamesTitleElement?.querySelector(".stats-player-rank-menu");
+  const trigger = rankMenu?.querySelector(".stats-player-rank-trigger");
+  const popup = rankMenu?.querySelector(".stats-player-rank-popup");
+  if (!rankMenu || !trigger || !popup) {
+    return;
+  }
+
+  const setOpen = (open) => {
+    popup.hidden = !open;
+    trigger.setAttribute("aria-expanded", String(open));
+    rankMenu.classList.toggle("is-open", open);
+  };
+
+  trigger.addEventListener("click", () => {
+    setOpen(trigger.getAttribute("aria-expanded") !== "true");
+  });
+
+  popup.addEventListener("click", (event) => {
+    const option = event.target.closest("[data-player-rank-leaderboard]");
+    if (!option) {
+      return;
+    }
+
+    const leaderboard = option.dataset.playerRankLeaderboard;
+    setOpen(false);
+    if (!leaderboard || selectedLeaderboard === leaderboard) {
+      return;
+    }
+
+    visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+    visibleMatchCount = INITIAL_MATCH_LIMIT;
+    resetPlayerGamesView();
+    selectedLeaderboard = leaderboard;
+    updateActiveButtons();
+    render();
+  });
+
+  rankMenu.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setOpen(false);
+      trigger.focus();
+    }
+  });
+
+  rankMenu.addEventListener("focusout", () => {
+    window.setTimeout(() => {
+      if (!rankMenu.contains(document.activeElement)) {
+        setOpen(false);
+      }
+    }, 0);
+  });
+}
+
 function renderPlayerGames(accounts, globalAccounts = accounts) {
   if (!playerGamesElement || !playerGamesTitleElement || !playerGamesMetaElement) {
     return;
@@ -2168,7 +2304,9 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     playerGamesTitleElement.innerHTML = `
       <span class="stats-player-profile-leaderboard">${escapeHtml(selectedLeaderboard)}</span>
       <span class="stats-player-profile-state">No data</span>
+      ${renderPlayerRankMenu(selectedAccount, 0)}
     `;
+    bindPlayerRankMenu();
     playerGamesMetaElement.textContent = `No data for this player in the ${selectedLeaderboard} leaderboard.`;
     if (playerGamesActionsElement) {
       playerGamesActionsElement.innerHTML = "";
@@ -2191,7 +2329,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     if (profileHeadingLabel) {
       profileHeadingLabel.textContent = "Player Profile";
     }
-    playerGamesTitleElement.textContent = "Select a player to open their profile";
+    playerGamesTitleElement.innerHTML = '<span class="stats-player-profile-empty-title">Select a player to open their profile</span>';
     playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
     if (playerGamesActionsElement) {
       playerGamesActionsElement.innerHTML = "";
@@ -2234,8 +2372,9 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   }
   playerGamesTitleElement.innerHTML = `
     <span class="stats-player-profile-leaderboard">${escapeHtml(selectedLeaderboard)}</span>
-    <span class="stats-player-profile-rank">#${playerRank || "--"}</span>
+    ${renderPlayerRankMenu(activeAccount, playerRank)}
   `;
+  bindPlayerRankMenu();
   playerGamesMetaElement.textContent = showingAllPlayerGames
     ? `All ${latestGames.length} matches in the ${selectedLeaderboard} slice.`
     : `Latest ${latestGames.length} matches in the ${selectedLeaderboard} slice.`;
@@ -3219,6 +3358,7 @@ function render() {
 
   const allGames = [...globalGames];
   const globalAccountList = sortAccounts(globalAccounts.values());
+  resolveActivePlayerShareKey(globalAccountList);
   globalRankMap = buildGlobalRankMap(globalAccountList);
 
   leaderboardGameCounts = new Map(Object.entries(leaderboardData.leaderboards)

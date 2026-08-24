@@ -162,6 +162,14 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  if (event.data?.type === "boha:scroll-content-top") {
+    window.scrollTo({
+      top: contentFrame.getBoundingClientRect().top + window.scrollY,
+      behavior: "smooth"
+    });
+    return;
+  }
+
   if (event.data?.type === "boha:page-state") {
     updateLocation(contentFrame.dataset.currentTab || getTabFromLocation(), true, event.data.search || "");
   }

@@ -1261,7 +1261,7 @@ const showPlayerOnLoad = window.innerWidth >= 500;
 radioWrap.classList.toggle("is-player-hidden", !showPlayerOnLoad);
 logoToggle.setAttribute("aria-expanded", String(showPlayerOnLoad));
 if (showPlayerOnLoad) {
-  radioWrap.style.left = "16px";
+  radioWrap.style.left = "40px";
   radioWrap.style.top = "37.8px";
   radioWrap.style.right = "auto";
 }

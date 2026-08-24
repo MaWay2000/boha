@@ -1745,7 +1745,11 @@ main {
 
 .stats-table-wrap-ranks {
   position: relative;
+  height: clamp(420px, 68vh, 820px);
   padding-top: 52px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .stats-table-wrap-ranks > .stats-table {
@@ -2086,6 +2090,18 @@ main {
 .stats-rank-row.is-clickable:hover td,
 .stats-rank-row.is-clickable:focus-within td {
   background: rgba(109, 232, 255, 0.04);
+}
+
+.stats-rank-row.is-expanded td,
+.stats-rank-row.is-expanded:hover td,
+.stats-rank-row.is-expanded:focus-within td,
+.stats-rank-row.is-expanded + .stats-detail-row td {
+  background: rgba(52, 190, 220, 0.14);
+}
+
+.stats-rank-row.is-expanded td:first-child,
+.stats-rank-row.is-expanded + .stats-detail-row td:first-child {
+  box-shadow: inset 3px 0 0 rgba(109, 232, 255, 0.82);
 }
 
 .stats-panel-note {

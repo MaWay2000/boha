@@ -3056,11 +3056,45 @@ function renderRanks(accountList) {
     })
     .join("");
 
+  function scrollExpandedAccountToTop(expandAccount) {
+    requestAnimationFrame(() => {
+      const scrollContainer = ranksElement.closest(".stats-table-wrap-ranks");
+      const selectedRow = [...ranksElement.querySelectorAll(".stats-rank-row[data-expand-account]")]
+        .find((row) => row.dataset.expandAccount === expandAccount);
+      if (!scrollContainer || !selectedRow) {
+        return;
+      }
+
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const selectedRect = selectedRow.getBoundingClientRect();
+      const headerHeight = scrollContainer.querySelector("thead")?.getBoundingClientRect().height || 0;
+      const selectedTop = scrollContainer.scrollTop + selectedRect.top - containerRect.top;
+      scrollContainer.scrollTo({
+        top: Math.max(0, selectedTop - headerHeight),
+        behavior: "smooth"
+      });
+
+      const statsSection = ranksElement.closest(".landing-stats");
+      if (window !== window.parent) {
+        window.parent.postMessage(
+          { type: "boha:scroll-content-top" },
+          window.location.origin
+        );
+      } else if (statsSection) {
+        window.scrollTo({
+          top: statsSection.getBoundingClientRect().top + window.scrollY,
+          behavior: "smooth"
+        });
+      }
+    });
+  }
+
   function toggleExpandedAccount(expandAccount) {
     if (!expandAccount) {
       return;
     }
 
+    const isOpening = !expandedAccounts.has(expandAccount);
     if (expandedAccounts.has(expandAccount)) {
       expandedAccounts.delete(expandAccount);
       activeExpandedAccountKey = null;
@@ -3072,6 +3106,9 @@ function renderRanks(accountList) {
     }
 
     render();
+    if (isOpening) {
+      scrollExpandedAccountToTop(expandAccount);
+    }
   }
 
   ranksElement.querySelectorAll(".stats-rank-row[data-expand-account]").forEach((row) => {

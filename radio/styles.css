@@ -15,7 +15,7 @@
 
 .wrap {
   position: fixed;
-  left: 16px;
+  left: 40px;
   top: 16px;
   right: auto;
   z-index: 9999;
@@ -691,4 +691,143 @@ input[type="range"] {
     right: 8px;
     width: min(360px, calc(100vw - 24px));
   }
+}
+
+/* Match the radio chrome to the icy-metal site navigation plates. */
+.logo {
+  filter:
+    contrast(1.08)
+    brightness(1.04)
+    drop-shadow(0 0 7px rgba(103, 220, 255, 0.2))
+    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.48));
+  transition: filter 180ms ease;
+}
+
+.logo-button:hover .logo,
+.logo-button:focus-visible .logo {
+  filter:
+    contrast(1.12)
+    brightness(1.13)
+    drop-shadow(0 0 12px rgba(109, 232, 255, 0.48))
+    drop-shadow(0 10px 18px rgba(0, 0, 0, 0.52));
+}
+
+.player {
+  isolation: isolate;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: filter 180ms ease;
+}
+
+.player::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  clip-path: polygon(13px 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 13px 100%, 0 50%);
+  background:
+    linear-gradient(90deg, rgba(207, 242, 255, 0.22), transparent 10%, transparent 90%, rgba(207, 242, 255, 0.22)),
+    linear-gradient(
+      180deg,
+      #d8f2fb 0 2px,
+      #5ea7c3 2px 5px,
+      #173c52 5px 8px,
+      #08131e 8px calc(100% - 8px),
+      #16425c calc(100% - 8px) calc(100% - 5px),
+      #67b5cf calc(100% - 5px) calc(100% - 2px),
+      #d8f2fb calc(100% - 2px)
+    );
+  box-shadow:
+    inset 0 0 18px rgba(105, 220, 255, 0.08),
+    inset 0 -10px 18px rgba(0, 0, 0, 0.36);
+  filter:
+    drop-shadow(1px 0 0 rgba(218, 244, 252, 0.96))
+    drop-shadow(2px 0 0 rgba(72, 158, 190, 0.9))
+    drop-shadow(0 8px 10px rgba(0, 0, 0, 0.42));
+}
+
+.player:hover {
+  filter:
+    brightness(1.08)
+    drop-shadow(0 0 9px rgba(109, 232, 255, 0.28));
+}
+
+.player.is-awaiting-play::before {
+  left: 30px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 7px 100%, 0 50%);
+  background:
+    linear-gradient(180deg, rgba(203, 240, 252, 0.22), transparent 30%),
+    linear-gradient(180deg, #173c52, #08131e 72%);
+  box-shadow:
+    inset 0 1px 0 rgba(225, 250, 255, 0.66),
+    inset 0 -1px 0 rgba(88, 186, 218, 0.58);
+  color: #eafaff;
+  text-shadow: 0 1px 1px #02060a;
+}
+
+.btn {
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 50%, calc(100% - 7px) 100%, 7px 100%, 0 50%);
+  background:
+    linear-gradient(180deg, rgba(225, 247, 255, 0.26) 0 2px, transparent 2px calc(100% - 2px), rgba(103, 191, 220, 0.34) calc(100% - 2px)),
+    linear-gradient(180deg, #31536a 0%, #142a3a 44%, #08131e 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(102, 184, 214, 0.22),
+    inset 0 -5px 8px rgba(0, 0, 0, 0.34);
+  transition: filter 160ms ease, background 160ms ease;
+}
+
+.btn:hover,
+.btn:focus-visible {
+  background:
+    linear-gradient(180deg, rgba(239, 253, 255, 0.46) 0 2px, transparent 2px calc(100% - 2px), rgba(117, 226, 255, 0.5) calc(100% - 2px)),
+    linear-gradient(180deg, #427591 0%, #18435a 48%, #0a1a28 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(122, 221, 248, 0.38),
+    inset 0 -5px 8px rgba(0, 0, 0, 0.3);
+  filter:
+    brightness(1.18)
+    drop-shadow(0 0 7px rgba(109, 232, 255, 0.54));
+}
+
+.btn svg {
+  filter: drop-shadow(0 0 3px rgba(135, 232, 255, 0.42));
+}
+
+.tube {
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 9px 100%, 0 50%);
+  background:
+    linear-gradient(180deg, rgba(211, 242, 252, 0.18) 0 2px, transparent 2px calc(100% - 2px), rgba(85, 177, 208, 0.25) calc(100% - 2px)),
+    linear-gradient(180deg, #132737 0%, #050b12 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(91, 171, 201, 0.2),
+    inset 0 3px 10px rgba(0, 0, 0, 0.76);
+}
+
+.eqGlow {
+  border-radius: 0;
+  background:
+    linear-gradient(180deg, rgba(165, 247, 255, 0.24), rgba(18, 147, 187, 0.08)),
+    linear-gradient(90deg, rgba(35, 198, 235, 0.32), rgba(151, 239, 255, 0.1));
+}
+
+.cover {
+  background: linear-gradient(180deg, #132737 0%, #050b12 100%);
+}
+
+.timebar {
+  border-radius: 0;
+  background: #050c13;
+  box-shadow:
+    inset 0 0 0 1px rgba(100, 187, 218, 0.3),
+    inset 0 2px 5px rgba(0, 0, 0, 0.72);
 }

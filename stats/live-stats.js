@@ -2410,6 +2410,14 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
           <td class="stats-date">
             ${escapeHtml(formatMatchDate(game.endDate))}
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
+            <button
+              class="stats-expand-toggle stats-player-game-toggle"
+              type="button"
+              aria-expanded="${isExpanded ? "true" : "false"}"
+            >
+              <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
+              <span class="visually-hidden">${isExpanded ? "Close match details" : "Open match details"}</span>
+            </button>
           </td>
           <td>
             <span class="stats-player-game-map">
@@ -2430,7 +2438,9 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
                 : ""}
             </span>
           </td>
-          <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span></td>
+          <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}${isUpsetMatch(game)
+            ? '<span class="stats-mega-win-star" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span>'
+            : ""}</span></td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td>
             ${replayUrl
@@ -2630,10 +2640,10 @@ function renderMatchup(game, options = {}) {
                 })
                 .join("")}
             </div>
-            ${renderUpsetBadge(team, strengthPercent)}
             ${showTeamStrength ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
+            ${renderUpsetBadge(team, strengthPercent)}
           </div>
         `;
         }).join("")}

@@ -3162,6 +3162,11 @@ main {
   cursor: pointer;
 }
 
+.stats-player-game-toggle {
+  margin-left: 7px;
+  vertical-align: middle;
+}
+
 .stats-player-game-row td {
   transition: background 160ms ease, color 160ms ease;
 }
@@ -3169,6 +3174,17 @@ main {
 .stats-player-game-row:hover td,
 .stats-player-game-row.is-expanded td {
   background: rgba(109, 232, 255, 0.05);
+}
+
+.stats-player-game-row.is-expanded td,
+.stats-player-game-row.is-expanded:hover td,
+.stats-player-game-row.is-expanded + .stats-player-game-detail-row td {
+  background: rgba(52, 190, 220, 0.14);
+}
+
+.stats-player-game-row.is-expanded td:first-child,
+.stats-player-game-row.is-expanded + .stats-player-game-detail-row td:first-child {
+  box-shadow: inset 3px 0 0 rgba(109, 232, 255, 0.82);
 }
 
 .stats-player-game-detail-row td {
@@ -3326,6 +3342,14 @@ main {
 .stats-player-game-result.is-crash {
   color: #d4f2ff;
   background: rgba(109, 232, 255, 0.12);
+}
+
+.stats-mega-win-star {
+  margin-left: 6px;
+  color: #ffd56a;
+  font-size: 0.82em;
+  line-height: 1;
+  text-shadow: 0 0 7px rgba(255, 198, 96, 0.5);
 }
 
 .stats-replay-link {

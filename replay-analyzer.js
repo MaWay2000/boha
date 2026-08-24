@@ -435,6 +435,14 @@
     return match ? match[1].toLowerCase() : "";
   }
 
+  async function calculateReplaySha256(arrayBuffer) {
+    if (!globalThis.crypto?.subtle) {
+      return "";
+    }
+    const digest = await globalThis.crypto.subtle.digest("SHA-256", arrayBuffer);
+    return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  }
+
   async function decodeGzipBase64Json(value) {
     if (typeof DecompressionStream !== "function") {
       throw new Error("This browser cannot expand compressed replay telemetry.");
@@ -525,8 +533,8 @@
     tacticalReplay.ownersAreLobbyPositions = true;
   }
 
-  async function loadWzstatsResult(replaySha256) {
-    if (!replaySha256) {
+  async function loadWzstatsResult(replaySha256, replayId) {
+    if (!replaySha256 && !replayId) {
       return null;
     }
 
@@ -536,7 +544,10 @@
     }
 
     const matchesPayload = await matchesResponse.json();
-    const match = (matchesPayload.matches || []).find((item) => item.replay_sha256 === replaySha256);
+    const match = (matchesPayload.matches || []).find((item) => (
+      (replaySha256 && item.replay_sha256 === replaySha256)
+      || (replayId && String(item.source_match_id) === String(replayId))
+    ));
     if (!match) {
       return null;
     }
@@ -6029,6 +6040,10 @@
 
     try {
       const arrayBuffer = await loadReplay();
+      if (!latestReplaySha256) {
+        setStatus("Identifying replay…");
+        latestReplaySha256 = await calculateReplaySha256(arrayBuffer);
+      }
       setStatus("Parsing replay…");
       latestExtraction = parseReplay(arrayBuffer);
       if (latestExtraction.embeddedMapArchive) {
@@ -6040,10 +6055,10 @@
         }
       }
       let publishedResult = null;
-      if (latestReplaySha256) {
+      if (latestReplaySha256 || latestReplayId) {
         setStatus("Loading replay-engine player summary…");
         try {
-          publishedResult = await loadWzstatsResult(latestReplaySha256);
+          publishedResult = await loadWzstatsResult(latestReplaySha256, latestReplayId);
         } catch (error) {
           latestExtraction.publishedStatsError = error.message || "Replay-engine player summary could not be loaded.";
         }

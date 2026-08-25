@@ -5846,15 +5846,21 @@
     updateBattlefieldPlayerStats(true);
   }
 
-  function renderBattlefield(extraction, tacticalReplay) {
+  function renderBattlefield(extraction, tacticalReplay, previewSupported) {
     stopBattlefieldPlayback();
     resetBattlefield3dReplay();
     const telemetryFrames = tacticalReplay.positionFrames;
     battlefieldFrames = telemetryFrames.filter((frame) => !frame.eventsOnly);
     battlefieldExtraction = extraction;
     battlefieldOwnersUsePositions = Boolean(tacticalReplay.ownersAreLobbyPositions);
-    battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
-    collectBattlefieldObjectDefinitions(telemetryFrames);
+    battlefieldTerrain = previewSupported ? createBattlefieldTerrain(extraction.mapTerrain) : null;
+    if (previewSupported) {
+      collectBattlefieldObjectDefinitions(telemetryFrames);
+    } else {
+      battlefieldDroidDefinitions = new Map();
+      battlefieldStructureDefinitions = new Map();
+      battlefieldDestroyedAt = new Map();
+    }
     battlefieldSpriteCache.clear();
     battlefieldSpriteBufferFrameIndex = 0;
     battlefieldSpriteBufferTarget = 0;
@@ -5876,20 +5882,25 @@
     battlefieldRange.value = "0";
     updateBattlefieldTimelineProgress();
     battlefieldDuration.value = formatDuration(duration);
-    const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
-    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
-    battlefieldBackground.checked = Boolean(battlefieldTerrain && battlefieldBackground.checked);
-    battlefieldBackground.disabled = !battlefieldTerrain;
-    battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length && battlefieldTiles.checked);
-    battlefieldTiles.disabled = true;
-    if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
-    setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), battlefieldTerrain
-      ? "Loading map tiles"
-      : "Map tiles are unavailable");
-    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
+    if (previewSupported) {
+      const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
+      battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
+      battlefieldBackground.checked = Boolean(battlefieldTerrain && battlefieldBackground.checked);
+      battlefieldBackground.disabled = !battlefieldTerrain;
+      battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length && battlefieldTiles.checked);
+      battlefieldTiles.disabled = true;
+      if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
+      setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), battlefieldTerrain
+        ? "Loading map tiles"
+        : "Map tiles are unavailable");
+      if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
+    } else {
+      battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · battlefield preview not supported for uploaded replays`;
+      battlefieldStatus.textContent = "Not Supported";
+    }
     populateBattlefieldLegend(extraction);
     renderBattlefieldMomentum(extraction);
-    setBattlefieldViewMode(battlefieldViewMode?.value || "3d");
+    if (previewSupported) setBattlefieldViewMode(battlefieldViewMode?.value || "3d");
   }
 
   function renderExtendedAnalysis(extraction) {
@@ -5902,9 +5913,11 @@
       : [];
     const battlefieldPositionFrames = positionFrames.filter((frame) => !frame.eventsOnly);
 
+    const previewSupported = Boolean(extraction.battlefieldPreviewSupported);
+    battlefieldPanel.classList.toggle("is-unsupported", !previewSupported);
     battlefieldPanel.hidden = battlefieldPositionFrames.length === 0;
     if (battlefieldPositionFrames.length) {
-      renderBattlefield(extraction, tacticalReplay);
+      renderBattlefield(extraction, tacticalReplay, previewSupported);
     } else {
       stopBattlefieldPlayback();
       resetBattlefield3dReplay();
@@ -6170,7 +6183,7 @@
     return response.arrayBuffer();
   }
 
-  async function analyzeReplay() {
+  async function analyzeReplay(allowPublishedBattlefield = false) {
     if (analysisRunning) {
       return;
     }
@@ -6207,6 +6220,7 @@
         }
       }
       attachPublishedPlayerStats(latestExtraction, publishedResult);
+      latestExtraction.battlefieldPreviewSupported = Boolean(allowPublishedBattlefield && publishedResult);
       renderExtraction(latestExtraction);
       setStatus("");
     } catch (error) {
@@ -6241,7 +6255,7 @@
     analyzeReplay();
   });
 
-  function analyzeReplayUrl() {
+  function analyzeReplayUrl(allowPublishedBattlefield = false) {
     if (!replayUrl.value.trim()) {
       setStatus("Paste a direct replay URL first.", true);
       replayUrl.focus();
@@ -6250,23 +6264,23 @@
 
     replayFile.value = "";
     replayFileName.textContent = "No file selected";
-    analyzeReplay();
+    analyzeReplay(allowPublishedBattlefield === true);
   }
 
-  replayUrlGo.addEventListener("click", analyzeReplayUrl);
+  replayUrlGo.addEventListener("click", () => analyzeReplayUrl(false));
 
   replayUrl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       replayUrl.blur();
-      analyzeReplayUrl();
+      analyzeReplayUrl(false);
     }
   });
 
   const linkedReplayUrl = new URLSearchParams(window.location.search).get("replay");
   if (linkedReplayUrl) {
     replayUrl.value = linkedReplayUrl;
-    analyzeReplayUrl();
+    analyzeReplayUrl(true);
   }
 
   eventCategory.addEventListener("change", () => {

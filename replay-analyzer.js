@@ -1381,6 +1381,11 @@
     teamBadge.setAttribute("aria-label", `Team ${teamLabel}`);
     identity.append(teamBadge);
 
+    const slotNumber = document.createElement("span");
+    slotNumber.className = "replay-player-table-slot-badge";
+    slotNumber.textContent = player.position == null ? "—" : String(player.position);
+    identity.append(slotNumber);
+
     const colourId = player.spectator ? 10 : Number(player.colour);
     const colour = playerColours[colourId];
     if (colour) {
@@ -1391,11 +1396,6 @@
       marker.setAttribute("aria-label", player.spectator ? "Spectator" : colour.name);
       identity.append(marker);
     }
-
-    const slotNumber = document.createElement("span");
-    slotNumber.className = "replay-player-table-slot-badge";
-    slotNumber.textContent = player.position == null ? "—" : String(player.position);
-    identity.append(slotNumber);
     cell.append(identity);
     return cell;
   }
@@ -1433,6 +1433,127 @@
     }
     const number = Number(value);
     return Number.isFinite(number) ? number : null;
+  }
+
+  const playerAwardGuide = [
+    ["🏆", "Match MVP", "Highest match score."],
+    ["🎯", "Top Fragger", "Most unit kills."],
+    ["🔥", "Killing Streak", "Most kills without losing a unit."],
+    ["💥", "Demolition Expert", "Most structures destroyed."],
+    ["⚙️", "War Machine", "Most units built."],
+    ["🏗️", "Master Builder", "Most structures built."],
+    ["🧪", "Research Pioneer", "Most research completed."],
+    ["⚔️", "Combat Efficiency", "Best kills-to-units-lost ratio among players with at least 25 unit losses."],
+    ["🛡️", "Last Army Standing", "Most units remaining at the end."],
+    ["🏰", "Fortress Keeper", "Most structures remaining at the end."],
+    ["🏭", "Production Powerhouse", "Most units and structures produced in total."],
+    ["☄️", "Total Destruction", "Highest combined unit kills and structures destroyed."],
+    ["⚡", "Power Hoarder", "Most power remaining at the end."],
+    ["🩸", "Costly Victory", "Winning player who lost the most units."],
+    ["🔥", "Last Stand", "Losing player with the most units and structures remaining."],
+    ["💀", "Glass Cannon", "Highest combined kills and unit losses rating."],
+    ["🪦", "Army Grinder", "Most units lost."],
+    ["🧱", "Structure Casualty", "Most structures lost."],
+    ["♻️", "Efficient Builder", "Best remaining-assets share among players who produced at least 50 assets."],
+    ["🌅", "Comeback Survivor", "Best destruction per remaining asset among losing survivors."],
+    ["🧹", "Clean Sweep", "Won without losing a structure."],
+    ["🩹", "Army Preservation", "Best unit survival share among armies with at least 25 total units."],
+    ["🏯", "Perfect Defense", "Best structure survival share among bases with at least 25 total structures."],
+    ["🔨", "Rebuild Master", "Strongest rebuilding performance despite structure losses."],
+    ["🗡️", "Siege Efficiency", "Best structures-destroyed-to-units-lost ratio with at least 25 unit losses."],
+    ["📈", "Score Efficiency", "Best score per produced asset among players with at least 50 produced assets."],
+    ["⚖️", "Balanced Commander", "Strongest balance across combat, production, research, and survival."],
+    ["🐺", "Underdog Victor", "Victory with the lowest non-negative winning score."],
+    ["🧨", "All-Out Assault", "Winning player with the most combined unit and structure losses."],
+    ["💎", "Untouchable", "Fewest unit losses among the match's major combatants."],
+    ["🛠️", "Industrial Recovery", "Strongest recovery measured from remaining assets after heavy losses."],
+    ["🚀", "Overproducer", "Largest gap between total production and assets remaining."],
+    ["🧠", "Research Efficiency", "Best research-to-structures-built ratio with at least 25 structures built."],
+    ["⭐", "Team MVP", "Highest score on the player's team."],
+    ["👑", "Team Carry", "Largest share of the team's total score."],
+    ["🦅", "Team Slayer", "Largest share of the team's total kills."],
+    ["🎁", "Generous Ally", "Most gifts sent to allies."],
+    ["🤝", "Team Support", "Helped the most distinct players."],
+    ["🔬", "Research Sprinter", "Started the first recorded research."],
+    ["🏭", "Early Industrialist", "Issued the first manufacturing order."],
+    ["🩸", "First Blood", "Earliest attack by a player who finished with kills."],
+    ["⚔️", "First Mobilization", "Issued the first attack order."],
+    ["🗺️", "Most Aggressive", "Issued the most attack orders."],
+    ["🧱", "Defensive Commander", "Issued the most guard, hold, patrol, and repair orders."],
+    ["⏱️", "Endurance Award", "Remained active through the end of the match."],
+    ["🚪", "Last to Leave", "Latest recorded departure from the match."],
+    ["📡", "Field Coordinator", "Most support gifts and coordination orders combined."]
+  ];
+
+  let playerAwardsGuideDialog = null;
+
+  function openPlayerAwardsGuide() {
+    if (!playerAwardsGuideDialog) {
+      const dialog = document.createElement("dialog");
+      dialog.className = "replay-awards-guide";
+      dialog.setAttribute("aria-labelledby", "replayAwardsGuideTitle");
+
+      const panel = document.createElement("div");
+      panel.className = "replay-awards-guide-panel";
+
+      const header = document.createElement("header");
+      header.className = "replay-awards-guide-header";
+      const title = document.createElement("h3");
+      title.id = "replayAwardsGuideTitle";
+      title.textContent = "Awards guide";
+      const close = document.createElement("button");
+      close.className = "replay-awards-guide-close";
+      close.type = "button";
+      close.textContent = "Close";
+      close.addEventListener("click", () => dialog.close());
+      header.append(title, close);
+
+      const list = document.createElement("div");
+      list.className = "replay-awards-guide-list";
+      playerAwardGuide.forEach(([icon, label, description]) => {
+        const item = document.createElement("article");
+        item.className = "replay-awards-guide-item";
+        const awardIcon = document.createElement("span");
+        awardIcon.className = "replay-awards-guide-icon";
+        awardIcon.textContent = icon;
+        awardIcon.setAttribute("aria-hidden", "true");
+        const copy = document.createElement("span");
+        copy.className = "replay-awards-guide-copy";
+        const name = document.createElement("strong");
+        name.textContent = label;
+        const explanation = document.createElement("small");
+        explanation.textContent = description;
+        copy.append(name, explanation);
+        item.append(awardIcon, copy);
+        list.append(item);
+      });
+
+      panel.append(header, list);
+      dialog.append(panel);
+      dialog.addEventListener("click", (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+      document.body.append(dialog);
+      playerAwardsGuideDialog = dialog;
+    }
+
+    if (!playerAwardsGuideDialog.open) playerAwardsGuideDialog.showModal();
+  }
+
+  function createPlayerAwardsHeader(onSort) {
+    const header = createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, onSort);
+    const help = document.createElement("button");
+    help.className = "replay-awards-help";
+    help.type = "button";
+    help.textContent = "?";
+    help.setAttribute("aria-label", "Show all awards and explanations");
+    help.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openPlayerAwardsGuide();
+    });
+    header.append(help);
+    return header;
   }
 
   function calculatePlayerAwards(players, events = []) {
@@ -5732,10 +5853,8 @@
     battlefieldFrames = telemetryFrames.filter((frame) => !frame.eventsOnly);
     battlefieldExtraction = extraction;
     battlefieldOwnersUsePositions = Boolean(tacticalReplay.ownersAreLobbyPositions);
-    battlefieldTerrain = null;
-    battlefieldDroidDefinitions = new Map();
-    battlefieldStructureDefinitions = new Map();
-    battlefieldDestroyedAt = new Map();
+    battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
+    collectBattlefieldObjectDefinitions(telemetryFrames);
     battlefieldSpriteCache.clear();
     battlefieldSpriteBufferFrameIndex = 0;
     battlefieldSpriteBufferTarget = 0;
@@ -5757,11 +5876,20 @@
     battlefieldRange.value = "0";
     updateBattlefieldTimelineProgress();
     battlefieldDuration.value = formatDuration(duration);
-    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · battlefield view not supported`;
-    battlefieldPanel.classList.add("is-unsupported");
-    battlefieldStatus.textContent = "Not Supported";
+    const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
+    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
+    battlefieldBackground.checked = Boolean(battlefieldTerrain && battlefieldBackground.checked);
+    battlefieldBackground.disabled = !battlefieldTerrain;
+    battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length && battlefieldTiles.checked);
+    battlefieldTiles.disabled = true;
+    if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
+    setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), battlefieldTerrain
+      ? "Loading map tiles"
+      : "Map tiles are unavailable");
+    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
     populateBattlefieldLegend(extraction);
     renderBattlefieldMomentum(extraction);
+    setBattlefieldViewMode(battlefieldViewMode?.value || "3d");
   }
 
   function renderExtendedAnalysis(extraction) {
@@ -5956,7 +6084,7 @@
           scope: "colgroup",
           className: "replay-stat-group"
         }),
-        createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, renderPlayerRows)
+        createPlayerAwardsHeader(renderPlayerRows)
       );
 
       const playerHeaderDetails = document.createElement("tr");

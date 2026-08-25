@@ -2294,6 +2294,15 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     return;
   }
 
+  const playerGamesHeader = playerGamesElement.closest("table")?.querySelector("thead tr");
+  if (playerGamesHeader && !playerGamesHeader.querySelector("[data-player-games-elo-header]")) {
+    const eloHeader = document.createElement("th");
+    eloHeader.dataset.playerGamesEloHeader = "";
+    eloHeader.textContent = "Elo";
+    const durationHeader = playerGamesHeader.querySelector('[data-sort-key="duration"]');
+    playerGamesHeader.insertBefore(eloHeader, durationHeader);
+  }
+
   const profileHeadingLabel = document.querySelector(".stats-player-profile-heading-line .panel-kicker");
   const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
   const selectedAccount = globalAccounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
@@ -2383,7 +2392,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   if (!latestGames.length) {
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">No recent games found for this player in the selected slice.</td>
+        <td colspan="6">No recent games found for this player in the selected slice.</td>
       </tr>
     `;
     return;
@@ -2392,13 +2401,24 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   playerGamesElement.innerHTML = latestGames
     .map((game) => {
       const outcome = getPlayerGameOutcome(game, activeAccount);
+      const activePlayerSlot = game.teams
+        .flatMap((team) => Array.isArray(team.players) ? team.players : [])
+        .find((slot) => slot?.account === activeAccount);
+      const rawEloDelta = activePlayerSlot?.eloDelta;
+      const hasEloDelta = rawEloDelta !== null
+        && rawEloDelta !== undefined
+        && Number.isFinite(Number(rawEloDelta));
+      const eloDelta = hasEloDelta ? Number(rawEloDelta) : null;
+      const eloDeltaLabel = hasEloDelta
+        ? `${eloDelta > 0 ? "+" : ""}${eloDelta.toFixed(2)}`
+        : "";
       const replayUrl = game.replayUrl ? normalizeReplayUrl(game.replayUrl) : "";
       const gameKey = getPlayerGameKey(game);
       const isExpanded = activeExpandedPlayerGameKey === gameKey;
       const detailRow = isExpanded
         ? `
           <tr class="stats-player-game-detail-row">
-            <td colspan="5">
+            <td colspan="6">
               ${renderPlayerGameDetails(game, activeAccount)}
             </td>
           </tr>
@@ -2441,6 +2461,9 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
           <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}${isUpsetMatch(game)
             ? '<span class="stats-mega-win-star" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span>'
             : ""}</span></td>
+          <td>${hasEloDelta
+            ? `<span class="stats-player-game-elo-change ${eloDelta >= 0 ? "is-positive" : "is-negative"}" title="Match Elo change">${escapeHtml(eloDeltaLabel)}</span>`
+            : ""}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td>
             ${replayUrl

@@ -3352,6 +3352,21 @@ main {
   text-shadow: 0 0 7px rgba(255, 198, 96, 0.5);
 }
 
+.stats-player-game-elo-change {
+  display: inline-block;
+  margin-left: 7px;
+  font: 700 0.76rem "Oxanium", sans-serif;
+  white-space: nowrap;
+}
+
+.stats-player-game-elo-change.is-positive {
+  color: #8de98e;
+}
+
+.stats-player-game-elo-change.is-negative {
+  color: #ff8b7e;
+}
+
 .stats-replay-link {
   color: var(--cyan);
 }

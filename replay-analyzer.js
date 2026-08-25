@@ -603,11 +603,21 @@
           structureKills: hasReplayEngineStats ? player.structures_destroyed : null,
           researchComplete: hasReplayEngineStats ? player.research_complete : null,
           score: hasReplayEngineStats ? player.score : null,
-          powerDestroyed: hasReplayEngineStats
-            ? (rawPlayer.powerDestroyed ?? rawPlayer.power_destroyed ?? null)
+          powerWon: hasReplayEngineStats
+            ? (rawPlayer.powerWon
+              ?? rawPlayer.power_won
+              ?? rawPlayer.powerDestroyed
+              ?? rawPlayer.power_destroyed
+              ?? rawPlayer.destroyedPower
+              ?? rawPlayer.destroyed_power
+              ?? null)
             : null,
           powerLost: hasReplayEngineStats
-            ? (rawPlayer.powerLost ?? rawPlayer.power_lost ?? null)
+            ? (rawPlayer.powerLost
+              ?? rawPlayer.power_lost
+              ?? rawPlayer.lostPower
+              ?? rawPlayer.lost_power
+              ?? null)
             : null,
           power: hasReplayEngineStats ? player.power : null,
           oilRigs: hasReplayEngineStats ? player.oil_rigs : null,
@@ -650,7 +660,7 @@
         structuresDestroyed: published.structureKills,
         researchComplete: published.researchComplete,
         score: published.score,
-        powerDestroyed: published.powerDestroyed,
+        powerWon: published.powerWon,
         powerLost: published.powerLost,
         power: published.power,
         oilRigs: published.oilRigs,
@@ -2301,7 +2311,7 @@
       createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
       createCell(formatStat(stats.score)),
       createCell(formatTotalKd(player)),
-      createCell(formatStat(stats.powerDestroyed)),
+      createCell(formatStat(stats.powerWon)),
       createCell(formatStat(stats.powerLost)),
       createResearchCell(researchActivity),
       createCell(formatStat(stats.droidsBuilt)),
@@ -5940,7 +5950,7 @@
         createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("Power won", "powerDestroyed", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("Power won", "powerWon", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Power lost", "powerLost", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
         createHeaderCell("Units", {

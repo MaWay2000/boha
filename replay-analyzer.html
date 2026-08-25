@@ -371,6 +371,31 @@
       box-shadow: none;
     }
 
+    .replay-battlefield-unsupported {
+      display: none;
+      width: 100%;
+      min-height: 360px;
+      place-items: center;
+      color: var(--muted);
+      font: 700 clamp(1.15rem, 2vw, 1.65rem) "Oxanium", sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-controls,
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-canvas,
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-loading,
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-minimap,
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-minimap-toggle,
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-map-controls,
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-footer {
+      display: none !important;
+    }
+
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-unsupported {
+      display: grid;
+    }
+
     .replay-snapshot-control {
       display: grid;
       grid-template-columns: minmax(180px, 1fr) auto;
@@ -2701,6 +2726,7 @@
                 </section>
               </aside>
               <div class="replay-battlefield-stage">
+                <div class="replay-battlefield-unsupported" role="status">Not Supported</div>
                 <canvas
                   class="replay-battlefield-canvas"
                   id="replayBattlefieldCanvas"

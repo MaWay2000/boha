@@ -5732,8 +5732,10 @@
     battlefieldFrames = telemetryFrames.filter((frame) => !frame.eventsOnly);
     battlefieldExtraction = extraction;
     battlefieldOwnersUsePositions = Boolean(tacticalReplay.ownersAreLobbyPositions);
-    battlefieldTerrain = createBattlefieldTerrain(extraction.mapTerrain);
-    collectBattlefieldObjectDefinitions(telemetryFrames);
+    battlefieldTerrain = null;
+    battlefieldDroidDefinitions = new Map();
+    battlefieldStructureDefinitions = new Map();
+    battlefieldDestroyedAt = new Map();
     battlefieldSpriteCache.clear();
     battlefieldSpriteBufferFrameIndex = 0;
     battlefieldSpriteBufferTarget = 0;
@@ -5755,20 +5757,11 @@
     battlefieldRange.value = "0";
     updateBattlefieldTimelineProgress();
     battlefieldDuration.value = formatDuration(duration);
-    const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
-    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
-    battlefieldBackground.checked = Boolean(battlefieldTerrain && battlefieldBackground.checked);
-    battlefieldBackground.disabled = !battlefieldTerrain;
-    battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length && battlefieldTiles.checked);
-    battlefieldTiles.disabled = true;
-    if (battlefieldTileQuality) battlefieldTileQuality.disabled = true;
-    setFixedTooltip(battlefieldTiles.closest(".replay-battlefield-option"), battlefieldTerrain
-      ? "Loading map tiles"
-      : "Map tiles are unavailable");
-    if (battlefieldTerrain) prepareBattlefieldTerrainTiles(battlefieldTerrain, true);
+    battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · battlefield view not supported`;
+    battlefieldPanel.classList.add("is-unsupported");
+    battlefieldStatus.textContent = "Not Supported";
     populateBattlefieldLegend(extraction);
     renderBattlefieldMomentum(extraction);
-    setBattlefieldViewMode(battlefieldViewMode?.value || "3d");
   }
 
   function renderExtendedAnalysis(extraction) {

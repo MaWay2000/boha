@@ -603,6 +603,12 @@
           structureKills: hasReplayEngineStats ? player.structures_destroyed : null,
           researchComplete: hasReplayEngineStats ? player.research_complete : null,
           score: hasReplayEngineStats ? player.score : null,
+          powerDestroyed: hasReplayEngineStats
+            ? (rawPlayer.powerDestroyed ?? rawPlayer.power_destroyed ?? null)
+            : null,
+          powerLost: hasReplayEngineStats
+            ? (rawPlayer.powerLost ?? rawPlayer.power_lost ?? null)
+            : null,
           power: hasReplayEngineStats ? player.power : null,
           oilRigs: hasReplayEngineStats ? player.oil_rigs : null,
           droids: hasReplayEngineStats ? player.remaining_droids : null,
@@ -644,6 +650,8 @@
         structuresDestroyed: published.structureKills,
         researchComplete: published.researchComplete,
         score: published.score,
+        powerDestroyed: published.powerDestroyed,
+        powerLost: published.powerLost,
         power: published.power,
         oilRigs: published.oilRigs,
         remainingDroids: published.droids,
@@ -2293,6 +2301,8 @@
       createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
       createCell(formatStat(stats.score)),
       createCell(formatTotalKd(player)),
+      createCell(formatStat(stats.powerDestroyed)),
+      createCell(formatStat(stats.powerLost)),
       createResearchCell(researchActivity),
       createCell(formatStat(stats.droidsBuilt)),
       createCell(formatStat(stats.droidsLost)),
@@ -5930,6 +5940,8 @@
         createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("Power won", "powerDestroyed", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("Power lost", "powerLost", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
         createHeaderCell("Units", {
           colSpan: 5,

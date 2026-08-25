@@ -2016,6 +2016,9 @@ function renderPlayerProfile(account) {
     .map((game) => getPlayerGameOutcome(game, account));
   const favoriteMaps = getCountedFavorites(account.games.map((game) => game.mapName));
   const favoriteModes = getCountedFavorites(account.games.map(formatPlayerMode));
+  const favoriteUnits = Array.isArray(account.favoriteUnits)
+    ? account.favoriteUnits.slice(0, 3)
+    : [];
   const opponents = getAccountOpponents(account);
   const teammates = getAccountTeammates(account);
   const profileUrl = new URL("index.html", window.location.href);
@@ -2041,6 +2044,7 @@ function renderPlayerProfile(account) {
       </article>
       <article><span class="stats-detail-label">Favorite maps</span><div>${renderMapProfileLinks(favoriteMaps, "No map history")}</div></article>
       <article><span class="stats-detail-label">Favorite modes</span><div>${renderProfileList(favoriteModes, "No mode history")}</div></article>
+      <article><span class="stats-detail-label">Favorite units</span><div>${renderProfileList(favoriteUnits, "No unit history")}</div></article>
       <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileComparisonLinks(account, opponents, "No opponents")}</div></article>
       <article><span class="stats-detail-label">Most-played teammates</span><div>${renderProfileComparisonLinks(account, teammates, "No teammates")}</div></article>
     </div>

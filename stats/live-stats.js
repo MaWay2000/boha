@@ -1,3 +1,5 @@
+import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js";
+
 const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
 const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");
 const MANIFEST_URL = USE_REMOTE_MIRROR_JSON
@@ -457,6 +459,7 @@ function hydratePublishedBoard(name) {
     loseCount: Number(player.losses || 0),
     drawCount: Number(player.draws || 0),
     totalKills: Number(player.totalKills || 0),
+    favoriteUnits: Array.isArray(player.favoriteUnits) ? player.favoriteUnits : [],
     discounted: Boolean(player.discounted)
   }]));
   const gameIds = new Set(board.gameIds || []);
@@ -1991,6 +1994,7 @@ function renderPlayerComparison(accounts) {
 }
 
 function renderPlayerProfile(account) {
+  destroyFavoriteUnitPreview();
   const shareButton = document.getElementById("statsProfileShare");
   if (!playerProfileElement || !account) {
     if (playerProfileElement) {
@@ -2037,6 +2041,7 @@ function renderPlayerProfile(account) {
       <article><span>Win streak</span><strong>${currentWinStreak} ${currentWinStreak === 1 ? "win" : "wins"}</strong></article>
       <article class="stats-profile-form"><span>Recent form</span><strong>${recentOutcomes.map((outcome) => `<i class="${outcome.className}" title="${escapeHtml(outcome.label)}">${escapeHtml(outcome.label.charAt(0))}</i>`).join("") || "--"}</strong></article>
     </div>
+    <div data-favorite-unit-preview></div>
     <div class="stats-profile-details">
       <article class="stats-profile-history">
         <span class="stats-detail-label">Pulse Ratio</span>
@@ -2044,11 +2049,19 @@ function renderPlayerProfile(account) {
       </article>
       <article><span class="stats-detail-label">Favorite maps</span><div>${renderMapProfileLinks(favoriteMaps, "No map history")}</div></article>
       <article><span class="stats-detail-label">Favorite modes</span><div>${renderProfileList(favoriteModes, "No mode history")}</div></article>
-      <article><span class="stats-detail-label">Favorite units</span><div>${renderProfileList(favoriteUnits, "No unit history")}</div></article>
+      <article><span class="stats-detail-label">Favorite units</span><div>${renderProfileList(
+        favoriteUnits.map((unit) => [unit.name || "Unknown unit", Number(unit.count || 0)]),
+        "No unit history"
+      )}</div></article>
       <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileComparisonLinks(account, opponents, "No opponents")}</div></article>
       <article><span class="stats-detail-label">Most-played teammates</span><div>${renderProfileComparisonLinks(account, teammates, "No teammates")}</div></article>
     </div>
   `;
+
+  initFavoriteUnitPreview(
+    playerProfileElement.querySelector("[data-favorite-unit-preview]"),
+    favoriteUnits
+  );
 
   if (shareButton) {
     shareButton.hidden = false;

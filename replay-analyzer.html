@@ -376,10 +376,19 @@
       width: 100%;
       min-height: 360px;
       place-items: center;
+      align-content: center;
+      gap: 14px;
+      text-align: center;
       color: var(--muted);
       font: 700 clamp(1.15rem, 2vw, 1.65rem) "Oxanium", sans-serif;
       letter-spacing: 0.12em;
       text-transform: uppercase;
+    }
+
+    .replay-battlefield-unsupported-logo {
+      display: block;
+      width: min(220px, 70vw);
+      height: auto;
     }
 
     #replayBattlefieldPanel.is-unsupported .replay-battlefield-controls,
@@ -413,6 +422,7 @@
 
     #replayBattlefieldPanel.is-unsupported .replay-battlefield-stage {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
       width: 100%;
       min-height: 220px;
       margin: 0;
@@ -2889,7 +2899,14 @@
                 </section>
               </aside>
               <div class="replay-battlefield-stage">
-                <div class="replay-battlefield-unsupported" role="status">Not Supported</div>
+                <div class="replay-battlefield-unsupported" role="status">
+                  <img
+                    class="replay-battlefield-unsupported-logo"
+                    src="assets/battlefield-logo-v3.png"
+                    alt="Battlefield"
+                  >
+                  <span>Not Supported</span>
+                </div>
                 <canvas
                   class="replay-battlefield-canvas"
                   id="replayBattlefieldCanvas"

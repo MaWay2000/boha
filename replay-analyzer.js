@@ -5915,8 +5915,8 @@
 
     const previewSupported = Boolean(extraction.battlefieldPreviewSupported);
     battlefieldPanel.classList.toggle("is-unsupported", !previewSupported);
-    battlefieldPanel.hidden = battlefieldPositionFrames.length === 0;
-    if (battlefieldPositionFrames.length) {
+    battlefieldPanel.hidden = previewSupported && battlefieldPositionFrames.length === 0;
+    if (battlefieldPositionFrames.length && previewSupported) {
       renderBattlefield(extraction, tacticalReplay, previewSupported);
     } else {
       stopBattlefieldPlayback();
@@ -5935,6 +5935,10 @@
       battlefieldSpriteCache.clear();
       battlefieldSpriteBufferGeneration += 1;
       battlefieldSpriteBufferScheduled = false;
+      if (battlefieldPositionFrames.length) {
+        battlefieldMeta.textContent = "Battlefield preview is not supported for uploaded replays";
+        battlefieldStatus.textContent = "Not Supported";
+      }
     }
 
     researchPanel.hidden = timeline.length === 0;
@@ -6202,7 +6206,7 @@
       }
       setStatus("Parsing replay…");
       latestExtraction = parseReplay(arrayBuffer);
-      if (latestExtraction.embeddedMapArchive) {
+      if (allowPublishedBattlefield && latestExtraction.embeddedMapArchive) {
         setStatus("Reading embedded map terrain…");
         try {
           await loadEmbeddedMapTerrain(latestExtraction);

@@ -396,6 +396,34 @@
       display: grid;
     }
 
+    #replayBattlefieldPanel.is-unsupported {
+      display: block;
+      height: auto;
+      min-height: 0;
+    }
+
+    #replayBattlefieldPanel.is-unsupported > :not(.replay-battlefield-layout),
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-sidebar {
+      display: none !important;
+    }
+
+    #replayBattlefieldPanel.is-unsupported > .replay-battlefield-layout {
+      display: block !important;
+    }
+
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-stage {
+      display: grid;
+      width: 100%;
+      min-height: 220px;
+      margin: 0;
+      padding: 0;
+      place-items: center;
+    }
+
+    #replayBattlefieldPanel.is-unsupported .replay-battlefield-unsupported {
+      min-height: 220px;
+    }
+
     .replay-snapshot-control {
       display: grid;
       grid-template-columns: minmax(180px, 1fr) auto;

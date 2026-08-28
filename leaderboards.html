@@ -102,7 +102,7 @@
               <table class="stats-table stats-table-ranks">
                 <thead>
                   <tr>
-                    <th data-sort-table="ranks" data-sort-key="rank" aria-sort="ascending"><button class="stats-sort-button" type="button">Rank</button></th>
+                    <th data-sort-table="ranks" data-sort-key="rank" aria-sort="ascending"><button class="stats-sort-button" type="button">#</button></th>
                     <th data-sort-table="ranks" data-sort-key="player" aria-sort="none"><button class="stats-sort-button" type="button">Player</button></th>
                     <th data-sort-table="ranks" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
                     <th data-sort-table="ranks" data-sort-key="matches" aria-sort="none"><button class="stats-sort-button" type="button">Games</button></th>
@@ -110,7 +110,7 @@
                       <div class="stats-record-sort-group stats-record-grid" aria-label="Sort by wins, losses, draws, crashes, or percentages">
                         <span class="stats-record-metric">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="wins" aria-label="Sort by wins">
-                            W
+                            Win
                             <span class="stats-sort-hint" aria-hidden="true">Wins</span>
                           </button>
                           <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="winRate" aria-label="Sort by win percentage (minimum 10 games)">
@@ -121,7 +121,7 @@
                         <span class="stats-record-sort-divider">/</span>
                         <span class="stats-record-metric">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="losses" aria-label="Sort by losses">
-                            L
+                            Lost
                             <span class="stats-sort-hint" aria-hidden="true">Losses</span>
                           </button>
                           <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="lossRate" aria-label="Sort by loss percentage (minimum 10 games)">
@@ -132,7 +132,7 @@
                         <span class="stats-record-sort-divider">/</span>
                         <span class="stats-record-metric">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="draws" aria-label="Sort by draws">
-                            D
+                            Draw&nbsp;
                             <span class="stats-sort-hint" aria-hidden="true">Draws</span>
                           </button>
                           <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="drawRate" aria-label="Sort by draw percentage (minimum 10 games)">
@@ -248,6 +248,6 @@
   </div>
 
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20260815-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20260828-1"></script>
 </body>
 </html>

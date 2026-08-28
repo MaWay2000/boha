@@ -1612,6 +1612,26 @@ main {
   box-shadow: 0 0 0 4px rgba(109, 232, 255, 0.08);
 }
 
+.stats-panel-head-ranks .stats-search-label {
+  color: #ffd56a;
+}
+
+.stats-panel-head-ranks .stats-search-input {
+  border-color: rgba(255, 213, 106, 0.72);
+  background: rgba(35, 29, 13, 0.62);
+  box-shadow: 0 0 18px rgba(255, 213, 106, 0.1);
+}
+
+.stats-panel-head-ranks .stats-search-input::placeholder {
+  color: rgba(255, 213, 106, 0.82);
+}
+
+.stats-panel-head-ranks .stats-search-input:focus {
+  border-color: #ffd56a;
+  background: rgba(42, 34, 14, 0.78);
+  box-shadow: 0 0 0 4px rgba(255, 213, 106, 0.14), 0 0 22px rgba(255, 213, 106, 0.16);
+}
+
 .stats-match-filters {
   border: 1px solid rgba(109, 232, 255, 0.14);
   border-radius: 16px;
@@ -1745,8 +1765,10 @@ main {
 
 .stats-table-wrap-ranks {
   position: relative;
+  width: min(100%, 676px);
   height: clamp(420px, 68vh, 820px);
   padding-top: 52px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
@@ -1754,6 +1776,42 @@ main {
 
 .stats-table-wrap-ranks > .stats-table {
   margin-top: -52px;
+}
+
+@media (min-width: 901px) {
+  .stats-grid {
+    grid-template-columns: minmax(0, 46fr) minmax(0, 54fr);
+  }
+
+  .stats-table-wrap-ranks > .stats-table {
+    table-layout: fixed;
+  }
+
+  .stats-table-wrap-ranks > .stats-table th:nth-child(1),
+  .stats-table-wrap-ranks > .stats-table td:nth-child(1) {
+    width: 64px;
+  }
+
+  .stats-table-wrap-ranks > .stats-table th:nth-child(2),
+  .stats-table-wrap-ranks > .stats-table td:nth-child(2) {
+    width: 240px;
+  }
+
+  .stats-table-wrap-ranks > .stats-table th:nth-child(3),
+  .stats-table-wrap-ranks > .stats-table td:nth-child(3) {
+    width: 150px;
+  }
+
+  .stats-table-wrap-ranks > .stats-table th:nth-child(4),
+  .stats-table-wrap-ranks > .stats-table td:nth-child(4) {
+    width: 110px;
+  }
+
+  .stats-table-wrap-ranks .stats-record-sort-group,
+  .stats-table-wrap-ranks .stats-record-grid {
+    max-width: 400px;
+    justify-content: start;
+  }
 }
 
 .stats-table {
@@ -1868,14 +1926,13 @@ main {
   position: relative;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 6px;
   justify-self: center;
   width: 100%;
 }
 
 .stats-record-metric .stats-sort-button-percent {
-  position: absolute;
-  left: calc(50% + 13px);
+  position: static;
 }
 
 .stats-record-sort-divider {
@@ -2075,7 +2132,7 @@ main {
 .stats-player-line {
   display: flex;
   align-items: baseline;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
 }
 
@@ -2147,8 +2204,11 @@ main {
 
 .stats-player-label {
   display: inline-block;
+  min-width: 0;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stats-player-bot {
@@ -2254,6 +2314,7 @@ main {
 
 .stats-expand-toggle {
   display: inline-flex;
+  flex: 0 0 18px;
   align-items: center;
   justify-content: center;
   min-width: 18px;
@@ -2969,7 +3030,7 @@ main {
 }
 
 .stats-profile-metrics {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(230px, 1.2fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(230px, 1.2fr);
 }
 
 .stats-profile-metrics article {
@@ -3045,6 +3106,15 @@ main {
 
 .stats-profile-history {
   grid-column: 1 / -1;
+  position: relative;
+}
+
+.stats-profile-chart-maximum {
+  position: absolute;
+  top: 30px;
+  left: 10px;
+  color: var(--muted);
+  font-size: 0.68rem;
 }
 
 .stats-profile-chart {
@@ -3063,11 +3133,51 @@ main {
   filter: drop-shadow(0 0 5px rgba(109, 232, 255, 0.35));
 }
 
+.stats-profile-chart-point {
+  fill: transparent;
+  stroke: transparent;
+  stroke-width: 10;
+  vector-effect: non-scaling-stroke;
+  cursor: crosshair;
+}
+
+.stats-profile-chart-point:hover {
+  fill: var(--cyan);
+  stroke: rgba(109, 232, 255, 0.35);
+  stroke-width: 5;
+  filter: drop-shadow(0 0 5px rgba(109, 232, 255, 0.8));
+}
+
+.stats-profile-chart-tooltip {
+  position: absolute;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 6px 9px;
+  border: 1px solid rgba(109, 232, 255, 0.5);
+  border-radius: 6px;
+  background: rgba(5, 16, 26, 0.96);
+  box-shadow: 0 0 12px rgba(109, 232, 255, 0.25);
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.stats-profile-chart-tooltip[hidden] {
+  display: none;
+}
+
 .stats-profile-chart-scale {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
   color: var(--muted);
   font-size: 0.68rem;
+}
+
+.stats-profile-chart-scale span:nth-child(2) {
+  text-align: center;
 }
 
 .stats-profile-chip {
@@ -3687,6 +3797,40 @@ main {
     padding-left: 0;
   }
 
+  .embedded-page .stats-grid > .stats-panel:first-child {
+    width: calc(100% - 102px);
+    justify-self: center;
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table {
+    width: 608px;
+    min-width: 608px;
+    max-width: 608px;
+  }
+
+  .embedded-page .stats-table-wrap-ranks {
+    width: min(100%, 608px);
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table th:first-child,
+  .embedded-page .stats-table-wrap-ranks > .stats-table td:first-child:not([colspan]) {
+    width: 40px;
+    padding-inline: 8px;
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table th:nth-child(3),
+  .embedded-page .stats-table-wrap-ranks > .stats-table td:nth-child(3):not([colspan]) {
+    width: 96px;
+    padding-inline: 8px;
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table th:nth-child(5),
+  .embedded-page .stats-table-wrap-ranks > .stats-table td:nth-child(5):not([colspan]) {
+    width: 232px;
+    min-width: 232px;
+    max-width: 232px;
+  }
+
   .stats-profile-metrics,
   .stats-profile-details {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3702,6 +3846,40 @@ main {
 }
 
 @media (max-width: 560px) {
+  .embedded-page .stats-grid > .stats-panel:first-child {
+    width: 100%;
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table {
+    width: 676px;
+    min-width: 676px;
+    max-width: 676px;
+  }
+
+  .embedded-page .stats-table-wrap-ranks {
+    width: min(100%, 676px);
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table th:first-child,
+  .embedded-page .stats-table-wrap-ranks > .stats-table td:first-child:not([colspan]) {
+    width: 56px;
+    padding-right: 8px;
+    padding-left: 14px;
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table th:nth-child(3),
+  .embedded-page .stats-table-wrap-ranks > .stats-table td:nth-child(3):not([colspan]) {
+    width: 132px;
+    padding-inline: 14px;
+  }
+
+  .embedded-page .stats-table-wrap-ranks > .stats-table th:nth-child(5),
+  .embedded-page .stats-table-wrap-ranks > .stats-table td:nth-child(5):not([colspan]) {
+    width: 248px;
+    min-width: 248px;
+    max-width: 248px;
+  }
+
   .stats-profile-heading {
     align-items: stretch;
     flex-direction: column;
@@ -3775,4 +3953,94 @@ main {
   .config-block {
     grid-template-columns: 1fr;
   }
+}
+.stats-table-wrap-ranks .stats-sort-button::after {
+  display: none;
+}
+
+.stats-table-wrap-ranks .stats-sort-button-percent {
+  display: none;
+}
+
+.stats-table-wrap-ranks .stats-expand-toggle {
+  display: none;
+}
+
+/* Compact leaderboard statistics while preserving the player column width. */
+.stats-table-wrap-ranks .stats-table {
+  table-layout: fixed;
+  width: 676px;
+  min-width: 676px;
+  max-width: 676px;
+}
+
+.stats-table-wrap-ranks .stats-table th:first-child,
+.stats-table-wrap-ranks .stats-table td:first-child:not([colspan]) {
+  width: 56px;
+}
+
+.stats-table-wrap-ranks .stats-table th:nth-child(2),
+.stats-table-wrap-ranks .stats-table td:nth-child(2):not([colspan]) {
+  width: 160px;
+  min-width: 160px;
+  max-width: 160px;
+}
+
+.stats-table-wrap-ranks .stats-table th:nth-child(3),
+.stats-table-wrap-ranks .stats-table td:nth-child(3):not([colspan]) {
+  width: 132px;
+}
+
+.stats-table-wrap-ranks .stats-table th:nth-child(4),
+.stats-table-wrap-ranks .stats-table td:nth-child(4):not([colspan]) {
+  width: 80px;
+  padding-inline: 8px;
+}
+
+.stats-table-wrap-ranks .stats-table th:nth-child(n + 5),
+.stats-table-wrap-ranks .stats-table td:nth-child(n + 5):not([colspan]) {
+  width: 248px;
+  min-width: 248px;
+  max-width: 248px;
+}
+
+.stats-table-wrap-ranks .stats-table th:nth-child(n + 5) {
+  white-space: nowrap;
+}
+
+/* Balance the leaderboard so every statistics column remains readable. */
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) {
+  width: 100%;
+  table-layout: fixed !important;
+}
+
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) :is(th, td) {
+  box-sizing: border-box;
+}
+
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) :is(th, td):nth-child(1) {
+  width: 54px !important;
+  padding-inline: 8px !important;
+}
+
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) :is(th, td):nth-child(2) {
+  width: auto !important;
+  min-width: 0;
+}
+
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) :is(th, td):nth-child(3) {
+  width: 150px !important;
+}
+
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) :is(th, td):nth-child(4) {
+  width: 100px !important;
+}
+
+:is(#leaderboardTable, #playersTable, #leaderboard-table, .leaderboard-table, .players-table, .player-table, .top-players-table, .top-players table, #topPlayers table, .leaderboard-panel table, .leaderboard-list table) :is(th, td):nth-child(n+5):nth-child(-n+8) {
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  padding-inline: 6px !important;
+  white-space: nowrap;
+  text-align: center;
 }

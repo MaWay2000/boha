@@ -15,7 +15,7 @@ const PLAYER_KEYS_URL = USE_REMOTE_MIRROR_JSON
   : new URL("./player-public-keys.json", import.meta.url);
 const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
-const INITIAL_PLAYER_LIMIT = 20;
+const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
 const MATCH_LIMIT_STEP = 30;
@@ -89,6 +89,8 @@ const playerComparisonElement = document.getElementById("statsPlayerComparison")
 const playerGamesElement = document.getElementById("statsPlayerGames");
 const playerGamesActionsElement = document.getElementById("statsPlayerGamesActions");
 const playerSearchElement = document.getElementById("statsPlayerSearch");
+const playerSearchClearElement = document.getElementById("statsPlayerSearchClear");
+const playerSearchFieldElement = playerSearchElement?.closest(".stats-search-field");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
 const matchesElement = document.getElementById("statsMatches");
 const matchesActionsElement = document.getElementById("statsMatchesActions");
@@ -636,6 +638,9 @@ function applyStateFromUrl() {
 
   if (playerSearchElement) {
     playerSearchElement.value = playerSearchQuery;
+  }
+  if (playerSearchClearElement) {
+    playerSearchClearElement.hidden = !playerSearchQuery;
   }
 
   if (matchesSearchElement) {
@@ -1776,7 +1781,7 @@ function renderProfileComparisonLinks(account, items, emptyLabel) {
     setCompactComparisonParams(params, accountKey, item.key);
     comparisonUrl.search = params.toString();
     const comparisonLabel = `Compare ${account.name || "Unknown"} with ${item.name}`;
-    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}" title="${escapeHtml(comparisonLabel)}">${escapeHtml(item.name)} <small>${item.count}</small></a>`;
+    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}">${escapeHtml(item.name)} <small>${item.count}</small><span class="stats-profile-link-hint" aria-hidden="true">${escapeHtml(comparisonLabel)}</span></a>`;
   }).join("");
 }
 
@@ -1826,7 +1831,7 @@ function renderComparisonOpponentLinks(account, opponents, side) {
     }
     comparisonUrl.search = params.toString();
     const comparisonLabel = `Compare ${account.name || "Unknown"} with ${opponent.name}`;
-    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}" title="${escapeHtml(comparisonLabel)}">${escapeHtml(opponent.name)} <small>${opponent.count}</small></a>`;
+    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}">${escapeHtml(opponent.name)} <small>${opponent.count}</small><span class="stats-profile-link-hint" aria-hidden="true">${escapeHtml(comparisonLabel)}</span></a>`;
   }).join("");
 }
 
@@ -2635,6 +2640,9 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       if (playerSearchElement) {
         playerSearchElement.value = playerSearchQuery;
       }
+      if (playerSearchClearElement) {
+        playerSearchClearElement.hidden = !playerSearchQuery;
+      }
 
       const eligibleAccounts = filterVisibleAccounts(accounts);
       const targetIndex = eligibleAccounts.findIndex((account) => getAccountExpandKey(account) === jumpAccount);
@@ -2999,6 +3007,9 @@ function renderSummary(accountList, gameList) {
         <strong class="stats-card-value">Unavailable</strong>
       </article>
     `;
+    if (playerSearchFieldElement) {
+      summaryElement.prepend(playerSearchFieldElement);
+    }
     return;
   }
 
@@ -3008,12 +3019,12 @@ function renderSummary(accountList, gameList) {
 
   summaryElement.innerHTML = `
     <article class="stats-card">
-      <span class="stats-card-label">Matches</span>
-      <strong class="stats-card-value">${gameList.length}</strong>
-    </article>
-    <article class="stats-card">
       <span class="stats-card-label">Ranked Players</span>
       <strong class="stats-card-value">${rankedPlayers.length}</strong>
+    </article>
+    <article class="stats-card">
+      <span class="stats-card-label">Matches</span>
+      <strong class="stats-card-value">${gameList.length}</strong>
     </article>
     <article class="stats-card">
       <span class="stats-card-label">Latest Match</span>
@@ -3023,6 +3034,9 @@ function renderSummary(accountList, gameList) {
         : `<span class="stats-player-note">${escapeHtml(latestMatch ? latestMatch.mapName : "Unknown map")}</span>`}
     </article>
   `;
+  if (playerSearchFieldElement) {
+    summaryElement.prepend(playerSearchFieldElement);
+  }
   if (statusElement) {
     statusElement.classList.add("stats-card", "stats-update-card");
     summaryElement.append(statusElement);
@@ -3639,8 +3653,29 @@ function renderButtons() {
 
 if (playerSearchElement) {
   playerSearchElement.addEventListener("input", (event) => {
-    playerSearchQuery = event.currentTarget.value;
+    const input = event.currentTarget;
+    const selectionStart = input.selectionStart;
+    const selectionEnd = input.selectionEnd;
+    playerSearchQuery = input.value;
+    if (playerSearchClearElement) {
+      playerSearchClearElement.hidden = !playerSearchQuery;
+    }
     render();
+    input.focus({ preventScroll: true });
+    if (selectionStart !== null && selectionEnd !== null) {
+      input.setSelectionRange(selectionStart, selectionEnd);
+    }
+  });
+}
+
+if (playerSearchClearElement && playerSearchElement) {
+  playerSearchClearElement.addEventListener("click", (event) => {
+    event.preventDefault();
+    playerSearchQuery = "";
+    playerSearchElement.value = "";
+    playerSearchClearElement.hidden = true;
+    render();
+    playerSearchElement.focus({ preventScroll: true });
   });
 }
 

@@ -17,11 +17,14 @@
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <link rel="stylesheet" href="styles.css">
   <style>
-    .open-data-intro {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+    .open-data-title-row {
+      display: flex;
       align-items: center;
       gap: 32px;
+    }
+
+    .open-data-title-row h2 {
+      flex: 1;
     }
 
     .open-data-hub-button {
@@ -34,8 +37,9 @@
     }
 
     @media (max-width: 860px) {
-      .open-data-intro {
-        grid-template-columns: 1fr;
+      .open-data-title-row {
+        align-items: stretch;
+        flex-direction: column;
         gap: 20px;
       }
 
@@ -52,18 +56,20 @@
         <div class="open-data-intro">
           <div class="section-head">
             <p class="eyebrow">Open Data</p>
-            <h2>The raw material stays public.</h2>
+            <div class="open-data-title-row">
+              <h2>The raw material stays public.</h2>
+              <a
+                class="button button-primary open-data-hub-button"
+                href="https://warzone2100.retropaganda.info/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >Visit Bohan Hub</a>
+            </div>
             <p>
               The original hub was explicit about open access to data, replays, and reproducible
               rankings. That principle stays intact here.
             </p>
           </div>
-          <a
-            class="button button-primary open-data-hub-button"
-            href="https://warzone2100.retropaganda.info/"
-            target="_blank"
-            rel="noopener noreferrer"
-          >Visit Bohan Hub</a>
         </div>
 
         <div class="open-data-grid">

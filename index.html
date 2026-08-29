@@ -53,7 +53,7 @@
       left: 50%;
       top: 50%;
       z-index: 1000;
-      width: min(520px, calc(100vw - 32px));
+      width: min(600px, calc(100vw - 32px)) !important;
       height: min(620px, calc(100vh - 32px));
       min-height: 0;
       transform: translate(-50%, -50%);
@@ -61,6 +61,35 @@
       border-radius: 24px;
       background: rgba(5, 10, 16, 0.98);
       box-shadow: 0 28px 80px rgba(0, 0, 0, 0.72);
+    }
+
+    @media (min-width: 1081px) {
+      .site-app-shell .topbar {
+        grid-template-columns: clamp(300px, 22vw, 430px) minmax(0, 1fr) 160px;
+      }
+    }
+
+    .site-app-shell .topbar-radio {
+      width: 160px;
+      min-width: 160px;
+      justify-self: end;
+      align-self: center;
+      padding: 0;
+      overflow: visible;
+      opacity: 1;
+    }
+
+    .site-app-shell .topbar-radio iframe {
+      width: 160px;
+      background: transparent;
+    }
+
+    @media (max-width: 820px) {
+      .site-app-shell .topbar-radio {
+        width: 160px;
+        min-width: 160px;
+        justify-self: end;
+      }
     }
 
     body.replay-analyzer-modal-open {
@@ -133,7 +162,7 @@
 
         <div class="topbar-radio" aria-label="Warzone Radio">
           <iframe
-            src="radio/"
+            src="radio/?v=20260828-1"
             title="Warzone Radio"
             loading="eager"
           ></iframe>

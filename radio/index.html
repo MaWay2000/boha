@@ -5,7 +5,7 @@
 <title>Warzone Radio</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>
-window.ASSET_VERSION = "20260319-logorandomfade1";
+window.ASSET_VERSION = "20260828-restored-player1";
 window.versionedAsset = function(path) {
   return path + "?v=" + window.ASSET_VERSION;
 };
@@ -15,6 +15,109 @@ stylesheet.rel = "stylesheet";
 stylesheet.href = window.versionedAsset("styles.css");
 document.head.appendChild(stylesheet);
 </script>
+<style>
+.wrap.is-player-hidden {
+  top: 0 !important;
+  right: 25px !important;
+  left: auto !important;
+}
+
+.wrap.is-player-hidden .logo-button {
+  right: -25px;
+  left: auto;
+  opacity: 0.5;
+}
+
+.wrap:not(.is-player-hidden) {
+  top: 75px !important;
+  right: auto !important;
+  left: 40px !important;
+}
+
+.settings-head {
+  position: relative;
+  justify-content: center;
+  min-height: 32px;
+}
+
+.settings-head > div,
+.settings-title-row {
+  width: 100%;
+}
+
+.settings-title {
+  display: none;
+}
+
+.settings-title-row {
+  justify-content: center;
+}
+
+.settings-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.wrap.is-player-hidden .settings-panel.is-open {
+  position: fixed;
+  top: 150px;
+  bottom: 16px;
+  right: auto;
+  left: 50%;
+  display: block !important;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  max-height: none;
+  transform: translateX(-50%);
+}
+
+.wrap:not(.is-player-hidden) .settings-panel.is-open {
+  position: fixed;
+  top: 150px;
+  bottom: 16px;
+  right: auto;
+  left: 50%;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 32px));
+  max-height: none;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 400px) {
+  .wrap.is-player-hidden {
+    right: 8px !important;
+  }
+
+  .wrap.is-player-hidden .logo-button {
+    right: 0;
+  }
+
+  .wrap:not(.is-player-hidden) {
+    top: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    width: 100%;
+  }
+
+  .wrap:not(.is-player-hidden) .logo-button {
+    top: 70px;
+    right: auto;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .wrap:not(.is-player-hidden) .player {
+    box-sizing: border-box;
+    width: calc(100vw - 24px);
+    margin: 140px auto 0;
+  }
+
+  .wrap:not(.is-player-hidden) .settings-panel.is-open {
+    top: 260px;
+  }
+}
+</style>
 </head>
 <body>
 
@@ -66,7 +169,6 @@ document.head.appendChild(stylesheet);
  <div class="settings-panel" id="settingsPanel" aria-hidden="true">
   <div class="settings-head">
    <div>
-    <div class="settings-kicker">Warzone Radio</div>
     <div class="settings-title-row">
      <div class="settings-title" id="settingsTitle">All Tracks</div>
      <button class="shuffle-toggle" id="shuffleToggle" type="button" onclick="toggleShuffleMode()" aria-pressed="false">

@@ -381,6 +381,9 @@ function setSettingsOpen(nextState) {
   settingsPanel.classList.toggle("is-open", settingsOpen);
   settingsButton.classList.toggle("is-open", settingsOpen);
   settingsPanel.setAttribute("aria-hidden", String(!settingsOpen));
+  if (logoToggle) {
+    logoToggle.setAttribute("aria-expanded", String(settingsOpen));
+  }
 
   if (window !== window.parent) {
     window.parent.postMessage(
@@ -395,11 +398,17 @@ function setSettingsOpen(nextState) {
 }
 
 function toggleSettingsPanel() {
-  setSettingsOpen(!settingsOpen);
+  if (settingsOpen) {
+    closeSettingsPanel();
+  } else {
+    setPlayerBarVisible(true);
+    setSettingsOpen(true);
+  }
 }
 
 function closeSettingsPanel() {
   setSettingsOpen(false);
+  setPlayerBarVisible(false);
 }
 
 window.addEventListener("message", (event) => {
@@ -1160,7 +1169,7 @@ document.addEventListener("keydown", unlockAudio);
         return;
       }
 
-      togglePlayerBar();
+      toggleSettingsPanel();
     });
   }
 

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Cell Background Options</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #070b11;
+      color: #d9e9f8;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    .sample {
+      position: relative;
+      width: 900px;
+      height: 110px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, var(--tone-a), var(--tone-b) 58%, var(--tone-c)),
+        var(--base);
+    }
+    .sample::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.035), transparent 42%),
+        repeating-linear-gradient(135deg, transparent 0 24px, rgba(120,93,185,.035) 24px 48px);
+      pointer-events: none;
+    }
+    .top-glimpse {
+      height: 24px;
+      border-bottom: 1px solid rgba(57, 206, 255, .25);
+      background:
+        linear-gradient(90deg, rgba(4,12,18,.9), rgba(12,27,37,.8)),
+        repeating-linear-gradient(90deg, transparent 0 145px, rgba(96,220,255,.14) 145px 147px);
+    }
+    .strip {
+      position: relative;
+      display: grid;
+      grid-template-columns: 330px max-content max-content minmax(0,1fr) max-content;
+      align-items: center;
+      height: 58px;
+      border-top: 1px solid rgba(154, 81, 255, .86);
+      border-bottom: 1px solid rgba(154, 81, 255, .92);
+      box-shadow: inset 0 1px rgba(255,255,255,.04), 0 0 12px rgba(121,55,225,.32);
+    }
+    .search-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 100%;
+      padding: 0 13px;
+      border-right: 1px solid rgba(175,126,255,.19);
+    }
+    .label, .meta-label {
+      color: #ffd76f;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      white-space: nowrap;
+    }
+    .search-box {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      height: 30px;
+      padding: 0 12px;
+      border: 1px solid rgba(255,213,106,.7);
+      border-radius: 18px;
+      background: rgba(31,25,10,.68);
+      box-shadow: 0 0 13px rgba(255,213,106,.09);
+      color: #f1f5fa;
+      font-size: 15px;
+    }
+    .clear {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      margin-left: auto;
+      border: 1px solid rgba(255,213,106,.7);
+      border-radius: 50%;
+      color: #ffd76f;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .meta {
+      height: 100%;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 14px;
+      border-right: 1px solid rgba(175,126,255,.15);
+      white-space: nowrap;
+    }
+    .meta-label { color: #8592ad; font-size: 10px; }
+    .meta strong { color: #f0f1f7; font-size: 16px; }
+    .meta em { color: #b267ef; font-size: 11px; font-style: normal; }
+    .option-name {
+      position: absolute;
+      right: 10px;
+      bottom: 5px;
+      z-index: 2;
+      padding: 2px 6px;
+      border: 1px solid rgba(125,214,255,.22);
+      border-radius: 4px;
+      background: rgba(3,7,11,.76);
+      color: rgba(178,225,255,.88);
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .bottom-glimpse {
+      height: 28px;
+      background: linear-gradient(180deg, rgba(7,18,27,.92), #060a10);
+      border-top: 1px solid rgba(37,184,226,.18);
+    }
+  </style>
+</head>
+<body>
+  <div class="sample">
+    <div class="top-glimpse"></div>
+    <div class="strip">
+      <div class="search-cell">
+        <span class="label">PLAYER SEARCH:</span>
+        <div class="search-box">ram <span class="clear">×</span></div>
+      </div>
+      <div class="meta"><span class="meta-label">RANKED PLAYERS</span><strong>315</strong></div>
+      <div class="meta"><span class="meta-label">MATCHES</span><strong>1311</strong></div>
+      <div class="meta"><span class="meta-label">LATEST MATCH</span><strong>Aug 13, 2026</strong><em>Opa-Shtorm-A-FB</em></div>
+      <div></div>
+    </div>
+    <div class="bottom-glimpse"></div>
+    <div class="option-name" id="optionName"></div>
+  </div>
+  <script>
+    const options = {
+      dark01: ["Dark 01 · Coal", "#07090d", "rgba(7,9,13,.98)", "rgba(14,14,18,.96)", "rgba(5,7,10,.98)"],
+      dark02: ["Dark 02 · Blue Black", "#040a10", "rgba(3,9,15,.98)", "rgba(7,16,25,.96)", "rgba(3,7,12,.98)"],
+      dark03: ["Dark 03 · Deep Navy", "#06101d", "rgba(5,13,25,.98)", "rgba(8,22,39,.96)", "rgba(5,10,20,.98)"],
+      dark04: ["Dark 04 · Smoked Brown", "#110b09", "rgba(18,10,7,.98)", "rgba(28,16,10,.95)", "rgba(12,8,8,.98)"],
+      dark05: ["Dark 05 · Carbon Violet", "#0e0916", "rgba(12,7,20,.98)", "rgba(22,12,33,.95)", "rgba(9,7,16,.98)"],
+      color01: ["Color 01 · Midnight Blue", "#071728", "rgba(5,20,36,.96)", "rgba(12,37,59,.93)", "rgba(6,17,31,.97)"],
+      color02: ["Color 02 · Steel Blue", "#102536", "rgba(12,31,46,.95)", "rgba(22,54,70,.92)", "rgba(10,24,37,.97)"],
+      color03: ["Color 03 · Deep Cyan", "#06252b", "rgba(4,31,37,.95)", "rgba(9,57,63,.91)", "rgba(4,25,31,.97)"],
+      color04: ["Color 04 · Forest Teal", "#08221e", "rgba(5,29,24,.96)", "rgba(12,50,42,.92)", "rgba(5,23,21,.98)"],
+      color05: ["Color 05 · Command Olive", "#22200d", "rgba(31,29,10,.95)", "rgba(53,49,18,.91)", "rgba(23,22,9,.97)"],
+      color06: ["Color 06 · Burnt Umber", "#28150b", "rgba(39,18,8,.95)", "rgba(66,31,14,.91)", "rgba(29,13,8,.98)"],
+      color07: ["Color 07 · Crimson Black", "#290b11", "rgba(40,7,14,.95)", "rgba(66,15,25,.91)", "rgba(28,7,12,.98)"],
+      color08: ["Color 08 · Burgundy", "#260d22", "rgba(38,9,31,.95)", "rgba(63,18,49,.91)", "rgba(27,8,24,.98)"],
+      color09: ["Color 09 · Imperial Purple", "#1b0e30", "rgba(27,9,48,.95)", "rgba(49,22,74,.91)", "rgba(20,8,37,.98)"],
+      color10: ["Color 10 · Slate Gray", "#1e252e", "rgba(25,32,40,.96)", "rgba(43,52,63,.92)", "rgba(20,26,33,.98)"]
+    };
+    const key = new URLSearchParams(location.search).get("v") || "dark01";
+    const selected = options[key] || options.dark01;
+    const root = document.documentElement;
+    root.style.setProperty("--base", selected[1]);
+    root.style.setProperty("--tone-a", selected[2]);
+    root.style.setProperty("--tone-b", selected[3]);
+    root.style.setProperty("--tone-c", selected[4]);
+    document.getElementById("optionName").textContent = selected[0];
+  </script>
+</body>
+</html>

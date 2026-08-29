@@ -1245,6 +1245,10 @@ main {
   min-width: 0;
   margin: 0;
   padding: 4px 10px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 42%),
+    repeating-linear-gradient(135deg, transparent 0 24px, rgba(120, 93, 185, 0.035) 24px 48px),
+    linear-gradient(90deg, rgba(7, 9, 13, 0.98), rgba(14, 14, 18, 0.96) 58%, rgba(5, 7, 10, 0.98));
 }
 
 .stats-summary .stats-search-field + .stats-card {

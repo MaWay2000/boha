@@ -79,10 +79,18 @@ const PLAYER_GAME_RESULT_ORDER = {
 
 const statusElement = document.getElementById("resultsStatus");
 const summaryElement = document.getElementById("statsSummary");
+const gamesFilterControlElement = document.getElementById("statsGamesFilterControl");
+const gamesFilterMenuElement = document.getElementById("statsGamesFilterMenu");
+const gamesFilterClearElement = document.getElementById("statsGamesFilterClear");
+const gamesFilterCloseElement = document.getElementById("statsGamesFilterClose");
+const trendingFilterMenuElement = document.getElementById("statsTrendingFilterMenu");
+const trendingFilterCloseElement = document.getElementById("statsTrendingFilterClose");
 const buttonsElement = document.getElementById("statsLeaderboardButtons");
 const ranksElement = document.getElementById("statsRanks");
 const rankActionsElement = document.getElementById("statsRanksActions");
 const playerGamesTitleElement = document.getElementById("statsPlayerGamesTitle");
+const playerRecentLabelElement = document.getElementById("statsPlayerRecentLabel");
+const playerRecentTableElement = document.getElementById("statsPlayerRecentTable");
 const playerGamesMetaElement = document.getElementById("statsPlayerGamesMeta");
 const playerProfileElement = document.getElementById("statsPlayerProfile");
 const playerComparisonElement = document.getElementById("statsPlayerComparison");
@@ -2430,6 +2438,13 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   const profileHeadingLabel = document.querySelector(".stats-player-profile-heading-line .panel-kicker");
   const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
   const selectedAccount = globalAccounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
+  const hasSelectedPlayer = Boolean(activeAccount || selectedAccount);
+  if (playerRecentLabelElement) {
+    playerRecentLabelElement.hidden = !hasSelectedPlayer;
+  }
+  if (playerRecentTableElement) {
+    playerRecentTableElement.hidden = !hasSelectedPlayer;
+  }
   if (!activeAccount && selectedAccount) {
     if (profileHeadingLabel) {
       profileHeadingLabel.innerHTML = `<span class="stats-player-profile-heading-name">${escapeHtml(selectedAccount.name || "Player")}</span>`;
@@ -3010,6 +3025,12 @@ function renderSummary(accountList, gameList) {
     if (playerSearchFieldElement) {
       summaryElement.prepend(playerSearchFieldElement);
     }
+    if (gamesFilterControlElement) {
+      summaryElement.append(gamesFilterControlElement);
+    }
+    if (trendingFilterMenuElement) {
+      summaryElement.append(trendingFilterMenuElement);
+    }
     return;
   }
 
@@ -3036,6 +3057,12 @@ function renderSummary(accountList, gameList) {
   `;
   if (playerSearchFieldElement) {
     summaryElement.prepend(playerSearchFieldElement);
+  }
+  if (gamesFilterControlElement) {
+    summaryElement.querySelectorAll(".stats-card")[1]?.after(gamesFilterControlElement);
+  }
+  if (trendingFilterMenuElement) {
+    summaryElement.querySelector(".stats-card")?.after(trendingFilterMenuElement);
   }
   if (statusElement) {
     statusElement.classList.add("stats-card", "stats-update-card");
@@ -3591,6 +3618,9 @@ function updateActiveButtons() {
 
   buttonsElement.closest(".stats-leaderboard-filter-menu")
     ?.classList.toggle("has-active-filter", selectedLeaderboard !== "Global");
+  if (gamesFilterClearElement) {
+    gamesFilterClearElement.hidden = selectedLeaderboard === "Global";
+  }
   buttonsElement.querySelectorAll(".stats-filter-button").forEach((button) => {
     button.classList.toggle("is-active", button.dataset.leaderboard === selectedLeaderboard);
   });
@@ -3650,6 +3680,28 @@ function renderButtons() {
 
   updateActiveButtons();
 }
+
+gamesFilterClearElement?.addEventListener("click", () => {
+  if (selectedLeaderboard === "Global") {
+    return;
+  }
+
+  selectedLeaderboard = "Global";
+  visiblePlayerCount = INITIAL_PLAYER_LIMIT;
+  visibleMatchCount = INITIAL_MATCH_LIMIT;
+  resetPlayerGamesView();
+  gamesFilterMenuElement?.removeAttribute("open");
+  updateActiveButtons();
+  render();
+});
+
+gamesFilterCloseElement?.addEventListener("click", () => {
+  gamesFilterMenuElement?.removeAttribute("open");
+});
+
+trendingFilterCloseElement?.addEventListener("click", () => {
+  trendingFilterMenuElement?.removeAttribute("open");
+});
 
 if (playerSearchElement) {
   playerSearchElement.addEventListener("input", (event) => {

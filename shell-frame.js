@@ -21,6 +21,7 @@ function getPageSearchParams() {
   const url = new URL(window.location.href);
   const params = new URLSearchParams(url.search);
   params.delete("tab");
+  params.delete("_framev");
   return params;
 }
 
@@ -72,6 +73,9 @@ function buildFrameUrl(tab, params = getPageSearchParams()) {
   const tabConfig = tabs[normalizedTab];
   const url = new URL(tabConfig.href, window.location.href);
   url.search = params.toString();
+  if (normalizedTab === "leaderboards") {
+    url.searchParams.set("_framev", "20260909-replay-analyzer");
+  }
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
@@ -80,6 +84,7 @@ function updateLocation(tab, replace = false, search = null) {
   const params = search === null
     ? getPageSearchParams()
     : new URLSearchParams(String(search).replace(/^\?/, ""));
+  params.delete("_framev");
 
   url.search = params.toString();
   if (tab === "leaderboards" || (tab === "compare" && url.searchParams.has("C"))) {

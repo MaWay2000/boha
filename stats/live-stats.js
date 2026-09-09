@@ -3854,6 +3854,22 @@ window.addEventListener("beforeunload", () => {
   }
 });
 
+document.addEventListener("click", (event) => {
+  const replayLink = event.target.closest(".stats-replay-link[data-replay-analyzer-url]");
+  if (!replayLink || window.parent === window) {
+    return;
+  }
+
+  event.preventDefault();
+  window.parent.postMessage(
+    {
+      type: "boha:open-replay-analyzer",
+      replayUrl: replayLink.dataset.replayAnalyzerUrl
+    },
+    window.location.origin
+  );
+});
+
 async function init() {
   applyStateFromUrl();
   setupSortHeaders();

@@ -688,31 +688,6 @@
         }
       });
 
-      function attachReplayLinkHandler() {
-        const frameDocument = contentFrame.contentDocument;
-        if (!frameDocument || frameDocument.documentElement.dataset.replayLinkHandlerAttached) {
-          return;
-        }
-
-        frameDocument.documentElement.dataset.replayLinkHandlerAttached = "true";
-        frameDocument.addEventListener("click", (event) => {
-          const replayLink = event.target.closest?.(
-            ".stats-replay-link[data-replay-analyzer-url]"
-          );
-          if (!replayLink) {
-            return;
-          }
-
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          const replayUrl = replayLink.dataset.replayAnalyzerUrl;
-          openReplayAnalyzer(replayUrl, replaySourceForUrl(replayUrl));
-        }, true);
-      }
-
-      contentFrame.addEventListener("load", attachReplayLinkHandler);
-      attachReplayLinkHandler();
-
       window.addEventListener("message", (event) => {
         if (
           event.origin !== window.location.origin

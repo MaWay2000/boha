@@ -716,7 +716,6 @@
       window.addEventListener("message", (event) => {
         if (
           event.origin !== window.location.origin
-          || event.source !== contentFrame.contentWindow
           || event.data?.type !== "boha:open-replay-analyzer"
         ) {
           return;

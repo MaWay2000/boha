@@ -554,7 +554,7 @@
 
     let detailMatch = null;
     try {
-      const detailResponse = await fetch(`https://onit.lt/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`, {
+      const detailResponse = await fetch(`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`, {
         cache: "no-store"
       });
       if (detailResponse.ok) {

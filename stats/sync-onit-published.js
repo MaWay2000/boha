@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-const PUBLISH_ORIGIN = "https://onit.lt/wzstats/data/";
+const PUBLISH_ORIGIN = "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/";
 const OUTPUT_DIR = path.join(__dirname, "published");
 const MANIFEST_NAME = "manifest.json";
 const ALLOWED_FILES = new Set(["matches.json", "leaderboards.json"]);

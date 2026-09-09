@@ -74,7 +74,7 @@ function buildFrameUrl(tab, params = getPageSearchParams()) {
   const url = new URL(tabConfig.href, window.location.href);
   url.search = params.toString();
   if (normalizedTab === "leaderboards") {
-    url.searchParams.set("_framev", "20260909-replay-analyzer-3");
+    url.searchParams.set("_framev", "20260909-replay-analyzer-4");
   }
   return `${url.pathname}${url.search}${url.hash}`;
 }

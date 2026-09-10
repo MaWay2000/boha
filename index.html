@@ -156,7 +156,7 @@
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
             <a href="recent-matches.html" target="contentFrame" data-tab="recent-matches">Recent Matches</a>
             <a href="compare.html" target="contentFrame" data-tab="compare">Compare Players</a>
-            <a href="replay-analyzer.html?v=20260910-popup-2" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
+            <a href="replay-analyzer.html?v=20260910-popup-3" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
           </span>
         </nav>
 
@@ -398,15 +398,19 @@
 
         previousFocus = document.activeElement;
         pendingReplayUrl = replayUrl.href;
-        const sourceLabel = typeof source === "string" ? source : source?.label || "";
-        const sourceUrl = typeof source === "object" ? source?.url || "" : "";
+        const isBohanReplay = replayUrl.origin === "https://warzone2100.retropaganda.info"
+          && replayUrl.pathname.startsWith("/replays/");
+        const sourceLabel = (typeof source === "string" ? source : source?.label || "")
+          || (isBohanReplay ? "Bohan / Retropaganda" : "");
+        const sourceUrl = (typeof source === "object" ? source?.url || "" : "")
+          || (isBohanReplay ? "https://warzone2100.retropaganda.info/" : "");
         pendingReplaySource = {
           label: sourceLabel,
           url: sourceUrlForLabel(sourceLabel, sourceUrl, replayUrl.href)
         };
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = `replay-analyzer.html?v=20260910-popup-2&replay=${encodeURIComponent(pendingReplayUrl)}`;
+        modalFrame.src = `replay-analyzer.html?v=20260910-popup-3&replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 
@@ -427,6 +431,10 @@
           }
 
           .replay-analyzer-intro {
+            display: none;
+          }
+
+          .replay-analyzer-grid {
             display: none;
           }
 
@@ -714,7 +722,10 @@
           return;
         }
 
-        openReplayAnalyzer(event.data.replayUrl, replaySourceForUrl(event.data.replayUrl));
+        const source = event.data.sourceLabel || event.data.sourceUrl
+          ? { label: event.data.sourceLabel || "", url: event.data.sourceUrl || "" }
+          : replaySourceForUrl(event.data.replayUrl);
+        openReplayAnalyzer(event.data.replayUrl, source);
       });
 
       const linkedReplayUrl = new URLSearchParams(window.location.search).get("replay");

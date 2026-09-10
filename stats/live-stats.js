@@ -791,6 +791,28 @@ function normalizeReplayUrl(url) {
   return String(url || "").replace(/^http:\/\//i, "https://");
 }
 
+const BOHAN_SOURCE_URL = "https://warzone2100.retropaganda.info/";
+
+function getReplaySource(game) {
+  const sourceMatchId = String(game?.sourceMatchId || "").trim();
+  const isBohan = String(game?.source || "").toLowerCase() === "bohan"
+    || /Bohan|Retropaganda/i.test(String(game?.sourceLabel || ""));
+
+  if (isBohan && /^\d+$/.test(sourceMatchId)) {
+    return {
+      replayUrl: `${BOHAN_SOURCE_URL}replays/${encodeURIComponent(sourceMatchId)}.wzrp`,
+      label: game?.sourceLabel || "Bohan / Retropaganda",
+      pageUrl: BOHAN_SOURCE_URL
+    };
+  }
+
+  return {
+    replayUrl: normalizeReplayUrl(game?.replayUrl),
+    label: game?.sourceLabel || "",
+    pageUrl: ""
+  };
+}
+
 function getReplayAnalyzerUrl(replayUrl) {
   const analyzerUrl = new URL("index.html", window.location.href);
   analyzerUrl.search = new URLSearchParams({ replay: normalizeReplayUrl(replayUrl) }).toString();
@@ -2557,7 +2579,8 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       const eloDeltaLabel = hasEloDelta
         ? `${eloDelta > 0 ? "+" : ""}${eloDelta.toFixed(2)}`
         : "";
-      const replayUrl = game.replayUrl ? normalizeReplayUrl(game.replayUrl) : "";
+      const replaySource = getReplaySource(game);
+      const replayUrl = replaySource.replayUrl;
       const gameKey = getPlayerGameKey(game);
       const isExpanded = activeExpandedPlayerGameKey === gameKey;
       const detailRow = isExpanded
@@ -2612,7 +2635,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td>
             ${replayUrl
-              ? `<a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}">Analyze</a>`
+              ? `<a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a>`
               : `<span class="stats-note">Unavailable</span>`}
           </td>
         </tr>
@@ -3042,7 +3065,8 @@ function renderSummary(accountList, gameList) {
 
   const rankedPlayers = accountList.filter((account) => !account.discounted);
   const latestMatch = gameList[0];
-  const latestReplayUrl = latestMatch?.replayUrl ? normalizeReplayUrl(latestMatch.replayUrl) : "";
+  const latestReplaySource = latestMatch ? getReplaySource(latestMatch) : null;
+  const latestReplayUrl = latestReplaySource?.replayUrl || "";
 
   summaryElement.innerHTML = `
     <article class="stats-card">
@@ -3057,7 +3081,7 @@ function renderSummary(accountList, gameList) {
       <span class="stats-card-label">Latest Match</span>
       <strong class="stats-card-value">${latestMatch ? formatShortDate(latestMatch.endDate) : "--"}</strong>
       ${latestReplayUrl
-        ? `<a class="stats-player-note stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(latestReplayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(latestReplayUrl)}" aria-label="Analyze latest match on ${escapeHtml(latestMatch.mapName || "Unknown map")}">${escapeHtml(latestMatch.mapName || "Unknown map")}</a>`
+        ? `<a class="stats-player-note stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(latestReplayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(latestReplayUrl)}" data-replay-source-label="${escapeHtml(latestReplaySource.label)}" data-replay-source-url="${escapeHtml(latestReplaySource.pageUrl)}" aria-label="Analyze latest match on ${escapeHtml(latestMatch.mapName || "Unknown map")}">${escapeHtml(latestMatch.mapName || "Unknown map")}</a>`
         : `<span class="stats-player-note">${escapeHtml(latestMatch ? latestMatch.mapName : "Unknown map")}</span>`}
     </article>
   `;
@@ -3414,6 +3438,7 @@ function renderMatches(gameList) {
 
   matchesElement.innerHTML = rows
     .map((game) => {
+      const replaySource = getReplaySource(game);
       return `
         <tr>
           <td class="stats-date">
@@ -3432,7 +3457,7 @@ function renderMatches(gameList) {
           })}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td><span class="stats-note">${escapeHtml(game.sourceLabel || "Legacy")}</span></td>
-          <td><a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(game.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Analyze</a></td>
+          <td><a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replaySource.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replaySource.replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a></td>
         </tr>
       `;
     })
@@ -3870,7 +3895,9 @@ document.addEventListener("click", (event) => {
   window.parent.postMessage(
     {
       type: "boha:open-replay-analyzer",
-      replayUrl: replayLink.dataset.replayAnalyzerUrl
+      replayUrl: replayLink.dataset.replayAnalyzerUrl,
+      sourceLabel: replayLink.dataset.replaySourceLabel || "",
+      sourceUrl: replayLink.dataset.replaySourceUrl || ""
     },
     window.location.origin
   );

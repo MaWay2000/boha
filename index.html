@@ -131,6 +131,11 @@
       height: 100%;
       border: 0;
       background: #07131d;
+      visibility: hidden;
+    }
+
+    .replay-analyzer-modal-frame.is-ready {
+      visibility: visible;
     }
 
   </style>
@@ -156,7 +161,7 @@
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
             <a href="recent-matches.html" target="contentFrame" data-tab="recent-matches">Recent Matches</a>
             <a href="compare.html" target="contentFrame" data-tab="compare">Compare Players</a>
-            <a href="replay-analyzer.html?v=20260910-popup-3" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
+            <a href="replay-analyzer.html?v=20260910-popup-4" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
           </span>
         </nav>
 
@@ -353,6 +358,7 @@
       function closeReplayAnalyzer() {
         modal.hidden = true;
         document.body.classList.remove("replay-analyzer-modal-open");
+        modalFrame.classList.remove("is-ready");
         pendingReplayUrl = "";
         pendingReplaySource = { label: "", url: "" };
         modalFrame.src = "about:blank";
@@ -408,9 +414,10 @@
           label: sourceLabel,
           url: sourceUrlForLabel(sourceLabel, sourceUrl, replayUrl.href)
         };
+        modalFrame.classList.remove("is-ready");
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = `replay-analyzer.html?v=20260910-popup-3&replay=${encodeURIComponent(pendingReplayUrl)}`;
+        modalFrame.src = `replay-analyzer.html?v=20260910-popup-4&replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 
@@ -611,6 +618,15 @@
           }
         `;
         frameDocument.head.append(modalStyles);
+        window.requestAnimationFrame(() => {
+          if (
+            pendingReplayUrl
+            && !modal.hidden
+            && modalFrame.contentDocument === frameDocument
+          ) {
+            modalFrame.classList.add("is-ready");
+          }
+        });
 
         const summaryGrid = frameDocument.getElementById("replaySummary");
         if (summaryGrid) {

@@ -156,7 +156,7 @@
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
             <a href="recent-matches.html" target="contentFrame" data-tab="recent-matches">Recent Matches</a>
             <a href="compare.html" target="contentFrame" data-tab="compare">Compare Players</a>
-            <a href="replay-analyzer.html?v=20260824-47" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
+            <a href="replay-analyzer.html?v=20260910-popup-1" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
           </span>
         </nav>
 
@@ -359,6 +359,12 @@
         if (previousFocus) {
           previousFocus.focus();
         }
+
+        const pageUrl = new URL(window.location.href);
+        if (pageUrl.searchParams.has("replay")) {
+          pageUrl.searchParams.delete("replay");
+          window.history.replaceState(null, "", pageUrl);
+        }
       }
 
       function replaySourceForUrl(value) {
@@ -400,7 +406,7 @@
         };
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = `replay-analyzer.html?v=20260824-47&replay=${encodeURIComponent(pendingReplayUrl)}`;
+        modalFrame.src = `replay-analyzer.html?v=20260910-popup-1&replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 
@@ -698,6 +704,11 @@
 
         openReplayAnalyzer(event.data.replayUrl, replaySourceForUrl(event.data.replayUrl));
       });
+
+      const linkedReplayUrl = new URLSearchParams(window.location.search).get("replay");
+      if (linkedReplayUrl) {
+        openReplayAnalyzer(linkedReplayUrl);
+      }
 
       modal.addEventListener("click", (event) => {
         if (event.target === modal) {

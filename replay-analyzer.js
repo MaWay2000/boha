@@ -30,6 +30,7 @@
   const eventPlayer = document.getElementById("replayEventPlayer");
   const eventSearch = document.getElementById("replayEventSearch");
   const battlefieldPanel = document.getElementById("replayBattlefieldPanel");
+  const battlefieldUnsupported = battlefieldPanel.querySelector(".replay-battlefield-unsupported span");
   const battlefieldMeta = document.getElementById("replayBattlefieldMeta");
   const battlefieldPlay = document.getElementById("replayBattlefieldPlay");
   const battlefieldSpeed = document.getElementById("replayBattlefieldSpeed");
@@ -553,6 +554,7 @@
     }
 
     let detailMatch = null;
+    let detailError = "";
     try {
       const detailResponse = await fetch(`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`, {
         cache: "no-store"
@@ -565,9 +567,12 @@
           detailMatch?.telemetry?.engineAnalysis,
           detailMatch?.players
         );
+      } else {
+        detailError = `Battlefield telemetry is temporarily unavailable (HTTP ${detailResponse.status}).`;
       }
     } catch (error) {
       detailMatch = null;
+      detailError = "Battlefield telemetry is temporarily unavailable.";
     }
 
     const players = Array.isArray(detailMatch?.players) ? detailMatch.players : (match.players || []);
@@ -579,6 +584,7 @@
         : null,
       partialStats: true,
       engineAnalysis: detailMatch?.telemetry?.engineAnalysis || null,
+      detailError,
       playerData: players.map((player) => {
         const hasReplayEngineStats = player.stats_source === "replay-engine";
         let rawPlayer = {};
@@ -682,6 +688,7 @@
         }
       : null;
     extraction.engineAnalysis = publishedResult?.engineAnalysis || null;
+    extraction.battlefieldPreviewError = publishedResult?.detailError || "";
   }
 
   function decodeGameTime(payload) {
@@ -3578,6 +3585,15 @@
     battlefieldAnimationFrame = requestAnimationFrame(animateBattlefield);
   }
 
+  function autoplayBattlefieldWhenReady() {
+    if (!battlefieldFrames.length) return;
+    if (battlefield3dLoading) {
+      battlefield3dResumeAfterLoading = true;
+      return;
+    }
+    startBattlefieldPlayback();
+  }
+
   function setBattlefield3dLoading(isLoading) {
     const nextLoading = Boolean(isLoading);
     if (nextLoading) {
@@ -5913,11 +5929,13 @@
       : [];
     const battlefieldPositionFrames = positionFrames.filter((frame) => !frame.eventsOnly);
 
-    const previewSupported = Boolean(extraction.battlefieldPreviewSupported);
-    battlefieldPanel.classList.toggle("is-unsupported", !previewSupported);
-    battlefieldPanel.hidden = previewSupported && battlefieldPositionFrames.length === 0;
-    if (battlefieldPositionFrames.length && previewSupported) {
-      renderBattlefield(extraction, tacticalReplay, previewSupported);
+    const previewRequested = Boolean(extraction.battlefieldPreviewSupported);
+    const previewAvailable = previewRequested && battlefieldPositionFrames.length > 0;
+    battlefieldPanel.classList.toggle("is-unsupported", !previewAvailable);
+    battlefieldPanel.hidden = !previewRequested && battlefieldPositionFrames.length === 0;
+    if (previewAvailable) {
+      battlefieldUnsupported.textContent = "Not Supported";
+      renderBattlefield(extraction, tacticalReplay, true);
     } else {
       stopBattlefieldPlayback();
       resetBattlefield3dReplay();
@@ -5935,6 +5953,11 @@
       battlefieldSpriteCache.clear();
       battlefieldSpriteBufferGeneration += 1;
       battlefieldSpriteBufferScheduled = false;
+      const unavailableMessage = extraction.battlefieldPreviewError
+        || (previewRequested ? "Battlefield telemetry unavailable" : "Not Supported");
+      battlefieldUnsupported.textContent = unavailableMessage;
+      battlefieldMeta.textContent = extraction.battlefieldPreviewError || "";
+      battlefieldStatus.textContent = unavailableMessage;
       if (battlefieldPositionFrames.length) {
         battlefieldMeta.textContent = "Battlefield preview is not supported for uploaded replays";
         battlefieldStatus.textContent = "Not Supported";
@@ -6226,6 +6249,7 @@
       attachPublishedPlayerStats(latestExtraction, publishedResult);
       latestExtraction.battlefieldPreviewSupported = Boolean(allowPublishedBattlefield && publishedResult);
       renderExtraction(latestExtraction);
+      autoplayBattlefieldWhenReady();
       setStatus("");
     } catch (error) {
       const corsHint = error instanceof TypeError

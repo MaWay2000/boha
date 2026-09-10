@@ -1,4 +1,4 @@
-import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20260827-1";
+import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20260830-showall2";
 
 const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
 const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");
@@ -789,6 +789,12 @@ function getLatestEndDate(results) {
 
 function normalizeReplayUrl(url) {
   return String(url || "").replace(/^http:\/\//i, "https://");
+}
+
+function getReplayAnalyzerUrl(replayUrl) {
+  const analyzerUrl = new URL("index.html", window.location.href);
+  analyzerUrl.search = new URLSearchParams({ replay: normalizeReplayUrl(replayUrl) }).toString();
+  return analyzerUrl.href;
 }
 
 function formatDate(value) {
@@ -1839,7 +1845,7 @@ function renderComparisonOpponentLinks(account, opponents, side) {
     }
     comparisonUrl.search = params.toString();
     const comparisonLabel = `Compare ${account.name || "Unknown"} with ${opponent.name}`;
-    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}">${escapeHtml(opponent.name)} <small>${opponent.count}</small><span class="stats-profile-link-hint" aria-hidden="true">${escapeHtml(comparisonLabel)}</span></a>`;
+    return `<a class="stats-profile-chip stats-profile-compare-link" href="${escapeHtml(comparisonUrl.href)}" target="_parent" aria-label="${escapeHtml(comparisonLabel)}">${escapeHtml(opponent.name)} <small>${opponent.count}</small></a>`;
   }).join("");
 }
 
@@ -2606,7 +2612,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td>
             ${replayUrl
-              ? `<a class="stats-replay-link" href="replay-analyzer.html?v=20260824-47&amp;replay=${encodeURIComponent(replayUrl)}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}">Analyze</a>`
+              ? `<a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}">Analyze</a>`
               : `<span class="stats-note">Unavailable</span>`}
           </td>
         </tr>
@@ -3051,7 +3057,7 @@ function renderSummary(accountList, gameList) {
       <span class="stats-card-label">Latest Match</span>
       <strong class="stats-card-value">${latestMatch ? formatShortDate(latestMatch.endDate) : "--"}</strong>
       ${latestReplayUrl
-        ? `<a class="stats-player-note stats-replay-link" href="replay-analyzer.html?v=20260824-47&amp;replay=${encodeURIComponent(latestReplayUrl)}" target="_top" data-replay-analyzer-url="${escapeHtml(latestReplayUrl)}" aria-label="Analyze latest match on ${escapeHtml(latestMatch.mapName || "Unknown map")}">${escapeHtml(latestMatch.mapName || "Unknown map")}</a>`
+        ? `<a class="stats-player-note stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(latestReplayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(latestReplayUrl)}" aria-label="Analyze latest match on ${escapeHtml(latestMatch.mapName || "Unknown map")}">${escapeHtml(latestMatch.mapName || "Unknown map")}</a>`
         : `<span class="stats-player-note">${escapeHtml(latestMatch ? latestMatch.mapName : "Unknown map")}</span>`}
     </article>
   `;
@@ -3426,7 +3432,7 @@ function renderMatches(gameList) {
           })}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
           <td><span class="stats-note">${escapeHtml(game.sourceLabel || "Legacy")}</span></td>
-          <td><a class="stats-replay-link" href="replay-analyzer.html?v=20260824-47&amp;replay=${encodeURIComponent(normalizeReplayUrl(game.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Analyze</a></td>
+          <td><a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(game.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(normalizeReplayUrl(game.replayUrl))}">Analyze</a></td>
         </tr>
       `;
     })

@@ -137,9 +137,118 @@ function addPreviewStyles() {
       text-align: center;
       font-size: .78rem;
     }
+    .stats-favorite-unit-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 16px 16px;
+    }
+    .stats-favorite-unit-show-all,
+    .stats-favorite-unit-modal-close {
+      min-height: 38px;
+      padding: 0 16px;
+      border: 1px solid rgba(84, 225, 255, .48);
+      border-radius: 3px;
+      color: #bdf5ff;
+      background: linear-gradient(180deg, #123246, #04111c 62%);
+      clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px);
+      cursor: pointer;
+      font: 600 .75rem "Oxanium", sans-serif;
+    }
+    .stats-favorite-unit-show-all:hover,
+    .stats-favorite-unit-show-all:focus-visible {
+      color: #fff;
+      border-color: rgba(109, 232, 255, .82);
+      outline: none;
+      box-shadow: 0 0 14px rgba(73, 221, 247, .2);
+    }
+    .stats-favorite-unit-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(1, 7, 12, .86);
+      backdrop-filter: blur(7px);
+    }
+    .stats-favorite-unit-modal[hidden] { display: none; }
+    .stats-favorite-unit-modal-panel {
+      box-sizing: border-box;
+      display: flex;
+      width: min(1180px, calc(100vw - 40px));
+      max-height: calc(100vh - 40px);
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid rgba(109, 232, 255, .42);
+      border-radius: 12px;
+      background: #07131f;
+      box-shadow: 0 26px 80px rgba(0, 0, 0, .72), inset 0 1px 0 rgba(176, 246, 255, .12);
+    }
+    .stats-favorite-unit-modal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(109, 232, 255, .2);
+    }
+    .stats-favorite-unit-modal-title {
+      margin: 0;
+      color: #c8f8ff;
+      font: 700 1rem "Oxanium", sans-serif;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .stats-favorite-unit-modal-close {
+      flex: 0 0 auto;
+      color: #ffe0c4;
+      border-color: rgba(255, 144, 74, .72);
+      background: linear-gradient(180deg, #853f20, #421f17);
+    }
+    .stats-favorite-unit-modal-close:hover,
+    .stats-favorite-unit-modal-close:focus-visible {
+      color: #fff7ef;
+      border-color: #ffad73;
+      outline: none;
+      box-shadow: 0 0 14px rgba(255, 112, 48, .22);
+    }
+    .stats-favorite-unit-modal-gallery {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .stats-favorite-unit-modal-pager {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 0 16px 16px;
+    }
+    .stats-favorite-unit-modal-page {
+      min-width: 110px;
+      color: var(--steel);
+      text-align: center;
+      font: 600 .72rem "Oxanium", sans-serif;
+    }
+    .stats-favorite-unit-modal-page-button {
+      min-width: 96px;
+    }
+    .stats-favorite-unit-modal-page-button:disabled {
+      opacity: .38;
+      cursor: default;
+      box-shadow: none;
+    }
+    body.stats-favorite-unit-modal-open { overflow: hidden; }
     @media (max-width: 560px) {
       .stats-favorite-unit-gallery { grid-template-columns: repeat(5, minmax(138px, 1fr)); }
       .stats-favorite-unit-card { min-width: 138px; height: 154px; }
+      .stats-favorite-unit-modal { padding: 10px; }
+      .stats-favorite-unit-modal-panel {
+        width: calc(100vw - 20px);
+        max-height: calc(100vh - 20px);
+      }
+      .stats-favorite-unit-modal-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   `;
   document.head.appendChild(style);
@@ -376,6 +485,7 @@ function disposeGroup(group) {
 export function destroyFavoriteUnitPreview() {
   if (!activePreview) return;
   cancelAnimationFrame(activePreview.frameId);
+  activePreview.cleanup?.();
   activePreview.items.forEach((item) => {
     item.resizeObserver?.disconnect();
     disposeGroup(item.model);
@@ -413,7 +523,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
 
   window.PIES_BASE = PIES_BASE;
   window.TEX_BASE = TEX_BASE;
-  const preview = { items: [], frameId: 0, loadToken: 0 };
+  const preview = { items: [], frameId: 0, loadToken: 0, cleanup: null };
   activePreview = preview;
 
   const definitions = await loadDefinitions();
@@ -446,7 +556,6 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     const category = getFavoriteUnitCategory(unit, designs[index], definitions);
     categories.find((item) => item.key === category)?.indexes.push(index);
   });
-  categories.forEach((category) => { category.indexes = category.indexes.slice(0, 5); });
   if (activePreview !== preview) return;
 
   const clearItems = () => {
@@ -458,7 +567,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     preview.items = [];
   };
 
-  const createUnitCard = async (unitIndex, token) => {
+  const createUnitCard = async (unitIndex, token, targetGallery = gallery) => {
     const unit = favorites[unitIndex];
     const card = document.createElement("article");
     card.className = "stats-favorite-unit-card";
@@ -490,7 +599,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     count.textContent = `${Number(unit.count || 0).toLocaleString()} produced`;
     info.append(name, count);
     card.append(stage, info);
-    gallery.appendChild(card);
+    targetGallery.appendChild(card);
 
     const design = designs[unitIndex];
     if (!design) {
@@ -545,19 +654,130 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     }
   };
 
+  let selectedCategory = categories[0];
+  let showAllButton = null;
   const selectCategory = (category) => {
+    selectedCategory = category;
     categoryTabs.querySelectorAll("button").forEach((button) => button.classList.toggle("is-active", button.dataset.category === category.key));
     const token = ++preview.loadToken;
     clearItems();
     gallery.replaceChildren();
     if (category.indexes.length) {
-      category.indexes.forEach((unitIndex) => { createUnitCard(unitIndex, token); });
+      category.indexes.slice(0, 5).forEach((unitIndex) => { createUnitCard(unitIndex, token); });
+      if (showAllButton) {
+        showAllButton.hidden = category.indexes.length <= 5;
+        showAllButton.textContent = `Show all (${category.indexes.length})`;
+      }
       return;
     }
+    if (showAllButton) showAllButton.hidden = true;
     const empty = document.createElement("p");
     empty.className = "stats-favorite-unit-empty";
     empty.textContent = `No ${category.label.toLowerCase()} history`;
     gallery.appendChild(empty);
+  };
+
+  const actions = document.createElement("div");
+  actions.className = "stats-favorite-unit-actions";
+  showAllButton = document.createElement("button");
+  showAllButton.type = "button";
+  showAllButton.className = "stats-favorite-unit-show-all";
+  showAllButton.textContent = "Show all";
+  actions.appendChild(showAllButton);
+  container.appendChild(actions);
+
+  const modal = document.createElement("div");
+  modal.className = "stats-favorite-unit-modal";
+  modal.hidden = true;
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-labelledby", "statsFavoriteUnitModalTitle");
+  const modalPanel = document.createElement("div");
+  modalPanel.className = "stats-favorite-unit-modal-panel";
+  const modalHead = document.createElement("div");
+  modalHead.className = "stats-favorite-unit-modal-head";
+  const modalTitle = document.createElement("h3");
+  modalTitle.className = "stats-favorite-unit-modal-title";
+  modalTitle.id = "statsFavoriteUnitModalTitle";
+  const modalClose = document.createElement("button");
+  modalClose.type = "button";
+  modalClose.className = "stats-favorite-unit-modal-close";
+  modalClose.textContent = "Close";
+  const modalGallery = document.createElement("div");
+  modalGallery.className = "stats-favorite-unit-gallery stats-favorite-unit-modal-gallery";
+  const modalPager = document.createElement("div");
+  modalPager.className = "stats-favorite-unit-modal-pager";
+  const modalPrevious = document.createElement("button");
+  modalPrevious.type = "button";
+  modalPrevious.className = "stats-favorite-unit-show-all stats-favorite-unit-modal-page-button";
+  modalPrevious.textContent = "Previous";
+  const modalPage = document.createElement("span");
+  modalPage.className = "stats-favorite-unit-modal-page";
+  const modalNext = document.createElement("button");
+  modalNext.type = "button";
+  modalNext.className = "stats-favorite-unit-show-all stats-favorite-unit-modal-page-button";
+  modalNext.textContent = "Next";
+  modalPager.append(modalPrevious, modalPage, modalNext);
+  modalHead.append(modalTitle, modalClose);
+  modalPanel.append(modalHead, modalGallery, modalPager);
+  modal.appendChild(modalPanel);
+  container.appendChild(modal);
+
+  const modalPageSize = 10;
+  let modalPageIndex = 0;
+  const renderModalPage = () => {
+    const category = selectedCategory;
+    const pageCount = Math.max(1, Math.ceil(category.indexes.length / modalPageSize));
+    modalPageIndex = Math.max(0, Math.min(modalPageIndex, pageCount - 1));
+    const firstIndex = modalPageIndex * modalPageSize;
+    const pageIndexes = category.indexes.slice(firstIndex, firstIndex + modalPageSize);
+    const token = ++preview.loadToken;
+    clearItems();
+    modalGallery.replaceChildren();
+    pageIndexes.forEach((unitIndex) => { createUnitCard(unitIndex, token, modalGallery); });
+    modalPage.textContent = `${firstIndex + 1}–${firstIndex + pageIndexes.length} of ${category.indexes.length}`;
+    modalPrevious.disabled = modalPageIndex === 0;
+    modalNext.disabled = modalPageIndex >= pageCount - 1;
+    modalGallery.scrollTop = 0;
+  };
+
+  const closeModal = () => {
+    if (modal.hidden) return;
+    modal.hidden = true;
+    document.body.classList.remove("stats-favorite-unit-modal-open");
+    selectCategory(selectedCategory);
+    showAllButton.focus({ preventScroll: true });
+  };
+  const openModal = () => {
+    const category = selectedCategory;
+    modalTitle.textContent = `All favorite ${category.label}`;
+    modal.hidden = false;
+    document.body.classList.add("stats-favorite-unit-modal-open");
+    modalPageIndex = 0;
+    renderModalPage();
+    modalClose.focus({ preventScroll: true });
+  };
+  const onModalKeydown = (event) => {
+    if (event.key === "Escape" && !modal.hidden) closeModal();
+  };
+  showAllButton.addEventListener("click", openModal);
+  modalClose.addEventListener("click", closeModal);
+  modalPrevious.addEventListener("click", () => {
+    modalPageIndex -= 1;
+    renderModalPage();
+  });
+  modalNext.addEventListener("click", () => {
+    modalPageIndex += 1;
+    renderModalPage();
+  });
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeModal();
+  });
+  document.addEventListener("keydown", onModalKeydown);
+  preview.cleanup = () => {
+    document.removeEventListener("keydown", onModalKeydown);
+    document.body.classList.remove("stats-favorite-unit-modal-open");
+    modal.remove();
   };
 
   categories.forEach((category) => {

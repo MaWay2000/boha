@@ -156,7 +156,7 @@
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
             <a href="recent-matches.html" target="contentFrame" data-tab="recent-matches">Recent Matches</a>
             <a href="compare.html" target="contentFrame" data-tab="compare">Compare Players</a>
-            <a href="replay-analyzer.html?v=20260910-popup-1" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
+            <a href="replay-analyzer.html?v=20260910-popup-2" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
           </span>
         </nav>
 
@@ -406,7 +406,7 @@
         };
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = `replay-analyzer.html?v=20260910-popup-1&replay=${encodeURIComponent(pendingReplayUrl)}`;
+        modalFrame.src = `replay-analyzer.html?v=20260910-popup-2&replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 
@@ -426,8 +426,11 @@
             padding-top: 0;
           }
 
-          .replay-analyzer-intro,
-          .replay-analyzer-intro + .data-card {
+          .replay-analyzer-intro {
+            display: none;
+          }
+
+          body.replay-analysis-ready .replay-analyzer-intro + .data-card {
             display: none;
           }
 
@@ -648,6 +651,13 @@
           embeddedCloseButton.addEventListener("click", closeReplayAnalyzer);
           modalActions.append(downloadButton, embeddedCloseButton);
 
+          const analyzerActions = frameDocument.querySelector(
+            ".replay-analyzer-intro + .data-card .replay-analyzer-actions"
+          );
+          if (analyzerActions) {
+            analyzerActions.append(modalActions);
+          }
+
           const placeModalActions = () => {
             if (summaryGrid.children.length < 4) {
               return false;
@@ -684,12 +694,14 @@
           };
 
           if (!placeModalActions()) {
-            const summaryObserver = new modalFrame.contentWindow.MutationObserver(() => {
-              if (placeModalActions()) {
-                summaryObserver.disconnect();
+            const placementDeadline = Date.now() + 30000;
+            const retryModalActionPlacement = () => {
+              if (placeModalActions() || Date.now() >= placementDeadline || modal.hidden) {
+                return;
               }
-            });
-            summaryObserver.observe(summaryGrid, { childList: true });
+              window.setTimeout(retryModalActionPlacement, 100);
+            };
+            window.setTimeout(retryModalActionPlacement, 100);
           }
         }
       });

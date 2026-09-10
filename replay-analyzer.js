@@ -572,7 +572,7 @@
       }
     } catch (error) {
       detailMatch = null;
-      detailError = "Battlefield telemetry is temporarily unavailable.";
+      detailError = "Battlefield telemetry could not be loaded. If your browser asks for local network access, choose Allow, then reopen this analyzer.";
     }
 
     const players = Array.isArray(detailMatch?.players) ? detailMatch.players : (match.players || []);
@@ -6216,6 +6216,7 @@
     }
 
     analysisRunning = true;
+    document.body.classList.remove("replay-analysis-ready");
     stopBattlefieldPlayback();
     results.hidden = true;
     latestExtraction = null;
@@ -6249,11 +6250,13 @@
       attachPublishedPlayerStats(latestExtraction, publishedResult);
       latestExtraction.battlefieldPreviewSupported = Boolean(allowPublishedBattlefield && publishedResult);
       renderExtraction(latestExtraction);
+      document.body.classList.add("replay-analysis-ready");
       autoplayBattlefieldWhenReady();
       setStatus("");
     } catch (error) {
+      document.body.classList.remove("replay-analysis-ready");
       const corsHint = error instanceof TypeError
-        ? " The server may block browser downloads; download the replay and choose the local file instead."
+        ? " If your browser asks for local network access, choose Allow, then click Go again. You can also download the replay and choose the local file instead."
         : "";
       setStatus(`${error.message || "Replay analysis failed."}${corsHint}`, true);
     } finally {
@@ -6295,13 +6298,13 @@
     analyzeReplay(allowPublishedBattlefield === true);
   }
 
-  replayUrlGo.addEventListener("click", () => analyzeReplayUrl(false));
+  replayUrlGo.addEventListener("click", () => analyzeReplayUrl(true));
 
   replayUrl.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
       replayUrl.blur();
-      analyzeReplayUrl(false);
+      analyzeReplayUrl(true);
     }
   });
 

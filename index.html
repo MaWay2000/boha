@@ -221,17 +221,6 @@
   <script>
     (function () {
       const endpoint = "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/visitors";
-      let visitorId = "";
-      try {
-        const storageKey = "bohaVisitorId";
-        visitorId = localStorage.getItem(storageKey) || "";
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(visitorId)) {
-          visitorId = crypto.randomUUID();
-          localStorage.setItem(storageKey, visitorId);
-        }
-      } catch (error) {
-        visitorId = "";
-      }
       let referrer = "";
       try {
         referrer = document.referrer ? new URL(document.referrer).origin : "";
@@ -244,8 +233,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           path: window.location.pathname,
-          referrer: referrer,
-          visitorId: visitorId
+          referrer: referrer
         }),
         cache: "no-store",
         credentials: "omit",

@@ -1549,6 +1549,7 @@
 
   function createPlayerAwardsHeader(onSort) {
     const header = createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, onSort);
+    header.classList.add("replay-awards-header");
     const help = document.createElement("button");
     help.className = "replay-awards-help";
     help.type = "button";

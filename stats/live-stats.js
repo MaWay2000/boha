@@ -36,7 +36,7 @@ const SORT_DEFAULTS = {
 };
 const SORT_ALLOWED_KEYS = {
   ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "crashes", "winRate", "lossRate", "drawRate", "crashRate"]),
-  "player-games": new Set(["date", "map", "result", "duration", "replay"]),
+  "player-games": new Set(["date", "map", "result", "elo", "duration"]),
   matches: new Set(["date", "map", "players", "duration", "replay"])
 };
 const SORT_DEFAULT_DIRECTIONS = {
@@ -58,8 +58,8 @@ const SORT_DEFAULT_DIRECTIONS = {
     date: "desc",
     map: "asc",
     result: "desc",
-    duration: "desc",
-    replay: "desc"
+    elo: "desc",
+    duration: "desc"
   },
   matches: {
     date: "desc",
@@ -1398,6 +1398,14 @@ function compareRankRows(left, right) {
   return applySortDirection(result, rankSortState.direction);
 }
 
+function getPlayerGameEloDelta(game, activeAccount) {
+  const activePlayerSlot = game.teams
+    .flatMap((team) => Array.isArray(team.players) ? team.players : [])
+    .find((slot) => slot?.account === activeAccount);
+  const eloDelta = Number(activePlayerSlot?.eloDelta);
+  return Number.isFinite(eloDelta) ? eloDelta : Number.NEGATIVE_INFINITY;
+}
+
 function comparePlayerGames(left, right, activeAccount) {
   let result = 0;
 
@@ -1412,12 +1420,14 @@ function comparePlayerGames(left, right, activeAccount) {
         PLAYER_GAME_RESULT_ORDER[getPlayerGameOutcome(right, activeAccount).label] || 0
       ) || compareNumberValues(left.endDate, right.endDate);
       break;
+    case "elo":
+      result = compareNumberValues(
+        getPlayerGameEloDelta(left, activeAccount),
+        getPlayerGameEloDelta(right, activeAccount)
+      ) || compareNumberValues(left.endDate, right.endDate);
+      break;
     case "duration":
       result = compareNumberValues(left.duration, right.duration)
-        || compareNumberValues(left.endDate, right.endDate);
-      break;
-    case "replay":
-      result = compareTextValues(getReplaySortValue(left.replayUrl), getReplaySortValue(right.replayUrl))
         || compareNumberValues(left.endDate, right.endDate);
       break;
     case "date":
@@ -2458,7 +2468,11 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   if (playerGamesHeader && !playerGamesHeader.querySelector("[data-player-games-elo-header]")) {
     const eloHeader = document.createElement("th");
     eloHeader.dataset.playerGamesEloHeader = "";
-    eloHeader.textContent = "Elo";
+    eloHeader.dataset.sortTable = "player-games";
+    eloHeader.dataset.sortKey = "elo";
+    eloHeader.className = "stats-player-game-elo";
+    eloHeader.setAttribute("aria-sort", "none");
+    eloHeader.innerHTML = '<button class="stats-sort-button" type="button">Elo</button>';
     const durationHeader = playerGamesHeader.querySelector('[data-sort-key="duration"]');
     playerGamesHeader.insertBefore(eloHeader, durationHeader);
   }
@@ -2596,7 +2610,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       return `
         <tr class="stats-player-game-row${isExpanded ? " is-expanded" : ""}" data-player-game-key="${escapeHtml(gameKey)}">
           <td class="stats-date">
-            ${escapeHtml(formatMatchDate(game.endDate))}
+            <span class="stats-date-day">${escapeHtml(formatMatchDate(game.endDate))}</span>
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
             <button
               class="stats-expand-toggle stats-player-game-toggle"
@@ -2629,7 +2643,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
           <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}${isUpsetMatch(game)
             ? '<span class="stats-mega-win-star" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span>'
             : ""}</span></td>
-          <td>${hasEloDelta
+          <td class="stats-player-game-elo">${hasEloDelta
             ? `<span class="stats-player-game-elo-change ${eloDelta >= 0 ? "is-positive" : "is-negative"}" title="Match Elo change">${escapeHtml(eloDeltaLabel)}</span>`
             : ""}</td>
           <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
@@ -3442,7 +3456,7 @@ function renderMatches(gameList) {
       return `
         <tr>
           <td class="stats-date">
-            ${escapeHtml(formatMatchDate(game.endDate))}
+            <span class="stats-date-day">${escapeHtml(formatMatchDate(game.endDate))}</span>
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>

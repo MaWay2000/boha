@@ -2738,6 +2738,15 @@ main {
   margin-left: 6px;
 }
 
+.stats-player-games-panel .stats-player-game-elo {
+  text-align: center;
+}
+
+.stats-player-games-panel th.stats-player-game-elo .stats-sort-button {
+  width: 100%;
+  justify-content: center;
+}
+
 .stats-player-profile {
   display: grid;
   gap: 14px;
@@ -3760,6 +3769,48 @@ main {
 }
 
 @media (max-width: 1080px) {
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stats-grid > .stats-summary,
+  .stats-grid > .stats-panel {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+  }
+
+  .stats-summary .stats-search-field {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+    padding-block: 7px;
+  }
+
+  .stats-summary .stats-search-input {
+    width: 100%;
+  }
+
+  .stats-summary .stats-player-search-clear {
+    top: auto;
+    bottom: 7px;
+    transform: none;
+  }
+
+  .stats-date-day {
+    display: block;
+  }
+
+  .stats-player-games-panel .stats-date-time {
+    margin-left: 0;
+  }
+
+  .stats-player-games-panel .stats-table {
+    min-width: 0;
+    table-layout: fixed;
+  }
+
   .topbar {
     grid-template-columns: clamp(200px, 18vw, 240px) minmax(0, 1fr);
   }

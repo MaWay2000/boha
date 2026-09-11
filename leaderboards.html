@@ -15,7 +15,7 @@
     rel="stylesheet"
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
-  <link rel="stylesheet" href="styles.css?v=20260829-search-coal1">
+  <link rel="stylesheet" href="styles.css?v=20260911-responsive-gutters-1">
   <style>
     .stats-reset-filters {
       flex: 0 0 auto;
@@ -691,9 +691,9 @@
                     <th data-sort-table="player-games" data-sort-key="date" aria-sort="descending"><button class="stats-sort-button" type="button">Date</button></th>
                     <th data-sort-table="player-games" data-sort-key="map" aria-sort="none"><button class="stats-sort-button" type="button">Map</button></th>
                     <th data-sort-table="player-games" data-sort-key="result" aria-sort="none"><button class="stats-sort-button" type="button">Result</button></th>
-                    <th data-player-games-elo-header>Elo</th>
-                    <th data-sort-table="player-games" data-sort-key="duration" aria-sort="none"><button class="stats-sort-button" type="button">Duration</button></th>
-                    <th data-sort-table="player-games" data-sort-key="replay" aria-sort="none"><button class="stats-sort-button" type="button">Replay</button></th>
+                    <th class="stats-player-game-elo" data-player-games-elo-header data-sort-table="player-games" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
+                    <th data-sort-table="player-games" data-sort-key="duration" aria-sort="none"><button class="stats-sort-button" type="button">Time</button></th>
+                    <th>Replay</th>
                   </tr>
                 </thead>
                 <tbody id="statsPlayerGames">
@@ -729,6 +729,6 @@
   </div>
 
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20260910-replay-popup-2"></script>
+  <script type="module" src="stats/live-stats.js?v=20260911-responsive-filters-1"></script>
 </body>
 </html>

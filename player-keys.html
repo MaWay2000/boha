@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bohan Player Keys</title>
+  <meta
+    name="description"
+    content="Search collected Bohan public keys by key or the latest nickname recorded for each key."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css?v=20260916-1">
+  <style>
+    .key-directory-panel {
+      margin-top: clamp(28px, 4vw, 54px);
+    }
+
+    .key-directory-head {
+      align-items: end;
+      gap: 24px;
+    }
+
+    .key-directory-intro {
+      display: grid;
+      gap: 6px;
+    }
+
+    .key-directory-intro p:last-child {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .key-directory-tools {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: min(100%, 520px);
+    }
+
+    .key-directory-tools .stats-search-field {
+      flex: 1;
+    }
+
+    .key-directory-download {
+      min-height: 45px;
+      padding: 10px 16px;
+      white-space: nowrap;
+    }
+
+    .key-directory-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 18px;
+      border-top: 1px solid rgba(109, 232, 255, 0.15);
+      border-bottom: 1px solid rgba(109, 232, 255, 0.15);
+      color: var(--muted);
+    }
+
+    .key-directory-status strong {
+      color: var(--cyan);
+      font-family: "Oxanium", sans-serif;
+    }
+
+    .key-directory-table-wrap {
+      max-height: none;
+      overflow-x: auto;
+    }
+
+    .key-directory-table {
+      table-layout: fixed;
+      min-width: 760px;
+    }
+
+    .key-directory-table th:first-child,
+    .key-directory-table td:first-child {
+      width: 67%;
+    }
+
+    .key-directory-key {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .key-directory-key code {
+      overflow-wrap: anywhere;
+      color: #d9f6ff;
+      font-size: 0.82rem;
+    }
+
+    .key-copy-button {
+      flex: 0 0 auto;
+      padding: 5px 9px;
+      border: 1px solid rgba(109, 232, 255, 0.3);
+      border-radius: 4px;
+      color: var(--cyan);
+      background: rgba(7, 25, 36, 0.86);
+      cursor: pointer;
+    }
+
+    .key-copy-button:hover,
+    .key-copy-button:focus-visible {
+      border-color: var(--cyan);
+      color: #fff;
+    }
+
+    .key-directory-nickname {
+      color: #eefaff;
+      font-weight: 700;
+    }
+
+    .key-directory-actions {
+      display: flex;
+      justify-content: center;
+      padding: 22px;
+    }
+
+    .key-directory-empty {
+      padding: 38px 18px !important;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 760px) {
+      .key-directory-head,
+      .key-directory-tools {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .key-directory-tools {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .key-directory-download {
+        justify-content: center;
+      }
+    }
+  </style>
+</head>
+<body class="embedded-page">
+  <div class="page-shell">
+    <main id="top">
+      <section class="landing-stats stats-shell section-frame">
+        <section class="stats-panel key-directory-panel">
+          <div class="stats-panel-head key-directory-head">
+            <div class="key-directory-intro">
+              <p class="panel-kicker stats-panel-title-main">Bohan Player Keys</p>
+              <p>One row per public key, showing the last nickname recorded with that key.</p>
+            </div>
+            <div class="key-directory-tools">
+              <label class="stats-search-field" for="keyDirectorySearch">
+                <span class="visually-hidden">Search by nickname or public key</span>
+                <input
+                  id="keyDirectorySearch"
+                  class="stats-search-input"
+                  type="search"
+                  placeholder="Nickname / key"
+                  autocomplete="off"
+                  spellcheck="false"
+                >
+              </label>
+              <a class="button button-primary key-directory-download" href="bohan-keys-last-nickname.txt" download>Download TXT</a>
+            </div>
+          </div>
+
+          <div class="key-directory-status" aria-live="polite">
+            <span id="keyDirectoryStatus">Loading player keys…</span>
+            <strong id="keyDirectoryCount"></strong>
+          </div>
+
+          <div class="stats-table-wrap key-directory-table-wrap">
+            <table class="stats-table key-directory-table">
+              <thead>
+                <tr>
+                  <th>Public key</th>
+                  <th>Last nickname</th>
+                </tr>
+              </thead>
+              <tbody id="keyDirectoryRows">
+                <tr><td class="key-directory-empty" colspan="2">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="key-directory-actions">
+            <button class="button button-secondary" id="keyDirectoryMore" type="button" hidden>Show more</button>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const PAGE_SIZE = 100;
+      const search = document.getElementById("keyDirectorySearch");
+      const rows = document.getElementById("keyDirectoryRows");
+      const status = document.getElementById("keyDirectoryStatus");
+      const count = document.getElementById("keyDirectoryCount");
+      const more = document.getElementById("keyDirectoryMore");
+      let entries = [];
+      let filtered = [];
+      let visible = PAGE_SIZE;
+
+      function normalize(value) {
+        return String(value || "").toLocaleLowerCase();
+      }
+
+      function makeCell(value, className) {
+        const cell = document.createElement("td");
+        cell.className = className || "";
+        cell.textContent = value;
+        return cell;
+      }
+
+      function render() {
+        rows.replaceChildren();
+        const shown = filtered.slice(0, visible);
+
+        if (!shown.length) {
+          const row = document.createElement("tr");
+          const cell = makeCell(entries.length ? "No matching keys." : "No player keys available.", "key-directory-empty");
+          cell.colSpan = 2;
+          row.appendChild(cell);
+          rows.appendChild(row);
+        }
+
+        shown.forEach(function (entry) {
+          const row = document.createElement("tr");
+          const keyCell = document.createElement("td");
+          const keyWrap = document.createElement("div");
+          const keyCode = document.createElement("code");
+          const copy = document.createElement("button");
+
+          keyWrap.className = "key-directory-key";
+          keyCode.textContent = entry.key;
+          copy.className = "key-copy-button";
+          copy.type = "button";
+          copy.textContent = "Copy";
+          copy.setAttribute("aria-label", "Copy public key for " + entry.nickname);
+          copy.addEventListener("click", async function () {
+            try {
+              await navigator.clipboard.writeText(entry.key);
+              copy.textContent = "Copied";
+              window.setTimeout(function () { copy.textContent = "Copy"; }, 1200);
+            } catch (error) {
+              window.prompt("Copy public key:", entry.key);
+            }
+          });
+
+          keyWrap.append(keyCode, copy);
+          keyCell.appendChild(keyWrap);
+          row.append(keyCell, makeCell(entry.nickname, "key-directory-nickname"));
+          rows.appendChild(row);
+        });
+
+        status.textContent = search.value.trim()
+          ? "Filtered by nickname or key"
+          : "Latest nickname recorded for every unique key";
+        count.textContent = filtered.length.toLocaleString() + (filtered.length === 1 ? " key" : " keys");
+        more.hidden = visible >= filtered.length;
+        more.textContent = "Show more (" + Math.min(PAGE_SIZE, filtered.length - visible).toLocaleString() + ")";
+      }
+
+      function applyFilter() {
+        const query = normalize(search.value.trim());
+        filtered = query
+          ? entries.filter(function (entry) {
+              return normalize(entry.key).includes(query) || normalize(entry.nickname).includes(query);
+            })
+          : entries;
+        visible = PAGE_SIZE;
+        render();
+      }
+
+      search.addEventListener("input", applyFilter);
+      more.addEventListener("click", function () {
+        visible += PAGE_SIZE;
+        render();
+      });
+
+      fetch("bohan-keys-last-nickname.txt?v=20260916-1", { cache: "no-store" })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.text();
+        })
+        .then(function (text) {
+          entries = text.trim().split(/\r?\n/).slice(1).map(function (line) {
+            const separator = line.indexOf("\t");
+            return {
+              key: separator >= 0 ? line.slice(0, separator) : line,
+              nickname: separator >= 0 ? line.slice(separator + 1) : ""
+            };
+          }).filter(function (entry) {
+            return entry.key && entry.nickname;
+          });
+          filtered = entries;
+          render();
+        })
+        .catch(function () {
+          status.textContent = "Unable to load the player-key list.";
+          count.textContent = "";
+          rows.innerHTML = '<tr><td class="key-directory-empty" colspan="2">The TXT export could not be loaded.</td></tr>';
+        });
+    })();
+  </script>
+  <script src="embedded-page.js?v=20260720-1"></script>
+</body>
+</html>

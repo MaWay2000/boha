@@ -556,9 +556,20 @@
     let detailMatch = null;
     let detailError = "";
     try {
-      const detailResponse = await fetch(`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`, {
-        cache: "no-store"
-      });
+      const detailUrl = `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`;
+      let detailResponse;
+      try {
+        detailResponse = await fetch(detailUrl, { cache: "no-store" });
+      } catch (error) {
+        // On the Tailscale host, MagicDNS resolves the public Funnel hostname to
+        // its local 100.x address. Retry explicitly so Firefox can show its
+        // Local Network Access permission prompt. Public Funnel clients keep
+        // using the normal request above because their address is public.
+        detailResponse = await fetch(detailUrl, {
+          cache: "no-store",
+          targetAddressSpace: "local"
+        });
+      }
       if (detailResponse.ok) {
         const detailPayload = await detailResponse.json();
         detailMatch = detailPayload.match || null;

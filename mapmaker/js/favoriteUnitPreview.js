@@ -6,6 +6,49 @@ const TEX_BASE = new URL("../classic/texpages/texpages/", import.meta.url).href;
 let definitionsPromise = null;
 let activePreview = null;
 
+const FRIENDLY_COMPONENT_NAMES = new Map([
+  ["Cyb-Wpn-Atmiss", "Scourge Missile"],
+  ["Cyb-Wpn-Grenade", "Grenade Launcher"],
+  ["Cyb-Wpn-Laser", "Flashlight Laser"],
+  ["Cyb-Wpn-Rail1", "Needle Gun"],
+  ["Cyb-Wpn-Thermite", "Thermite Flamer"],
+  ["CyborgRotMG", "Assault Gun"],
+  ["bTrikeMG", "Trike Machine Gun"],
+  ["BusBody", "School Bus Body"],
+  ["FireBody", "Fire Engine Body"],
+  ["HeavyChopper", "Heavy Chopper"],
+  ["ScavCamperBody", "Scavenger Camper"]
+]);
+
+function cleanPlaceholderName(value) {
+  const name = String(value || "").trim();
+  const placeholder = name.match(/^\*\s*(.*?)\s*\*$/);
+  return (placeholder ? placeholder[1] : name).trim();
+}
+
+function friendlyComponentName(item, fallback = "") {
+  const id = String(item?.id || "").trim();
+  if (/^ZNULL/i.test(id)) return "";
+  if (FRIENDLY_COMPONENT_NAMES.has(id)) return FRIENDLY_COMPONENT_NAMES.get(id);
+
+  const name = cleanPlaceholderName(item?.name);
+  if (name && !/^ZNULL/i.test(name) && name !== id) return name;
+
+  const cleanFallback = cleanPlaceholderName(fallback);
+  if (cleanFallback && !/^ZNULL/i.test(cleanFallback)) return cleanFallback;
+  return "";
+}
+
+function withoutUnitCategory(name, droidType, isVtol = false) {
+  const value = String(name || "").trim();
+  const isCyborg = [5, 10, 11, 12].includes(droidType);
+  if (!isCyborg && !isVtol) return value;
+  let cleaned = value;
+  if (isCyborg) cleaned = cleaned.replace(/\bcyborg\b/gi, " ");
+  if (isVtol) cleaned = cleaned.replace(/\bvtol\b/gi, " ");
+  return cleaned.replace(/\s{2,}/g, " ").trim();
+}
+
 function addPreviewStyles() {
   if (document.getElementById("favoriteUnitPreviewStyles")) return;
   const style = document.createElement("style");
@@ -306,7 +349,7 @@ function findDesign(unit, definitions) {
 function definitionName(collection, id) {
   if (!id) return "";
   const item = collection?.[id] || Object.values(collection || {}).find((entry) => entry.id === id);
-  return item?.name || "";
+  return friendlyComponentName(item);
 }
 
 function getComponentIds(unit, signature = unit?.signature) {
@@ -367,10 +410,10 @@ function buildComponentLookups(definitions, nameCandidatesBySignature) {
 
 function canonicalComponentName(unit, body, propulsion, weapons) {
   const droidType = Number.parseInt(String(unit?.signature || "").split(":", 1)[0], 10);
-  const weaponName = weapons.map((weapon) => weapon?.name || weapon?.id).filter(Boolean).join(" / ");
+  const weaponName = weapons.map((weapon) => friendlyComponentName(weapon)).filter(Boolean).join(" / ");
   if ([5, 10, 11, 12].includes(droidType) && weaponName) return weaponName;
   const cleanWeaponName = weaponName.replace(/^VTOL\s+/i, "");
-  return [cleanWeaponName, body?.name || body?.id, propulsion?.name || propulsion?.id]
+  return [cleanWeaponName, friendlyComponentName(body), friendlyComponentName(propulsion)]
     .filter(Boolean)
     .join(" ");
 }
@@ -534,19 +577,34 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     nameCandidatesBySignature,
     componentLookups
   ));
-  const displayNames = favorites.map((unit, index) => designs[index]?.name || unit.name || "Unknown unit");
+  const displayNames = favorites.map((unit, index) => {
+    const designName = cleanPlaceholderName(designs[index]?.name);
+    const replayName = cleanPlaceholderName(unit.name);
+    return designName && !/^ZNULL/i.test(designName)
+      ? designName
+      : replayName && !/^ZNULL/i.test(replayName)
+        ? replayName
+        : "Unknown unit";
+  });
   const displayNameLines = favorites.map((unit, index) => {
     const design = designs[index];
+    const droidType = Number.parseInt(String(unit?.signature || "").split(":", 1)[0], 10);
     const weaponId = Array.isArray(design?.weapons) ? design.weapons[0] : design?.weapon;
-    const weapon = definitionName(definitions.weapons, weaponId) || displayNames[index];
-    const body = definitionName(definitions.bodies, design?.body);
     const propulsion = definitionName(definitions.propulsions, design?.propulsion);
-  return {
-    weapon,
-    body: body || "Unknown body",
-    propulsion: propulsion || "Unknown propulsion"
-  };
-});
+    const isVtol = /vtol/i.test(propulsion);
+    const weapon = withoutUnitCategory(
+      definitionName(definitions.weapons, weaponId) || cleanPlaceholderName(unit.name) || displayNames[index],
+      droidType,
+      isVtol
+    );
+    const body = withoutUnitCategory(definitionName(definitions.bodies, design?.body), droidType, isVtol);
+    return {
+      weapon,
+      body: body || "Unknown body",
+      propulsion: propulsion || "Unknown propulsion",
+      hidePropulsion: [5, 10, 11, 12].includes(droidType) || isVtol
+    };
+  });
   const categories = [
     { key: "tanks", label: "Tanks", indexes: [] },
     { key: "cyborgs", label: "Cyborgs", indexes: [] },
@@ -591,7 +649,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     const propulsionName = document.createElement("span");
     propulsionName.textContent = displayNameLines[unitIndex].propulsion;
     name.append(weaponName, bodyName);
-    if (!/cyborg|vtol/i.test(displayNameLines[unitIndex].propulsion)) {
+    if (!displayNameLines[unitIndex].hidePropulsion) {
       name.append(propulsionName);
     }
     const count = document.createElement("span");

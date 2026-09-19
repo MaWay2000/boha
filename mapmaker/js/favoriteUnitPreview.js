@@ -480,13 +480,6 @@ function piePath(value, prefix = "") {
   return name.includes("/") ? name : `${prefix}${name}`;
 }
 
-function getRightPropulsionModel(leftModel) {
-  const left = String(leftModel || "");
-  if (/^prmvtl/i.test(left)) return "";
-  const right = left.replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
-  return right === left ? "" : right;
-}
-
 function getDroidParts(design, definitions) {
   const body = definitions.bodies[design.body];
   const propulsion = definitions.propulsions[design.propulsion];
@@ -498,8 +491,6 @@ function getDroidParts(design, definitions) {
   const leftModel = typeof propulsionModels === "string" ? propulsionModels : propulsionModels?.left;
   if (leftModel) {
     parts.push({ role: "propulsion", path: piePath(leftModel, "components/prop/"), side: "left" });
-    const rightModel = getRightPropulsionModel(leftModel);
-    if (rightModel) parts.push({ role: "propulsion", path: piePath(rightModel, "components/prop/"), side: "right" });
     bodySpecificPropulsion = true;
   }
   if (design.propulsion && !bodySpecificPropulsion) {

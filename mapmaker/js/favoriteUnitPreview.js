@@ -66,11 +66,18 @@ function addPreviewStyles() {
       display: block;
       padding: 14px 16px 0;
     }
+    .stats-favorite-unit-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px 0;
+    }
     .stats-favorite-unit-category-tabs {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      padding: 10px 16px 0;
+      min-width: 0;
     }
     .stats-favorite-unit-category-tab {
       padding: 5px 12px;
@@ -182,8 +189,8 @@ function addPreviewStyles() {
     }
     .stats-favorite-unit-actions {
       display: flex;
+      flex: 0 0 auto;
       justify-content: flex-end;
-      padding: 0 16px 16px;
     }
     .stats-favorite-unit-show-all,
     .stats-favorite-unit-modal-close {
@@ -284,6 +291,7 @@ function addPreviewStyles() {
     }
     body.stats-favorite-unit-modal-open { overflow: hidden; }
     @media (max-width: 560px) {
+      .stats-favorite-unit-controls { align-items: flex-start; }
       .stats-favorite-unit-gallery { grid-template-columns: repeat(5, minmax(138px, 1fr)); }
       .stats-favorite-unit-card { min-width: 138px; height: 154px; }
       .stats-favorite-unit-modal { padding: 10px; }
@@ -544,9 +552,12 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
 
   const categoryTabs = document.createElement("div");
   categoryTabs.className = "stats-favorite-unit-category-tabs";
+  const controls = document.createElement("div");
+  controls.className = "stats-favorite-unit-controls";
+  controls.appendChild(categoryTabs);
   const gallery = document.createElement("div");
   gallery.className = "stats-favorite-unit-gallery";
-  container.append(label, categoryTabs, gallery);
+  container.append(label, controls, gallery);
   if (!favorites.length) {
     const empty = document.createElement("p");
     empty.className = "stats-favorite-unit-empty";
@@ -733,7 +744,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   showAllButton.className = "stats-favorite-unit-show-all";
   showAllButton.textContent = "Show all";
   actions.appendChild(showAllButton);
-  container.appendChild(actions);
+  controls.appendChild(actions);
 
   const modal = document.createElement("div");
   modal.className = "stats-favorite-unit-modal";

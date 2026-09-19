@@ -588,7 +588,7 @@
                     <th data-sort-table="ranks" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
                     <th data-sort-table="ranks" data-sort-key="matches" aria-sort="none"><button class="stats-sort-button" type="button">Games</button></th>
                     <th class="stats-record-sort-head">
-                      <div class="stats-record-sort-group stats-record-grid" aria-label="Sort by wins, losses, draws, crashes, or percentages">
+                      <div class="stats-record-sort-group stats-record-grid" aria-label="Sort by wins, losses, draws, or percentages">
                         <span class="stats-record-metric">
                           <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="wins" aria-label="Sort by wins">
                             Win
@@ -619,17 +619,6 @@
                           <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="drawRate" aria-label="Sort by draw percentage (minimum 10 games)">
                             %
                             <span class="stats-sort-hint" aria-hidden="true">Draw percentage</span>
-                          </button>
-                        </span>
-                        <span class="stats-record-sort-divider">/</span>
-                        <span class="stats-record-metric">
-                          <button class="stats-sort-button stats-sort-button-compact" type="button" data-sort-table="ranks" data-sort-key="crashes" aria-label="Sort by crashed all-loser games">
-                            X
-                            <span class="stats-sort-hint" aria-hidden="true">Crashes</span>
-                          </button>
-                          <button class="stats-sort-button stats-sort-button-compact stats-sort-button-percent" type="button" data-sort-table="ranks" data-sort-key="crashRate" aria-label="Sort by crash percentage (minimum 10 games)">
-                            %
-                            <span class="stats-sort-hint" aria-hidden="true">Crash percentage</span>
                           </button>
                         </span>
                       </div>
@@ -729,6 +718,6 @@
   </div>
 
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20260919-propulsion-models"></script>
+  <script type="module" src="stats/live-stats.js?v=20260919-hide-crashes"></script>
 </body>
 </html>

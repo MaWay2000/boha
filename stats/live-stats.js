@@ -18,6 +18,7 @@ const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import
 const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
+const KNOWN_BOT_NAMES = new Set(["wave", "generic", "da_bot", "scavengers"]);
 const MATCH_LIMIT_STEP = 30;
 const PLAYER_GAME_LIMIT = 20;
 const AUTO_REFRESH_MS = 5 * 60_000;
@@ -35,7 +36,7 @@ const SORT_DEFAULTS = {
   matches: { key: "date", direction: "desc" }
 };
 const SORT_ALLOWED_KEYS = {
-  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "crashes", "winRate", "lossRate", "drawRate", "crashRate"]),
+  ranks: new Set(["rank", "player", "elo", "matches", "wins", "losses", "draws", "winRate", "lossRate", "drawRate"]),
   "player-games": new Set(["date", "map", "result", "elo", "duration"]),
   matches: new Set(["date", "map", "players", "duration", "replay"])
 };
@@ -48,11 +49,9 @@ const SORT_DEFAULT_DIRECTIONS = {
     wins: "desc",
     losses: "desc",
     draws: "desc",
-    crashes: "desc",
     winRate: "desc",
     lossRate: "desc",
-    drawRate: "desc",
-    crashRate: "desc"
+    drawRate: "desc"
   },
   "player-games": {
     date: "desc",
@@ -464,7 +463,7 @@ function hydratePublishedBoard(name) {
     publicKeys: new Set(player.publicKeys || []),
     name: player.name || "Unknown",
     names: new Map(Object.entries(player.names || { [player.name || "Unknown"]: 1 })),
-    bot: Boolean(player.bot),
+    bot: isKnownBotName(player.name),
     games: [],
     elo: Number(player.elo || 1500),
     winCount: Number(player.wins || 0),
@@ -477,14 +476,14 @@ function hydratePublishedBoard(name) {
   const gameIds = new Set(board.gameIds || []);
   const ratingEvents = board.ratingEvents || {};
   const games = (leaderboardData.games || [])
-    .filter((game) => gameIds.has(game.id))
+    .filter((game) => gameIds.has(game.id) && !isCrashedPublishedGame(game))
     .map((publishedGame) => {
       const slots = (publishedGame.slots || []).map((slot) => {
         let account = accounts.get(String(slot.id));
         if (!account) {
           account = {
             mainPublicKey: null, publicKeys: new Set(), name: slot.name || "Unknown",
-            names: new Map([[slot.name || "Unknown", 1]]), bot: true, games: [],
+            names: new Map([[slot.name || "Unknown", 1]]), bot: isKnownBotName(slot.name), games: [],
             elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, totalKills: 0, discounted: true
           };
           accounts.set(String(slot.id), account);
@@ -589,7 +588,26 @@ function sortAccounts(accounts) {
 }
 
 function filterVisibleAccounts(accountList) {
-  return accountList.filter((account) => !account.discounted || account.games.length >= 2);
+  return accountList.filter((account) => !account.bot && (!account.discounted || account.games.length >= 2));
+}
+
+function isCrashedPublishedGame(game) {
+  if (game?.crashed || game?.resultSource === "replay-engine-crash") {
+    return true;
+  }
+
+  const players = (game?.slots || []).filter((slot) =>
+    ["winner", "loser", "contender"].includes(slot?.userType)
+  );
+  return players.length > 0 && players.every((slot) => slot.userType === "loser");
+}
+
+function filterRankedAccounts(accountList) {
+  return accountList.filter((account) => !account.discounted && !account.bot);
+}
+
+function isKnownBotName(name) {
+  return KNOWN_BOT_NAMES.has(String(name || "").trim().toLowerCase());
 }
 
 function getNextPlayerLimit(currentCount, totalCount) {
@@ -1061,7 +1079,7 @@ function setCompactComparisonParams(params, accountAKey, accountBKey) {
 
 function buildGlobalRankMap(accountList) {
   return new Map(
-    filterVisibleAccounts(accountList)
+    filterRankedAccounts(accountList)
       .map((account, index) => [getAccountExpandKey(account), index + 1])
   );
 }
@@ -2364,7 +2382,7 @@ function getPlayerLeaderboardRanks(account) {
 
   return leaderboards.flatMap((leaderboard) => {
     const { accounts } = hydratePublishedBoard(leaderboard);
-    const rankedAccounts = filterVisibleAccounts(sortAccounts(accounts.values()));
+    const rankedAccounts = filterRankedAccounts(sortAccounts(accounts.values()));
     const rankIndex = rankedAccounts.findIndex((candidate) => getAccountExpandKey(candidate) === accountKey);
     return rankIndex >= 0 ? [{ leaderboard, rank: rankIndex + 1 }] : [];
   });
@@ -3077,7 +3095,7 @@ function renderSummary(accountList, gameList) {
     return;
   }
 
-  const rankedPlayers = accountList.filter((account) => !account.discounted);
+  const rankedPlayers = filterRankedAccounts(accountList);
   const latestMatch = gameList[0];
   const latestReplaySource = latestMatch ? getReplaySource(latestMatch) : null;
   const latestReplayUrl = latestReplaySource?.replayUrl || "";
@@ -3122,9 +3140,19 @@ function renderRanks(accountList) {
   }
 
   const eligibleAccounts = filterVisibleAccounts(accountList);
+  const rankedPositions = new Map(
+    filterRankedAccounts(accountList).map((account, index) => [account, index + 1])
+  );
   const searchQuery = normalizeSearchQuery(playerSearchQuery);
   const matchingRows = eligibleAccounts
-    .map((account, index) => ({ account, rank: index + 1 }))
+    .map((account, index) => {
+      const rankedPosition = rankedPositions.get(account);
+      return {
+        account,
+        rank: rankedPosition ?? Number.MAX_SAFE_INTEGER - eligibleAccounts.length + index,
+        rankLabel: rankedPosition ?? "—"
+      };
+    })
     .filter(({ account }) => matchesPlayerSearch(account, searchQuery))
     .sort(compareRankRows);
   const rows = searchQuery ? matchingRows : matchingRows.slice(0, visiblePlayerCount);
@@ -3140,7 +3168,7 @@ function renderRanks(accountList) {
   }
 
   ranksElement.innerHTML = rows
-    .map(({ account, rank }) => {
+    .map(({ account, rankLabel }) => {
       const displayStats = getAccountDisplayStats(account);
       const displayGameCount = getAccountDisplayGameCount(account);
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
@@ -3248,7 +3276,7 @@ function renderRanks(accountList) {
         : "";
       return `
         <tr class="stats-rank-row${isExpanded ? " is-expanded" : ""} is-clickable" data-expand-account="${escapeHtml(expandKey)}">
-          <td class="stats-rank">${rank}</td>
+          <td class="stats-rank">${rankLabel}</td>
           <td class="stats-player-name">
             ${playerDetails}
           </td>
@@ -3278,12 +3306,6 @@ function renderRanks(accountList) {
                 <span class="stats-record-count">${displayStats.draws}</span>
                 <span class="stats-record-value-divider">/</span>
                 <span class="stats-record-percent">${formatRecordPercentage(displayStats.draws, displayGameCount)}</span>
-              </span>
-              <span class="stats-record-sort-divider">/</span>
-              <span class="stats-record-value">
-                <span class="stats-record-count">${displayStats.crashes}</span>
-                <span class="stats-record-value-divider">/</span>
-                <span class="stats-record-percent">${formatRecordPercentage(displayStats.crashes, displayGameCount)}</span>
               </span>
             </span>
           </td>

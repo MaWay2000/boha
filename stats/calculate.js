@@ -1,5 +1,10 @@
 export const eloBase = 1500;
 export const eloThreshold = 5;
+const knownBotNames = new Set(['wave', 'generic', 'da_bot', 'scavengers']);
+
+function isKnownBotName(name) {
+	return knownBotNames.has(String(name || '').trim().toLowerCase());
+}
 
 export function gather(results, playerPublicKeys, filterGames) {
 	const accounts = new Map();
@@ -45,7 +50,6 @@ export function gather(results, playerPublicKeys, filterGames) {
 					id = mainPublicKey ? mainPublicKey : publicKey;
 				}
 			} else {
-				bot = name || player.usertype && player.usertype !== 'spectator';
 				if (name)
 					for(const color of ['Red', 'Orange', 'Yellow', 'Green', 'Cyan', 'Blue', 'Purple', 'Pink', 'Grey', 'Black']) {
 						if (name.startsWith(color + '-')) {
@@ -54,6 +58,7 @@ export function gather(results, playerPublicKeys, filterGames) {
 						}
 					}
 				else name = player.usertype === 'spectator' ? 'spectator' : player.usertype ? 'generic' : 'empty slot';
+				bot = isKnownBotName(name);
 				if (bot) publicKey = name;
 				id = name;
 			}
@@ -151,12 +156,17 @@ export function gather(results, playerPublicKeys, filterGames) {
 		if (account.games.length < eloThreshold) account.discounted = true;
 	}
 
-	games = Array.from(filterGames(games));
+	games = Array.from(filterGames(games)).filter(game => {
+		const teams = game.teams.filter(team => team.players.length);
+		return teams.length > 0 && !teams.every(team => team.userType === 'loser');
+	});
 
 	{ const gameSet = new Set(games.map(game => game.startDate));
 		for (const account of accounts.values())
 			account.games = account.games.filter(game => gameSet.has(game.startDate));
 	}
+	for (const account of accounts.values())
+		account.discounted = !account.mainPublicKey || account.games.length < eloThreshold;
 	for (const account of accounts.values()) account.totalKills = 0;
 	for (const game of games) for (const slot of game.slots)
 		slot.account.totalKills += (slot.kills ?? 0) + (slot.structureKills ?? 0);

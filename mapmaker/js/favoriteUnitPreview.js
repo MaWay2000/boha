@@ -779,7 +779,34 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   modalHead.append(modalTitle, modalClose);
   modalPanel.append(modalHead, modalGallery, modalPager);
   modal.appendChild(modalPanel);
-  container.appendChild(modal);
+  // The player profile uses a decorative clip-path. Keeping the fixed modal
+  // inside that profile clips it to the card and can place the gallery outside
+  // the visible viewport. Mount it at the document root so it behaves as a
+  // real viewport-level dialog.
+  document.body.appendChild(modal);
+
+  let modalHostWindow = null;
+  const syncModalViewport = () => {
+    try {
+      const hostFrame = window.frameElement;
+      if (!hostFrame || window.parent === window) return;
+      const frameRect = hostFrame.getBoundingClientRect();
+      const visibleTop = Math.max(0, -frameRect.top);
+      const visibleBottom = Math.min(frameRect.height, window.parent.innerHeight - frameRect.top);
+      const visibleHeight = Math.max(1, visibleBottom - visibleTop);
+      modal.style.position = "absolute";
+      modal.style.inset = "auto 0 auto 0";
+      modal.style.top = `${visibleTop}px`;
+      modal.style.height = `${visibleHeight}px`;
+      modalPanel.style.maxHeight = `${Math.max(160, visibleHeight - 40)}px`;
+      modalHostWindow = window.parent;
+    } catch (error) {
+      console.warn("Unable to align favorite-unit dialog with the host viewport:", error);
+    }
+  };
+  syncModalViewport();
+  modalHostWindow?.addEventListener("scroll", syncModalViewport, { passive: true });
+  modalHostWindow?.addEventListener("resize", syncModalViewport);
 
   const modalPageSize = 10;
   let modalPageIndex = 0;
@@ -808,6 +835,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   };
   const openModal = () => {
     const category = selectedCategory;
+    syncModalViewport();
     modalTitle.textContent = `All favorite ${category.label}`;
     modal.hidden = false;
     document.body.classList.add("stats-favorite-unit-modal-open");
@@ -834,6 +862,8 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   document.addEventListener("keydown", onModalKeydown);
   preview.cleanup = () => {
     document.removeEventListener("keydown", onModalKeydown);
+    modalHostWindow?.removeEventListener("scroll", syncModalViewport);
+    modalHostWindow?.removeEventListener("resize", syncModalViewport);
     document.body.classList.remove("stats-favorite-unit-modal-open");
     modal.remove();
   };

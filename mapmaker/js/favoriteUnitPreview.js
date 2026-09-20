@@ -263,7 +263,7 @@ function addPreviewStyles() {
       box-shadow: 0 0 14px rgba(255, 112, 48, .22);
     }
     .stats-favorite-unit-modal-gallery {
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       overflow-x: hidden;
       overflow-y: auto;
       padding: 16px;
@@ -410,9 +410,18 @@ function buildComponentLookups(definitions, nameCandidatesBySignature) {
     propulsions: strongestComponentCandidates(propulsionCandidates),
     weapons: strongestComponentCandidates(weaponCandidates)
   };
-  Object.keys(definitions.bodies).sort().forEach((id, index) => lookups.bodies.set(index, id));
-  Object.keys(definitions.propulsions).sort().forEach((id, index) => lookups.propulsions.set(index, id));
-  Object.keys(definitions.weapons).sort().forEach((id, index) => lookups.weapons.set(index, id));
+  // Replay numeric IDs usually match the sorted component tables, but some
+  // legacy/custom stats use different slots. Preserve mappings learned from
+  // replay unit names and use the sorted tables only as a fallback.
+  Object.keys(definitions.bodies).sort().forEach((id, index) => {
+    if (!lookups.bodies.has(index)) lookups.bodies.set(index, id);
+  });
+  Object.keys(definitions.propulsions).sort().forEach((id, index) => {
+    if (!lookups.propulsions.has(index)) lookups.propulsions.set(index, id);
+  });
+  Object.keys(definitions.weapons).sort().forEach((id, index) => {
+    if (!lookups.weapons.has(index)) lookups.weapons.set(index, id);
+  });
   return lookups;
 }
 

@@ -1,5 +1,5 @@
 {
-  "format": 1,
+  "format": 2,
   "source": "https://betaguide.wz2100.net/data_master/stats/",
   "targets": [
     {
@@ -21,6 +21,27 @@
     "count": 5,
     "basePointsPerSecond": 14,
     "modulePointsPerSecond": 12
+  },
+  "presets": {
+    "advancedBases": {
+      "label": "Advanced bases",
+      "source": "https://raw.githubusercontent.com/Warzone2100/warzone2100/master/data/mp/multiplay/script/functions/camTechEnabler.js",
+      "throughSeconds": 384,
+      "researchIds": [
+        "R-Wpn-Rocket-Damage01",
+        "R-Wpn-Rocket05-MiniPod",
+        "R-Vehicle-Engine01",
+        "R-Sys-Engineering01",
+        "R-Struc-Research-Upgrade01",
+        "R-Struc-Research-Module",
+        "R-Struc-CommandRelay",
+        "R-Sys-Sensor-Tower01",
+        "R-Sys-Sensor-Turret01",
+        "R-Defense-WallUpgrade02",
+        "R-Defense-WallUpgrade01",
+        "R-Defense-HardcreteWall"
+      ]
+    }
   },
   "topics": [
     {

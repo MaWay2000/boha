@@ -83,7 +83,7 @@
 
     .rush-controls {
       display: grid;
-      grid-template-columns: repeat(2, minmax(150px, 220px)) minmax(0, 1fr);
+      grid-template-columns: repeat(2, minmax(150px, 220px)) minmax(190px, 240px) minmax(0, 1fr);
       align-items: end;
       gap: 16px;
       padding: 18px 20px;
@@ -108,6 +108,29 @@
       font: 700 1rem "Oxanium", sans-serif;
       background: rgba(2, 10, 17, 0.9);
     }
+
+    .rush-preset {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-height: 44px;
+      padding: 9px 12px;
+      border: 1px solid rgba(109, 232, 255, 0.28);
+      border-radius: 5px;
+      color: #eefaff;
+      font: 700 0.9rem "Oxanium", sans-serif;
+      background: rgba(2, 10, 17, 0.9);
+      cursor: pointer;
+    }
+
+    .rush-preset input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--cyan);
+    }
+
+    .rush-preset span { display: grid; gap: 2px; }
+    .rush-preset small { color: var(--muted); font: 500 0.72rem "Space Grotesk", sans-serif; }
 
     .rush-assumption {
       margin: 0;
@@ -321,6 +344,7 @@
 
     .rush-research-item:hover { border-color: rgba(109, 232, 255, 0.42); }
     .rush-research-item input { accent-color: var(--cyan); }
+    .rush-research-item input:disabled { cursor: not-allowed; opacity: 0.7; }
     .rush-research-item small { color: var(--muted); }
 
     .rush-empty {
@@ -365,6 +389,10 @@
           </label>
           <label class="rush-control">Research points / sec per lab
             <input id="rushLabRate" type="number" min="1" max="200" step="1" value="26">
+          </label>
+          <label class="rush-preset">
+            <input id="rushAdvancedBases" type="checkbox">
+            <span>Advanced bases<small>Apply full-base starting research</small></span>
           </label>
           <p class="rush-assumption">Default 26 RP/s = a 14 RP/s lab plus a 12 RP/s module. Times assume constant output, enough power, and no pauses. Research-speed upgrades are represented as prerequisites but the selected rate stays constant.</p>
         </section>
@@ -416,13 +444,22 @@
         remaining: document.getElementById("rushRemaining"), points: document.getElementById("rushPoints"),
         power: document.getElementById("rushPower"), now: document.getElementById("rushNow"),
         gantt: document.getElementById("rushGantt"), queue: document.getElementById("rushQueue"),
-        list: document.getElementById("rushResearchList"), clear: document.getElementById("rushClear")
+        list: document.getElementById("rushResearchList"), clear: document.getElementById("rushClear"),
+        advanced: document.getElementById("rushAdvancedBases")
       };
       let data;
       let byId;
       let children;
       let targetAncestors;
+      let advancedBaseIds = new Set();
+      const manualCompleted = new Set();
       const completed = new Set();
+
+      function rebuildCompleted() {
+        completed.clear();
+        manualCompleted.forEach((id) => completed.add(id));
+        if (elements.advanced.checked) advancedBaseIds.forEach((id) => completed.add(id));
+      }
 
       function formatTime(seconds) {
         if (!Number.isFinite(seconds)) return "—";
@@ -574,6 +611,7 @@
       function syncCheckboxes() {
         elements.list.querySelectorAll("input[data-id]").forEach((input) => {
           input.checked = completed.has(input.dataset.id);
+          input.disabled = elements.advanced.checked && advancedBaseIds.has(input.dataset.id);
         });
       }
 
@@ -591,12 +629,13 @@
           points.textContent = `${topic.points.toLocaleString()} RP`;
           checkbox.addEventListener("change", function () {
             if (checkbox.checked) {
-              completed.add(topic.id);
-              ancestors(topic.id).forEach((id) => completed.add(id));
+              manualCompleted.add(topic.id);
+              ancestors(topic.id).forEach((id) => manualCompleted.add(id));
             } else {
-              completed.delete(topic.id);
-              descendants(topic.id).forEach((id) => completed.delete(id));
+              manualCompleted.delete(topic.id);
+              descendants(topic.id).forEach((id) => manualCompleted.delete(id));
             }
+            rebuildCompleted();
             syncCheckboxes();
             renderSchedule();
           });
@@ -607,13 +646,20 @@
 
       elements.labs.addEventListener("input", renderSchedule);
       elements.rate.addEventListener("input", renderSchedule);
+      elements.advanced.addEventListener("change", function () {
+        rebuildCompleted();
+        syncCheckboxes();
+        renderSchedule();
+      });
       elements.clear.addEventListener("click", function () {
-        completed.clear();
+        manualCompleted.clear();
+        elements.advanced.checked = false;
+        rebuildCompleted();
         syncCheckboxes();
         renderSchedule();
       });
 
-      fetch("research-rush-data.json?v=20260920-1", { cache: "no-store" })
+      fetch("research-rush-data.json?v=20260920-2", { cache: "no-store" })
         .then((response) => {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           return response.json();
@@ -623,6 +669,7 @@
           byId = new Map(data.topics.map((topic) => [topic.id, topic]));
           children = new Map(data.topics.map((topic) => [topic.id, []]));
           data.topics.forEach((topic) => topic.requires.forEach((id) => children.get(id).push(topic.id)));
+          advancedBaseIds = new Set(data.presets?.advancedBases?.researchIds || []);
           targetAncestors = data.targets.map((target) => ancestors(target.researchId));
           data.targets.forEach((target) => {
             const link = document.createElement("a");

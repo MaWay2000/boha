@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Five-Lab Research Rush</title>
+  <meta
+    name="description"
+    content="Plan an ASAP five-lab Warzone 2100 research route to Heavy Rocket Bastion and Avenger SAM."
+  >
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  >
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css?v=20260916-1">
+  <style>
+    .rush-shell {
+      display: grid;
+      gap: 22px;
+      min-width: 0;
+      margin-top: clamp(24px, 4vw, 52px);
+    }
+
+    .rush-hero,
+    .rush-controls,
+    .rush-panel {
+      min-width: 0;
+      border: 1px solid rgba(109, 232, 255, 0.2);
+      background: linear-gradient(145deg, rgba(8, 24, 35, 0.96), rgba(5, 15, 24, 0.98));
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.26);
+    }
+
+    .rush-hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+      gap: 24px;
+      padding: clamp(22px, 3vw, 36px);
+    }
+
+    .rush-hero h1 {
+      margin: 4px 0 12px;
+      color: #eefaff;
+      font-family: "Oxanium", sans-serif;
+      font-size: clamp(1.7rem, 3vw, 2.8rem);
+      line-height: 1.08;
+      overflow-wrap: anywhere;
+      text-transform: uppercase;
+    }
+
+    .rush-hero-copy > p:last-child {
+      max-width: 760px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .rush-targets {
+      display: grid;
+      gap: 10px;
+    }
+
+    .rush-target {
+      display: grid;
+      gap: 4px;
+      padding: 15px 17px;
+      border-left: 3px solid var(--cyan);
+      background: rgba(29, 72, 91, 0.32);
+      color: #effbff;
+      text-decoration: none;
+    }
+
+    .rush-target:nth-child(2) {
+      border-left-color: #ffbf4f;
+    }
+
+    .rush-target span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+    }
+
+    .rush-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(150px, 220px)) minmax(0, 1fr);
+      align-items: end;
+      gap: 16px;
+      padding: 18px 20px;
+    }
+
+    .rush-control {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .rush-control input {
+      min-height: 44px;
+      padding: 9px 12px;
+      border: 1px solid rgba(109, 232, 255, 0.28);
+      border-radius: 5px;
+      color: #fff;
+      font: 700 1rem "Oxanium", sans-serif;
+      background: rgba(2, 10, 17, 0.9);
+    }
+
+    .rush-assumption {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .rush-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .rush-stat {
+      display: grid;
+      gap: 5px;
+      padding: 17px 18px;
+      border: 1px solid rgba(109, 232, 255, 0.16);
+      background: rgba(9, 28, 40, 0.88);
+    }
+
+    .rush-stat span {
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .rush-stat strong {
+      color: #f4fcff;
+      font: 800 clamp(1.1rem, 2vw, 1.55rem) "Oxanium", sans-serif;
+    }
+
+    .rush-panel {
+      padding: 20px;
+    }
+
+    .rush-panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    .rush-panel-head h2 {
+      margin: 0;
+      color: var(--cyan);
+      font: 800 1.02rem "Oxanium", sans-serif;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .rush-panel-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .rush-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .rush-legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      margin-right: 6px;
+      border-radius: 2px;
+      background: #4ccbe8;
+    }
+
+    .rush-legend .bastion::before { background: #ee6f54; }
+    .rush-legend .sam::before { background: #ffbd4a; }
+
+    .rush-now {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .rush-now-card {
+      min-width: 0;
+      padding: 13px;
+      border: 1px solid rgba(109, 232, 255, 0.18);
+      background: rgba(4, 14, 22, 0.82);
+    }
+
+    .rush-now-card span {
+      display: block;
+      margin-bottom: 6px;
+      color: var(--muted);
+      font: 700 0.72rem "Oxanium", sans-serif;
+      text-transform: uppercase;
+    }
+
+    .rush-now-card strong {
+      display: block;
+      overflow-wrap: anywhere;
+      color: #edfaff;
+      font-size: 0.9rem;
+    }
+
+    .rush-now-card.is-idle strong { color: #6e8290; }
+
+    .rush-gantt {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+
+    .rush-lane {
+      display: grid;
+      grid-template-columns: 58px minmax(820px, 1fr);
+      align-items: stretch;
+      min-height: 54px;
+    }
+
+    .rush-lane-label {
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+      font: 800 0.78rem "Oxanium", sans-serif;
+      background: rgba(4, 15, 23, 0.9);
+    }
+
+    .rush-lane-track {
+      position: relative;
+      min-height: 54px;
+      border-left: 1px solid rgba(109, 232, 255, 0.2);
+      background:
+        repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), rgba(109, 232, 255, 0.08) calc(10% - 1px), rgba(109, 232, 255, 0.08) 10%),
+        rgba(3, 12, 19, 0.72);
+    }
+
+    .rush-task {
+      position: absolute;
+      top: 7px;
+      bottom: 7px;
+      display: flex;
+      align-items: center;
+      min-width: 3px;
+      overflow: hidden;
+      padding: 0 7px;
+      border: 1px solid rgba(197, 246, 255, 0.34);
+      border-radius: 3px;
+      color: #061017;
+      font: 800 0.68rem "Oxanium", sans-serif;
+      white-space: nowrap;
+      background: #4ccbe8;
+    }
+
+    .rush-task.bastion { background: #ee6f54; }
+    .rush-task.sam { background: #ffbd4a; }
+
+    .rush-table-wrap {
+      min-width: 0;
+      overflow-x: auto;
+    }
+
+    .rush-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .rush-table th,
+    .rush-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(109, 232, 255, 0.12);
+      text-align: left;
+    }
+
+    .rush-table th {
+      color: var(--cyan);
+      font: 700 0.75rem "Oxanium", sans-serif;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .rush-table td {
+      color: #dbeaf1;
+      font-size: 0.88rem;
+    }
+
+    .rush-research-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .rush-research-item {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(109, 232, 255, 0.12);
+      background: rgba(4, 15, 23, 0.66);
+      cursor: pointer;
+    }
+
+    .rush-research-item:hover { border-color: rgba(109, 232, 255, 0.42); }
+    .rush-research-item input { accent-color: var(--cyan); }
+    .rush-research-item small { color: var(--muted); }
+
+    .rush-empty {
+      padding: 26px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      .rush-hero { grid-template-columns: 1fr; }
+      .rush-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rush-assumption { grid-column: 1 / -1; }
+      .rush-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .rush-now { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 620px) {
+      .rush-controls,
+      .rush-summary,
+      .rush-now,
+      .rush-research-list { grid-template-columns: 1fr; }
+      .rush-panel-head { align-items: flex-start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body class="embedded-page">
+  <div class="page-shell">
+    <main id="top">
+      <section class="section-frame rush-shell">
+        <header class="rush-hero">
+          <div class="rush-hero-copy">
+            <p class="eyebrow">Five-Lab Research Rush</p>
+            <h1>Heavy Rocket Bastion + Avenger SAM</h1>
+            <p>Keep every available lab on the next scheduled topic. Mark anything you already researched and the five-lab route recalculates instantly.</p>
+          </div>
+          <div class="rush-targets" id="rushTargets"></div>
+        </header>
+
+        <section class="rush-controls" aria-label="Schedule settings">
+          <label class="rush-control">Labs
+            <input id="rushLabCount" type="number" min="1" max="5" step="1" value="5">
+          </label>
+          <label class="rush-control">Research points / sec per lab
+            <input id="rushLabRate" type="number" min="1" max="200" step="1" value="26">
+          </label>
+          <p class="rush-assumption">Default 26 RP/s = a 14 RP/s lab plus a 12 RP/s module. Times assume constant output, enough power, and no pauses. Research-speed upgrades are represented as prerequisites but the selected rate stays constant.</p>
+        </section>
+
+        <section class="rush-summary" aria-live="polite">
+          <div class="rush-stat"><span>Finish both</span><strong id="rushFinish">—</strong></div>
+          <div class="rush-stat"><span>Remaining topics</span><strong id="rushRemaining">—</strong></div>
+          <div class="rush-stat"><span>Research points</span><strong id="rushPoints">—</strong></div>
+          <div class="rush-stat"><span>Power required</span><strong id="rushPower">—</strong></div>
+        </section>
+
+        <section class="rush-panel">
+          <div class="rush-panel-head">
+            <div><h2>Research these now</h2><p>The first available assignment for every lab.</p></div>
+            <div class="rush-legend"><span>Shared path</span><span class="bastion">Bastion</span><span class="sam">SAM</span></div>
+          </div>
+          <div class="rush-now" id="rushNow"></div>
+          <div class="rush-gantt" id="rushGantt"></div>
+        </section>
+
+        <section class="rush-panel">
+          <div class="rush-panel-head">
+            <div><h2>Ordered lab queue</h2><p>Start each item at the displayed time, as soon as its prerequisites and assigned lab are free.</p></div>
+          </div>
+          <div class="rush-table-wrap">
+            <table class="rush-table">
+              <thead><tr><th>Start</th><th>Lab</th><th>Research</th><th>Duration</th><th>Power</th></tr></thead>
+              <tbody id="rushQueue"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="rush-panel">
+          <div class="rush-panel-head">
+            <div><h2>Already researched</h2><p>Checking a topic also checks its prerequisites. The plan then removes completed work.</p></div>
+            <button class="button button-secondary" id="rushClear" type="button">Clear all</button>
+          </div>
+          <div class="rush-research-list" id="rushResearchList"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const elements = {
+        targets: document.getElementById("rushTargets"), labs: document.getElementById("rushLabCount"),
+        rate: document.getElementById("rushLabRate"), finish: document.getElementById("rushFinish"),
+        remaining: document.getElementById("rushRemaining"), points: document.getElementById("rushPoints"),
+        power: document.getElementById("rushPower"), now: document.getElementById("rushNow"),
+        gantt: document.getElementById("rushGantt"), queue: document.getElementById("rushQueue"),
+        list: document.getElementById("rushResearchList"), clear: document.getElementById("rushClear")
+      };
+      let data;
+      let byId;
+      let children;
+      let targetAncestors;
+      const completed = new Set();
+
+      function formatTime(seconds) {
+        if (!Number.isFinite(seconds)) return "—";
+        const rounded = Math.max(0, Math.round(seconds));
+        const hours = Math.floor(rounded / 3600);
+        const minutes = Math.floor((rounded % 3600) / 60);
+        const secs = rounded % 60;
+        return hours ? `${hours}h ${String(minutes).padStart(2, "0")}m` : `${minutes}m ${String(secs).padStart(2, "0")}s`;
+      }
+
+      function ancestors(id, result = new Set()) {
+        for (const prerequisite of byId.get(id).requires) {
+          if (!result.has(prerequisite)) {
+            result.add(prerequisite);
+            ancestors(prerequisite, result);
+          }
+        }
+        return result;
+      }
+
+      function descendants(id, result = new Set()) {
+        for (const child of children.get(id) || []) {
+          if (!result.has(child)) {
+            result.add(child);
+            descendants(child, result);
+          }
+        }
+        return result;
+      }
+
+      function branchFor(id) {
+        const inBastion = targetAncestors[0].has(id) || data.targets[0].researchId === id;
+        const inSam = targetAncestors[1].has(id) || data.targets[1].researchId === id;
+        return inBastion && inSam ? "shared" : (inBastion ? "bastion" : "sam");
+      }
+
+      function makeSchedule() {
+        const labCount = Math.max(1, Math.min(5, Number(elements.labs.value) || 5));
+        const rate = Math.max(1, Number(elements.rate.value) || 26);
+        const remaining = new Map(data.topics.filter((topic) => !completed.has(topic.id)).map((topic) => [topic.id, topic]));
+        const duration = (topic) => topic.points / rate;
+        const criticalCache = new Map();
+
+        function critical(id) {
+          if (criticalCache.has(id)) return criticalCache.get(id);
+          const topic = remaining.get(id);
+          if (!topic) return 0;
+          const next = (children.get(id) || []).filter((child) => remaining.has(child));
+          const value = duration(topic) + (next.length ? Math.max(...next.map(critical)) : 0);
+          criticalCache.set(id, value);
+          return value;
+        }
+
+        const labs = Array.from({ length: labCount }, (_, index) => ({ index, freeAt: 0 }));
+        const done = new Set(completed);
+        const started = new Set();
+        const running = [];
+        const tasks = [];
+        let now = 0;
+
+        while (started.size < remaining.size || running.length) {
+          for (let index = running.length - 1; index >= 0; index--) {
+            if (running[index].end <= now + 0.000001) {
+              done.add(running[index].id);
+              running.splice(index, 1);
+            }
+          }
+
+          const ready = [...remaining.values()].filter((topic) =>
+            !started.has(topic.id) && topic.requires.every((id) => done.has(id))
+          ).sort((a, b) => critical(b.id) - critical(a.id) || b.points - a.points || a.name.localeCompare(b.name));
+          const freeLabs = labs.filter((lab) => lab.freeAt <= now + 0.000001);
+
+          while (ready.length && freeLabs.length) {
+            const topic = ready.shift();
+            const lab = freeLabs.shift();
+            const task = {
+              id: topic.id, name: topic.name, points: topic.points, power: topic.power,
+              lab: lab.index, start: now, end: now + duration(topic), branch: branchFor(topic.id)
+            };
+            lab.freeAt = task.end;
+            started.add(topic.id);
+            running.push(task);
+            tasks.push(task);
+          }
+
+          if (started.size >= remaining.size && !running.length) break;
+          const nextFinish = Math.min(...running.map((task) => task.end));
+          if (!Number.isFinite(nextFinish)) break;
+          now = nextFinish;
+        }
+
+        return { tasks, labs: labCount, rate, finish: tasks.length ? Math.max(...tasks.map((task) => task.end)) : 0 };
+      }
+
+      function renderSchedule() {
+        const schedule = makeSchedule();
+        const remainingTopics = data.topics.filter((topic) => !completed.has(topic.id));
+        elements.finish.textContent = formatTime(schedule.finish);
+        elements.remaining.textContent = remainingTopics.length.toLocaleString();
+        elements.points.textContent = remainingTopics.reduce((sum, topic) => sum + topic.points, 0).toLocaleString();
+        elements.power.textContent = remainingTopics.reduce((sum, topic) => sum + topic.power, 0).toLocaleString();
+
+        elements.now.replaceChildren();
+        for (let lab = 0; lab < schedule.labs; lab++) {
+          const task = schedule.tasks.find((item) => item.lab === lab && item.start === 0);
+          const card = document.createElement("div");
+          card.className = "rush-now-card" + (task ? "" : " is-idle");
+          card.innerHTML = `<span>Lab ${lab + 1}</span><strong>${task ? task.name : "Waiting for prerequisite"}</strong>`;
+          elements.now.appendChild(card);
+        }
+
+        elements.gantt.replaceChildren();
+        for (let lab = 0; lab < schedule.labs; lab++) {
+          const lane = document.createElement("div");
+          lane.className = "rush-lane";
+          const label = document.createElement("div");
+          label.className = "rush-lane-label";
+          label.textContent = `LAB ${lab + 1}`;
+          const track = document.createElement("div");
+          track.className = "rush-lane-track";
+          schedule.tasks.filter((task) => task.lab === lab).forEach((task) => {
+            const bar = document.createElement("div");
+            bar.className = `rush-task ${task.branch === "shared" ? "" : task.branch}`;
+            bar.style.left = `${schedule.finish ? task.start / schedule.finish * 100 : 0}%`;
+            bar.style.width = `${schedule.finish ? Math.max(0.3, (task.end - task.start) / schedule.finish * 100) : 0}%`;
+            bar.textContent = task.name;
+            bar.title = `${task.name}\n${formatTime(task.start)} – ${formatTime(task.end)}`;
+            track.appendChild(bar);
+          });
+          lane.append(label, track);
+          elements.gantt.appendChild(lane);
+        }
+
+        elements.queue.replaceChildren();
+        schedule.tasks.slice().sort((a, b) => a.start - b.start || a.lab - b.lab).forEach((task) => {
+          const row = document.createElement("tr");
+          [formatTime(task.start), `Lab ${task.lab + 1}`, task.name, formatTime(task.end - task.start), task.power.toLocaleString()]
+            .forEach((value) => { const cell = document.createElement("td"); cell.textContent = value; row.appendChild(cell); });
+          elements.queue.appendChild(row);
+        });
+        if (!schedule.tasks.length) {
+          const row = document.createElement("tr");
+          row.innerHTML = '<td colspan="5" class="rush-empty">Both targets are already researched.</td>';
+          elements.queue.appendChild(row);
+        }
+      }
+
+      function syncCheckboxes() {
+        elements.list.querySelectorAll("input[data-id]").forEach((input) => {
+          input.checked = completed.has(input.dataset.id);
+        });
+      }
+
+      function renderResearchList() {
+        elements.list.replaceChildren();
+        data.topics.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach((topic) => {
+          const label = document.createElement("label");
+          label.className = "rush-research-item";
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.dataset.id = topic.id;
+          const name = document.createElement("span");
+          name.textContent = topic.name;
+          const points = document.createElement("small");
+          points.textContent = `${topic.points.toLocaleString()} RP`;
+          checkbox.addEventListener("change", function () {
+            if (checkbox.checked) {
+              completed.add(topic.id);
+              ancestors(topic.id).forEach((id) => completed.add(id));
+            } else {
+              completed.delete(topic.id);
+              descendants(topic.id).forEach((id) => completed.delete(id));
+            }
+            syncCheckboxes();
+            renderSchedule();
+          });
+          label.append(checkbox, name, points);
+          elements.list.appendChild(label);
+        });
+      }
+
+      elements.labs.addEventListener("input", renderSchedule);
+      elements.rate.addEventListener("input", renderSchedule);
+      elements.clear.addEventListener("click", function () {
+        completed.clear();
+        syncCheckboxes();
+        renderSchedule();
+      });
+
+      fetch("research-rush-data.json?v=20260920-1", { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.json();
+        })
+        .then((payload) => {
+          data = payload;
+          byId = new Map(data.topics.map((topic) => [topic.id, topic]));
+          children = new Map(data.topics.map((topic) => [topic.id, []]));
+          data.topics.forEach((topic) => topic.requires.forEach((id) => children.get(id).push(topic.id)));
+          targetAncestors = data.targets.map((target) => ancestors(target.researchId));
+          data.targets.forEach((target) => {
+            const link = document.createElement("a");
+            link.className = "rush-target";
+            link.href = target.guideUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.innerHTML = `<span>${target.type} target</span><strong>${target.name}</strong>`;
+            elements.targets.appendChild(link);
+          });
+          renderResearchList();
+          renderSchedule();
+        })
+        .catch((error) => {
+          elements.now.innerHTML = `<p class="rush-empty">Unable to load research data: ${error.message}</p>`;
+        });
+    })();
+  </script>
+  <script src="embedded-page.js?v=20260720-1"></script>
+</body>
+</html>

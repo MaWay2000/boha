@@ -1,0 +1,435 @@
+{
+  "format": 1,
+  "source": "https://betaguide.wz2100.net/data_master/stats/",
+  "targets": [
+    {
+      "researchId": "R-Defense-Super-Rocket",
+      "componentId": "X-Super-Rocket",
+      "name": "Heavy Rocket Bastion",
+      "type": "Structure",
+      "guideUrl": "https://betaguide.wz2100.net/structure.html?details_id=X-Super-Rocket"
+    },
+    {
+      "researchId": "R-Wpn-Missile-LtSAM",
+      "componentId": "Missile-LtSAM",
+      "name": "Avenger SAM",
+      "type": "Weapon",
+      "guideUrl": "https://betaguide.wz2100.net/weapons.html?details_id=Missile-LtSAM"
+    }
+  ],
+  "lab": {
+    "count": 5,
+    "basePointsPerSecond": 14,
+    "modulePointsPerSecond": 12
+  },
+  "topics": [
+    {
+      "id": "R-Wpn-Missile-LtSAM",
+      "name": "Avenger SAM",
+      "points": 14400,
+      "power": 450,
+      "requires": [
+        "R-Sys-Sensor-Upgrade02",
+        "R-Wpn-Missile2A-T"
+      ],
+      "target": true
+    },
+    {
+      "id": "R-Struc-CommandRelay",
+      "name": "Command Relay Post",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Sys-Sensor-Tower01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade04",
+      "name": "Dedicated Synaptic Link Data Analysis",
+      "points": 4800,
+      "power": 150,
+      "requires": [
+        "R-Struc-Research-Upgrade03"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade05",
+      "name": "Dedicated Synaptic Link Data Analysis Mk2",
+      "points": 6000,
+      "power": 187,
+      "requires": [
+        "R-Struc-Research-Upgrade04"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade06",
+      "name": "Dedicated Synaptic Link Data Analysis Mk3",
+      "points": 8000,
+      "power": 250,
+      "requires": [
+        "R-Struc-Research-Upgrade05"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Sys-Engineering01",
+      "name": "Engineering",
+      "points": 1200,
+      "power": 37,
+      "requires": [],
+      "target": false
+    },
+    {
+      "id": "R-Vehicle-Engine01",
+      "name": "Fuel Injection Engine",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Sys-Engineering01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-HardcreteWall",
+      "name": "Hardcrete",
+      "points": 600,
+      "power": 18,
+      "requires": [
+        "R-Sys-Engineering01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage01",
+      "name": "HE Rockets",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Wpn-Rocket05-MiniPod"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage02",
+      "name": "HE Rockets Mk2",
+      "points": 2400,
+      "power": 75,
+      "requires": [
+        "R-Wpn-Rocket-Damage01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage03",
+      "name": "HE Rockets Mk3",
+      "points": 3600,
+      "power": 112,
+      "requires": [
+        "R-Wpn-Rocket-Damage02"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage04",
+      "name": "HEAT Rocket Warhead",
+      "points": 4800,
+      "power": 150,
+      "requires": [
+        "R-Wpn-Rocket01-LtAT"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage05",
+      "name": "HEAT Rocket Warhead Mk2",
+      "points": 6000,
+      "power": 187,
+      "requires": [
+        "R-Wpn-Rocket-Damage04"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage06",
+      "name": "HEAT Rocket Warhead Mk3",
+      "points": 7200,
+      "power": 225,
+      "requires": [
+        "R-Wpn-Rocket-Damage05"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-Super-Rocket",
+      "name": "Heavy Rocket Bastion",
+      "points": 12000,
+      "power": 375,
+      "requires": [
+        "R-Wpn-RocketSlow-Accuracy02",
+        "R-Defense-WallUpgrade05",
+        "R-Wpn-Rocket-Damage08"
+      ],
+      "target": true
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage07",
+      "name": "HESH Rocket Warhead",
+      "points": 8400,
+      "power": 262,
+      "requires": [
+        "R-Wpn-Rocket-Damage06"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Damage08",
+      "name": "HESH Rocket Warhead Mk2",
+      "points": 9600,
+      "power": 300,
+      "requires": [
+        "R-Wpn-Rocket-Damage07"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Sys-Engineering02",
+      "name": "Improved Engineering",
+      "points": 4800,
+      "power": 150,
+      "requires": [
+        "R-Sys-Engineering01",
+        "R-Struc-Research-Upgrade04"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-WallUpgrade01",
+      "name": "Improved Hardcrete",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Defense-HardcreteWall"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-WallUpgrade02",
+      "name": "Improved Hardcrete Mk2",
+      "points": 2400,
+      "power": 75,
+      "requires": [
+        "R-Defense-WallUpgrade01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-WallUpgrade03",
+      "name": "Improved Hardcrete Mk3",
+      "points": 3600,
+      "power": 112,
+      "requires": [
+        "R-Defense-WallUpgrade02"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Accuracy02",
+      "name": "Improved Rocket Wire Guidance",
+      "points": 4800,
+      "power": 150,
+      "requires": [
+        "R-Wpn-Rocket-Damage04",
+        "R-Wpn-Rocket-Accuracy01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket01-LtAT",
+      "name": "Lancer AT Rocket",
+      "points": 3600,
+      "power": 112,
+      "requires": [
+        "R-Wpn-Rocket-Damage03"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket05-MiniPod",
+      "name": "Mini-Rocket Pod",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Vehicle-Engine01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade07",
+      "name": "Neural Synapse Research Brain",
+      "points": 10000,
+      "power": 312,
+      "requires": [
+        "R-Struc-Research-Upgrade06"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Module",
+      "name": "Research Module",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Struc-CommandRelay"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-RocketSlow-Accuracy01",
+      "name": "Rocket Laser Designator",
+      "points": 6000,
+      "power": 187,
+      "requires": [
+        "R-Wpn-Rocket-Accuracy02"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Missile2A-T",
+      "name": "Scourge Missile",
+      "points": 16600,
+      "power": 450,
+      "requires": [
+        "R-Wpn-Rocket07-Tank-Killer",
+        "R-Wpn-RocketSlow-Accuracy02",
+        "R-Struc-Research-Upgrade07"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Sys-Sensor-Tower01",
+      "name": "Sensor Tower",
+      "points": 900,
+      "power": 28,
+      "requires": [
+        "R-Sys-Sensor-Turret01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Sys-Sensor-Turret01",
+      "name": "Sensor Turret",
+      "points": 900,
+      "power": 28,
+      "requires": [],
+      "target": false
+    },
+    {
+      "id": "R-Sys-Sensor-Upgrade01",
+      "name": "Sensor Upgrade",
+      "points": 1800,
+      "power": 56,
+      "requires": [
+        "R-Struc-Research-Upgrade04"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Sys-Sensor-Upgrade02",
+      "name": "Sensor Upgrade Mk2",
+      "points": 3600,
+      "power": 112,
+      "requires": [
+        "R-Sys-Sensor-Upgrade01",
+        "R-Struc-Research-Upgrade05"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket-Accuracy01",
+      "name": "Stabilized Rockets",
+      "points": 3600,
+      "power": 112,
+      "requires": [
+        "R-Struc-Research-Upgrade01",
+        "R-Wpn-Rocket-Damage02"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-WallUpgrade04",
+      "name": "Supercrete",
+      "points": 6000,
+      "power": 187,
+      "requires": [
+        "R-Sys-Engineering02",
+        "R-Defense-WallUpgrade03"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Defense-WallUpgrade05",
+      "name": "Supercrete Mk2",
+      "points": 8000,
+      "power": 250,
+      "requires": [
+        "R-Defense-WallUpgrade04"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade01",
+      "name": "Synaptic Link Data Analysis",
+      "points": 1200,
+      "power": 37,
+      "requires": [
+        "R-Struc-Research-Module"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade02",
+      "name": "Synaptic Link Data Analysis Mk2",
+      "points": 2400,
+      "power": 75,
+      "requires": [
+        "R-Struc-Research-Upgrade01"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Struc-Research-Upgrade03",
+      "name": "Synaptic Link Data Analysis Mk3",
+      "points": 3600,
+      "power": 112,
+      "requires": [
+        "R-Struc-Research-Upgrade02"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-Rocket07-Tank-Killer",
+      "name": "Tank Killer Rocket",
+      "points": 6000,
+      "power": 187,
+      "requires": [
+        "R-Wpn-RocketSlow-Accuracy01",
+        "R-Wpn-Rocket-Damage05"
+      ],
+      "target": false
+    },
+    {
+      "id": "R-Wpn-RocketSlow-Accuracy02",
+      "name": "Thermal Imaging Rockets",
+      "points": 7200,
+      "power": 225,
+      "requires": [
+        "R-Wpn-RocketSlow-Accuracy01",
+        "R-Struc-Research-Upgrade04"
+      ],
+      "target": false
+    }
+  ]
+}

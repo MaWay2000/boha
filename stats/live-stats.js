@@ -1,4 +1,4 @@
-import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20260920-five-column-modal";
+import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20260920-all-unit-versions-2";
 
 const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
 const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");
@@ -526,18 +526,33 @@ function hydratePublishedBoard(name) {
 }
 
 function getFavoriteUnitNameCandidates() {
-  const candidates = new Map();
-  Object.values(leaderboardData?.leaderboards || {}).forEach((board) => {
-    (board.players || []).forEach((player) => {
-      (player.favoriteUnits || []).forEach((unit) => {
-        if (!unit.signature || !unit.name) return;
-        if (!candidates.has(unit.signature)) candidates.set(unit.signature, []);
-        const names = candidates.get(unit.signature);
-        if (!names.includes(unit.name)) names.push(unit.name);
-      });
+  const candidateCounts = new Map();
+  const globalBoard = leaderboardData?.leaderboards?.Global;
+  (globalBoard?.players || []).forEach((player) => {
+    (player.favoriteUnits || []).forEach((unit) => {
+      if (!unit.signature || !unit.name) return;
+      const signature = normalizeFavoriteUnitSignature(unit.signature);
+      if (!candidateCounts.has(signature)) candidateCounts.set(signature, new Map());
+      const names = candidateCounts.get(signature);
+      names.set(unit.name, (names.get(unit.name) || 0) + Number(unit.count || 0));
     });
   });
-  return candidates;
+  return new Map([...candidateCounts].map(([signature, names]) => [
+    signature,
+    [...names]
+      .map(([name, count]) => ({ name, count }))
+      .sort((left, right) => right.count - left.count)
+  ]));
+}
+
+function normalizeFavoriteUnitSignature(signature) {
+  const parts = String(signature || "").split(":");
+  if (parts.length < 9) return String(signature || "");
+
+  // ZNULLREPAIR is serialized as component 5 by some replay versions and as
+  // 0 by others. Both mean that the design has no repair turret.
+  if (Number(parts[4]) === 5) parts[4] = "0";
+  return parts.join(":");
 }
 
 function getGlobalFavoriteUnits(account) {
@@ -546,18 +561,24 @@ function getGlobalFavoriteUnits(account) {
     : new Set(account?.publicKeys || []);
   const unitsBySignature = new Map();
 
-  Object.values(leaderboardData?.leaderboards || {}).forEach((board) => {
-    (board.players || []).forEach((player) => {
-      const playerKeys = Array.isArray(player.publicKeys) ? player.publicKeys : [];
-      if (!playerKeys.some((key) => accountKeys.has(key))) return;
+  const globalBoard = leaderboardData?.leaderboards?.Global;
+  (globalBoard?.players || []).forEach((player) => {
+    const playerKeys = Array.isArray(player.publicKeys) ? player.publicKeys : [];
+    if (!playerKeys.some((key) => accountKeys.has(key))) return;
 
-      (player.favoriteUnits || []).forEach((unit) => {
-        if (!unit?.signature) return;
-        const existing = unitsBySignature.get(unit.signature);
-        if (!existing || Number(unit.count || 0) > Number(existing.count || 0)) {
-          unitsBySignature.set(unit.signature, unit);
-        }
-      });
+    (player.favoriteUnits || []).forEach((unit) => {
+      if (!unit?.signature) return;
+      const signature = normalizeFavoriteUnitSignature(unit.signature);
+      const existing = unitsBySignature.get(signature);
+      if (existing) {
+        existing.count += Number(unit.count || 0);
+      } else {
+        unitsBySignature.set(signature, {
+          ...unit,
+          signature,
+          count: Number(unit.count || 0)
+        });
+      }
     });
   });
 

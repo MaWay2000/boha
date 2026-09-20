@@ -317,14 +317,29 @@ function loadDefinitions() {
       fetchJson("components/bodies/body.json"),
       fetchJson("components/prop/propulsion.json"),
       fetchJson("components/weapons/weapons.json"),
-      fetchJson("components/templates.json")
-    ]).then(([bodies, propulsions, weapons, templates]) => ({ bodies, propulsions, weapons, templates }));
+      fetchJson("components/templates.json"),
+      fetchJson("components/brain.json"),
+      fetchJson("components/repair.json"),
+      fetchJson("components/ecm.json"),
+      fetchJson("components/sensor.json"),
+      fetchJson("components/construction.json")
+    ]).then(([bodies, propulsions, weapons, templates, brains, repairs, ecms, sensors, constructions]) => ({
+      bodies, propulsions, weapons, templates, brains, repairs, ecms, sensors, constructions
+    }));
   }
   return definitionsPromise;
 }
 
 function normalized(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function candidateName(candidate) {
+  return typeof candidate === "string" ? candidate : String(candidate?.name || "");
+}
+
+function candidateCount(candidate) {
+  return typeof candidate === "string" ? 1 : Math.max(0, Number(candidate?.count || 0));
 }
 
 function findNamedDefinition(definitions, designName) {
@@ -368,7 +383,12 @@ function getComponentIds(unit, signature = unit?.signature) {
   };
   return {
     bodyId: numberOrFallback(unit?.bodyId, parts[1]),
+    brainId: Number.parseInt(parts[2], 10),
     propulsionId: numberOrFallback(unit?.propulsionId, parts[3]),
+    repairId: Number.parseInt(parts[4], 10),
+    ecmId: Number.parseInt(parts[5], 10),
+    sensorId: Number.parseInt(parts[6], 10),
+    constructId: Number.parseInt(parts[7], 10),
     weaponIds: Array.isArray(unit?.weaponIds) && unit.weaponIds.length
       ? unit.weaponIds.map((value) => Number.parseInt(value, 10)).filter(Number.isFinite)
       : [Number.parseInt(parts[8], 10)].filter(Number.isFinite)
@@ -393,44 +413,67 @@ function buildComponentLookups(definitions, nameCandidatesBySignature) {
   const bodyCandidates = new Map();
   const propulsionCandidates = new Map();
   const weaponCandidates = new Map();
+  const brainCandidates = new Map();
+  const repairCandidates = new Map();
+  const ecmCandidates = new Map();
+  const sensorCandidates = new Map();
+  const constructCandidates = new Map();
   for (const [signature, names] of nameCandidatesBySignature || []) {
     const componentIds = getComponentIds(null, signature);
-    for (const name of new Set((names || []).filter(Boolean))) {
+    for (const candidate of names || []) {
+      const name = candidateName(candidate);
+      if (!name) continue;
       const design = findDesign({ name }, definitions);
-      if (!design) continue;
-      addComponentCandidate(bodyCandidates, componentIds.bodyId, design.body);
-      addComponentCandidate(propulsionCandidates, componentIds.propulsionId, design.propulsion);
-      componentIds.weaponIds.forEach((weaponId, index) => {
-        addComponentCandidate(weaponCandidates, weaponId, design.weapons?.[index] || design.weapons?.[0]);
-      });
+      if (design) {
+        addComponentCandidate(bodyCandidates, componentIds.bodyId, design.body);
+        addComponentCandidate(propulsionCandidates, componentIds.propulsionId, design.propulsion);
+        componentIds.weaponIds.forEach((weaponId, index) => {
+          addComponentCandidate(weaponCandidates, weaponId, design.weapons?.[index] || design.weapons?.[0]);
+        });
+      }
+      addComponentCandidate(brainCandidates, componentIds.brainId, findNamedDefinition(definitions.brains, name)?.id);
+      addComponentCandidate(repairCandidates, componentIds.repairId, findNamedDefinition(definitions.repairs, name)?.id);
+      addComponentCandidate(ecmCandidates, componentIds.ecmId, findNamedDefinition(definitions.ecms, name)?.id);
+      addComponentCandidate(sensorCandidates, componentIds.sensorId, findNamedDefinition(definitions.sensors, name)?.id);
+      addComponentCandidate(constructCandidates, componentIds.constructId, findNamedDefinition(definitions.constructions, name)?.id);
     }
   }
   const lookups = {
     bodies: strongestComponentCandidates(bodyCandidates),
     propulsions: strongestComponentCandidates(propulsionCandidates),
-    weapons: strongestComponentCandidates(weaponCandidates)
+    weapons: strongestComponentCandidates(weaponCandidates),
+    brains: strongestComponentCandidates(brainCandidates),
+    repairs: strongestComponentCandidates(repairCandidates),
+    ecms: strongestComponentCandidates(ecmCandidates),
+    sensors: strongestComponentCandidates(sensorCandidates),
+    constructions: strongestComponentCandidates(constructCandidates)
   };
-  // Replay numeric IDs usually match the sorted component tables, but some
-  // legacy/custom stats use different slots. Preserve mappings learned from
-  // replay unit names and use the sorted tables only as a fallback.
+  // Core body, propulsion, and weapon IDs are their positions in the sorted
+  // component tables. Keep these authoritative: localized or reused replay
+  // names can otherwise teach two numeric weapon IDs the same component.
   Object.keys(definitions.bodies).sort().forEach((id, index) => {
-    if (!lookups.bodies.has(index)) lookups.bodies.set(index, id);
+    lookups.bodies.set(index, id);
   });
   Object.keys(definitions.propulsions).sort().forEach((id, index) => {
-    if (!lookups.propulsions.has(index)) lookups.propulsions.set(index, id);
+    lookups.propulsions.set(index, id);
   });
   Object.keys(definitions.weapons).sort().forEach((id, index) => {
-    if (!lookups.weapons.has(index)) lookups.weapons.set(index, id);
+    lookups.weapons.set(index, id);
   });
+  for (const collection of ["brains", "repairs", "ecms", "sensors", "constructions"]) {
+    Object.keys(definitions[collection]).sort().forEach((id, index) => {
+      if (!lookups[collection].has(index)) lookups[collection].set(index, id);
+    });
+  }
   return lookups;
 }
 
-function canonicalComponentName(unit, body, propulsion, weapons) {
+function canonicalComponentName(unit, body, propulsion, weapons, auxiliary = null) {
   const droidType = Number.parseInt(String(unit?.signature || "").split(":", 1)[0], 10);
   const weaponName = weapons.map((weapon) => friendlyComponentName(weapon)).filter(Boolean).join(" / ");
   if ([5, 10, 11, 12].includes(droidType) && weaponName) return weaponName;
-  const cleanWeaponName = weaponName.replace(/^VTOL\s+/i, "");
-  return [cleanWeaponName, friendlyComponentName(body), friendlyComponentName(propulsion)]
+  const turretName = weaponName.replace(/^VTOL\s+/i, "") || friendlyComponentName(auxiliary);
+  return [turretName, friendlyComponentName(body), friendlyComponentName(propulsion)]
     .filter(Boolean)
     .join(" ");
 }
@@ -442,6 +485,21 @@ function findDesignByComponentIds(unit, definitions, componentLookups) {
   const weaponIds = componentIds.weaponIds.map((id) => componentLookups.weapons.get(id)).filter(Boolean);
   if (!bodyId || !propulsionId || (componentIds.weaponIds.length && !weaponIds.length)) return null;
 
+  const renderableComponent = (collection, id) => {
+    // Replay component slot 0 is the sentinel for no auxiliary turret. It must
+    // never fall through to index 0 of a sorted definition table.
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const component = definitions[collection]?.[componentLookups[collection]?.get(id)];
+    if (!component || /^ZNULL/i.test(component.id || "") || component.location === "DEFAULT") return null;
+    return component;
+  };
+  const brain = renderableComponent("brains", componentIds.brainId);
+  const repair = renderableComponent("repairs", componentIds.repairId);
+  const ecm = renderableComponent("ecms", componentIds.ecmId);
+  const sensor = renderableComponent("sensors", componentIds.sensorId);
+  const construct = renderableComponent("constructions", componentIds.constructId);
+  const auxiliary = sensor || construct || repair || brain || ecm;
+
   const template = Object.values(definitions.templates).find((item) => {
     const templateWeapons = Array.isArray(item.weapons) ? item.weapons : [];
     return item.body === bodyId
@@ -449,29 +507,67 @@ function findDesignByComponentIds(unit, definitions, componentLookups) {
       && templateWeapons.length === weaponIds.length
       && templateWeapons.every((weaponId, index) => weaponId === weaponIds[index]);
   });
-  if (template) return template;
+  if (template && !auxiliary) return template;
 
   const body = definitions.bodies[bodyId];
   const propulsion = definitions.propulsions[propulsionId];
   const weapons = weaponIds.map((id) => definitions.weapons[id]).filter(Boolean);
   return {
-    name: canonicalComponentName(unit, body, propulsion, weapons),
+    name: canonicalComponentName(unit, body, propulsion, weapons, auxiliary),
     body: bodyId,
     propulsion: propulsionId,
     weapons: weaponIds,
-    type: "DROID"
+    brain: brain?.id,
+    repair: repair?.id,
+    ecm: ecm?.id,
+    sensor: sensor?.id,
+    construct: construct?.id,
+    type: sensor ? "SENSOR" : construct ? "CONSTRUCT" : repair ? "REPAIR" : brain ? "COMMAND" : ecm ? "ECM" : "DROID"
   };
 }
 
 function findCanonicalDesign(unit, definitions, nameCandidatesBySignature, componentLookups) {
   const componentDesign = findDesignByComponentIds(unit, definitions, componentLookups);
+  const candidateEntries = [...(nameCandidatesBySignature?.get(unit.signature) || [])];
+  if (unit.name && !candidateEntries.some((candidate) => candidateName(candidate) === unit.name)) {
+    candidateEntries.push({ name: unit.name, count: Number(unit.count || 0) });
+  }
+
+  const templateCandidates = new Map();
+  const totalCandidateCount = candidateEntries.reduce((sum, candidate) => sum + candidateCount(candidate), 0);
+  for (const candidate of candidateEntries) {
+    const name = candidateName(candidate);
+    const template = findDesign({ ...unit, name }, definitions);
+    if (!template) continue;
+    const key = JSON.stringify([
+      template.body || "", template.propulsion || "", template.weapons || [],
+      template.brain || "", template.repair || "", template.ecm || "",
+      template.sensor || "", template.construct || "", template.type || ""
+    ]);
+    if (!templateCandidates.has(key)) templateCandidates.set(key, { design: template, count: 0 });
+    templateCandidates.get(key).count += candidateCount(candidate);
+  }
+  const bestTemplate = [...templateCandidates.values()].sort((left, right) => right.count - left.count)[0];
+  if (bestTemplate) {
+    const droidType = Number.parseInt(String(unit?.signature || "").split(":", 1)[0], 10);
+    const numericBody = definitions.bodies?.[componentDesign?.body];
+    const numericWeapons = (componentDesign?.weapons || []).map((id) => definitions.weapons?.[id]).filter(Boolean);
+    const expectsWeapon = [0, 5, 7, 12].includes(droidType);
+    const invalidNumeric = !componentDesign
+      || !numericBody
+      || /^ZNULL/i.test(numericBody.id || "")
+      || (expectsWeapon && (!numericWeapons.length || numericWeapons.some((weapon) => /^ZNULL/i.test(weapon.id || ""))))
+      || ([5, 10, 11, 12].includes(droidType) && !/cyborg/i.test(componentDesign?.body || ""))
+      || (droidType === 13 && componentDesign?.body !== "SuperTransportBody");
+    const confidence = totalCandidateCount > 0 ? bestTemplate.count / totalCandidateCount : 0;
+    if (invalidNumeric || confidence >= 0.5) return bestTemplate.design;
+  }
+
   if (componentDesign) return componentDesign;
-  const candidateNames = [
-    ...(nameCandidatesBySignature?.get(unit.signature) || []),
-    unit.name
-  ];
-  for (const candidateName of new Set(candidateNames.filter(Boolean))) {
-    const design = findDesign({ ...unit, name: candidateName }, definitions);
+  for (const candidate of candidateEntries) {
+    const name = candidateName(candidate);
+    if (!name) continue;
+    const design = findDesign({ ...unit, name }, definitions);
     if (design) return design;
   }
   return null;
@@ -522,6 +618,26 @@ function getDroidParts(design, definitions) {
     if (weapon.model && weapon.model !== weapon.mountModel) parts.push({ role: "weapon", path: piePath(weapon.model, "components/weapons/"), ...meta });
     if (weapon.muzzleGfx) parts.push({ role: "muzzle", path: piePath(weapon.muzzleGfx), ...meta });
   });
+  const addTurretComponent = (componentId, collection, kind) => {
+    const component = definitions[collection]?.[componentId];
+    if (!component) return;
+    const meta = { slot: 0, kind };
+    if (component.mountModel) parts.push({ role: "mount", path: piePath(component.mountModel, "components/weapons/"), ...meta });
+    const model = component.model || component.sensorModel;
+    if (model && model !== component.mountModel) parts.push({ role: "weapon", path: piePath(model, "components/weapons/"), ...meta });
+  };
+  addTurretComponent(design.construct, "constructions", "construct");
+  addTurretComponent(design.repair, "repairs", "repair");
+  addTurretComponent(design.sensor, "sensors", "sensor");
+  const brain = definitions.brains?.[design.brain];
+  if (brain?.turret) {
+    const weapon = definitions.weapons?.[brain.turret];
+    if (weapon?.mountModel) parts.push({ role: "mount", path: piePath(weapon.mountModel, "components/weapons/"), slot: 0, kind: "brain" });
+    if (weapon?.model && weapon.model !== weapon.mountModel) parts.push({ role: "weapon", path: piePath(weapon.model, "components/weapons/"), slot: 0, kind: "brain" });
+  } else {
+    addTurretComponent(design.brain, "brains", "brain");
+  }
+  addTurretComponent(design.ecm, "ecms", "ecm");
   return parts;
 }
 
@@ -549,7 +665,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   if (!container) return;
   destroyFavoriteUnitPreview();
   addPreviewStyles();
-  const favorites = Array.isArray(units) ? units.filter((unit) => {
+  const rawFavorites = Array.isArray(units) ? units.filter((unit) => {
     const droidType = Number.parseInt(String(unit?.signature || "").split(":", 1)[0], 10);
     return droidType !== 3 && droidType !== 10;
   }) : [];
@@ -567,7 +683,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   const gallery = document.createElement("div");
   gallery.className = "stats-favorite-unit-gallery";
   container.append(label, controls, gallery);
-  if (!favorites.length) {
+  if (!rawFavorites.length) {
     const empty = document.createElement("p");
     empty.className = "stats-favorite-unit-empty";
     empty.textContent = "No unit history";
@@ -582,12 +698,37 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
 
   const definitions = await loadDefinitions();
   const componentLookups = buildComponentLookups(definitions, nameCandidatesBySignature);
-  const designs = favorites.map((unit) => findCanonicalDesign(
+  const rawDesigns = rawFavorites.map((unit) => findCanonicalDesign(
     unit,
     definitions,
     nameCandidatesBySignature,
     componentLookups
   ));
+  const mergedByDesign = new Map();
+  rawFavorites.forEach((unit, index) => {
+    const design = rawDesigns[index];
+    const droidType = Number.parseInt(String(unit?.signature || "").split(":", 1)[0], 10);
+    const designKey = design
+      ? JSON.stringify([
+          droidType, design.body || "", design.propulsion || "", design.weapons || [],
+          design.brain || "", design.repair || "", design.ecm || "",
+          design.sensor || "", design.construct || "", design.type || ""
+        ])
+      : `signature:${unit.signature}`;
+    const existing = mergedByDesign.get(designKey);
+    if (existing) {
+      existing.unit.count += Number(unit.count || 0);
+      return;
+    }
+    mergedByDesign.set(designKey, {
+      unit: { ...unit, count: Number(unit.count || 0) },
+      design
+    });
+  });
+  const mergedFavorites = [...mergedByDesign.values()]
+    .sort((left, right) => right.unit.count - left.unit.count);
+  const favorites = mergedFavorites.map((entry) => entry.unit);
+  const designs = mergedFavorites.map((entry) => entry.design);
   const displayNames = favorites.map((unit, index) => {
     const designName = cleanPlaceholderName(designs[index]?.name);
     const replayName = cleanPlaceholderName(unit.name);
@@ -603,8 +744,13 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     const weaponId = Array.isArray(design?.weapons) ? design.weapons[0] : design?.weapon;
     const propulsion = definitionName(definitions.propulsions, design?.propulsion);
     const isVtol = /vtol/i.test(propulsion);
+    const auxiliary = definitionName(definitions.sensors, design?.sensor)
+      || definitionName(definitions.constructions, design?.construct)
+      || definitionName(definitions.repairs, design?.repair)
+      || definitionName(definitions.brains, design?.brain)
+      || definitionName(definitions.ecms, design?.ecm);
     const weapon = withoutUnitCategory(
-      definitionName(definitions.weapons, weaponId) || cleanPlaceholderName(unit.name) || displayNames[index],
+      definitionName(definitions.weapons, weaponId) || auxiliary || cleanPlaceholderName(unit.name) || displayNames[index],
       droidType,
       isVtol
     );

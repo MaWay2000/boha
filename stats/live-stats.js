@@ -131,6 +131,8 @@ let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
 let visibleMatchCount = INITIAL_MATCH_LIMIT;
 let playerSearchQuery = "";
+let renderedAccountList = null;
+let renderedGameList = null;
 let matchesSearchQuery = "";
 let matchesDateFrom = "";
 let matchesDateTo = "";
@@ -3652,6 +3654,8 @@ function renderMatchActions(totalMatches, shownMatches) {
 
 function render() {
   if (!leaderboardData) {
+    renderedAccountList = null;
+    renderedGameList = null;
     updateStatusText([]);
     updateSortIndicators();
     syncStateToUrl();
@@ -3659,6 +3663,8 @@ function render() {
   }
 
   if (!leaderboardData.games.length) {
+    renderedAccountList = [];
+    renderedGameList = [];
     updateStatusText([]);
     leaderboardGameCounts = new Map();
     globalRankMap = new Map();
@@ -3685,7 +3691,9 @@ function render() {
   const { accounts, games } = hydratePublishedBoard(selectedLeaderboard);
 
   const accountList = sortAccounts(accounts.values());
+  renderedAccountList = accountList;
   const gameList = [...games].sort((left, right) => right.endDate - left.endDate);
+  renderedGameList = gameList;
   const recentGameList = gameList;
 
   updateStatusText(leaderboardData.games);
@@ -3696,6 +3704,27 @@ function render() {
   renderPlayerGames(accountList, globalAccountList);
   renderMatches(recentGameList);
   updateSortIndicators();
+  syncStateToUrl();
+}
+
+function renderPlayerSearchResults() {
+  // Typing only changes the ranked-player filter. Keep the expensive game,
+  // comparison, profile, and 3D preview sections intact until another action
+  // actually changes their data or selection.
+  if (renderedAccountList === null) {
+    render();
+    return;
+  }
+  renderRanks(renderedAccountList);
+  syncStateToUrl();
+}
+
+function renderMatchSearchResults() {
+  if (renderedGameList === null) {
+    render();
+    return;
+  }
+  renderMatches(renderedGameList);
   syncStateToUrl();
 }
 
@@ -3800,7 +3829,7 @@ if (playerSearchElement) {
     if (playerSearchClearElement) {
       playerSearchClearElement.hidden = !playerSearchQuery;
     }
-    render();
+    renderPlayerSearchResults();
     input.focus({ preventScroll: true });
     if (selectionStart !== null && selectionEnd !== null) {
       input.setSelectionRange(selectionStart, selectionEnd);
@@ -3814,7 +3843,7 @@ if (playerSearchClearElement && playerSearchElement) {
     playerSearchQuery = "";
     playerSearchElement.value = "";
     playerSearchClearElement.hidden = true;
-    render();
+    renderPlayerSearchResults();
     playerSearchElement.focus({ preventScroll: true });
   });
 }
@@ -3823,7 +3852,7 @@ if (matchesSearchElement) {
   matchesSearchElement.addEventListener("input", (event) => {
     matchesSearchQuery = event.currentTarget.value;
     visibleMatchCount = INITIAL_MATCH_LIMIT;
-    render();
+    renderMatchSearchResults();
   });
 }
 

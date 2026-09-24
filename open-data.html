@@ -38,8 +38,18 @@
 
     .open-data-title-actions {
       display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .open-data-title-actions .open-data-keys-button {
+      width: 116px;
+      min-height: 36px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      line-height: 1.05;
+      text-align: center;
+      white-space: normal;
     }
 
     @media (max-width: 860px) {
@@ -50,11 +60,11 @@
       }
 
       .open-data-hub-button {
-        width: 100%;
+        padding-inline: 16px;
       }
 
       .open-data-title-actions {
-        flex-direction: column;
+        flex-wrap: nowrap;
       }
     }
   </style>
@@ -71,14 +81,14 @@
               <span class="open-data-title-actions">
                 <a
                   class="button button-primary open-data-hub-button"
-                  href="player-keys.html"
-                >Search Player Keys</a>
-                <a
-                  class="button button-primary open-data-hub-button"
                   href="https://warzone2100.retropaganda.info/"
                   target="_blank"
                   rel="noopener noreferrer"
                 >Visit Bohan Hub</a>
+                <a
+                  class="button button-primary open-data-hub-button open-data-keys-button"
+                  href="player-keys.html"
+                >Search Player Keys</a>
               </span>
             </div>
             <p>

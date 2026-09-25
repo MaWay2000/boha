@@ -118,6 +118,7 @@ let selectedLeaderboard = "Global";
 let resultsData = { format: 0, results: [] };
 let leaderboardData = null;
 let leaderboardDataSignature = "";
+let bannedAccountIds = new Set();
 let liveFeedState = "idle";
 let playerPublicKeys = {};
 let upstreamManifest = null;
@@ -448,6 +449,9 @@ async function ensureLeaderboardData(force = false) {
   }
   leaderboardData = payload;
   leaderboardDataSignature = signature;
+  bannedAccountIds = new Set((payload.leaderboards.Global?.players || [])
+    .filter((player) => player.banned)
+    .map((player) => String(player.id)));
   runtime.leaderboards = Object.keys(payload.leaderboards);
   ensureSelectedLeaderboard();
   renderButtons();
@@ -473,7 +477,8 @@ function hydratePublishedBoard(name) {
     drawCount: Number(player.draws || 0),
     totalKills: Number(player.totalKills || 0),
     favoriteUnits: Array.isArray(player.favoriteUnits) ? player.favoriteUnits : [],
-    discounted: Boolean(player.discounted)
+    discounted: Boolean(player.discounted),
+    banned: Boolean(player.banned) || bannedAccountIds.has(String(player.id))
   }]));
   const gameIds = new Set(board.gameIds || []);
   const ratingEvents = board.ratingEvents || {};
@@ -486,7 +491,8 @@ function hydratePublishedBoard(name) {
           account = {
             mainPublicKey: null, publicKeys: new Set(), name: slot.name || "Unknown",
             names: new Map([[slot.name || "Unknown", 1]]), bot: isKnownBotName(slot.name), games: [],
-            elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, totalKills: 0, discounted: true
+            elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, totalKills: 0, discounted: true,
+            banned: bannedAccountIds.has(String(slot.id))
           };
           accounts.set(String(slot.id), account);
         }
@@ -611,7 +617,7 @@ function sortAccounts(accounts) {
 }
 
 function filterVisibleAccounts(accountList) {
-  return accountList.filter((account) => !account.bot && (!account.discounted || account.games.length >= 2));
+  return accountList.filter((account) => !account.banned && !account.bot && (!account.discounted || account.games.length >= 2));
 }
 
 function isCrashedPublishedGame(game) {
@@ -626,7 +632,7 @@ function isCrashedPublishedGame(game) {
 }
 
 function filterRankedAccounts(accountList) {
-  return accountList.filter((account) => !account.discounted && !account.bot);
+  return accountList.filter((account) => !account.banned && !account.discounted && !account.bot);
 }
 
 function isKnownBotName(name) {
@@ -975,6 +981,7 @@ function getTeamToneClass(userType) {
 }
 
 function matchesPlayerSearch(account, searchQuery) {
+  if (account?.banned) return false;
   if (!searchQuery) {
     return true;
   }
@@ -1016,7 +1023,7 @@ function matchesRecentGameSearch(game, searchQuery) {
 
   return game.players.some((slot) => {
     const account = slot.account;
-    if (!account) {
+    if (!account || account.banned) {
       return false;
     }
 
@@ -3681,7 +3688,7 @@ function render() {
   const { accounts: globalAccounts, games: globalGames } = hydratePublishedBoard("Global");
 
   const allGames = [...globalGames];
-  const globalAccountList = sortAccounts(globalAccounts.values());
+  const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !account.banned);
   resolveActivePlayerShareKey(globalAccountList);
   globalRankMap = buildGlobalRankMap(globalAccountList);
 
@@ -3690,7 +3697,7 @@ function render() {
 
   const { accounts, games } = hydratePublishedBoard(selectedLeaderboard);
 
-  const accountList = sortAccounts(accounts.values());
+  const accountList = sortAccounts(accounts.values()).filter((account) => !account.banned);
   renderedAccountList = accountList;
   const gameList = [...games].sort((left, right) => right.endDate - left.endDate);
   renderedGameList = gameList;

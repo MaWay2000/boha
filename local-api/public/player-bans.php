@@ -95,6 +95,32 @@ function publishBans(): void
     }
 }
 
+function publishBansOnline(): string
+{
+    $powershell = (string) getenv('SystemRoot') . '\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
+    $script = dirname(__DIR__) . '/scripts/Publish-PlayerBanStats.ps1';
+    if (!is_file($powershell) || !is_file($script)) {
+        throw new RuntimeException('Online publisher is not installed on this PC. Local stats are still saved.');
+    }
+    $process = proc_open(
+        [$powershell, '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $script],
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes,
+        dirname(__DIR__, 2)
+    );
+    if (!is_resource($process)) {
+        throw new RuntimeException('Could not start the online publisher. Local stats are still saved.');
+    }
+    fclose($pipes[0]);
+    $output = trim(stream_get_contents($pipes[1]) . "\n" . stream_get_contents($pipes[2]));
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    if (proc_close($process) !== 0) {
+        throw new RuntimeException('GitHub publication failed; local stats are still saved. ' . mb_substr($output, 0, 1500));
+    }
+    return $output;
+}
+
 $remoteAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
 $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
 $localHost = preg_match('/^(?:127\.0\.0\.1|localhost|\[::1\]):8787$/', $host) === 1;
@@ -187,10 +213,10 @@ try {
         }
         $action = (string) ($_POST['action'] ?? '');
         $key = trim((string) ($_POST['public_key'] ?? ''));
-        if (!in_array($action, ['ban', 'unban', 'publish'], true)) {
+        if (!in_array($action, ['ban', 'unban', 'publish', 'publish-online'], true)) {
             throw new RuntimeException('Unknown action.');
         }
-        if ($action !== 'publish') {
+        if ($action !== 'publish' && $action !== 'publish-online') {
             if (!validPlayerKey($key)) throw new RuntimeException('Choose an account with a valid public key.');
             if ($action === 'ban') {
                 $selected = null;
@@ -242,7 +268,9 @@ try {
             }
         }
         publishBans();
-        $notice = $action === 'publish' ? 'Stats republished.' : ucfirst($action) . ' saved; local stats republished.';
+        $notice = $action === 'publish-online'
+            ? publishBansOnline()
+            : ($action === 'publish' ? 'Stats republished locally.' : ucfirst($action) . ' saved; local stats republished.');
         $data = readBans();
     }
 } catch (Throwable $exception) {
@@ -351,6 +379,7 @@ $activeBans = array_values(array_filter($data['bans'] ?? [], static fn(array $ba
       </div>
     <?php endforeach; ?>
     <form method="post"><input type="hidden" name="csrf" value="<?= banEscape($_SESSION['ban_csrf']) ?>"><button class="subtle" name="action" value="publish">Republish stats</button></form>
+    <form method="post" style="margin-top:10px"><input type="hidden" name="csrf" value="<?= banEscape($_SESSION['ban_csrf']) ?>"><button name="action" value="publish-online">Publish online to GitHub</button></form>
   </section>
   <section class="panel">
     <div class="panel-head"><h2>Find a player</h2><span class="count-pill">Keyed accounts only</span></div>

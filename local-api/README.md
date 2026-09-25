@@ -47,4 +47,12 @@ from Git. Active bans give the account an effective ELO of -2000 and hide it
 from the public leaderboard and player search without deleting historical
 matches or changing other players' match results. Saving a ban republishes
 local stats and updates the local preview. Commit and push the generated
-`stats/published` files to update the hosted website.
+`stats/published` files to update the hosted website, or use **Publish online to
+GitHub** in the local ban panel. That action runs
+`scripts/Publish-PlayerBanStats.ps1`, which copies only the three generated
+publication files into a temporary worktree based on the latest `origin/main`,
+then commits and pushes those files. It requires GitHub credentials already
+configured for noninteractive Git on this PC. The private ban list, password
+hash, and unrelated local files are never added to that commit. If a newer
+match snapshot arrives during publication, retry the button so the local stats
+are regenerated before pushing; it never force-pushes over newer work.

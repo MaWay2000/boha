@@ -8,7 +8,16 @@ Created by [MaWay2000](https://github.com/MaWay2000).
 
 ## Live App
 
-[Open Warzone2100 MapMaker](https://maway2000.github.io/boha/mapmaker/)
+[**Open Warzone2100 MapMaker**](https://maway2000.github.io/boha/mapmaker/) · [Community hub](https://maway2000.github.io/boha/) · [Report an issue](https://github.com/MaWay2000/boha/issues)
+
+## Getting Started
+
+1. Open the live app in a browser with WebGL support.
+2. Use the File tab to create a map, load a local file, or browse the bundled map list.
+3. Edit terrain, height, structures, droids, and objects using the related tabs.
+4. Validate the map, choose its name, and export a `.wz` archive.
+
+Keep a copy of the original map before editing. Export your work before closing the page; do not rely on the browser tab as your only copy.
 
 ## What It Can Do
 
@@ -89,21 +98,23 @@ Help links, project information, creator information, and GitHub Discussions.
 
 Because the app loads JSON, textures, and PIE files, run it through a small local web server instead of opening every file directly.
 
+From the root of the `boha` checkout:
+
 ```bash
 python -m http.server 8765
 ```
 
 Then open:
 
-```text
-http://127.0.0.1:8765/index.html
-```
+[http://127.0.0.1:8765/mapmaker/](http://127.0.0.1:8765/mapmaker/)
+
+No build step is required. The optional `maps/index.php` helper needs a PHP-capable server; it does not execute on GitHub Pages. The static `maps/filelist.txt` list is used for hosted map browsing.
 
 ## Community
 
-Use GitHub Discussions for bug reports, suggestions, questions, mapmaking screenshots, shared maps, and general Warzone 2100 MapMaker talk:
+The editor is maintained in the consolidated [boha repository](https://github.com/MaWay2000/boha). Use its [issue tracker](https://github.com/MaWay2000/boha/issues) for bugs and suggestions. Include your browser, steps to reproduce, and an example map when possible.
 
-[Warzone2100 MapMaker Discussions](https://github.com/MaWay2000/warzone2100-mapmaker/discussions/1)
+The older standalone repository is archived; the live app and current source are linked above.
 
 ## License
 

@@ -307,7 +307,7 @@
       localStorage.setItem(battlefieldSettingsKey, JSON.stringify({
         view: battlefieldViewMode?.value || "3d",
         speed: Number(battlefieldSpeed?.value) || 0,
-        quality: battlefieldTileQuality?.value || "high",
+        quality: battlefieldTileQuality?.value || "medium",
         droids: Boolean(battlefieldDroids?.checked),
         structures: Boolean(battlefieldStructures?.checked),
         battleMarkers: Boolean(battlefieldBattleMarkers?.checked),
@@ -332,7 +332,7 @@
   battlefieldSpeedValue.value = `${battlefieldPlaybackSpeed()}×`;
   battlefieldTileQuality.value = ["low", "medium", "high", "ultra"].includes(battlefieldSettings.quality)
     ? battlefieldSettings.quality
-    : "high";
+    : "medium";
   battlefieldDroids.checked = battlefieldSettings.droids !== false;
   battlefieldStructures.checked = battlefieldSettings.structures !== false;
   battlefieldBattleMarkers.checked = battlefieldSettings.battleMarkers !== false;

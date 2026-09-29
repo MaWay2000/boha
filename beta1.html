@@ -22,14 +22,11 @@
         <div class="beta-toolbar-stat beta-updated"><span>LAST UPDATED</span><strong id="betaStamp">Loading…</strong></div>
       </div>
 
-      <div class="beta-context"><span class="beta-tag">BETA 1 · EXPERIMENTAL</span><span>Team-balance rating with a personal-performance adjustment. Public ELO is unchanged.</span><a href="#betaRules">How scoring works</a></div>
-
       <div class="beta-layout">
         <section class="beta-ranks" aria-label="Beta 1 player rankings">
-          <div class="beta-panel-heading"><span>BETA 1 PLAYERS</span><small id="betaCount">Loading ratings…</small></div>
           <div class="beta-table-wrap">
             <table class="beta-rank-table">
-              <thead><tr><th scope="col">#</th><th scope="col">TOP PLAYERS</th><th scope="col">BETA RATING</th><th scope="col">GAMES</th><th scope="col">WIN</th><th scope="col">LOST</th><th scope="col">DRAW</th></tr></thead>
+              <thead><tr><th scope="col"><button type="button" data-beta-sort="rating">#</button></th><th scope="col"><button type="button" data-beta-sort="name">TOP PLAYERS</button></th><th scope="col"><button type="button" data-beta-sort="rating">BETA RATING</button></th><th scope="col"><button type="button" data-beta-sort="games">GAMES</button></th><th scope="col"><span class="beta-record-head"><button type="button" data-beta-sort="wins">WIN</button><i>/</i><button type="button" data-beta-sort="losses">LOST</button><i>/</i><button type="button" data-beta-sort="draws">DRAW</button></span></th></tr></thead>
               <tbody id="betaPlayers"></tbody>
             </table>
           </div>
@@ -39,6 +36,8 @@
           <div class="beta-profile-head"><span>PLAYER PROFILE</span><strong>Select a player to open their Beta 1 profile</strong></div>
         </section>
       </div>
+
+      <div class="beta-context"><span class="beta-tag">BETA 1 · EXPERIMENTAL</span><span>Team-balance rating with a personal-performance adjustment. Public ELO is unchanged.</span><a href="#betaRules">How scoring works</a></div>
 
       <details class="beta-rules" id="betaRules">
         <summary>How Beta 1 is calculated <span>Experimental rules</span></summary>

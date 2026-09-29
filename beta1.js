@@ -4,13 +4,14 @@ const searchElement = document.getElementById("betaSearch");
 const clearElement = document.getElementById("betaClear");
 const playersElement = document.getElementById("betaPlayers");
 const detailElement = document.getElementById("betaDetail");
-const countElement = document.getElementById("betaCount");
 const showingElement = document.getElementById("betaShowing");
 const loadMoreElement = document.getElementById("betaLoadMore");
 let snapshot = null;
 let selected = null;
 let shownPlayers = 100;
 let shownHistory = 20;
+let sortKey = "rating";
+let sortDirection = -1;
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -37,24 +38,32 @@ function renderPlayers() {
   if (!snapshot) return;
   const query = searchElement.value.trim().toLocaleLowerCase();
   const matching = snapshot.players.filter((player) => matchesSearch(player, query));
+  matching.sort((left, right) => {
+    const comparison = sortKey === "name"
+      ? left.name.localeCompare(right.name)
+      : left[sortKey] - right[sortKey];
+    return sortDirection * comparison || right.rating - left.rating;
+  });
   const limited = matching.slice(0, shownPlayers);
   const establishedRanks = new Map(snapshot.players.filter((player) => !player.provisional)
     .map((player, index) => [player.id, index + 1]));
   clearElement.hidden = !query;
-  countElement.textContent = query ? `${matching.length} found` : "Experimental rankings";
   showingElement.textContent = `Showing ${limited.length} of ${matching.length} ${query ? "matching players (P = provisional)" : "established players"}.`;
   loadMoreElement.hidden = matching.length <= shownPlayers;
   loadMoreElement.textContent = `Load more (top ${Math.min(matching.length, shownPlayers + 100)})`;
+  document.querySelectorAll("[data-beta-sort]").forEach((button) => {
+    const active = button.dataset.betaSort === sortKey;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-label", `Sort by ${button.dataset.betaSort}${active ? `, currently ${sortDirection < 0 ? "descending" : "ascending"}` : ""}`);
+  });
   playersElement.innerHTML = limited.length ? limited.map((player, index) => `
     <tr class="${selected?.id === player.id ? "is-active" : ""}" data-id="${escapeHtml(player.id)}">
       <td>${player.provisional ? "P" : establishedRanks.get(player.id) ?? index + 1}</td>
       <td><button type="button" data-id="${escapeHtml(player.id)}" aria-label="Open ${escapeHtml(player.name)} Beta 1 profile">${escapeHtml(player.name)}</button></td>
       <td><strong>${player.rating.toFixed(2)}</strong><small>${player.provisional ? "Provisional" : signed(player.history.slice(0, 10).reduce((sum, event) => sum + event.delta, 0)) + " last 10"}</small></td>
       <td>${player.games}</td>
-      <td>${player.wins}<small>${percent(player.wins, player.games)}</small></td>
-      <td>${player.losses}<small>${percent(player.losses, player.games)}</small></td>
-      <td>${player.draws}<small>${percent(player.draws, player.games)}</small></td>
-    </tr>`).join("") : `<tr><td colspan="7">No matching rated accounts in this snapshot.</td></tr>`;
+      <td><div class="beta-record"><span>${player.wins}<small>${percent(player.wins, player.games)}</small></span><span>${player.losses}<small>${percent(player.losses, player.games)}</small></span><span>${player.draws}<small>${percent(player.draws, player.games)}</small></span></div></td>
+    </tr>${selected?.id === player.id ? `<tr class="beta-detail-row"><td colspan="5"><div class="beta-expanded"><span>PLAYER NAMES</span><div class="beta-names">${(player.names || [player.name]).map((name) => `<span>${escapeHtml(name)}</span>`).join("")}</div><span>${(player.publicKeys || []).length} KEY(S) TRACKED</span><div class="beta-keys">${(player.publicKeys || []).map((key) => `<button type="button" class="beta-key" data-copy-key="${escapeHtml(key)}" title="Copy public key">${escapeHtml(key)}</button>`).join("")}</div></div></td></tr>` : ""}`).join("") : `<tr><td colspan="5">No matching rated accounts in this snapshot.</td></tr>`;
 }
 
 function chartMarkup(player) {
@@ -84,7 +93,7 @@ function renderDetail() {
     `<i class="${event.outcome.toLowerCase()}" title="${event.outcome}">${event.outcome[0]}</i>`).join("");
   const recent = player.history.slice(0, shownHistory);
   detailElement.innerHTML = `
-    <div class="beta-profile-head"><span>PLAYER PROFILE</span><strong>${escapeHtml(player.name)}</strong><button class="beta-copy" type="button" id="betaShare">Copy profile link</button></div>
+    <div class="beta-profile-head"><span>${escapeHtml(player.name)}</span><strong>BETA 1 ${player.provisional ? "PROVISIONAL" : `RANK #${snapshot.players.filter((item) => !item.provisional).findIndex((item) => item.id === player.id) + 1}`}</strong><button class="beta-copy" type="button" id="betaShare">Copy profile link</button></div>
     <div class="beta-profile-inner">
       <div class="beta-stat-grid">
         <div class="beta-stat-tile"><span>CURRENT BETA</span><strong>${player.rating.toFixed(2)}</strong></div>
@@ -129,6 +138,11 @@ function selectPlayer(id, updateUrl = true) {
 }
 
 playersElement.addEventListener("click", (event) => {
+  const key = event.target.closest("button[data-copy-key]");
+  if (key) {
+    navigator.clipboard.writeText(key.dataset.copyKey).then(() => { key.title = "Copied"; }).catch(() => { key.title = "Copy failed"; });
+    return;
+  }
   const row = event.target.closest("tr[data-id]");
   if (row) selectPlayer(row.dataset.id);
 });
@@ -149,6 +163,15 @@ detailElement.addEventListener("click", async (event) => {
   }
 });
 loadMoreElement.addEventListener("click", () => { shownPlayers += 100; renderPlayers(); });
+document.querySelector(".beta-rank-table thead").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-beta-sort]");
+  if (!button) return;
+  const nextKey = button.dataset.betaSort;
+  sortDirection = sortKey === nextKey ? -sortDirection : (nextKey === "name" ? 1 : -1);
+  sortKey = nextKey;
+  shownPlayers = 100;
+  renderPlayers();
+});
 searchElement.addEventListener("input", () => { shownPlayers = 100; renderPlayers(); });
 clearElement.addEventListener("click", () => { searchElement.value = ""; searchElement.focus(); shownPlayers = 100; renderPlayers(); });
 document.querySelector('.beta-context a').addEventListener('click', () => { document.getElementById('betaRules').open = true; });
@@ -159,11 +182,11 @@ fetch("stats/published/beta1.json", { cache: "no-cache" })
     snapshot = data;
     renderToolbar();
     const requested = new URLSearchParams(window.location.search).get("betaPlayer");
-    const initial = data.players.find((player) => player.id === requested) || data.players.find((player) => !player.provisional);
+    const initial = requested ? data.players.find((player) => player.id === requested) : null;
     if (initial) selectPlayer(initial.id, false);
     else renderPlayers();
   })
   .catch((error) => {
-    playersElement.innerHTML = `<tr><td colspan="7">Beta 1 data could not be loaded: ${escapeHtml(error.message)}</td></tr>`;
+    playersElement.innerHTML = `<tr><td colspan="5">Beta 1 data could not be loaded: ${escapeHtml(error.message)}</td></tr>`;
     document.getElementById("betaStamp").textContent = "Unavailable";
   });

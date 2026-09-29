@@ -13,6 +13,7 @@ A modern Warzone 2100 community hub bringing together player statistics, recent 
 | [Recent matches](https://maway2000.github.io/boha/recent-matches.html) | Browse recorded matches and their results. |
 | [Compare players](https://maway2000.github.io/boha/compare.html) | Compare player statistics. |
 | [Replay analyzer](https://maway2000.github.io/boha/replay-analyzer.html) | Visit the replay-analysis section. |
+| [Beta 1 balance rating](https://maway2000.github.io/boha/?tab=beta1) | Try the experimental team-balance rating; public ELO is unchanged. |
 | [MapMaker](https://maway2000.github.io/boha/mapmaker/) | Load, edit, validate, and export Warzone 2100 maps. |
 | [PIE model editor](https://maway2000.github.io/boha/model-editor/) | Inspect models, edit vertices, and export PIE files. |
 | [OPUS to MP3](https://maway2000.github.io/boha/opus2mp3/) | Convert audio files in the browser. |
@@ -51,6 +52,8 @@ Use a local HTTP server instead of opening HTML files directly, because the tool
 The website and the replay-processing backend are separate systems. GitHub Pages serves static files; it does not run the analyzer, a database, PHP, or Node.js backend services.
 
 The `sync-onit-published.yml` workflow verifies and mirrors normalized, replay-derived snapshots into `stats/published/` every 30 minutes. Its historical filename does not imply that the publisher must remain on the original host. The configured publisher is defined in `stats/sync-onit-published.js`.
+
+After each snapshot sync, the workflow runs `node stats/generate-beta1.js` to rebuild the experimental `stats/published/beta1.json` from `leaderboards.json` and `matches.json`. This is a shadow rating only: it never writes to the backend ELO or launches replay workers. Run `node --test stats/beta1-rating.test.js` to check its scoring and eligibility rules.
 
 A manual-only legacy workflow, `sync-warzone-upstream.yml`, remains available for upstream statistics synchronization. Maintainers can also run:
 

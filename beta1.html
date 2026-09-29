@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BOHA Beta 1 Balance Rating</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="beta1.css">
+</head>
+<body class="embedded-page beta-page">
+  <div class="page-shell">
+    <main id="beta1" class="beta-shell">
+      <div class="beta-toolbar" aria-label="Beta 1 statistics">
+        <label class="beta-search"><span>PLAYER SEARCH:</span><input id="betaSearch" type="search" autocomplete="off" placeholder="Nickname / key" aria-label="Find a Beta 1 player by nickname or public key"><button id="betaClear" type="button" aria-label="Clear player search" hidden>×</button></label>
+        <div class="beta-toolbar-stat"><span>RATED PLAYERS</span><strong id="betaPlayerTotal">—</strong></div>
+        <div class="beta-toolbar-stat"><span>RATED MATCHES</span><strong id="betaMatchTotal">—</strong></div>
+        <div class="beta-toolbar-stat"><span>PERSONAL SCORE</span><strong id="betaPersonalTotal">—</strong></div>
+        <div class="beta-toolbar-stat beta-updated"><span>LAST UPDATED</span><strong id="betaStamp">Loading…</strong></div>
+      </div>
+
+      <div class="beta-context"><span class="beta-tag">BETA 1 · EXPERIMENTAL</span><span>Team-balance rating with a personal-performance adjustment. Public ELO is unchanged.</span><a href="#betaRules">How scoring works</a></div>
+
+      <div class="beta-layout">
+        <section class="beta-ranks" aria-label="Beta 1 player rankings">
+          <div class="beta-panel-heading"><span>BETA 1 PLAYERS</span><small id="betaCount">Loading ratings…</small></div>
+          <div class="beta-table-wrap">
+            <table class="beta-rank-table">
+              <thead><tr><th scope="col">#</th><th scope="col">TOP PLAYERS</th><th scope="col">BETA RATING</th><th scope="col">GAMES</th><th scope="col">WIN</th><th scope="col">LOST</th><th scope="col">DRAW</th></tr></thead>
+              <tbody id="betaPlayers"></tbody>
+            </table>
+          </div>
+          <div class="beta-rank-actions"><span id="betaShowing"></span><button type="button" id="betaLoadMore" hidden>Load more</button></div>
+        </section>
+        <section class="beta-profile" id="betaDetail" aria-live="polite">
+          <div class="beta-profile-head"><span>PLAYER PROFILE</span><strong>Select a player to open their Beta 1 profile</strong></div>
+        </section>
+      </div>
+
+      <details class="beta-rules" id="betaRules">
+        <summary>How Beta 1 is calculated <span>Experimental rules</span></summary>
+        <div class="beta-rule-grid">
+          <div><strong>Eligible matches</strong><p>Replay-engine records only: two equal human teams of at least two players, known public keys, at least 3 minutes, no crash or cheat flag. One-on-one, incomplete, and excluded matches do not change this rating.</p></div>
+          <div><strong>Team result</strong><p>Each account starts at 1500. Pre-match team-average ratings set the expected win chance. Win = 1, draw = 0.5, loss = 0. Result points = K × (actual − expected), with K starting at 16 and tapering to 10 after 20 rated games.</p></div>
+          <div><strong>Personal play</strong><p>Combat efficiency 45%, building pressure 25%, unit production 20%, research 10%. Counters are compared with earlier matches of similar team size and duration, preferring the same map when enough samples exist. Team shares produce a personal change capped at ±8.</p></div>
+          <div><strong>Guardrails</strong><p>Total change is capped at ±15 per match. If trusted counters or comparison samples are missing, that match uses team-result scoring only. A positive change after a loss is possible, but not guaranteed.</p></div>
+        </div>
+      </details>
+    </main>
+  </div>
+  <script src="embedded-page.js"></script>
+  <script src="beta1.js" defer></script>
+</body>
+</html>

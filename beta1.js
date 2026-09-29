@@ -1,5 +1,7 @@
 "use strict";
 
+const betaConfig = window.BOHA_BETA_CONFIG || { label: "Beta 1", tab: "beta1", data: "stats/published/beta1.json" };
+const isBeta3 = betaConfig.tab === "beta3";
 const searchElement = document.getElementById("betaSearch");
 const clearElement = document.getElementById("betaClear");
 const playersElement = document.getElementById("betaPlayers");
@@ -59,7 +61,7 @@ function renderPlayers() {
   playersElement.innerHTML = limited.length ? limited.map((player, index) => `
     <tr class="${selected?.id === player.id ? "is-active" : ""}" data-id="${escapeHtml(player.id)}">
       <td>${player.provisional ? "P" : establishedRanks.get(player.id) ?? index + 1}</td>
-      <td><button type="button" data-id="${escapeHtml(player.id)}" aria-label="Open ${escapeHtml(player.name)} Beta 1 profile">${escapeHtml(player.name)}</button></td>
+      <td><button type="button" data-id="${escapeHtml(player.id)}" aria-label="Open ${escapeHtml(player.name)} ${betaConfig.label} profile">${escapeHtml(player.name)}</button></td>
       <td><strong>${player.rating.toFixed(2)}</strong><small>${player.provisional ? "Provisional" : signed(player.history.slice(0, 10).reduce((sum, event) => sum + event.delta, 0)) + " last 10"}</small></td>
       <td>${player.games}</td>
       <td><div class="beta-record"><span>${player.wins}<small>${percent(player.wins, player.games)}</small></span><span>${player.losses}<small>${percent(player.losses, player.games)}</small></span><span>${player.draws}<small>${percent(player.draws, player.games)}</small></span></div></td>
@@ -77,7 +79,7 @@ function chartMarkup(player) {
   const line = points.join(" ");
   const area = `0,132 ${line} 600,132`;
   return `<div class="beta-chart-panel"><h3>RATING RATIO · ${player.games} RATED GAMES</h3>
-    <svg class="beta-chart" viewBox="0 0 600 135" preserveAspectRatio="none" role="img" aria-label="Beta 1 rating history from ${low} to ${high}">
+    <svg class="beta-chart" viewBox="0 0 600 135" preserveAspectRatio="none" role="img" aria-label="${betaConfig.label} rating history from ${low} to ${high}">
       <defs><linearGradient id="betaChartFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#40d7f4" stop-opacity=".28"/><stop offset="100%" stop-color="#40d7f4" stop-opacity="0"/></linearGradient></defs>
       <line x1="0" y1="132" x2="600" y2="132" stroke="#244f60"/><line x1="0" y1="65" x2="600" y2="65" stroke="#244f60" opacity=".45"/>
       <polygon points="${area}" fill="url(#betaChartFill)"/><polyline points="${line}" fill="none" stroke="#58daf5" stroke-width="2.4" vector-effect="non-scaling-stroke"/>
@@ -93,7 +95,7 @@ function renderDetail() {
     `<i class="${event.outcome.toLowerCase()}" title="${event.outcome}">${event.outcome[0]}</i>`).join("");
   const recent = player.history.slice(0, shownHistory);
   detailElement.innerHTML = `
-    <div class="beta-profile-head"><span>${escapeHtml(player.name)}</span><strong>BETA 1 ${player.provisional ? "PROVISIONAL" : `RANK #${snapshot.players.filter((item) => !item.provisional).findIndex((item) => item.id === player.id) + 1}`}</strong><button class="beta-copy" type="button" id="betaShare">Copy profile link</button></div>
+    <div class="beta-profile-head"><span>${escapeHtml(player.name)}</span><strong>${betaConfig.label.toUpperCase()} ${player.provisional ? "PROVISIONAL" : `RANK #${snapshot.players.filter((item) => !item.provisional).findIndex((item) => item.id === player.id) + 1}`}</strong><button class="beta-copy" type="button" id="betaShare">Copy profile link</button></div>
     <div class="beta-profile-inner">
       <div class="beta-stat-grid">
         <div class="beta-stat-tile"><span>CURRENT BETA</span><strong>${player.rating.toFixed(2)}</strong></div>
@@ -104,17 +106,18 @@ function renderDetail() {
         <div class="beta-stat-tile"><span>RECENT FORM</span><div class="beta-form">${form}</div></div>
       </div>
       ${chartMarkup(player)}
-      <div class="beta-history-panel"><h3>RECENT BETA 1 MATCHES</h3><div class="beta-history-wrap"><table class="beta-history-table"><thead><tr>
-        <th>Date</th><th>Match / map</th><th>Result</th><th>Before → after</th><th>Team</th><th>Personal</th><th>Total</th>
+      <div class="beta-history-panel"><h3>RECENT ${betaConfig.label.toUpperCase()} MATCHES</h3><div class="beta-history-wrap"><table class="beta-history-table"><thead><tr>
+        <th>Date</th><th>Match / map</th><th>Result</th><th>Before → after</th><th>Team</th><th>Personal</th>${isBeta3 ? "<th>Stat / expected</th><th>Game rank</th>" : ""}<th>Total</th>
       </tr></thead><tbody>${recent.map((event) => `<tr>
         <td>${dateText(event.date)}</td><td title="${escapeHtml(event.map)}">#${escapeHtml(event.matchId)} · ${escapeHtml(event.map)}</td>
         <td>${event.outcome}</td><td>${event.before.toFixed(2)} → ${event.after.toFixed(2)}</td>
         <td class="${event.resultDelta >= 0 ? "positive" : "negative"}">${signed(event.resultDelta)}</td>
-        <td class="${event.observedShare === null ? "missing" : event.personalDelta >= 0 ? "positive" : "negative"}" title="${event.observedShare === null ? "Trusted counters or peer samples unavailable" : `Observed share ${event.observedShare}% vs expected ${event.expectedShare}%`}">${event.observedShare === null ? "—" : signed(event.personalDelta)}</td>
+        <td class="${(isBeta3 ? event.performanceRank === null : event.observedShare === null) ? "missing" : event.personalDelta >= 0 ? "positive" : "negative"}" title="${isBeta3 ? escapeHtml(event.metricRanks ? `Match-wide weighted stat score ${event.performanceScore}% vs expected ${event.expectedPerformance}%. Score rank ${event.metricRanks.score}%, kills ${event.metricRanks.kills}%, unit K/D ${event.metricRanks.unitKd}%, structures destroyed ${event.metricRanks.structuresDestroyed}%, research ${event.metricRanks.research}%, production ${event.metricRanks.production}%.` : "Trusted replay counters unavailable") : event.observedShare === null ? "Trusted counters or peer samples unavailable" : `Observed share ${event.observedShare}% vs expected ${event.expectedShare}%`}">${(isBeta3 ? event.performanceRank === null : event.observedShare === null) ? "—" : signed(event.personalDelta)}</td>
+        ${isBeta3 ? `<td>${event.performanceRank === null ? "—" : `${event.performanceScore}% / ${event.expectedPerformance}%`}</td><td>${event.performanceRank === null ? "—" : `#${event.performanceRank}/${event.fieldSize}`}</td>` : ""}
         <td class="${event.delta >= 0 ? "positive" : "negative"}">${signed(event.delta)}</td>
       </tr>`).join("")}</tbody></table></div>
       ${player.history.length > shownHistory ? `<button type="button" class="beta-more" id="betaMore">Show more matches</button>` : ""}
-      <p class="beta-detail-note">Team = match result against expected team strength. Personal = share of team performance. “—” means result-only scoring.</p></div>
+      <p class="beta-detail-note">${isBeta3 ? "Team = result against expected team strength. Personal = match-wide rank of actual replay stats (hover for each metric). A missing rank means result-only scoring." : "Team = match result against expected team strength. Personal = share of team performance. “—” means result-only scoring."}</p></div>
       <p class="beta-detail-note">${player.provisional ? "Provisional: fewer than 20 eligible games." : "Established rating."} Based on the ${dateText(snapshot.sourceGeneratedAt)} published snapshot. Public ELO is unaffected.</p>
     </div>`;
 }
@@ -151,8 +154,8 @@ detailElement.addEventListener("click", async (event) => {
     shownHistory += 30;
     renderDetail();
   } else if (event.target.id === "betaShare" && selected) {
-    const url = new URL(window.parent === window ? "beta1.html" : "index.html", window.location.href);
-    url.searchParams.set(window.parent === window ? "betaPlayer" : "tab", window.parent === window ? selected.id : "beta1");
+    const url = new URL(window.parent === window ? `${betaConfig.tab}.html` : "index.html", window.location.href);
+    url.searchParams.set(window.parent === window ? "betaPlayer" : "tab", window.parent === window ? selected.id : betaConfig.tab);
     if (window.parent !== window) url.searchParams.set("betaPlayer", selected.id);
     try {
       await navigator.clipboard.writeText(url.toString());
@@ -176,7 +179,7 @@ searchElement.addEventListener("input", () => { shownPlayers = 100; renderPlayer
 clearElement.addEventListener("click", () => { searchElement.value = ""; searchElement.focus(); shownPlayers = 100; renderPlayers(); });
 document.querySelector('.beta-context a').addEventListener('click', () => { document.getElementById('betaRules').open = true; });
 
-fetch("stats/published/beta1.json", { cache: "no-cache" })
+fetch(betaConfig.data, { cache: "no-cache" })
   .then((response) => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
   .then((data) => {
     snapshot = data;
@@ -187,6 +190,9 @@ fetch("stats/published/beta1.json", { cache: "no-cache" })
     else renderPlayers();
   })
   .catch((error) => {
-    playersElement.innerHTML = `<tr><td colspan="5">Beta 1 data could not be loaded: ${escapeHtml(error.message)}</td></tr>`;
+    const message = window.location.protocol === "file:"
+      ? "Open this page through the website or a local HTTP server; direct file links cannot load rating data."
+      : `${betaConfig.label} data could not be loaded: ${escapeHtml(error.message)}`;
+    playersElement.innerHTML = `<tr><td colspan="5">${message}</td></tr>`;
     document.getElementById("betaStamp").textContent = "Unavailable";
   });

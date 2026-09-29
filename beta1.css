@@ -1,4 +1,5 @@
 .beta-page { color: #dceaf6; }
+.beta3-page { background: #07111d; }
 .beta-shell { min-height: 680px; padding: 0 0 76px; background: radial-gradient(circle at 10% 14%,#38262647,transparent 32%),radial-gradient(circle at 84% 7%,#422b5330,transparent 30%),linear-gradient(180deg,#111923,#07111d 540px); }
 .beta-toolbar { display:flex; align-items:stretch; min-height:42px; border:1px solid #72549c; box-shadow:0 0 0 1px #241a37 inset,0 0 11px #62398673; background:linear-gradient(180deg,#181122ec,#0c111de8); }
 .beta-search { display:flex; align-items:center; gap:9px; flex:0 1 390px; min-width:220px; padding:4px 9px; border-right:1px solid #4f3d62; color:#e2c25f; font:700 11px Oxanium,sans-serif; letter-spacing:.09em; white-space:nowrap; }
@@ -59,6 +60,7 @@
 .beta-detail-note {color:#8eacbd;font-size:11px;line-height:1.5;}
 .beta-history-wrap {overflow-x:auto;}
 .beta-history-table {width:100%;min-width:630px;border-collapse:collapse;font-size:11px;}
+.beta3-page .beta-history-table {min-width:850px;}
 .beta-history-table th,.beta-history-table td {padding:8px 6px;border-bottom:1px solid #1d4050;text-align:left;}
 .beta-history-table th {color:#7bc6db;background:#092331;font:800 10px Oxanium,sans-serif;letter-spacing:.06em;}
 .beta-history-table td:nth-child(n+3),.beta-history-table th:nth-child(n+3) {text-align:right;}

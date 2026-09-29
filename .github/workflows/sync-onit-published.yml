@@ -31,6 +31,9 @@ jobs:
       - name: Recalculate experimental Beta 1 ratings
         run: node stats/generate-beta1.js
 
+      - name: Recalculate experimental Beta 3 ratings
+        run: node stats/generate-beta3.js
+
       - name: Commit and push updates
         run: |
           if [[ -z "$(git status --short -- stats/published)" ]]; then
@@ -39,6 +42,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add stats/published/matches.json stats/published/leaderboards.json stats/published/manifest.json stats/published/beta1.json
+          git add stats/published/matches.json stats/published/leaderboards.json stats/published/manifest.json stats/published/beta1.json stats/published/beta3.json
           git commit -m "updated MaWay2000 published stats"
           git push

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BOHA Beta 3 Match-Stats Rating</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="beta1.css?v=20260929-beta3-2">
+</head>
+<body class="embedded-page beta-page beta3-page">
+  <div class="page-shell">
+    <main id="beta3" class="beta-shell">
+      <div class="beta-toolbar" aria-label="Beta 3 statistics">
+        <label class="beta-search"><span>PLAYER SEARCH:</span><input id="betaSearch" type="search" autocomplete="off" placeholder="Nickname / key" aria-label="Find a Beta 3 player by nickname or public key"><button id="betaClear" type="button" aria-label="Clear player search" hidden>×</button></label>
+        <div class="beta-toolbar-stat"><span>RATED PLAYERS</span><strong id="betaPlayerTotal">—</strong></div>
+        <div class="beta-toolbar-stat"><span>RATED MATCHES</span><strong id="betaMatchTotal">—</strong></div>
+        <div class="beta-toolbar-stat"><span>PERSONAL SCORE</span><strong id="betaPersonalTotal">—</strong></div>
+        <div class="beta-toolbar-stat beta-updated"><span>LAST UPDATED</span><strong id="betaStamp">Loading…</strong></div>
+      </div>
+      <div class="beta-layout">
+        <section class="beta-ranks" aria-label="Beta 3 player rankings">
+          <div class="beta-table-wrap"><table class="beta-rank-table">
+            <thead><tr><th scope="col"><button type="button" data-beta-sort="rating">#</button></th><th scope="col"><button type="button" data-beta-sort="name">TOP PLAYERS</button></th><th scope="col"><button type="button" data-beta-sort="rating">BETA RATING</button></th><th scope="col"><button type="button" data-beta-sort="games">GAMES</button></th><th scope="col"><span class="beta-record-head"><button type="button" data-beta-sort="wins">WIN</button><i>/</i><button type="button" data-beta-sort="losses">LOST</button><i>/</i><button type="button" data-beta-sort="draws">DRAW</button></span></th></tr></thead>
+            <tbody id="betaPlayers"></tbody>
+          </table></div>
+          <div class="beta-rank-actions"><span id="betaShowing"></span><button type="button" id="betaLoadMore" hidden>Load more</button></div>
+        </section>
+        <section class="beta-profile" id="betaDetail" aria-live="polite"><div class="beta-profile-head"><span>PLAYER PROFILE</span><strong>Select a player to open their Beta 3 profile</strong></div></section>
+      </div>
+      <div class="beta-context"><span class="beta-tag">BETA 3 · EXPERIMENTAL</span><span>Real replay stats across every player in the match. Public ELO and Beta 1 are unchanged.</span><a href="#betaRules">How scoring works</a></div>
+      <details class="beta-rules" id="betaRules"><summary>How Beta 3 is calculated <span>Experimental rules</span></summary>
+        <div class="beta-rule-grid">
+          <div><strong>Eligible matches</strong><p>Replay-engine records only: two equal human teams of at least two known public-keyed players, at least 3 minutes, no crash or cheat flag. One-on-one, incomplete, and excluded matches do not change this rating.</p></div>
+          <div><strong>Team result</strong><p>Everyone starts at 1500. Team-average pre-match ratings set the expected win chance. Result points = K × (actual − expected); K starts at 12 and tapers to 8 after 20 rated games.</p></div>
+          <div><strong>Real game stats</strong><p>All six (or more) players are ranked on replay score 25%, unit K/D 30%, kills 15%, structures destroyed 10%, completed research topics 15%, and units built 5%. Ties share rank. The weighted score is compared with the player’s expected rank from pre-match ratings, multiplied by 36, and capped at ±10 personal points. Hover a match’s personal points to inspect its metric ranks. Research is the published topic count, not the analyzer’s lab-activity percentage.</p></div>
+          <div><strong>Guardrails</strong><p>Total change is capped at ±15. A strong losing player may gain points; a poorly performing winner may lose points. If any participant lacks trusted counters, the entire match uses team-result points only. Match rank measures these six metrics, not every kind of contribution; no cheating verdict or public ELO change follows from it.</p></div>
+        </div>
+      </details>
+    </main>
+  </div>
+  <script src="embedded-page.js"></script>
+  <script>window.BOHA_BETA_CONFIG = { label: "Beta 3", tab: "beta3", data: "stats/published/beta3.json" };</script>
+  <script src="beta1.js?v=20260929-beta3-2" defer></script>
+</body>
+</html>

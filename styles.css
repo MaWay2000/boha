@@ -3733,6 +3733,32 @@ main {
   background: linear-gradient(180deg, #5da9c6, #1e6588 48%, #0d3858 52%, #257399);
 }
 
+.site-app-shell .topbar > .topnav > .topnav-actions > .beta3-link {
+  position: absolute;
+  left: calc(100% + 124px);
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 36px;
+  border: 2px solid #86cbe5;
+  color: #e4f4ff;
+  font: 800 14px Oxanium, sans-serif;
+  letter-spacing: .07em;
+  background: linear-gradient(180deg, #3b7e9f, #123b58 48%, #09243c 52%, #1a587c);
+  box-shadow: inset 0 2px #ffffff4a, 0 5px 10px #0009;
+  text-shadow: 0 2px 2px #000, 0 0 6px #b5e5fa;
+  text-decoration: none;
+  text-transform: uppercase;
+  transform: translateY(-50%);
+  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+}
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .beta3-link[aria-current="page"] {
+  color: #fff;
+  background: linear-gradient(180deg, #5da9c6, #1e6588 48%, #0d3858 52%, #257399);
+}
+
 @media (max-width: 800px) {
   .site-app-shell .topbar > .topnav > .topnav-actions {
     margin-bottom: 30px;
@@ -3741,6 +3767,18 @@ main {
   .site-app-shell .topbar > .topnav > .topnav-actions > .beta1-link {
     left: auto;
     right: 0;
+    top: 100%;
+    width: 88px;
+    height: 28px;
+    font-size: 11px;
+    transform: none;
+    z-index: 2;
+  }
+
+  .site-app-shell .topbar > .topnav > .topnav-actions > .beta3-link {
+    position: absolute;
+    left: auto;
+    right: 94px;
     top: 100%;
     width: 88px;
     height: 28px;

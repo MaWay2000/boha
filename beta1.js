@@ -131,7 +131,7 @@ function selectPlayer(id, updateUrl = true) {
   renderDetail();
   if (updateUrl) {
     const url = new URL(window.location.href);
-    url.searchParams.set("betaPlayer", id);
+    url.searchParams.set("betaPlayer", betaProfileLinkId(player, snapshot.players));
     history.replaceState(null, "", url);
     window.bohaEmbeddedPage?.postState(url.search);
     if (window.matchMedia("(max-width: 820px)").matches) {
@@ -155,8 +155,9 @@ detailElement.addEventListener("click", async (event) => {
     renderDetail();
   } else if (event.target.id === "betaShare" && selected) {
     const url = new URL(window.parent === window ? `${betaConfig.tab}.html` : "index.html", window.location.href);
-    url.searchParams.set(window.parent === window ? "betaPlayer" : "tab", window.parent === window ? selected.id : betaConfig.tab);
-    if (window.parent !== window) url.searchParams.set("betaPlayer", selected.id);
+    const linkId = betaProfileLinkId(selected, snapshot.players);
+    url.searchParams.set(window.parent === window ? "betaPlayer" : "tab", window.parent === window ? linkId : betaConfig.tab);
+    if (window.parent !== window) url.searchParams.set("betaPlayer", linkId);
     try {
       await navigator.clipboard.writeText(url.toString());
       event.target.textContent = "Copied";
@@ -185,9 +186,17 @@ fetch(betaConfig.data, { cache: "no-cache" })
     snapshot = data;
     renderToolbar();
     const requested = new URLSearchParams(window.location.search).get("betaPlayer");
-    const initial = requested ? data.players.find((player) => player.id === requested) : null;
-    if (initial) selectPlayer(initial.id, false);
-    else renderPlayers();
+    const initial = requested ? findBetaProfile(data.players, requested) : null;
+    if (initial) {
+      selectPlayer(initial.id, false);
+      const linkId = betaProfileLinkId(initial, data.players);
+      if (requested !== linkId) {
+        const url = new URL(window.location.href);
+        url.searchParams.set("betaPlayer", linkId);
+        history.replaceState(null, "", url);
+        window.bohaEmbeddedPage?.postState(url.search);
+      }
+    } else renderPlayers();
   })
   .catch((error) => {
     const message = window.location.protocol === "file:"

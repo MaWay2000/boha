@@ -77,7 +77,7 @@
 @media(max-width:560px) { .beta-context {display:block;}.beta-context span+span {display:block;margin-top:5px;} .beta-context a {display:block;margin-top:5px;} .beta-table-wrap::before {content:"Swipe table to see more columns →";display:block;padding:5px;color:#91bdce;font-size:11px;} .beta-rank-table {min-width:520px;} .beta-stat-grid {grid-template-columns:repeat(2,minmax(0,1fr));}.beta-stat-tile:last-child {grid-column:span 2;}.beta-rule-grid {grid-template-columns:1fr;} }
 
 /* Match the public leaderboard's compact table and player-profile layout. */
-.beta-shell {background:transparent;}
+.beta-shell {padding-top:20px;background:transparent;}
 .beta-toolbar {border-radius:5px;background:linear-gradient(90deg,#080711c7,#1d1436a3 50%,#080711c7);}
 .beta-layout {grid-template-columns:minmax(0,46fr) minmax(0,54fr);gap:18px;padding:16px 0 0;}
 .beta-ranks,.beta-profile {padding:18px;}

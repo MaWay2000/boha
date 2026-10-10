@@ -822,32 +822,39 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
       return;
     }
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    renderer.setClearColor(0x000000, 0);
-    stage.insertBefore(renderer.domElement, message);
-    const scene = new THREE.Scene();
-    scene.add(new THREE.HemisphereLight(0xbdefff, 0x10202a, 1.45));
-    const light = new THREE.DirectionalLight(0xffffff, 1.4);
-    light.position.set(4, 6, 5);
-    scene.add(light);
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    const item = { renderer, scene, camera, model: null, resizeObserver: null };
-    preview.items.push(item);
-
-    const resize = () => {
-      const width = Math.max(1, stage.clientWidth);
-      const height = Math.max(1, stage.clientHeight);
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-    item.resizeObserver = new ResizeObserver(resize);
-    item.resizeObserver.observe(stage);
-    resize();
-
+    let item = null;
+    let loadTimeout = null;
     try {
-      const model = await buildDroidGroup(getDroidParts(design, definitions));
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      renderer.setClearColor(0x000000, 0);
+      stage.insertBefore(renderer.domElement, message);
+      const scene = new THREE.Scene();
+      scene.add(new THREE.HemisphereLight(0xbdefff, 0x10202a, 1.45));
+      const light = new THREE.DirectionalLight(0xffffff, 1.4);
+      light.position.set(4, 6, 5);
+      scene.add(light);
+      const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+      item = { renderer, scene, camera, model: null, resizeObserver: null };
+      preview.items.push(item);
+
+      const resize = () => {
+        const width = Math.max(1, stage.clientWidth);
+        const height = Math.max(1, stage.clientHeight);
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+      };
+      item.resizeObserver = new ResizeObserver(resize);
+      item.resizeObserver.observe(stage);
+      resize();
+
+      const model = await Promise.race([
+        buildDroidGroup(getDroidParts(design, definitions)),
+        new Promise((_, reject) => {
+          loadTimeout = window.setTimeout(() => reject(new Error("Model loading timed out")), 30000);
+        })
+      ]);
       if (activePreview !== preview || token !== preview.loadToken) {
         disposeGroup(model);
         return;
@@ -865,7 +872,16 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
       message.hidden = true;
     } catch (error) {
       console.warn("Favorite unit preview failed:", error);
-      message.textContent = "Unable to load 3D model";
+      item?.resizeObserver?.disconnect();
+      item?.renderer?.dispose();
+      if (item) preview.items = preview.items.filter((entry) => entry !== item);
+      message.textContent = /webgl|context/i.test(String(error))
+        ? "3D unavailable: WebGL failed"
+        : /timed out/i.test(String(error))
+          ? "3D model timed out"
+          : "Unable to load 3D model";
+    } finally {
+      if (loadTimeout !== null) window.clearTimeout(loadTimeout);
     }
   };
 

@@ -1,5 +1,6 @@
 import * as THREE from "./three.module.js";
 import { buildDroidGroup, updateDroidAnimations } from "./droidGroup.js";
+import { drawSoftwareUnit } from "./softwareUnitPreview.js";
 
 const PIES_BASE = new URL("../pies/", import.meta.url).href;
 const TEX_BASE = new URL("../classic/texpages/texpages/", import.meta.url).href;
@@ -135,6 +136,15 @@ function addPreviewStyles() {
       inset: 0;
     }
     .stats-favorite-unit-stage canvas { display: block; width: 100%; height: 100%; }
+    .stats-favorite-unit-fallback-label {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      z-index: 1;
+      color: #9abcc7;
+      font-size: .62rem;
+      pointer-events: none;
+    }
     .stats-favorite-unit-message:not([hidden]) {
       position: absolute;
       inset: 0;
@@ -825,6 +835,10 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     let item = null;
     let loadTimeout = null;
     try {
+      if (new URLSearchParams(window.location.search).get("unitPreview") === "2d"
+        || window.location.hash === "#unitPreview2d") {
+        throw new Error("WebGL unavailable (2D preview requested)");
+      }
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
       renderer.setClearColor(0x000000, 0);
@@ -874,12 +888,42 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
       console.warn("Favorite unit preview failed:", error);
       item?.resizeObserver?.disconnect();
       item?.renderer?.dispose();
+      item?.renderer?.domElement?.remove();
       if (item) preview.items = preview.items.filter((entry) => entry !== item);
-      message.textContent = /webgl|context/i.test(String(error))
-        ? "3D unavailable: WebGL failed"
-        : /timed out/i.test(String(error))
+      if (/webgl|context/i.test(String(error))) {
+        try {
+          const model = item?.model || await buildDroidGroup(getDroidParts(design, definitions));
+          if (activePreview !== preview || token !== preview.loadToken) {
+            disposeGroup(model);
+            return;
+          }
+          if (new THREE.Box3().setFromObject(model).isEmpty()) throw new Error("No model geometry loaded");
+          const canvas = document.createElement("canvas");
+          canvas.setAttribute("aria-label", "2D preview of the unit model");
+          stage.insertBefore(canvas, message);
+          const fallbackLabel = document.createElement("span");
+          fallbackLabel.className = "stats-favorite-unit-fallback-label";
+          fallbackLabel.textContent = "2D preview";
+          stage.appendChild(fallbackLabel);
+          const redraw = () => drawSoftwareUnit(model, canvas);
+          const fallbackItem = { model, renderer: null, resizeObserver: new ResizeObserver(redraw) };
+          preview.items.push(fallbackItem);
+          fallbackItem.resizeObserver.observe(stage);
+          redraw();
+          model.traverse((mesh) => {
+            const image = mesh.material?.map?.image;
+            if (image && !image.complete) image.addEventListener("load", redraw, { once: true });
+          });
+          message.hidden = true;
+        } catch (fallbackError) {
+          console.warn("Favorite unit 2D fallback failed:", fallbackError);
+          message.textContent = "Unit preview unavailable";
+        }
+      } else {
+        message.textContent = /timed out/i.test(String(error))
           ? "3D model timed out"
           : "Unable to load 3D model";
+      }
     } finally {
       if (loadTimeout !== null) window.clearTimeout(loadTimeout);
     }
@@ -1054,6 +1098,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   const render = (time) => {
     if (activePreview !== preview) return;
     preview.items.forEach((item, index) => {
+      if (!item.renderer) return; // Static Canvas 2D fallback redraws only on resize or texture load.
       if (item.model) {
         item.model.rotation.y = time * 0.00042 + index * 0.22;
         updateDroidAnimations(item.model, time);

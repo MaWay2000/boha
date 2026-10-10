@@ -1,11 +1,13 @@
 import * as THREE from "./three.module.js";
 import { buildDroidGroup, updateDroidAnimations } from "./droidGroup.js";
-import { drawSoftwareUnit } from "./softwareUnitPreview.js";
+import { drawSoftwareUnit } from "./softwareUnitPreview.js?v=20261010-software-3d-1";
 
 const PIES_BASE = new URL("../pies/", import.meta.url).href;
 const TEX_BASE = new URL("../classic/texpages/texpages/", import.meta.url).href;
 let definitionsPromise = null;
 let activePreview = null;
+const forceSoftwarePreview = ["2d", "software"].includes(new URLSearchParams(window.location.search).get("unitPreview"))
+  || window.location.hash === "#unitPreview2d";
 
 const FRIENDLY_COMPONENT_NAMES = new Map([
   ["Cyb-Wpn-Atmiss", "Scourge Missile"],
@@ -133,18 +135,9 @@ function addPreviewStyles() {
     }
     .stats-favorite-unit-stage {
       position: absolute;
-      inset: 0;
+      inset: 52px 6px 22px;
     }
     .stats-favorite-unit-stage canvas { display: block; width: 100%; height: 100%; }
-    .stats-favorite-unit-fallback-label {
-      position: absolute;
-      right: 8px;
-      bottom: 8px;
-      z-index: 1;
-      color: #9abcc7;
-      font-size: .62rem;
-      pointer-events: none;
-    }
     .stats-favorite-unit-message:not([hidden]) {
       position: absolute;
       inset: 0;
@@ -835,9 +828,8 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     let item = null;
     let loadTimeout = null;
     try {
-      if (new URLSearchParams(window.location.search).get("unitPreview") === "2d"
-        || window.location.hash === "#unitPreview2d") {
-        throw new Error("WebGL unavailable (2D preview requested)");
+      if (forceSoftwarePreview) {
+        throw new Error("WebGL unavailable (software preview requested)");
       }
       const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -897,26 +889,21 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
             disposeGroup(model);
             return;
           }
-          if (new THREE.Box3().setFromObject(model).isEmpty()) throw new Error("No model geometry loaded");
+          const box = new THREE.Box3().setFromObject(model);
+          if (box.isEmpty()) throw new Error("No model geometry loaded");
+          model.position.sub(box.getCenter(new THREE.Vector3()));
           const canvas = document.createElement("canvas");
-          canvas.setAttribute("aria-label", "2D preview of the unit model");
+          canvas.setAttribute("aria-label", "Rotating 3D preview of the unit model");
+          canvas.dataset.engine = "software-3d";
           stage.insertBefore(canvas, message);
-          const fallbackLabel = document.createElement("span");
-          fallbackLabel.className = "stats-favorite-unit-fallback-label";
-          fallbackLabel.textContent = "2D preview";
-          stage.appendChild(fallbackLabel);
           const redraw = () => drawSoftwareUnit(model, canvas);
-          const fallbackItem = { model, renderer: null, resizeObserver: new ResizeObserver(redraw) };
+          const fallbackItem = { model, renderer: null, softwareCanvas: canvas, lastRender: 0, resizeObserver: new ResizeObserver(redraw) };
           preview.items.push(fallbackItem);
           fallbackItem.resizeObserver.observe(stage);
           redraw();
-          model.traverse((mesh) => {
-            const image = mesh.material?.map?.image;
-            if (image && !image.complete) image.addEventListener("load", redraw, { once: true });
-          });
           message.hidden = true;
         } catch (fallbackError) {
-          console.warn("Favorite unit 2D fallback failed:", fallbackError);
+          console.warn("Favorite unit software 3D preview failed:", fallbackError);
           message.textContent = "Unit preview unavailable";
         }
       } else {
@@ -1098,12 +1085,22 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   const render = (time) => {
     if (activePreview !== preview) return;
     preview.items.forEach((item, index) => {
-      if (!item.renderer) return; // Static Canvas 2D fallback redraws only on resize or texture load.
+      if (item.softwareCanvas) {
+        // Keep CPU rendering bounded, including the 20-model gallery.
+        if (document.hidden || time - item.lastRender < 50) return;
+        const rect = item.softwareCanvas.getBoundingClientRect();
+        if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) return;
+        item.lastRender = time;
+      }
       if (item.model) {
         item.model.rotation.y = time * 0.00042 + index * 0.22;
         updateDroidAnimations(item.model, time);
       }
-      item.renderer.render(item.scene, item.camera);
+      if (item.softwareCanvas) {
+        drawSoftwareUnit(item.model, item.softwareCanvas);
+      } else {
+        item.renderer.render(item.scene, item.camera);
+      }
     });
     preview.frameId = requestAnimationFrame(render);
   };

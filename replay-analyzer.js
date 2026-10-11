@@ -6213,7 +6213,23 @@
     latestReplayId = extractReplayId(url.href);
     latestReplaySha256 = extractReplaySha256(url.href);
     setStatus("Downloading replay…");
-    const response = await fetch(url.href);
+    let response;
+    try {
+      response = await fetch(url.href);
+    } catch (downloadError) {
+      // Some upstream files are plain WZrp despite Content-Encoding: br.
+      // Browsers cannot ignore that header; use our verified stored copy.
+      if (url.origin !== "https://warzone2100.retropaganda.info" || !latestReplayId) {
+        throw downloadError;
+      }
+      const indexResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
+      if (!indexResponse.ok) throw downloadError;
+      const index = await indexResponse.json();
+      const match = (index.matches || []).find(item => String(item.source_match_id) === latestReplayId);
+      if (!match || !/^[a-f0-9]{64}$/.test(match.replay_sha256 || "")) throw downloadError;
+      setStatus("Downloading stored replay copy…");
+      response = await fetch(`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${match.replay_sha256}`);
+    }
     if (!response.ok) {
       throw new Error(`Replay download failed with HTTP ${response.status}.`);
     }

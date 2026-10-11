@@ -17,6 +17,9 @@ if ($path === '/gzip') {
 } elseif ($path === '/br') {
     header('Content-Encoding: br');
     echo base64_decode('Cw6AV1pycCByZXBsYXkgdHJhbnNwb3J0IGZpeHR1cmUD');
+} elseif ($path === '/plain-as-br') {
+    header('Content-Encoding: br');
+    echo $body;
 } elseif ($path === '/bad-br') {
     header('Content-Encoding: br');
     echo 'not valid brotli';

@@ -32,7 +32,7 @@ try {
     if (!$ready) throw new RuntimeException('Local test server did not start.');
     $paths = ['plain', 'gzip', 'deflate'];
     $brotli = (curl_version()['features'] & CURL_VERSION_BROTLI) !== 0;
-    if ($brotli) $paths = array_merge($paths, ['br', 'redirect']);
+    if ($brotli) $paths = array_merge($paths, ['br', 'redirect', 'plain-as-br']);
     foreach ($paths as $path) {
         $result = $download->invoke($queue, 'http://' . $address . '/' . $path);
         if ($result !== ['status' => 200, 'body' => 'WZrp replay transport fixture', 'filename' => 'fixture.wzrp']) {

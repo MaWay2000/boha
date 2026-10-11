@@ -133,7 +133,7 @@ final class ReplayQueue
         return (int) $this->pdo->lastInsertId();
     }
 
-    private function download(string $url): array
+    private function download(string $url, bool $decode = true): array
     {
         $filename = null;
         $handle = curl_init($url);
@@ -147,6 +147,7 @@ final class ReplayQueue
             // Advertise only encodings supported by this libcurl build and decode
             // HTTP compression (including Brotli) before validating/hashing WZrp.
             CURLOPT_ENCODING => '',
+            CURLOPT_HTTP_CONTENT_DECODING => $decode,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => $this->timeoutSeconds,
             CURLOPT_USERAGENT => 'MaWay2000-wzstats/1.0',
@@ -159,8 +160,15 @@ final class ReplayQueue
         ]);
         $body = curl_exec($handle);
         $error = curl_error($handle);
+        $errorCode = curl_errno($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
         curl_close($handle);
+        if ($decode && $errorCode === CURLE_BAD_CONTENT_ENCODING) {
+            // Upstream occasionally labels a plain replay as Brotli. Accept
+            // the raw retry only if it is actually a WZrp file, never bad br.
+            $raw = $this->download($url, false);
+            if ($raw['status'] === 200 && str_starts_with($raw['body'], 'WZrp')) return $raw;
+        }
         if (!is_string($body)) {
             throw new RuntimeException('Replay download failed' . ($error !== '' ? ': ' . $error : '.'));
         }

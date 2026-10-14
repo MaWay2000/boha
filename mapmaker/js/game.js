@@ -7983,7 +7983,12 @@ function buildTileNumber(x, y) {
 }
 
 function getReusableMapTail(info) {
-  if (!info || !info.tail || info.width !== mapW || info.height !== mapH) return null;
+  if (!info || !info.tail || info.tail.length < 8 || info.width !== mapW || info.height !== mapH) {
+    // Warzone requires a gateway header even when the map has no gateways.
+    const emptyGateways = new Uint8Array(8);
+    new DataView(emptyGateways.buffer).setUint32(0, 1, true);
+    return emptyGateways;
+  }
   return info.tail;
 }
 

@@ -20,52 +20,81 @@
     .open-data-title-row {
       display: flex;
       align-items: center;
-      gap: 32px;
+      flex-wrap: wrap;
+      gap: 24px;
     }
 
-    .open-data-title-row h2 {
-      flex: 1;
+    #opendata .open-data-title-row h2 {
+      flex: 1 1 650px;
+      min-width: 0;
+      white-space: normal;
     }
 
     .open-data-hub-button {
-      min-height: 62px;
-      padding-inline: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 46px;
+      min-width: 190px;
+      padding: 12px 18px;
+      box-sizing: border-box;
+      border: 1px solid #427e96;
+      border-radius: 3px;
+      border-top: 2px solid #76deef;
+      background: linear-gradient(180deg, #15394b, #071923);
+      color: #dff8ff;
       font-family: "Oxanium", sans-serif;
-      font-size: 1.08rem;
+      font-size: 0.9rem;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: 0.025em;
       white-space: nowrap;
-      box-shadow: 0 0 26px rgba(85, 217, 242, 0.16);
+      box-shadow: inset 0 1px 0 #ffffff0a, 0 3px 10px #0004;
+      transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
     }
+    .open-data-hub-button::after { content: "↗"; color: #7de3f4; font-size: 1.15rem; }
+    .open-data-hub-button:hover { color: #fff; border-color: #82e8f7; background: linear-gradient(180deg, #205069, #102d3c); transform: translateY(-1px); }
+    .open-data-hub-button:focus-visible { outline: 2px solid #ffbe70; outline-offset: 4px; }
+    .open-data-hub-button:active { transform: translateY(0); }
 
     .open-data-title-actions {
-      display: flex;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      flex-shrink: 0;
       gap: 10px;
     }
 
     .open-data-title-actions .open-data-keys-button {
-      width: 116px;
-      min-height: 36px;
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      line-height: 1.05;
-      text-align: center;
-      white-space: normal;
+      background: linear-gradient(180deg, #102b3a, #07151f);
     }
+    .open-data-keys-button::after { content: "→"; }
+    .open-data-title-actions .open-data-keys-button:hover { background: linear-gradient(180deg, #205069, #102d3c); }
 
-    @media (max-width: 860px) {
+    @media (max-width: 1100px) {
       .open-data-title-row {
         align-items: stretch;
         flex-direction: column;
         gap: 20px;
       }
 
+      #opendata .open-data-title-row h2 { flex-basis: auto; }
+
       .open-data-hub-button {
         padding-inline: 16px;
       }
 
       .open-data-title-actions {
-        flex-wrap: nowrap;
+        align-self: flex-start;
       }
+    }
+    @media (max-width: 480px) {
+      .open-data-title-actions { grid-template-columns: 1fr; width: 100%; }
+      .open-data-hub-button { min-width: 0; width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .open-data-hub-button { transition: none; }
+      .open-data-hub-button:hover { transform: none; }
     }
   </style>
 </head>
@@ -80,13 +109,13 @@
               <h2>The raw material stays public.</h2>
               <span class="open-data-title-actions">
                 <a
-                  class="button button-primary open-data-hub-button"
+                  class="button open-data-hub-button"
                   href="https://warzone2100.retropaganda.info/"
                   target="_blank"
                   rel="noopener noreferrer"
                 >Visit Bohan Hub</a>
                 <a
-                  class="button button-primary open-data-hub-button open-data-keys-button"
+                  class="button open-data-hub-button open-data-keys-button"
                   href="player-keys.html"
                 >Search Player Keys</a>
               </span>

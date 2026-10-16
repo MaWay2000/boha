@@ -318,13 +318,17 @@
     }
     .file-name-field {
       display: flex;
-      flex-direction: column;
-      gap: 3px;
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
       color: var(--text);
       font-size: 0.9rem;
     }
     .file-name-field input {
-      width: 100%;
+      flex: 1;
+      min-width: 0;
+      width: 0;
       box-sizing: border-box;
       background: #2b3a4d;
       border: 1px solid #4b5f78;
@@ -615,6 +619,29 @@
       font-size: 1rem;
     }
 
+    #filePanel .file-section-title {
+      display:flex; align-items:center; justify-content:center; gap:12px;
+      color:#7ddfff; font-family:"Segoe UI",Arial,sans-serif; font-size:1rem;
+      font-weight:700; line-height:1.4; text-align:center; margin:2px 0 6px;
+    }
+    #filePanel .file-section-title::before,
+    #filePanel .file-section-title::after {
+      content:""; flex:1; height:2px; background:#f39a3c;
+    }
+    #filePanel .file-name-field, #filePanel .file-name-field input { color:#eef5ff; }
+    #filePanel #localSaveSelect {
+      color:#eef5ff; background:#142130; border:1px solid #526b85;
+      font-family:"Segoe UI",Arial,sans-serif; line-height:1.5; color-scheme:dark;
+    }
+    #filePanel #localSaveSelect option { color:#eef5ff; background:#142130; padding:4px 6px; }
+    #filePanel #localSaveSelect option:checked {
+      color:#fff; background:#145b79 linear-gradient(#145b79,#145b79); font-weight:600;
+    }
+
+    .local-save-preview { margin:6px 0 0; }
+    #localSavePreviewCanvas { display:block; width:100%; height:auto; background:#101923; border:1px solid #526b85; border-radius:3px; box-sizing:border-box; }
+    #localSavePreviewCaption { margin-top:4px; color:#b8ccdc; font-size:11px; text-align:center; }
+
     /* Overlay (initial file chooser) */
     #overlayMsg {
       position: fixed; left:0; top:0; width:100vw; height:100vh;
@@ -748,28 +775,32 @@
     <!-- FILE TAB -->
     <div id="filePanel" class="panel">
       <div class="panel-box">
-        <div class="show-hide-title">Map file</div>
+        <div class="show-hide-title file-section-title">Open Map</div>
         <div class="file-actions">
           <button type="button" id="fileNewBtn" class="action-btn">New map</button>
           <button type="button" id="fileServerBtn" class="action-btn">Browse server maps</button>
           <button type="button" id="fileLoadBtn" class="action-btn">Load map</button>
           <button type="button" id="fileOfficialBtn" class="action-btn">Download official maps</button>
           <div class="file-actions-separator"></div>
-          <button type="button" id="fileValidateBtn" class="action-btn">Validate map</button>
-          <label class="file-name-field" for="fileMapNameInput">
-            Map name
-            <input type="text" id="fileMapNameInput" value="Untitled Map" autocomplete="off" spellcheck="false">
-          </label>
-          <button type="button" id="fileSaveBtn" class="action-btn">Save map</button>
-          <div class="file-actions-separator"></div>
+          <label for="localSaveSelect" class="file-section-title">Load local Web saves:</label>
           <select id="localSaveSelect" size="5" style="width:100%; font-size:0.85rem;"></select>
           <div style="display:flex; gap:4px;">
             <button type="button" id="localSaveLoadBtn" class="action-btn">Load local</button>
             <button type="button" id="localSaveDeleteBtn" class="action-btn">Delete</button>
           </div>
-          <div id="localSaveStatus" style="font-size:0.75rem; color:#8aa; line-height:1.3;"></div>
+          <figure class="local-save-preview">
+            <canvas id="localSavePreviewCanvas" width="384" height="224" role="img" aria-label="Saved map terrain preview"></canvas>
+            <figcaption id="localSavePreviewCaption">Select a local save to preview.</figcaption>
+          </figure>
+          <div class="file-actions-separator"></div>
+          <div class="file-section-title">Save Map</div>
+          <label class="file-name-field" for="fileMapNameInput">
+            Map name
+            <input type="text" id="fileMapNameInput" value="Untitled Map" autocomplete="off" spellcheck="false">
+          </label>
+          <button type="button" id="fileValidateBtn" class="action-btn">Validate map</button>
+          <button type="button" id="fileSaveBtn" class="action-btn">Save map</button>
         </div>
-        <div id="fileStatus">Load .wz, .map, or JSON maps. Save exports .wz.</div>
       </div>
     </div>
 

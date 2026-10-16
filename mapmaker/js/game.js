@@ -1,4 +1,5 @@
 import * as THREE from './three.module.js';
+import { drawLocalSavePreview } from './localSavePreview.js';
 
 function normalizeTexPath(name){
   let n = String(name || '').replace(/\\/g,'/').toLowerCase();
@@ -6648,7 +6649,7 @@ function populateStructureFilter() {
   });
   filterSelect.value = 'All types';
 }
-let activeTab = 'view';
+let activeTab = 'about';
 window.activeTab = activeTab;
 let brushSize = 1;
 let heightMax = 255;
@@ -7142,6 +7143,19 @@ function refreshLocalSaveList() {
   if (localSaveLoadBtn) localSaveLoadBtn.disabled = !hasSelection;
   if (localSaveDeleteBtn) localSaveDeleteBtn.disabled = !hasSelection;
   refreshOverlayLocalSaveList(index);
+  refreshLocalSavePreview();
+}
+
+let localSavePreviewFrame = 0;
+function refreshLocalSavePreview() {
+  cancelAnimationFrame(localSavePreviewFrame);
+  localSavePreviewFrame = requestAnimationFrame(() => {
+    drawLocalSavePreview(
+      document.getElementById('localSavePreviewCanvas'),
+      document.getElementById('localSavePreviewCaption'),
+      localSaveSelect?.value ? readLocalSaveSnapshot(localSaveSelect.value) : null
+    );
+  });
 }
 
 function getLocalAutosaveEnabled() {
@@ -9101,6 +9115,7 @@ function setupFilePanel() {
     });
   }
   if (localSaveDeleteBtn) localSaveDeleteBtn.addEventListener('click', deleteSelectedLocalSave);
+  if (localSaveSelect) localSaveSelect.addEventListener('change', refreshLocalSavePreview);
   refreshLocalSaveList();
   if (saveBtn) {
     saveBtn.addEventListener('click', saveCurrentMap);

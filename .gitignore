@@ -1,1 +1,12 @@
 .codex-remote-attachments/
+/mapmaker-local/
+/local-api/hosted-wzstats/storage/visitor-activity/
+/tmp/
+/output/
+/local-api/vendor/
+/local-api/storage/
+/local-api/hosted-wzstats/storage/
+/local-api/hosted-wzstats/data/
+/local-api/hosted-wzstats/local-worker-env.php
+/local-api/hosted-wzstats/src/*.before-*.php
+/local-api/hosted-wzstats/bin/codex-visitor-migrate-*.php

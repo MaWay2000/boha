@@ -66,6 +66,9 @@
   let timer;
   const schedule = () => { clearTimeout(timer); timer = setTimeout(state, 1000); };
   window.addEventListener('public-site-state', event => {playerName = event.detail?.playerName || '';schedule();});
+  window.addEventListener('message', event => {
+    if (event.origin === location.origin && event.data?.type === 'boha:page-state') schedule();
+  });
   window.addEventListener('popstate', schedule);
   window.addEventListener('hashchange', schedule);
   document.addEventListener('click', event => {

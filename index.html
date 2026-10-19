@@ -220,8 +220,10 @@
     </div>
   </div>
 
+  <script src="visitor-activity.js?v=20261020-1"></script>
   <script>
     (function () {
+      if (window.__publicVisitorActivity) return;
       const endpoint = "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/visitors";
       let visitorId = "";
       try {

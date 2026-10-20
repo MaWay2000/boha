@@ -156,8 +156,6 @@
               Discord Server
             </a>
             <a class="bohan-hub-link" href="open-data.html" target="contentFrame" data-tab="open-data">Bohan Hub</a>
-            <a class="beta1-link" href="beta1.html" target="contentFrame" data-tab="beta1">Beta 1</a>
-            <a class="beta3-link" href="beta3.html" target="contentFrame" data-tab="beta3">Beta 3</a>
           </span>
           <span class="topnav-row topnav-primary">
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
@@ -274,6 +272,21 @@
         // Fail open when the logging service is temporarily unavailable.
       });
     })();
+  </script>
+  <script>
+    // Experimental ratings are available only in the local development preview.
+    if (["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) {
+      const actions = document.querySelector(".topnav-actions");
+      for (const [tab, label] of [["beta1", "Beta 1"], ["beta3", "Beta 3"]]) {
+        const link = document.createElement("a");
+        link.className = tab + "-link";
+        link.href = tab + ".html";
+        link.target = "contentFrame";
+        link.dataset.tab = tab;
+        link.textContent = label;
+        actions.append(link);
+      }
+    }
   </script>
   <script src="shell-frame.js?v=7"></script>
   <script>

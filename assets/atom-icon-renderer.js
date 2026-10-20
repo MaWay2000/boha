@@ -33,6 +33,10 @@ window.BohaAtomIconRenderer = function (canvas) {
   return function draw(time) {
     ctx.setTransform(canvas.width / 64, 0, 0, canvas.height / 64, 0, 0);
     ctx.clearRect(0, 0, 64, 64);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(32, 32, 32, 0, tau); ctx.clip();
+    ctx.fillStyle = '#03070B';
+    ctx.fillRect(0, 0, 64, 64);
     const electrons = [0, 1, 2].map(ring => point(time * 1.55 + ring * tau / 3 + 0.05, ring));
     rings(false);
     electrons.filter(p => p.z < 0).forEach(electron);
@@ -44,5 +48,6 @@ window.BohaAtomIconRenderer = function (canvas) {
     ctx.beginPath(); ctx.arc(32, 32, 6, 0, tau); ctx.fill(); ctx.shadowBlur = 0;
     rings(true);
     electrons.filter(p => p.z >= 0).forEach(electron);
+    ctx.restore();
   };
 };

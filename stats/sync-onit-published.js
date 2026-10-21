@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const {sanitizeLeaderboards, sanitizeMatches} = require("./public-export.cjs");
 
 const PUBLISH_ORIGIN = "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/";
 const OUTPUT_DIR = path.join(__dirname, "published");
@@ -38,6 +39,7 @@ async function sync() {
 
   fs.mkdirSync(OUTPUT_DIR, { recursive: true });
   let changed = false;
+  const publicManifest = {format: 1, publishedAt: manifest.publishedAt, files: {}};
   for (const [name, metadata] of Object.entries(manifest.files)) {
     if (!ALLOWED_FILES.has(name)) {
       throw new Error(`Publication manifest contains an unexpected file: ${name}`);
@@ -47,10 +49,15 @@ async function sync() {
     if (actualHash !== metadata.sha256) {
       throw new Error(`${name} SHA-256 mismatch.`);
     }
-    changed = writeIfChanged(path.join(OUTPUT_DIR, name), content) || changed;
+    const input = JSON.parse(content.toString("utf8"));
+    const publicData = name === "leaderboards.json" ? sanitizeLeaderboards(input) : sanitizeMatches(input);
+    const safeContent = Buffer.from(JSON.stringify(publicData) + "\n");
+    publicManifest.files[name] = {sha256: sha256(safeContent), bytes: safeContent.length};
+    if (name === "matches.json") publicManifest.files[name].matchesCount = publicData.matches.length;
+    changed = writeIfChanged(path.join(OUTPUT_DIR, name), safeContent) || changed;
   }
 
-  changed = writeIfChanged(path.join(OUTPUT_DIR, MANIFEST_NAME), manifestBuffer) || changed;
+  changed = writeIfChanged(path.join(OUTPUT_DIR, MANIFEST_NAME), Buffer.from(JSON.stringify(publicManifest) + "\n")) || changed;
   console.log(changed
     ? `Published MaWay2000 snapshot ${manifest.files["matches.json"].sha256.slice(0, 16)}.`
     : "No MaWay2000 publication changes detected.");

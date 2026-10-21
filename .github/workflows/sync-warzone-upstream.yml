@@ -30,7 +30,10 @@ jobs:
           UPSTREAM_BASIC_PASSWORD: ${{ secrets.UPSTREAM_BASIC_PASSWORD }}
         run: node stats/sync-upstream.js
 
-      - name: Commit and push updates
+      - name: Validate public release privacy
+        run: node stats/check-public-release.cjs
+
+      - name: Commit verified public updates
         run: |
           if [[ -z "$(git status --short)" ]]; then
             echo "No changes to commit."

@@ -10,3 +10,7 @@
 /local-api/hosted-wzstats/local-worker-env.php
 /local-api/hosted-wzstats/src/*.before-*.php
 /local-api/hosted-wzstats/bin/codex-visitor-migrate-*.php
+/local-api/
+/security-desk/
+/server/
+/replay-downloader/

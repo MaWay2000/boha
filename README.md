@@ -52,6 +52,10 @@ Use a local HTTP server instead of opening HTML files directly, because the tool
 
 The website and the replay-processing backend are separate systems. GitHub Pages serves static files; it does not run the analyzer, a database, PHP, or Node.js backend services.
 
+Local administration/backend files are deliberately excluded from this public
+repository. Public statistics are privacy-filtered before publication; see
+[SECURITY.md](SECURITY.md) for the boundary and pre-publication checks.
+
 The `sync-onit-published.yml` workflow verifies and mirrors normalized, replay-derived snapshots into `stats/published/` every 30 minutes. Its historical filename does not imply that the publisher must remain on the original host. The configured publisher is defined in `stats/sync-onit-published.js`.
 
 After each snapshot sync, the workflow runs `node stats/generate-beta1.js` to rebuild the experimental `stats/published/beta1.json` from `leaderboards.json` and `matches.json`. This is a shadow rating only: it never writes to the backend ELO or launches replay workers. Run `node --test stats/beta1-rating.test.js` to check its scoring and eligibility rules.

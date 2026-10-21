@@ -464,6 +464,7 @@ function hydratePublishedBoard(name) {
     return { accounts: new Map(), games: [] };
   }
 
+  const listedAccountIds = new Set((board.players || []).map(player => String(player.id)));
   const accounts = new Map((board.players || []).map((player) => [String(player.id), {
     mainPublicKey: player.mainPublicKey || null,
     publicKeys: new Set(player.publicKeys || []),
@@ -530,6 +531,8 @@ function hydratePublishedBoard(name) {
       slots.forEach((slot) => slot.account.games.push(game));
       return game;
     });
+  // Preserve historical slots without republishing omitted player profiles.
+  for (const id of accounts.keys()) if (!listedAccountIds.has(id)) accounts.delete(id);
   return { accounts, games };
 }
 

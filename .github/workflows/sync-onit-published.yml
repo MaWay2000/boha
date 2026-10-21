@@ -34,7 +34,11 @@ jobs:
       - name: Recalculate experimental Beta 3 ratings
         run: node stats/generate-beta3.js
 
-      - name: Commit and push updates
+      - name: Validate public release privacy
+        # Check the generated publication before it can enter public Git history.
+        run: node stats/check-public-release.cjs && node --test stats/public-export.test.cjs
+
+      - name: Commit verified public updates
         run: |
           if [[ -z "$(git status --short -- stats/published)" ]]; then
             echo "No publication changes to commit."

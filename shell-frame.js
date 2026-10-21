@@ -2,6 +2,8 @@ const contentFrame = document.getElementById("contentFrame");
 const navLinks = [...document.querySelectorAll(".topnav a[data-tab]")];
 const tabControls = [...document.querySelectorAll("[data-tab]")];
 let frameIsLoading = false;
+let activeProfileName = "";
+let frameTitleObserver = null;
 
 const tabs = Object.fromEntries(
   navLinks.map((link) => [
@@ -35,7 +37,40 @@ function getTabFromLocation() {
 
 function updateDocumentTitle(tab) {
   const label = tabs[tab]?.label || "Leaderboards";
-  document.title = `Warzone 2100 - ${label}`;
+  const section = tab === "compare" ? "Compare" : label.replace(/\s+/g, " ").trim();
+  const player = activeProfileName.replace(/\s+/g, " ").trim().slice(0, 80);
+  const supportsProfile = ["leaderboards", "beta1", "beta3"].includes(tab);
+  const suffix = supportsProfile && player
+    ? (tab === "leaderboards" ? player : `${player} — ${section}`)
+    : section;
+  const title = `Warzone 2100 - ${suffix}`;
+  if (document.title !== title) document.title = title;
+}
+
+function observeFrameTitle() {
+  frameTitleObserver?.disconnect();
+  frameTitleObserver = null;
+  const tab = contentFrame.dataset.currentTab || getTabFromLocation();
+  try {
+    const frameDocument = contentFrame.contentDocument;
+    const syncTitle = () => {
+      if (frameIsLoading || contentFrame.dataset.currentTab !== tab) return;
+      const heading = tab === "leaderboards"
+        ? frameDocument.querySelector(".stats-player-profile-heading-name")
+        : ["beta1", "beta3"].includes(tab)
+          ? frameDocument.querySelector("#betaDetail .beta-profile-head > span") : null;
+      activeProfileName = heading?.textContent || "";
+      updateDocumentTitle(tab);
+    };
+    syncTitle();
+    if (frameDocument?.body && ["leaderboards", "beta1", "beta3"].includes(tab)) {
+      frameTitleObserver = new MutationObserver(syncTitle);
+      frameTitleObserver.observe(frameDocument.body, {subtree: true, childList: true, characterData: true});
+    }
+  } catch (error) {
+    activeProfileName = "";
+    updateDocumentTitle(tab);
+  }
 }
 
 function setActiveTab(tab) {
@@ -107,6 +142,8 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false, resetSear
     return;
   }
 
+  activeProfileName = "";
+  frameTitleObserver?.disconnect();
   setActiveTab(normalizedTab);
 
   const searchParams = resetSearch ? new URLSearchParams() : getPageSearchParams();
@@ -117,6 +154,8 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false, resetSear
     contentFrame.style.height = "480px";
     contentFrame.dataset.currentTab = normalizedTab;
     contentFrame.src = nextSrc;
+  } else {
+    observeFrameTitle();
   }
 
   if (updateHistory) {
@@ -144,6 +183,7 @@ tabControls.forEach((control) => {
 contentFrame.addEventListener("load", () => {
   frameIsLoading = false;
   syncFrameHeightFromDocument();
+  observeFrameTitle();
 });
 
 window.addEventListener("message", (event) => {

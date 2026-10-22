@@ -1,5 +1,5 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
-import { BOHAN_PREFERENCE_KEY, loadBohanCalculation, calculatePublishedRatings, readBohanPreference, writeBohanPreference, mountBohanControl } from "./bohan-live-rating.mjs?v=20261022-1";
+import { BOHAN_PREFERENCE_KEY, loadBohanCalculation, calculatePublishedRatings, readBohanPreference, writeBohanPreference, mountBohanControl } from "./bohan-live-rating.mjs?v=20261022-2";
 
 const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
 const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");

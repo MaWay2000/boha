@@ -81,7 +81,7 @@ export function calculatePublishedRatings(board, calculation) {
 export function mountBohanControl(host) {
   const stylesheet = document.createElement("link");
   stylesheet.rel = "stylesheet";
-  stylesheet.href = new URL("./bohan-live-rating.css", import.meta.url).href;
+  stylesheet.href = new URL("./bohan-live-rating.css?v=20261022-2", import.meta.url).href;
   document.head.append(stylesheet);
 
   const control = document.createElement("div");

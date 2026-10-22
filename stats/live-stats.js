@@ -1,4 +1,5 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
+import { BOHAN_PREFERENCE_KEY, loadBohanCalculation, calculatePublishedRatings, readBohanPreference, writeBohanPreference, mountBohanControl } from "./bohan-live-rating.mjs?v=20261022-1";
 
 const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
 const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");
@@ -118,6 +119,10 @@ let selectedLeaderboard = "Global";
 let resultsData = { format: 0, results: [] };
 let leaderboardData = null;
 let leaderboardDataSignature = "";
+let bohanCalculation = null;
+const bohanBoardCache = new Map();
+let bohanControl = null;
+let changingCalculation = false;
 let bannedAccountIds = new Set();
 let liveFeedState = "idle";
 let playerPublicKeys = {};
@@ -534,6 +539,16 @@ function hydratePublishedBoard(name) {
   // Preserve historical slots without republishing omitted player profiles.
   for (const id of accounts.keys()) if (!listedAccountIds.has(id)) accounts.delete(id);
   return { accounts, games };
+}
+
+function getRatingBoard(name) {
+  if (!bohanCalculation) return hydratePublishedBoard(name);
+  if (!bohanBoardCache.has(name)) {
+    const result = hydratePublishedBoard(name);
+    calculatePublishedRatings(result, bohanCalculation);
+    bohanBoardCache.set(name, result);
+  }
+  return bohanBoardCache.get(name);
 }
 
 function getFavoriteUnitNameCandidates() {
@@ -2414,7 +2429,7 @@ function getPlayerLeaderboardRanks(account) {
     : Object.keys(leaderboardData.leaderboards);
 
   return leaderboards.flatMap((leaderboard) => {
-    const { accounts } = hydratePublishedBoard(leaderboard);
+    const { accounts } = getRatingBoard(leaderboard);
     const rankedAccounts = filterRankedAccounts(sortAccounts(accounts.values()));
     const rankIndex = rankedAccounts.findIndex((candidate) => getAccountExpandKey(candidate) === accountKey);
     return rankIndex >= 0 ? [{ leaderboard, rank: rankIndex + 1 }] : [];
@@ -3727,7 +3742,7 @@ function render() {
     return;
   }
 
-  const { accounts: globalAccounts, games: globalGames } = hydratePublishedBoard("Global");
+  const { accounts: globalAccounts, games: globalGames } = getRatingBoard("Global");
 
   const allGames = [...globalGames];
   const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !account.banned);
@@ -3737,7 +3752,7 @@ function render() {
   leaderboardGameCounts = new Map(Object.entries(leaderboardData.leaderboards)
     .map(([leaderboard, board]) => [leaderboard, Number(board.matches || 0)]));
 
-  const { accounts, games } = hydratePublishedBoard(selectedLeaderboard);
+  const { accounts, games } = getRatingBoard(selectedLeaderboard);
 
   const accountList = sortAccounts(accounts.values()).filter((account) => !account.banned);
   renderedAccountList = accountList;
@@ -3985,7 +4000,48 @@ async function refreshFromMirror(force = false) {
   const leaderboardChanged = await ensureLeaderboardData(force);
 
   if (leaderboardChanged || force) {
+    bohanBoardCache.clear();
+    try {
+      render();
+    } catch (error) {
+      if (!bohanCalculation) throw error;
+      bohanCalculation = null;
+      bohanBoardCache.clear();
+      if (bohanControl) {
+        bohanControl.checkbox.checked = false;
+        bohanControl.status.textContent = "Live calculation failed. Showing published ratings.";
+      }
+      console.error("Live rating refresh failed", error);
+      render();
+    }
+  }
+}
+
+async function changeBohanCalculation(enabled) {
+  if (changingCalculation) return;
+  changingCalculation = true;
+  bohanControl.checkbox.disabled = true;
+  const previous = bohanCalculation;
+  bohanControl.status.textContent = enabled ? "Loading from bohan’s website…" : "Restoring published ratings…";
+  try {
+    bohanCalculation = enabled ? await loadBohanCalculation() : null;
+    bohanBoardCache.clear();
     render();
+    bohanControl.checkbox.checked = enabled;
+    bohanControl.status.textContent = enabled ? "Live Elo · our published matches" : "Published ratings";
+    try { writeBohanPreference(window.localStorage, enabled); } catch {}
+  } catch (error) {
+    bohanCalculation = previous;
+    bohanBoardCache.clear();
+    render();
+    bohanControl.checkbox.checked = Boolean(previous);
+    bohanControl.status.textContent = previous
+      ? "Could not switch. Keeping the previous live calculation."
+      : "Could not load live calculation. Showing published ratings.";
+    console.error("Calculation source switch failed", error);
+  } finally {
+    bohanControl.checkbox.disabled = false;
+    changingCalculation = false;
   }
 }
 
@@ -4041,6 +4097,11 @@ document.addEventListener("click", (event) => {
 async function init() {
   applyStateFromUrl();
   setupSortHeaders();
+  const sourceHost = document.querySelector(".stats-grid") || document.querySelector(".stats-shell") || document.querySelector("main");
+  if (sourceHost) {
+    bohanControl = mountBohanControl(sourceHost);
+    bohanControl.checkbox.addEventListener("change", () => changeBohanCalculation(bohanControl.checkbox.checked));
+  }
 
   try {
     await refreshFromMirror(true);
@@ -4052,6 +4113,20 @@ async function init() {
     return;
   }
 
+  if (bohanControl) {
+    bohanControl.checkbox.disabled = false;
+    let preferLive = false;
+    try { preferLive = readBohanPreference(window.localStorage); } catch {}
+    if (preferLive) {
+      bohanControl.checkbox.checked = true;
+      await changeBohanCalculation(true);
+    }
+    window.addEventListener("storage", (event) => {
+      if (event.key === BOHAN_PREFERENCE_KEY && !changingCalculation) {
+        changeBohanCalculation(event.newValue === "true");
+      }
+    });
+  }
   startRefreshLoop();
 }
 

@@ -31,6 +31,20 @@
     @media (min-width: 1600px) {
       :root { --editor-panel-width:430px; }
     }
+    body.script-tab-open {
+      --editor-panel-width:clamp(min(320px, 50vw), var(--script-editor-width, min(60vw, 1100px)), max(50vw, calc(100vw - 300px)));
+    }
+    body.script-tab-open #editPanel { box-sizing:border-box; }
+    #scriptWidthHandle {
+      display:none; position:absolute; top:var(--menu-height); bottom:0;
+      left:calc(var(--editor-panel-width) - 4px); width:8px; z-index:13;
+      cursor:ew-resize; touch-action:none; background:#283445;
+    }
+    body.script-tab-open #scriptWidthHandle { display:block; }
+    #scriptWidthHandle:hover, #scriptWidthHandle:focus-visible,
+    body.script-width-resizing #scriptWidthHandle { background:#6CF527; outline:none; }
+    body.script-width-resizing { cursor:ew-resize; user-select:none; }
+    body.overlay-open #scriptWidthHandle, body.loading-map #scriptWidthHandle { display:none; }
     html, body {
       height: 100%; margin: 0; padding: 0;
       background: var(--bg); color: var(--fg);
@@ -403,7 +417,9 @@
       left: calc(var(--editor-panel-width) + (100vw - var(--editor-panel-width)) / 2);
       top: calc(var(--menu-height) + (100vh - var(--menu-height)) / 2);
       transform: translate(-50%, -50%);
-      width: min(380px, calc(100vw - 24px));
+      width: min(900px, calc(100vw - var(--editor-panel-width) - 32px));
+      max-height: calc(100vh - var(--menu-height) - 32px);
+      overflow-y: auto;
       background: rgba(24,32,48,0.97);
       border: 1px solid var(--border);
       border-radius: 4px;
@@ -414,6 +430,13 @@
     }
     body.overlay-open #saveResultOverlay {
       left: 50vw;
+      width: min(900px, calc(100vw - 24px));
+    }
+    @media (max-width: 700px) {
+      #saveResultOverlay {
+        left: 50vw;
+        width: calc(100vw - 24px);
+      }
     }
     #saveResultOverlay.hidden {
       display: none;
@@ -619,6 +642,105 @@
       font-size: 1rem;
     }
 
+    #scriptPanel .script-header { display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:8px; text-align:left; }
+    #scriptPanel .script-title { font-size:1rem; white-space:nowrap; }
+    #scriptPanel .script-search {
+      margin-top:6px; padding:6px; background:#172334; border:1px solid #435066;
+      font-size:0.8rem;
+    }
+    #scriptPanel .script-search-row { display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+    #scriptPanel .script-search-row + .script-search-row { margin-top:6px; }
+    #scriptPanel .script-search[hidden],
+    #scriptPanel .script-search-row[hidden] { display:none; }
+    #scriptPanel .script-search input[type="text"] {
+      flex:1 1 130px; min-width:70px; width:0; box-sizing:border-box;
+      padding:3px 5px; border:1px solid #435066; background:#101822; color:#dde; font:inherit;
+    }
+    #scriptPanel .script-search input:focus { outline:1px solid #6CF527; }
+    #scriptPanel .script-search-count { min-width:68px; text-align:center; color:#90a4b8; white-space:nowrap; }
+    #scriptPanel .script-search-case { display:flex; align-items:center; gap:3px; white-space:nowrap; }
+    #scriptPanel .script-search-case input { margin:0; accent-color:#6CF527; }
+    #scriptPanel .script-search .action-btn,
+    #scriptPanel .script-header .action-btn { font-size:0.8rem; }
+    #scriptPanel .script-search .action-btn:not(:disabled):hover,
+    #scriptPanel .script-search .action-btn:not(:disabled):focus-visible,
+    #scriptPanel .script-header .action-btn:not(:disabled):hover,
+    #scriptPanel .script-header .action-btn:not(:disabled):focus-visible {
+      background:#6CF527; color:#000; border-color:#6CF527;
+    }
+    #scriptPanel .script-search-match { color:inherit; background:#ffd44733; padding:0; font:inherit; }
+    #scriptPanel .script-search-match.is-current { background:#f39a3c66; box-shadow:inset 0 0 0 1px #f39a3c; }
+    #scriptPanel .script-editor-frame {
+      display:grid; grid-template-columns:4.25em minmax(0, 1fr); grid-template-rows:minmax(0, 1fr);
+      box-sizing:border-box; height:calc(100vh - 275px - var(--script-search-height, 0px)); min-height:260px;
+      resize:vertical; overflow:hidden; margin:6px 0 8px;
+      background:#101822; border:1px solid #435066;
+    }
+    #scriptPanel .script-editor-frame:focus-within { outline:1px solid #6CF527; }
+    #scriptPanel .script-code-wrap { position:relative; min-width:0; min-height:0; overflow:hidden; }
+    #scriptPanel .script-source,
+    #scriptPanel .script-highlight,
+    #scriptPanel .script-line-numbers {
+      box-sizing:border-box; margin:0; padding:8px;
+      font:13px/1.45 Consolas, "Courier New", monospace;
+      tab-size:2; white-space:pre; letter-spacing:normal; text-indent:0; text-transform:none;
+    }
+    #scriptPanel .script-highlight code { font:inherit; white-space:inherit; }
+    #scriptPanel .script-line-numbers {
+      overflow:hidden; text-align:right; user-select:none;
+      color:#74869d; background:#141e2b; border-right:1px solid #283445;
+    }
+    #scriptPanel .script-highlight {
+      position:absolute; inset:0; overflow:hidden; pointer-events:none; color:#dde;
+    }
+    #scriptPanel .script-source {
+      position:absolute; inset:0; display:block; width:100%; height:100%;
+      resize:none; overflow:auto; border:0; outline:none;
+      background:transparent; color:transparent; -webkit-text-fill-color:transparent; caret-color:#dde;
+    }
+    #scriptPanel .script-source:focus { outline:none; }
+    #scriptPanel .script-source::placeholder { color:#90a4b8; -webkit-text-fill-color:#90a4b8; }
+    #scriptPanel .script-source::selection { background:#4da3ff55; color:transparent; }
+    #scriptPanel .script-highlight .token.comment { color:#8296ad; }
+    #scriptPanel .script-highlight .token.keyword { color:#c792ea; }
+    #scriptPanel .script-highlight .token.string,
+    #scriptPanel .script-highlight .token.template-string { color:#c3e88d; }
+    #scriptPanel .script-highlight .token.number,
+    #scriptPanel .script-highlight .token.boolean { color:#f6b26b; }
+    #scriptPanel .script-highlight .token.function { color:#82aaff; }
+    #scriptPanel .script-highlight .token.operator { color:#7ddfff; }
+    #scriptPanel .script-highlight .token.punctuation { color:#aab6cb; }
+    #scriptPanel .script-highlight .token.constant { color:#f78c6c; }
+    #scriptPanel .script-highlight .token.regex,
+    #scriptPanel .script-highlight .token.class-name { color:#ffcb6b; }
+    #scriptPanel .script-filename {
+      min-width:0; font-size:0.8rem; color:#7ddfff; overflow-wrap:anywhere;
+    }
+    #scriptPanel .script-run { width:100%; }
+    #scriptPanel .script-run:not(:disabled):hover,
+    #scriptPanel .script-run:not(:disabled):focus-visible {
+      background:#6CF527; color:#000; border-color:#6CF527;
+    }
+    #scriptPanel .script-hint,
+    #scriptPanel .script-status {
+      font-size:0.8rem; line-height:1.4; color:#90a4b8; white-space:pre-wrap; overflow-wrap:anywhere;
+    }
+    #scriptPanel .script-error { color:#f28a79; }
+
+    #filePanel > .panel-box { border-top: 0; }
+    #filePanel .file-actions-separator { display: none; }
+
+    #filePanel .action-btn:not(:disabled):hover,
+    #filePanel .action-btn:not(:disabled):focus-visible {
+      background: #6CF527;
+      color: #000;
+      border-color: #6CF527;
+    }
+    #filePanel .action-btn:focus-visible {
+      outline: 2px solid #6CF527;
+      outline-offset: 2px;
+    }
+
     #filePanel .file-section-title {
       display:flex; align-items:center; justify-content:center; gap:12px;
       color:#7ddfff; font-family:"Segoe UI",Arial,sans-serif; font-size:1rem;
@@ -764,6 +886,7 @@
     <button type="button" class="tab-btn" data-tab="about">About</button>
     <button type="button" id="undoBtn" class="tab-btn" disabled title="Undo (Ctrl+Z)">↺</button>
     <button type="button" id="redoBtn" class="tab-btn" disabled title="Redo (Ctrl+Y)">↻</button>
+    <button type="button" class="tab-btn" data-tab="script">Script</button>
   </div>
   <div id="uiBar" class="hidden">
     <span id="mapFilename"></span>
@@ -1463,6 +1586,9 @@
       </div>
     </div>
 
+    <!-- SCRIPT TAB -->
+    <div id="scriptPanel" class="panel" style="display:none;"></div>
+
     <!-- ABOUT TAB -->
     <div id="aboutPanel" class="panel" style="display:none;">
       <div style="display:flex; gap:4px; margin-bottom:6px;">
@@ -1528,6 +1654,7 @@
 
   </div>
 
+  <div id="scriptWidthHandle" role="separator" aria-orientation="vertical" aria-label="Resize script editor" title="Drag to change script editor width" tabindex="0"></div>
   <div id="threeContainer"></div>
   <div id="minimapPanel">
     <div id="minimapTitle">Minimap</div>

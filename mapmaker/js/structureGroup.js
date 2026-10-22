@@ -68,11 +68,35 @@ function getTeamMaskPath(textureName) {
   return match && TEAM_MASK_PAGES.has(match[1]) ? match[1] + '_tcmask.png' : null;
 }
 
+// The module owns these textures for the editor's lifetime. Materials remain
+// separate so team colours and opacity are still independent per structure.
+const sharedStructureTextures = new Map();
+
+function getSharedStructureTexture(textureName) {
+  const base = (typeof window !== 'undefined' && window.TEX_BASE) ? window.TEX_BASE : 'classic/texpages/texpages/';
+  const url = base + normalizeTexPath(textureName);
+  if (sharedStructureTextures.has(url)) return sharedStructureTextures.get(url);
+  const texture = new THREE.TextureLoader().load(url, undefined, undefined, () => {
+    if (sharedStructureTextures.get(url) === texture) {
+      sharedStructureTextures.delete(url);
+      texture.userData.mapmakerSharedStructureTexture = false;
+    }
+  });
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.LinearMipMapLinearFilter;
+  texture.userData.mapmakerSharedStructureTexture = true;
+  sharedStructureTextures.set(url, texture);
+  return texture;
+}
+
+export function disposeUnsharedTexture(texture) {
+  if (texture && !texture.userData?.mapmakerSharedStructureTexture && typeof texture.dispose === 'function') texture.dispose();
+}
+
 function createPieMaterial(textureName, opacityOverride, teamColorEnabled = false) {
   const transparent = opacityOverride !== null;
   const opacity = transparent ? opacityOverride : 1;
   if (!textureName) return new THREE.MeshLambertMaterial({ color: 0x8888ff, transparent, opacity });
-  const loader = new THREE.TextureLoader();
   const texName = normalizeTexPath(textureName);
   const missingStructureTextures = new Set([
     'page-0-scav.png',
@@ -87,9 +111,7 @@ function createPieMaterial(textureName, opacityOverride, teamColorEnabled = fals
   if (missingStructureTextures.has(texName)) {
     return new THREE.MeshLambertMaterial({ color: 0x8f8f86, transparent, opacity });
   }
-  const tex = loader.load(((typeof window!=='undefined'&&window.TEX_BASE)?window.TEX_BASE:TEX_BASE) + texName, undefined, undefined, () => {});
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.LinearMipMapLinearFilter;
+  const tex = getSharedStructureTexture(texName);
   const material = new THREE.MeshLambertMaterial({ map: tex, transparent, opacity });
   material.alphaTest = 0.5;
   const classicFactoryTint = texName === 'page-13-player-buildings.png';
@@ -100,13 +122,7 @@ function createPieMaterial(textureName, opacityOverride, teamColorEnabled = fals
   const classicTeamColor = texName === 'page-12-player-buildings.png';
   if (!teamColorEnabled && !classicTeamColor) return material;
   const maskName = getTeamMaskPath(texName);
-  const mask = maskName
-    ? loader.load(((typeof window!=='undefined'&&window.TEX_BASE)?window.TEX_BASE:TEX_BASE) + maskName, undefined, undefined, () => {})
-    : null;
-  if (mask) {
-    mask.magFilter = THREE.NearestFilter;
-    mask.minFilter = THREE.LinearMipMapLinearFilter;
-  }
+  const mask = maskName ? getSharedStructureTexture(maskName) : null;
   material.userData.teamColor = new THREE.Color(PLAYER_COLORS[0]);
   material.userData.teamColorMask = mask;
   material.onBeforeCompile = shader => {

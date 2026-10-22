@@ -1,5 +1,9 @@
 import * as THREE from './three.module.js';
 import { drawLocalSavePreview } from './localSavePreview.js';
+import { metadataText, mapPlayerIndex, parseLegacyIni, readMapArchiveMetadata, readMapArchiveEntities } from './archiveImport.js';
+import { materializeScriptMap, normalizeMapScriptSource, readMapScriptSource, writeMapScriptSource, runMapScript, buildScriptMapFiles } from './scriptMapImport.js';
+import { mountScriptEditor } from './scriptEditor.js';
+import { mountScriptPanelResize } from './scriptPanelResize.js';
 
 function normalizeTexPath(name){
   let n = String(name || '').replace(/\\/g,'/').toLowerCase();
@@ -16,7 +20,7 @@ import { loadMapUnified, getTilesetIndexFromTtp } from './maploader.js';
 import { convertGammaGameMapToClassic, parseTTypes } from './convert.js';
 import { cameraState, resetCameraTarget, setupKeyboard } from './camera.js';
 import { parsePie, loadPieGeometry } from "./pie.js";
-import { buildStructureGroup, setStructureGroupPlayerColor } from "./structureGroup.js?v=wall-live-refresh";
+import { buildStructureGroup, setStructureGroupPlayerColor, disposeUnsharedTexture } from "./structureGroup.js?v=wall-live-refresh";
 import { STRUCTURE_TURRETS } from "./structure_turrets.js";
 import { loadSensorDefs, getSensorModels } from "./sensors.js";
 import { buildDroidGroup, updateDroidAnimations } from "./droidGroup.js";
@@ -200,13 +204,10 @@ function showSaveResult(savedName, mode, extraNote = '', details = null, title =
         ['Tileset', details.tileset],
         ['Size', details.size],
         ['Players', details.players],
-        ['Objects', details.objects],
-        ['Oil by player', details.oilByPlayer],
         ['Balance', details.balance],
-        ['HQ positions', details.hqPositions],
         ['File size', details.fileSize],
         ['SHA-256', details.sha256],
-        [details.timeLabel || 'Saved', details.savedAt],
+        ...(mode === 'loaded' ? [] : [[details.timeLabel || 'Saved', details.savedAt]]),
         ['Made with', details.madeWith]
       ].forEach(([label, value]) => appendSaveResultDetail(label, value));
       if (details.playerSummary) {
@@ -488,7 +489,7 @@ function disposeObject3D(obj) {
     const materials = Array.isArray(child.material) ? child.material : [child.material];
     materials.forEach(mat => {
       if (!mat) return;
-      if (mat.map && typeof mat.map.dispose === 'function') mat.map.dispose();
+      if (mat.map && typeof mat.map.dispose === 'function') disposeUnsharedTexture(mat.map);
       if (typeof mat.dispose === 'function') mat.dispose();
     });
   });
@@ -5303,8 +5304,7 @@ function getStructurePlayer(group) {
   const data = group?.userData?.structureExport || {};
   const source = data.sourceEntry || {};
   const raw = data.player ?? source.player ?? source.startpos ?? 0;
-  const player = parseInt(raw, 10);
-  return Number.isFinite(player) ? Math.max(0, Math.min(10, player)) : 0;
+  return mapPlayerIndex(raw);
 }
 
 function setStructurePlayer(group, player) {
@@ -5953,8 +5953,8 @@ function showLicenseHelpDialog() {
 function showServerMapLicenseDialog(filename, metadata) {
   if (!serverMapLicenseDialog || !serverMapLicenseBody) return;
   const mapName = getServerMapDisplayName(filename, metadata);
-  const author = Array.isArray(metadata?.author) ? metadata.author.join(', ') : metadata?.author;
-  const license = metadata?.license || 'Unknown';
+  const author = getSaveAuthor();
+  const license = getSaveLicense();
   const tips = getLicenseUseText(license);
 
   serverMapLicenseBody.innerHTML = '';
@@ -6801,7 +6801,9 @@ function refreshObjectPreviewLayer() {
   if (objectsGroup && scene && !scene.children.includes(objectsGroup)) {
     scene.add(objectsGroup);
   }
-  updateMinimap();
+  // drawMap3D rebuilds the minimap once the archive has finished importing.
+  // Rebuilding the whole terrain for every imported tree is quadratic work.
+  if (!document.body.classList.contains('loading-map')) updateMinimap();
 }
 
 function setMapDirty(dirty) {
@@ -7199,6 +7201,10 @@ function makeLocalSaveSnapshot() {
     tileTypesById: Array.isArray(tileTypesById) ? tileTypesById.slice() : [],
     structureStyle: currentStructJsonStyle || 'array',
     mapInfo: { ...currentMapInfoOverrides },
+    levelMetadata: currentLevelJson ? JSON.parse(JSON.stringify(currentLevelJson)) : null,
+    serverMetadata: currentServerMapMetadata ? JSON.parse(JSON.stringify(currentServerMapMetadata)) : null,
+    serverSourceName: currentServerMapSourceName,
+    mapScript: currentMapScript ? {...currentMapScript} : null,
     structures: getLocalSaveEntriesFromJson(buildStructJson(), 'structures'),
     features: getLocalSaveEntriesFromJson(buildFeatureJson(), 'features'),
     droids: getLocalSaveEntriesFromJson(buildDroidJson(), 'droids')
@@ -7325,7 +7331,7 @@ function setMapState(w, h, tiles, rotations, heights, xflip = [], yflip = [], tr
   if (previewGroup) {
     previewGroup.traverse(child => {
       if (child.isMesh) {
-        if (child.material && child.material.map) child.material.map.dispose();
+        if (child.material && child.material.map) disposeUnsharedTexture(child.material.map);
         if (child.material) child.material.dispose();
         if (child.geometry) child.geometry.dispose();
       }
@@ -7583,6 +7589,8 @@ let currentGamJson = null;
 let currentLevelJson = null;
 let currentServerMapMetadata = null;
 let currentServerMapSourceName = '';
+let currentMapScript = null;
+let mapScriptEditor = null;
 let currentMapInfoOverrides = {
   name: '',
   author: '',
@@ -7612,16 +7620,7 @@ function makeSaveFilename() {
 }
 
 function getMetadataText(...values) {
-  for (const value of values) {
-    if (Array.isArray(value)) {
-      const joined = value.map(item => String(item || '').trim()).filter(Boolean).join(', ');
-      if (joined) return joined;
-    } else {
-      const text = String(value || '').trim();
-      if (text) return text;
-    }
-  }
-  return '';
+  return metadataText(...values);
 }
 
 function getDefaultMapInfoOverrides() {
@@ -7697,7 +7696,7 @@ function updateUserMapInfoField(key, value) {
 
 function updateMapInfoInputs() {
   if (settingsMapNameInput) settingsMapNameInput.value = getMetadataText(currentMapInfoOverrides.name, currentLevelJson?.name, currentServerMapMetadata?.name, getCurrentMapFilename());
-  if (settingsMapAuthorInput) settingsMapAuthorInput.value = getMetadataText(currentMapInfoOverrides.author, currentServerMapMetadata?.author, currentLevelJson?.author, currentLevelJson?.authors, currentLevelJson?.creator);
+  if (settingsMapAuthorInput) settingsMapAuthorInput.value = getMetadataText(currentMapInfoOverrides.author, currentLevelJson?.author, currentLevelJson?.authors, currentLevelJson?.creator, currentServerMapMetadata?.author);
   if (settingsMapCreatedInput) settingsMapCreatedInput.value = getMetadataText(currentMapInfoOverrides.created, currentServerMapMetadata?.created, currentLevelJson?.created).slice(0, 10);
   if (settingsMapTypeInput) settingsMapTypeInput.value = getMetadataText(currentMapInfoOverrides.mapType, currentServerMapMetadata?.type, currentLevelJson?.mapType, 'normal').toLowerCase() === 'script-generated' ? 'script-generated' : 'normal';
   if (settingsMapDescriptionInput) settingsMapDescriptionInput.value = getMetadataText(currentMapInfoOverrides.description, currentLevelJson?.description, currentLevelJson?.readme);
@@ -7707,7 +7706,7 @@ function updateMapInfoInputs() {
   if (settingsMapVersionInput) settingsMapVersionInput.value = getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion);
   if (settingsMapTagsInput) settingsMapTagsInput.value = getMetadataText(currentMapInfoOverrides.tags, currentLevelJson?.tags);
   if (settingsMapLicenseInput) {
-    const license = getMetadataText(currentMapInfoOverrides.license, currentServerMapMetadata?.license, currentLevelJson?.license, currentLevelJson?.licence);
+    const license = getMetadataText(currentMapInfoOverrides.license, currentLevelJson?.license, currentLevelJson?.licence, currentLevelJson?.['spdx-license-id'], currentServerMapMetadata?.license);
     ensureLicenseOption(settingsMapLicenseInput, license);
     settingsMapLicenseInput.value = license;
   }
@@ -7726,26 +7725,26 @@ function getSaveMapName() {
 function getSaveAuthor() {
   return getMetadataText(
     currentMapInfoOverrides.author,
-    currentServerMapMetadata?.author,
     currentLevelJson?.author,
     currentLevelJson?.authors,
-    currentLevelJson?.creator
+    currentLevelJson?.creator,
+    currentServerMapMetadata?.author
   ) || 'Unknown';
 }
 
 function getSaveLicense() {
   return getMetadataText(
     currentMapInfoOverrides.license,
-    currentServerMapMetadata?.license,
     currentLevelJson?.license,
-    currentLevelJson?.licence
+    currentLevelJson?.licence,
+    currentLevelJson?.['spdx-license-id'],
+    currentServerMapMetadata?.license
   ) || 'Unknown';
 }
 
 function getSaveSourceName() {
   if (currentMapInfoOverrides.source) return currentMapInfoOverrides.source;
-  if (!currentServerMapMetadata && !currentServerMapSourceName) return '';
-  return getServerMapDisplayName(currentServerMapSourceName, currentServerMapMetadata);
+  return getMetadataText(currentLevelJson?.source, currentServerMapMetadata?.source, currentServerMapSourceName);
 }
 
 function getSaveObjectSummary() {
@@ -7836,7 +7835,7 @@ function formatSavePlayerStats(players) {
         item.research + ' research',
         item.defenses + ' defenses'
       ];
-      return 'Player ' + player + ': ' + bits.join(', ');
+      return (player === 10 ? 'Scavengers' : 'Player ' + player) + ': ' + bits.join(', ');
     })
     .join('\n');
 }
@@ -7858,7 +7857,7 @@ function formatHqPositions(players) {
 
 function getSaveBalanceSummary(players) {
   const keys = ['droids', 'extractors', 'power', 'factories', 'vtolFactories', 'cyborgFactories', 'research', 'defenses'];
-  const values = Array.from(players.values());
+  const values = Array.from(players.entries()).filter(([player]) => player !== 10).map(([, stats]) => stats);
   if (!values.length) return 'Unknown';
   const details = keys.map(key => {
     const nums = values.map(item => item[key] || 0);
@@ -7867,16 +7866,7 @@ function getSaveBalanceSummary(players) {
     return { key, min, max, eq: min === max };
   });
   const balanced = details.every(item => item.eq);
-  const label = balanced ? 'Yes' : 'No';
-  const compact = details.map(item => {
-    const name = item.key
-      .replace('vtolFactories', 'VTOL')
-      .replace('cyborgFactories', 'cyborg')
-      .replace('extractors', 'oil')
-      .replace('factories', 'factories');
-    return name + ' ' + item.min + '-' + item.max + (item.eq ? ' equal' : ' mixed');
-  }).join(', ');
-  return label + ' (' + compact + ')';
+  return balanced ? 'YES' : 'NO';
 }
 
 function getSavePlayerSummary() {
@@ -7901,18 +7891,18 @@ function buildSaveResultDetails(blob = null, sha256 = '', timeLabel = 'Saved') {
   const activePlayers = new Set();
   if (objectsGroup) {
     objectsGroup.children.forEach(group => {
-      if (group?.userData?.structureExport) activePlayers.add(getStructurePlayer(group));
+      if (group?.userData?.structureExport && getStructurePlayer(group) !== 10) activePlayers.add(getStructurePlayer(group));
     });
   }
-  currentDroidEntries.forEach(entry => activePlayers.add(getObjectEntryPlayer(entry)));
-  const declaredPlayers = currentServerMapMetadata?.slots || getDeclaredPlayerCount(activePlayers);
+  currentDroidEntries.forEach(entry => { const player = getObjectEntryPlayer(entry); if (player !== 10) activePlayers.add(player); });
+  const declaredPlayers = getDeclaredPlayerCount(activePlayers) || currentServerMapMetadata?.slots;
   const playerStats = getSavePlayerStats();
   return {
     mapName: getSaveMapName(),
     author: getSaveAuthor(),
     license: getSaveLicense(),
     source: getSaveSourceName(),
-    created: getMetadataText(currentMapInfoOverrides.created, currentServerMapMetadata?.created, currentLevelJson?.created),
+    created: getMetadataText(currentMapInfoOverrides.created, currentLevelJson?.created, currentServerMapMetadata?.created),
     uploaded: getMetadataText(currentMapInfoOverrides.uploaded, currentServerMapMetadata?.download?.uploaded, currentLevelJson?.uploaded),
     version: getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion),
     mapType: getMetadataText(currentMapInfoOverrides.mapType, currentServerMapMetadata?.type, currentLevelJson?.mapType),
@@ -7931,7 +7921,7 @@ function buildSaveResultDetails(blob = null, sha256 = '', timeLabel = 'Saved') {
     playerSummary: formatSavePlayerStats(playerStats),
     timeLabel,
     savedAt: new Date().toLocaleString(),
-    madeWith: 'Warzone2100 MapMaker'
+    madeWith: getMetadataText(currentLevelJson?.generator, currentLevelJson?.madeWith, currentLevelJson?.['made-with'], currentServerMapMetadata?.generator) || 'Unknown'
   };
 }
 
@@ -8111,7 +8101,9 @@ function buildDefaultLevelJson(base) {
     type: 'skirmish',
     players: 4,
     tileset: getOfficialTilesetName(tilesetIndex),
-    generator: 'warzone2100-mapmaker'
+    ...(currentLevelJson || {}),
+    // Preserve recorded provenance; exporting an imported map does not make us its original creator.
+    ...(currentMapArchive ? {} : { generator: currentLevelJson?.generator || 'warzone2100-mapmaker' })
   }, null, 2);
 }
 
@@ -8140,9 +8132,9 @@ async function readArchiveJson(zip, suffix) {
 
 async function loadArchiveMetadata(zip) {
   const gam = await readArchiveJson(zip, 'gam.json');
-  const level = await readArchiveJson(zip, 'level.json');
-  const feature = await readArchiveJson(zip, 'feature.json');
-  const droid = await readArchiveJson(zip, 'droid.json');
+  const level = await readMapArchiveMetadata(zip);
+  const feature = await readMapArchiveEntities(zip, 'feature');
+  const droid = await readMapArchiveEntities(zip, 'droid');
   const ttypesName = Object.keys(zip.files).find(fn => fn.toLowerCase().endsWith('ttypes.ttp') && !zip.files[fn].dir);
   currentGamArchivePath = gam.name;
   currentLevelArchivePath = level.name;
@@ -8151,10 +8143,12 @@ async function loadArchiveMetadata(zip) {
   currentTileTypesArchivePath = ttypesName || null;
   currentGamJson = gam.data;
   currentLevelJson = level.data;
-  const features = feature.data ? (Array.isArray(feature.data) ? feature.data : Array.isArray(feature.data.features) ? feature.data.features : Object.values(feature.data)) : [];
-  const droids = droid.data ? (Array.isArray(droid.data) ? droid.data : Array.isArray(droid.data.droids) ? droid.data.droids : Object.values(droid.data)) : [];
+  const features = feature.entries;
+  const droids = droid.entries;
   currentFeatureEntries = features.filter(entry => entry && typeof entry === 'object');
   currentDroidEntries = droids.filter(entry => entry && typeof entry === 'object');
+  currentMapScript = await readMapScriptSource(zip);
+  syncMapScriptEditor();
 }
 
 function resetLoadedMetadata() {
@@ -8169,7 +8163,101 @@ function resetLoadedMetadata() {
   currentLevelJson = null;
   currentServerMapMetadata = null;
   currentServerMapSourceName = '';
+  currentMapScript = null;
+  syncMapScriptEditor();
   resetMapInfoOverrides();
+}
+
+function syncMapScriptEditor() {
+  mapScriptEditor?.setScript(currentMapScript);
+}
+
+function updateMapScriptDraft(source) {
+  if (!currentMapScript) return;
+  currentMapScript = {...currentMapScript, source, pendingChanges:true};
+  markMapDirty();
+}
+
+async function runEditedMapScript(value) {
+  const script = normalizeMapScriptSource(value);
+  if (!script) throw new Error('No valid map script is loaded.');
+  const sourceContext = currentMapScript;
+  // Compile, execute and validate before touching the current map.
+  const data = await runMapScript(script.source);
+  if (currentMapScript !== sourceContext) throw new Error('The map changed while the script was running. Run again for the current map.');
+  const generated = buildScriptMapFiles(data, currentMapArchive ? script.filename : 'game.js');
+  const grid = generated.files[0][1];
+  const parsed = await loadMapUnified(new File([grid], generated.mapName));
+  if (currentMapScript !== sourceContext) throw new Error('The map changed while the script was running. Run again for the current map.');
+  const structures = JSON.parse(generated.files[1][1]);
+  const droids = JSON.parse(generated.files[2][1]);
+  const features = JSON.parse(generated.files[3][1]);
+  const appliedScript = {...script, pendingChanges:false};
+  const nextArchive = currentMapArchive ? currentMapArchive.clone() : null;
+  if (nextArchive) {
+    // JSZip.clone shares its file dictionary; own it before replacing entries.
+    nextArchive.files = {...nextArchive.files};
+    nextArchive.remove(script.filename);
+    for (const [name, contents] of generated.files) nextArchive.file(name, contents);
+    writeMapScriptSource(nextArchive, appliedScript);
+  }
+  const previous = makeLocalSaveSnapshot();
+  const archiveState = [
+    currentMapArchive, currentMapArchivePath, currentMapExportInfo, currentStructArchivePath,
+    currentStructJsonStyle, currentDroidArchivePath, currentFeatureArchivePath,
+    currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath
+  ];
+  const history = {undo:undoStack.slice(), redo:redoStack.slice(), dirty:mapDirty};
+  if (localAutosaveTimer) {
+    clearTimeout(localAutosaveTimer);
+    localAutosaveTimer = null;
+  }
+  try {
+    setLoadingProgress('Applying script-generated map', 40);
+    clearMapObjects();
+    setMapState(parsed.mapW, parsed.mapH, parsed.mapTiles, parsed.mapRotations,
+      parsed.mapHeights, parsed.mapXFlip, parsed.mapYFlip, parsed.mapTriFlip);
+    updateHeightUI(255);
+    setLoadingProgress('Loading structures', 65);
+    await loadStructureEntries(structures);
+    currentFeatureEntries = features;
+    await loadFeaturesFromMetadata();
+    setLoadingProgress('Loading droids', 90);
+    await loadDroidEntries(droids);
+    drawMap3D();
+    currentMapArchive = nextArchive;
+    currentMapArchivePath = generated.mapName;
+    currentMapExportInfo = getMapExportInfo(grid);
+    currentStructArchivePath = generated.files[1][0];
+    currentStructJsonStyle = 'array';
+    currentDroidArchivePath = generated.files[2][0];
+    currentFeatureArchivePath = generated.files[3][0];
+    currentMapScript = appliedScript;
+    syncMapScriptEditor();
+    undoStack.length = 0;
+    redoStack.length = 0;
+    updateUndoRedoButtons();
+    markMapDirty();
+    return 'Map updated: ' + data.width + ' × ' + data.height + '.';
+  } catch (error) {
+    try {
+      await loadLocalSaveSnapshot(previous);
+    } finally {
+      [currentMapArchive, currentMapArchivePath, currentMapExportInfo, currentStructArchivePath,
+        currentStructJsonStyle, currentDroidArchivePath, currentFeatureArchivePath,
+        currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath] = archiveState;
+      undoStack.length = 0;
+      redoStack.length = 0;
+      undoStack.push(...history.undo);
+      redoStack.push(...history.redo);
+      setMapDirty(history.dirty);
+      updateUndoRedoButtons();
+      if (history.dirty) scheduleLocalAutosave();
+    }
+    throw error;
+  } finally {
+    hideLoadingProgress();
+  }
 }
 
 function makeDroidEntry(design, player, tileX, tileY, degrees) {
@@ -8406,7 +8494,7 @@ function markStructureForExport(group, def, rot, sizeX, sizeY, sourceEntry = nul
     rotDeg: normalizeDegrees((rot || 0) * 90),
     sizeX: sizeX || def.sizeX || 1,
     sizeY: sizeY || def.sizeY || 1,
-    player: sourceEntry?.player ?? sourceEntry?.startpos ?? 0,
+    player: mapPlayerIndex(sourceEntry?.player ?? sourceEntry?.startpos),
     modules: moduleCount,
     sourceEntry,
     style
@@ -8461,7 +8549,7 @@ function getStructureExportEntry(group, style, id) {
     base.rotation = degreesToWzAngle(getStructureRotationDegrees(group));
   }
   const player = getStructurePlayer(group);
-  if (base.player !== undefined) base.player = player;
+  if (base.player !== undefined) base.player = player === 10 ? 'scavenger' : player;
   else base.startpos = player;
   const moduleCount = getStructureModuleCount(group);
   if (moduleCount > 0) base.modules = moduleCount;
@@ -8623,8 +8711,7 @@ function isFootprintWithinMap(footprint) {
 
 function getObjectEntryPlayer(entry) {
   const raw = entry?.player ?? entry?.startpos;
-  const player = parseInt(raw, 10);
-  return Number.isFinite(player) ? player : 0;
+  return mapPlayerIndex(raw);
 }
 
 function isOilFeature(entry) {
@@ -8743,7 +8830,8 @@ function getDeclaredPlayerCount(activePlayers) {
   const raw = currentLevelJson?.players ?? currentGamJson?.players ?? currentGamJson?.Players;
   const declared = parseInt(raw, 10);
   if (Number.isFinite(declared) && declared > 0) return Math.min(Math.max(declared, 1), 11);
-  if (activePlayers.size) return Math.min(Math.max(Math.max(...activePlayers) + 1, 1), 11);
+  const humans = Array.from(activePlayers).filter(player => player >= 0 && player < 10);
+  if (humans.length) return Math.max(...humans) + 1;
   return 0;
 }
 
@@ -8982,6 +9070,7 @@ async function buildWzFileBlob() {
   updateStructJson(zip);
   updateFeatureJson(zip);
   updateDroidJson(zip);
+  writeMapScriptSource(zip, currentMapScript);
   zip.file(mapPath, buildMapFileBytes());
   zip.file(getTileTypesArchivePath(mapPath), buildTileTypesFileBytes());
   return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
@@ -10218,7 +10307,7 @@ const initDom = () => {
     if (previewGroup && scene && !hasHeightViewSelection && !hasTileSelection) {
       previewGroup.traverse(child => {
         if (child.isMesh) {
-          if (child.material && child.material.map) child.material.map.dispose();
+          if (child.material && child.material.map) disposeUnsharedTexture(child.material.map);
           if (child.material) child.material.dispose();
           if (child.geometry) child.geometry.dispose();
         }
@@ -11066,7 +11155,7 @@ function __old_updateHighlight(event) {
     if (previewGroup) {
       previewGroup.traverse(child => {
         if (child.isMesh) {
-          if (child.material && child.material.map) child.material.map.dispose();
+          if (child.material && child.material.map) disposeUnsharedTexture(child.material.map);
           if (child.material) child.material.dispose();
           if (child.geometry) child.geometry.dispose();
         }
@@ -11128,7 +11217,7 @@ function __old_updateHighlight(event) {
   if (previewGroup) {
     previewGroup.traverse(child => {
       if (child.isMesh) {
-        if (child.material && child.material.map) child.material.map.dispose();
+        if (child.material && child.material.map) disposeUnsharedTexture(child.material.map);
         if (child.material) child.material.dispose();
         if (child.geometry) child.geometry.dispose();
       }
@@ -11202,7 +11291,7 @@ function __old_updateHighlight(event) {
         scene.remove(highlightModelGroup);
         highlightModelGroup.traverse(child => {
           if (child.isMesh) {
-            if (child.material && child.material.map) child.material.map.dispose();
+            if (child.material && child.material.map) disposeUnsharedTexture(child.material.map);
             if (child.material) child.material.dispose();
             if (child.geometry) child.geometry.dispose();
           }
@@ -11465,9 +11554,24 @@ function handleContinuousBrushMove(event) {
   handleContinuousBrushPaint(event);
 }
 
+function resizeScriptViewport() {
+  if (!renderer || !camera || !threeContainer) return;
+  applyPreviewQuality();
+  camera.aspect = threeContainer.offsetWidth / Math.max(1, threeContainer.offsetHeight);
+  camera.updateProjectionMatrix();
+}
+
+function updateScriptPanelLayout(tab) {
+  const scriptOpen = tab === 'script';
+  const changed = document.body.classList.contains('script-tab-open') !== scriptOpen;
+  document.body.classList.toggle('script-tab-open', scriptOpen);
+  if (changed) resizeScriptViewport();
+}
+
 function setActiveTab(tab) {
   const previousTab = activeTab;
   activeTab = tab;
+  updateScriptPanelLayout(tab);
   window.activeTab = activeTab;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
     const isActive = btn.getAttribute('data-tab') === tab;
@@ -12301,32 +12405,7 @@ async function setTileset(idx) {
 }
 
 function parseStructIni(text) {
-  const sections = [];
-  let current = null;
-  String(text || '').split(/\r?\n/).forEach(line => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith(';') || trimmed.startsWith('#')) return;
-    const section = trimmed.match(/^\[([^\]]+)\]$/);
-    if (section) {
-      current = {};
-      sections.push(current);
-      return;
-    }
-    if (!current) return;
-    const eq = trimmed.indexOf('=');
-    if (eq < 0) return;
-    const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).trim();
-    if (key === 'position' || key === 'rotation') {
-      current[key] = value.split(',').map(part => parseInt(part.trim(), 10) || 0);
-    } else if (key === 'id' || key === 'startpos' || key === 'modules') {
-      const n = parseInt(value, 10);
-      current[key] = Number.isFinite(n) ? n : value;
-    } else {
-      current[key] = value;
-    }
-  });
-  return sections;
+  return parseLegacyIni(text);
 }
 
 async function addLoadedStructure(def, entry, rot, rotDeg, tileX, tileY, sizeX, sizeY, minH) {
@@ -12375,7 +12454,13 @@ async function loadFeaturesFromMetadata() {
   if (!FEATURE_DEFS.length) {
     try { await loadFeatureDefs(); } catch (e) {}
   }
-  await Promise.all(currentFeatureEntries.map(entry => addLoadedFeature(entry).catch(() => null)));
+  // Legacy maps can contain thousands of trees/oil features. Avoid flooding
+  // model requests and allow the loading UI to paint between small batches.
+  const entries = currentFeatureEntries.slice();
+  for (let index = 0; index < entries.length; index += 24) {
+    await Promise.all(entries.slice(index, index + 24).map(entry => addLoadedFeature(entry).catch(() => null)));
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
 }
 
 function foldLegacyStructureModules(entries) {
@@ -12429,7 +12514,7 @@ async function loadStructureEntries(rawEntries) {
       try { await loadStructureDefs(); } catch (e) {}
     }
     const entries = foldLegacyStructureModules(rawEntries);
-    const promises = entries.map(entry => {
+    const loadEntry = entry => {
       const name = typeof entry.name === 'string' ? entry.name.toLowerCase() : null;
       if (!name) return Promise.resolve();
       const def = STRUCTURE_DEFS.find(d => d.id.toLowerCase() === name);
@@ -12455,8 +12540,11 @@ async function loadStructureEntries(rawEntries) {
       }
       return addLoadedStructure(def, entry, rot, rotDeg, tileX, tileY, sizeX, sizeY, minH)
         .catch(() => {});
-    });
-    await Promise.all(promises);
+    };
+    for (let index = 0; index < entries.length; index += 16) {
+      await Promise.all(entries.slice(index, index + 16).map(loadEntry));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
     await refreshAllWallConnections();
   } catch (err) {
     console.error('Failed to load structure entries:', err);
@@ -12466,8 +12554,8 @@ async function loadStructureEntries(rawEntries) {
 async function loadDroidEntries(entries) {
   currentDroidEntries = [];
   try {
-    await loadComponentDefs();
     currentDroidEntries = entries.filter(entry => entry && typeof entry === 'object');
+    await loadComponentDefs();
     for (const entry of entries) {
       if (entry.template && templateDefs && templateDefs[entry.template]) {
         const t = templateDefs[entry.template];
@@ -12508,7 +12596,7 @@ async function loadDroidEntries(entries) {
         }
       }
       const geom = new THREE.ConeGeometry(0.3, 0.6, 4);
-      const color = PLAYER_COLORS[(entry.startpos ?? 0) % PLAYER_COLORS.length];
+      const color = PLAYER_COLORS[getObjectEntryPlayer(entry) % PLAYER_COLORS.length];
       const mat = new THREE.MeshLambertMaterial({ color });
       const mesh = new THREE.Mesh(geom, mat);
       mesh.rotation.y = -yaw;
@@ -12526,20 +12614,9 @@ async function loadDroidEntries(entries) {
 }
 
 async function loadDroidsFromZip(zip) {
-  const droidName = Object.keys(zip.files).find(fn => fn.toLowerCase().endsWith('droid.json') && !zip.files[fn].dir);
-  currentDroidArchivePath = droidName || null;
-  if (!droidName) {
-    currentDroidEntries = [];
-    return;
-  }
-  try {
-    const text = await zip.files[droidName].async('string');
-    const data = JSON.parse(text);
-    const entries = Array.isArray(data) ? data : Array.isArray(data.droids) ? data.droids : Object.values(data);
-    await loadDroidEntries(entries);
-  } catch (err) {
-    console.error('Failed to load droids from droid.json:', err);
-  }
+  const droids = await readMapArchiveEntities(zip, 'droid');
+  currentDroidArchivePath = droids.name;
+  await loadDroidEntries(droids.entries);
 }
 
 async function loadLocalSaveSnapshot(snapshot) {
@@ -12562,7 +12639,11 @@ async function loadLocalSaveSnapshot(snapshot) {
   currentGamArchivePath = null;
   currentLevelArchivePath = null;
   currentGamJson = null;
-  currentLevelJson = null;
+  currentLevelJson = snapshot.levelMetadata && typeof snapshot.levelMetadata === 'object' ? snapshot.levelMetadata : null;
+  currentServerMapMetadata = snapshot.serverMetadata && typeof snapshot.serverMetadata === 'object' ? snapshot.serverMetadata : null;
+  currentServerMapSourceName = String(snapshot.serverSourceName || '');
+  currentMapScript = normalizeMapScriptSource(snapshot.mapScript);
+  syncMapScriptEditor();
   currentMapInfoOverrides = { ...getDefaultMapInfoOverrides(), ...(snapshot.mapInfo || {}) };
   if (!currentMapInfoOverrides.name) currentMapInfoOverrides.name = String(name || '').trim();
   updateMapInfoInputs();
@@ -12732,7 +12813,7 @@ async function loadMapFile(file, options = {}) {
     setTimeout(hideLoadingProgress, 600);
     hideOverlay();
     showLoadedMapInfo(file, displayName);
-    return;
+    return true;
   }
   try {
     setLoadingProgress('Reading archive file', 20);
@@ -12753,6 +12834,13 @@ async function loadMapFile(file, options = {}) {
     setLoadingProgress('Detecting tileset', 44);
     autoTs = getTilesetIndexFromName(currentLevelJson?.tileset);
     if (autoTs == null) autoTs = await getTilesetIndexFromTtp(zip, TTP_TILESET_MAP);
+    const hasScriptGrid = !names.some(name => /\.map$/i.test(name)) &&
+      names.some(name => /(^|[\\/])game\.js$/i.test(name));
+    if (hasScriptGrid) {
+      setLoadingProgress('Generating scripted map', 46);
+      await materializeScriptMap(zip);
+      await loadArchiveMetadata(zip);
+    }
     let allMapNames = Object.keys(zip.files)
       .filter(fname => fname.toLowerCase().endsWith(".map") && !zip.files[fname].dir);
     let mapFileName = allMapNames.find(f => f.toLowerCase().endsWith("game.map")) || allMapNames[0];
@@ -12837,15 +12925,17 @@ async function loadMapFile(file, options = {}) {
     }
     if (!found) {
       infoDiv.innerHTML = '<b style=\"color:red\">Failed to decode any map grid in this archive!</b>';
-      setLoadingProgress('Failed to decode map grid', 100);
+      hideLoadingProgress();
       showOverlay("Failed to load map. Please select another file.");
       resetCameraTarget(mapW, mapH, threeContainer);
     }
+    return found;
   } catch (err) {
     infoDiv.innerHTML = '<b style=\"color:red\">Failed to open archive!</b>';
-    setLoadingProgress('Failed to open map archive', 100);
+    hideLoadingProgress();
     showOverlay("Failed to open file. Please select another map.");
     resetCameraTarget(mapW, mapH, threeContainer);
+    return false;
   }
 }
 
@@ -12890,15 +12980,15 @@ async function loadServerMap(filename) {
     const blob = await fetchBlobWithProgress('maps/' + filename, filename);
     const licenseInfo = await licenseInfoPromise;
     const file = new File([blob], filename);
-    await loadMapFile(file, {
+    const loaded = await loadMapFile(file, {
       displayName: getServerMapDisplayName(filename, licenseInfo),
       serverMetadata: licenseInfo,
       serverFilename: filename
     });
-    scheduleServerMapLicenseNotice(filename, licenseInfo);
+    if (loaded) scheduleServerMapLicenseNotice(filename, licenseInfo);
   } catch (err) {
     infoDiv.innerHTML = '<b style="color:red">Failed to load server map!</b>';
-    setLoadingProgress('Failed to download server map', 100);
+    hideLoadingProgress();
     console.error(err);
   }
 }
@@ -12966,11 +13056,11 @@ function drawMap3D() {
         scene.remove(obj);
         if (Array.isArray(obj.material)) {
           obj.material.forEach(mat => {
-            if (mat && mat.map && typeof mat.map.dispose === "function") mat.map.dispose();
+            if (mat && mat.map && typeof mat.map.dispose === "function") disposeUnsharedTexture(mat.map);
             if (mat && typeof mat.dispose === "function") mat.dispose();
           });
         } else if (obj.material) {
-          if (obj.material.map && typeof obj.material.map.dispose === "function") obj.material.map.dispose();
+          if (obj.material.map && typeof obj.material.map.dispose === "function") disposeUnsharedTexture(obj.material.map);
           if (typeof obj.material.dispose === "function") obj.material.dispose();
         }
         if (obj.geometry && typeof obj.geometry.dispose === "function") obj.geometry.dispose();
@@ -13770,7 +13860,7 @@ function updateHighlight(event) {
     scene.remove(highlightModelGroup);
     highlightModelGroup.traverse(child => {
       if (child.isMesh) {
-        if (child.material && child.material.map) child.material.map.dispose();
+        if (child.material && child.material.map) disposeUnsharedTexture(child.material.map);
         if (child.material) child.material.dispose();
         if (child.geometry) child.geometry.dispose();
       }
@@ -13841,3 +13931,11 @@ if (document.readyState === 'loading') {
 } else {
   initDom();
 }
+
+mapScriptEditor = mountScriptEditor(document.getElementById('scriptPanel'), {
+  onChange: updateMapScriptDraft,
+  onRun: runEditedMapScript
+});
+syncMapScriptEditor();
+
+mountScriptPanelResize(document.getElementById('scriptWidthHandle'), document.getElementById('editPanel'), resizeScriptViewport);

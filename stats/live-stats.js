@@ -2720,17 +2720,56 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
         return;
       }
 
-      activeExpandedPlayerGameKey = activeExpandedPlayerGameKey === playerGameKey
-        ? null
-        : playerGameKey;
-
-      renderPlayerGames(accounts);
+      const game = latestGames.find((candidate) => getPlayerGameKey(candidate) === playerGameKey);
+      if (game) {
+        togglePlayerGameDetails(row, game, activeAccount, accounts);
+      }
     });
   });
 
   bindCopyButtons(playerGamesElement);
+  bindPlayerGameJumpLinks(playerGamesElement, accounts);
+}
 
-  playerGamesElement.querySelectorAll(".stats-team-tile[data-jump-account]").forEach((tile) => {
+function setPlayerGameRowExpanded(row, expanded) {
+  row.classList.toggle("is-expanded", expanded);
+  const toggle = row.querySelector(".stats-player-game-toggle");
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.querySelector('[aria-hidden="true"]').textContent = expanded ? "-" : "+";
+  toggle.querySelector(".visually-hidden").textContent = expanded
+    ? "Close match details"
+    : "Open match details";
+}
+
+function togglePlayerGameDetails(row, game, activeAccount, accounts) {
+  const gameKey = getPlayerGameKey(game);
+  const isOpening = activeExpandedPlayerGameKey !== gameKey;
+  const expandedRow = playerGamesElement.querySelector(".stats-player-game-row.is-expanded");
+  if (expandedRow) {
+    setPlayerGameRowExpanded(expandedRow, false);
+    const oldDetails = expandedRow.nextElementSibling;
+    if (oldDetails?.classList.contains("stats-player-game-detail-row")) {
+      oldDetails.remove();
+    }
+  }
+
+  activeExpandedPlayerGameKey = isOpening ? gameKey : null;
+  if (!isOpening) {
+    return;
+  }
+
+  // Expanding a match must not rerender the profile or restart its 3D previews.
+  setPlayerGameRowExpanded(row, true);
+  const detailRow = document.createElement("tr");
+  detailRow.className = "stats-player-game-detail-row";
+  detailRow.innerHTML = `<td colspan="6">${renderPlayerGameDetails(game, activeAccount)}</td>`;
+  row.after(detailRow);
+  bindCopyButtons(detailRow);
+  bindPlayerGameJumpLinks(detailRow, accounts);
+}
+
+function bindPlayerGameJumpLinks(scope, accounts) {
+  scope.querySelectorAll(".stats-team-tile[data-jump-account]").forEach((tile) => {
     tile.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();

@@ -15,7 +15,7 @@
     rel="stylesheet"
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
-  <link rel="stylesheet" href="styles.css?v=20260911-responsive-gutters-1">
+  <link rel="stylesheet" href="styles.css?v=20261022-match-ui-1">
   <style>
     .stats-reset-filters {
       flex: 0 0 auto;
@@ -672,7 +672,7 @@
 
             <section class="stats-player-profile" id="statsPlayerProfile" hidden></section>
 
-            <p class="stats-detail-label stats-profile-recent-label" id="statsPlayerRecentLabel" hidden>Recent matches</p>
+            <p class="stats-detail-label stats-profile-recent-label" id="statsPlayerRecentLabel" hidden>Recent matches &amp; analysis</p>
             <div class="stats-table-wrap" id="statsPlayerRecentTable" hidden>
               <table class="stats-table">
                 <thead>
@@ -682,7 +682,7 @@
                     <th data-sort-table="player-games" data-sort-key="result" aria-sort="none"><button class="stats-sort-button" type="button">Result</button></th>
                     <th class="stats-player-game-elo" data-player-games-elo-header data-sort-table="player-games" data-sort-key="elo" aria-sort="none"><button class="stats-sort-button" type="button">Elo</button></th>
                     <th data-sort-table="player-games" data-sort-key="duration" aria-sort="none"><button class="stats-sort-button" type="button">Time</button></th>
-                    <th>Replay</th>
+                    <th>Statistics</th>
                   </tr>
                 </thead>
                 <tbody id="statsPlayerGames">
@@ -719,6 +719,6 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20261021-public-data-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20261022-match-expansion-1"></script>
 </body>
 </html>

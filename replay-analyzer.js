@@ -1498,7 +1498,7 @@
     ["⚔️", "First Mobilization", "Issued the first attack order."],
     ["🗺️", "Most Aggressive", "Issued the most attack orders."],
     ["🧱", "Defensive Commander", "Issued the most guard, hold, patrol, and repair orders."],
-    ["⏱️", "Endurance Award", "Remained active through the end of the match."],
+    ["⏱️", "Endurance Award", "No recorded departure through the end of a fully decoded match. Not awarded when departure history is incomplete."],
     ["🚪", "Last to Leave", "Latest recorded departure from the match."],
     ["📡", "Field Coordinator", "Most support gifts and coordination orders combined."]
   ];
@@ -1574,7 +1574,44 @@
     return header;
   }
 
-  function calculatePlayerAwards(players, events = []) {
+  function hasCompletePlayerDepartureHistory(extraction) {
+    const duration = extraction.match?.elapsedMilliseconds;
+    const types = extraction.messages?.types;
+    return Number.isFinite(duration) && duration > 0
+      && Array.isArray(types)
+      && types.every((message) => Number(message.type) !== 121 || (
+        Number(message.decodeErrors) === 0
+        && Number(message.decodedEvents) === Number(message.count)
+      ));
+  }
+
+  function getPlayerDepartures(players, events) {
+    const departures = new Map();
+    const positionKey = (value) => value == null || value === "" ? null : Number(value);
+    const playersByPosition = new Map(players
+      .filter((player) => Number.isFinite(positionKey(player.position)))
+      .map((player) => [positionKey(player.position), player]));
+    players.forEach((player) => {
+      const time = playerStat(player, "playerLeftGameTime");
+      if (time != null && time >= 0) departures.set(player, time);
+    });
+    events.forEach((event) => {
+      if (Number(event.messageType) !== 121
+        && !(event.category === "Player" && event.action === "Player left")) return;
+      const player = playersByPosition.get(positionKey(event.player));
+      if (!player) return;
+      const time = event.time == null || event.time === "" ? null : Number(event.time);
+      const validTime = Number.isFinite(time) && time >= 0 ? time : null;
+      // Even an untimed departure rules out Endurance. Keep the earliest known
+      // departure if replay events are duplicated or summary data disagrees.
+      const previous = departures.get(player);
+      departures.set(player, previous == null ? validTime
+        : validTime == null ? previous : Math.min(previous, validTime));
+    });
+    return departures;
+  }
+
+  function calculatePlayerAwards(players, events = [], departureHistoryComplete = false) {
     const awardsByPlayer = new Map(players.map((player) => [player, []]));
     const competitors = players.filter((player) => (
       !player.spectator && player.summary && (
@@ -2010,14 +2047,15 @@
       (event) => event.category === "Droid order" && defensiveActions.has(event.action),
       (player, value) => `Most defensive orders issued: ${number(value)}`
     );
+    const departures = getPlayerDepartures(competitors, events);
     competitors
-      .filter((player) => playerStat(player, "playerLeftGameTime") == null)
-      .forEach((player) => giveAward(player, "⏱️", "Endurance Award", "Remained active through the end of the match"));
+      .filter((player) => departureHistoryComplete && !departures.has(player))
+      .forEach((player) => giveAward(player, "⏱️", "Endurance Award", "No recorded departure through the end of the match"));
     addTopAward({
       icon: "🚪",
       label: "Last to Leave",
-      candidates: competitors.filter((player) => playerStat(player, "playerLeftGameTime") != null),
-      value: (player) => stat(player, "playerLeftGameTime"),
+      candidates: competitors.filter((player) => departures.get(player) != null),
+      value: (player) => departures.get(player),
       details: (player, value) => `Latest recorded departure: ${formatDuration(value)}`
     });
     const coordinationActions = new Set(["Help build", "Fire support", "Commander support", "Guard"]);
@@ -6070,7 +6108,11 @@
       renderSummaryItem("Host", hostPlayer ? hostPlayer.name : "Unknown")
     ]);
 
-    const awardsByPlayer = calculatePlayerAwards(extraction.players, extraction.events.records);
+    const awardsByPlayer = calculatePlayerAwards(
+      extraction.players,
+      extraction.events.records,
+      hasCompletePlayerDepartureHistory(extraction)
+    );
     const researchActivityByPlayer = calculateResearchActivity(
       extraction.players,
       extraction.events.records,

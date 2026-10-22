@@ -3336,6 +3336,7 @@ main {
 
 .stats-profile-recent-label {
   margin: 0 0 -6px;
+  text-align: center;
 }
 
 .stats-player-game-map {
@@ -3391,15 +3392,17 @@ main {
   transition: background 160ms ease, color 160ms ease;
 }
 
-.stats-player-game-row:hover td,
-.stats-player-game-row.is-expanded td {
-  background: rgba(109, 232, 255, 0.05);
+.stats-player-game-row:hover td {
+  background: rgba(109, 232, 255, 0.14);
 }
 
 .stats-player-game-row.is-expanded td,
-.stats-player-game-row.is-expanded:hover td,
 .stats-player-game-row.is-expanded + .stats-player-game-detail-row td {
   background: rgba(52, 190, 220, 0.14);
+}
+
+.stats-player-game-row.is-expanded:hover td {
+  background: rgba(109, 232, 255, 0.22);
 }
 
 .stats-player-game-row.is-expanded td:first-child,

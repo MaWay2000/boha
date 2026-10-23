@@ -15,4 +15,5 @@ jobs:
           node-version: '22'
       - run: node --test stats/public-export.test.cjs
       - run: node --test stats/player-game-expansion.test.cjs stats/replay-awards.test.cjs stats/replay-telemetry.test.cjs
+      - run: node --test stats/site-news.test.cjs stats/site-news-model.test.mjs
       - run: node stats/check-public-release.cjs

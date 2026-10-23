@@ -18,6 +18,9 @@
   <script src="assets/atom-icon-renderer.js?v=20261021-circle-1" defer></script>
   <script src="assets/atom-favicon.js?v=20261022-static-1" defer></script>
   <link rel="stylesheet" href="styles.css?v=20260929-beta3-1">
+  <link rel="stylesheet" href="site-news.css?v=20261023-balloon-3d-1">
+  <script src="site-news.js?v=20261023-balloon-flight-3" defer></script>
+  <script src="site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
   <style>
     body.radio-playlist-open {
       overflow: hidden;
@@ -143,6 +146,23 @@
   </style>
 </head>
 <body class="site-app-shell">
+  <button class="news-balloon" id="siteNewsBalloon" type="button" aria-label="Open latest Warzone 2100 news" aria-haspopup="dialog" aria-controls="siteNewsDialog" aria-expanded="false" style="transform: translate3d(16px, 24px, 0)">
+    <img src="assets/news-balloon-cutout-v1.png" width="132" height="184" alt="" draggable="false">
+    <span class="news-balloon-label" aria-hidden="true">NEWS</span>
+    <span class="news-balloon-unread" id="siteNewsUnread" aria-hidden="true">NEW</span>
+  </button>
+  <dialog class="site-news-dialog" id="siteNewsDialog" aria-labelledby="siteNewsTitle" aria-describedby="siteNewsDescription">
+    <header>
+      <div><p class="site-news-eyebrow">WARZONE 2100 · WEB STATS</p><h2 id="siteNewsTitle">What's new</h2></div>
+      <button class="site-news-close" id="siteNewsClose" type="button" aria-label="Close news" autofocus>×</button>
+    </header>
+    <ol class="site-news-list" id="siteNewsList"></ol>
+    <div class="site-news-settings">
+      <label><input type="checkbox" id="siteNewsMotion"> Animate balloon</label>
+      <p class="site-news-motion-note" id="siteNewsMotionNote"></p>
+    </div>
+    <footer id="siteNewsDescription">Latest site updates. Click the balloon anytime to read them again.</footer>
+  </dialog>
   <div class="page-shell">
     <div class="page-noise" aria-hidden="true"></div>
 

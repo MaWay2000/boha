@@ -2719,6 +2719,14 @@
         display: none;
       }
     }
+    .replay-telemetry-summary { cursor: pointer; color: var(--steel, #a8dceb); font-weight: 700; }
+    #replayTelemetryPanel > details { min-width: 0; }
+    .replay-telemetry-status { margin-left: 12px; font-size: 0.8rem; color: var(--muted, #90adbb); }
+    .replay-telemetry-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.8rem; }
+    #replayTelemetryPanel .stats-table-wrap { overflow-x: auto; }
+    .replay-telemetry-table th, .replay-telemetry-table td { text-align: left; padding: 9px; border-bottom: 1px solid rgba(109,232,255,0.16); vertical-align: top; }
+    .replay-telemetry-available { color: #8de2b4; }
+    .replay-telemetry-unavailable { color: #e5c58b; }
   </style>
 </head>
 <body>
@@ -2785,6 +2793,28 @@
                 </table>
               </div>
             </div>
+          </article>
+
+          <article class="data-card replay-results-section" id="replayTelemetryPanel" hidden>
+            <details>
+              <summary class="replay-telemetry-summary">Extended telemetry<span class="replay-telemetry-status" id="replayTelemetryStatus"></span></summary>
+              <p id="replayTelemetryNote"></p>
+              <div class="stats-table-wrap"><table class="replay-telemetry-table">
+                <thead><tr><th>Metric</th><th>Coverage</th><th>Meaning / limitation</th></tr></thead>
+                <tbody id="replayTelemetryCoverage"></tbody>
+              </table></div>
+              <div class="stats-table-wrap"><table class="replay-telemetry-table">
+                <thead><tr><th>Player</th><th>Units completed</th><th>Structures completed</th><th>Completed unit value</th><th>Observed units destroyed</th><th>Ownership transfers in / out</th><th>Own lab completions</th><th>Structures replaced</th></tr></thead>
+                <tbody id="replayTelemetryPlayers"></tbody>
+              </table></div>
+              <label for="replayTelemetryFilter">Recorded event type</label>
+              <select id="replayTelemetryFilter"><option value="">All events</option></select>
+              <div class="stats-table-wrap"><table class="replay-telemetry-table">
+                <thead><tr><th>Time</th><th>Event</th><th>Player</th><th>Details</th></tr></thead>
+                <tbody id="replayTelemetryEvents"></tbody>
+              </table></div>
+              <button type="button" class="replay-action" id="replayTelemetryMore" hidden>Show more events</button>
+            </details>
           </article>
 
           <article class="data-card replay-results-section" id="replayBattlefieldPanel" hidden>
@@ -3111,7 +3141,8 @@
   </div>
 
   <script src="site-events.js?v=20261020-3"></script>
-  <script src="replay-analyzer.js?v=20261022-endurance-award-1"></script>
+  <script src="stats/replay-telemetry.js?v=20261023-telemetry-1"></script>
+  <script src="replay-analyzer.js?v=20261023-telemetry-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

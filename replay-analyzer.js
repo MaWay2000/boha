@@ -463,6 +463,11 @@
       return;
     }
     try {
+      if (extended.telemetryEncoding === "gzip+base64"
+          && typeof extended.telemetryGzipBase64 === "string") {
+        extended.telemetry = await decodeGzipBase64Json(extended.telemetryGzipBase64);
+        delete extended.telemetryGzipBase64;
+      }
       if (extended.snapshotsEncoding === "gzip+base64"
           && typeof extended.snapshotsGzipBase64 === "string") {
         extended.snapshots = await decodeGzipBase64Json(extended.snapshotsGzipBase64);
@@ -1454,15 +1459,15 @@
   }
 
   const playerAwardGuide = [
-    ["🏆", "Match MVP", "Highest match score."],
-    ["🎯", "Top Fragger", "Most unit kills."],
-    ["🔥", "Killing Streak", "Most kills without losing a unit."],
-    ["💥", "Demolition Expert", "Most structures destroyed."],
-    ["⚙️", "War Machine", "Most units built."],
-    ["🏗️", "Master Builder", "Most structures built."],
-    ["🧪", "Research Pioneer", "Most research completed."],
-    ["⚔️", "Combat Efficiency", "Best kills-to-units-lost ratio among players with at least 25 unit losses."],
-    ["🛡️", "Last Army Standing", "Most units remaining at the end."],
+    ["🏆", "Match MVP", "Highest recorded match score, including zero or negative scores. Ties share the award."],
+    ["🎯", "Slayer", "Destroyed the most enemy units, based on recorded unit kills. Own unit losses and structures destroyed do not count. Ties share the award."],
+    ["🔥", "Flawless Combat", "Most recorded kills with exactly zero recorded unit losses, minimum 25 kills."],
+    ["💥", "Demolition Expert", "Most recorded structures destroyed."],
+    ["⚙️", "War Factory", "Most recorded units built."],
+    ["🏗️", "Master engineer", "Most recorded structures built."],
+    ["🧪", "Mad scientist", "Highest recorded research-lab activity percentage, with at least 10 research topics completed. Requires replay-engine lab telemetry; ties share the award."],
+    ["⚔️", "Combat veteran", "Best recorded kills-to-units-lost ratio, with at least 25 unit losses. Both statistics must be known."],
+    ["🛡️", "Supreme Force", "Most recorded units remaining at the verified match end. Early leavers are excluded."],
     ["🏰", "Fortress Keeper", "Most structures remaining at the end."],
     ["🏭", "Production Powerhouse", "Most units and structures produced in total."],
     ["☄️", "Total Destruction", "Highest combined unit kills and structures destroyed."],
@@ -1470,31 +1475,25 @@
     ["🩸", "Costly Victory", "Winning player who lost the most units."],
     ["🔥", "Last Stand", "Losing player with the most units and structures remaining."],
     ["💀", "Glass Cannon", "Highest combined kills and unit losses rating."],
-    ["🪦", "Army Grinder", "Most units lost."],
-    ["🧱", "Structure Casualty", "Most structures lost."],
+    ["🧱", "Camper Hill", "Most structures lost. Counts destroyed buildings, not damage absorbed."],
     ["♻️", "Efficient Builder", "Best remaining-assets share among players who produced at least 50 assets."],
-    ["🌅", "Comeback Survivor", "Best destruction per remaining asset among losing survivors."],
-    ["🧹", "Clean Sweep", "Won without losing a structure."],
-    ["🩹", "Army Preservation", "Best unit survival share among armies with at least 25 total units."],
-    ["🏯", "Perfect Defense", "Best structure survival share among bases with at least 25 total structures."],
-    ["🔨", "Rebuild Master", "Strongest rebuilding performance despite structure losses."],
-    ["🗡️", "Siege Efficiency", "Best structures-destroyed-to-units-lost ratio with at least 25 unit losses."],
+    ["🧹", "Rat Hunter", "Won with zero recorded structure losses and at least 25 structures built or remaining. Requires verified match-end participation."],
+    ["🩹", "No Soldier Left Behind", "Highest remaining units / (remaining + lost units), with at least 25 total units and verified match-end participation. Both statistics must be known."],
+    ["🏯", "Hold the Line", "Highest remaining structures / (remaining + lost structures), minimum 25 total structures. Requires known statistics and verified match-end participation."],
+    ["🗡️", "Siege expert", "Best recorded structures-destroyed-to-units-lost ratio, with at least 25 unit losses. Both statistics must be known."],
     ["📈", "Score Efficiency", "Best score per produced asset among players with at least 50 produced assets."],
     ["⚖️", "Balanced Commander", "Strongest balance across combat, production, research, and survival."],
-    ["🐺", "Underdog Victor", "Victory with the lowest non-negative winning score."],
-    ["🧨", "All-Out Assault", "Winning player with the most combined unit and structure losses."],
+    ["🧨", "Gladiator", "Winning player with the most combined unit and structure losses."],
     ["💎", "Untouchable", "Fewest unit losses among the match's major combatants."],
-    ["🛠️", "Industrial Recovery", "Strongest recovery measured from remaining assets after heavy losses."],
-    ["🚀", "Overproducer", "Largest gap between total production and assets remaining."],
+    ["🚀", "Made in China", "Largest gap between total production and assets remaining."],
     ["🧠", "Research Efficiency", "Best research-to-structures-built ratio with at least 25 structures built."],
-    ["⭐", "Team MVP", "Highest score on the player's team."],
+    ["⭐", "Team MVP", "Highest recorded score on a fixed team with at least two non-spectator players. Includes negative scores and shared ties; disabled for FFA and solo teams."],
     ["👑", "Team Carry", "Largest share of the team's total score."],
     ["🦅", "Team Slayer", "Largest share of the team's total kills."],
-    ["🎁", "Generous Ally", "Most gifts sent to allies."],
-    ["🤝", "Team Support", "Helped the most distinct players."],
-    ["🔬", "Research Sprinter", "Started the first recorded research."],
-    ["🏭", "Early Industrialist", "Issued the first manufacturing order."],
-    ["🩸", "First Blood", "Earliest attack by a player who finished with kills."],
+    ["🎁", "Brother in Arms", "Most valid recorded teammate gift commands. Excludes self-gifts, enemies, spectators, unknown recipients, empty asset/power gifts, and autogame commands. Fixed teams only."],
+    ["🤝", "Team Support", "Most distinct teammates addressed by valid recorded gift commands. Fixed teams only."],
+    ["🔬", "Research Sprinter", "First recorded research start across all non-spectator players, even without summary statistics. Withheld if research decoding or relevant timestamps are incomplete."],
+    ["🏭", "Early Industrialist", "First recorded manufacturing order across all non-spectator players, even without summary statistics. Withheld if production decoding or relevant timestamps are incomplete."],
     ["⚔️", "First Mobilization", "Issued the first attack order."],
     ["🗺️", "Most Aggressive", "Issued the most attack orders."],
     ["🧱", "Defensive Commander", "Issued the most guard, hold, patrol, and repair orders."],
@@ -1611,7 +1610,7 @@
     return departures;
   }
 
-  function calculatePlayerAwards(players, events = [], departureHistoryComplete = false) {
+  function calculatePlayerAwards(players, events = [], departureHistoryComplete = false, match = {}, messageTypes = null) {
     const awardsByPlayer = new Map(players.map((player) => [player, []]));
     const competitors = players.filter((player) => (
       !player.spectator && player.summary && (
@@ -1620,6 +1619,27 @@
     ));
     const number = (value) => Number(value).toLocaleString();
     const stat = (player, key) => playerStat(player, key) || 0;
+    // Step-one awards require actual statistics; unknown is not a zero score,
+    // a perfect survival record, or a valid ratio denominator.
+    const recordedAwardStat = (player, key) => {
+      const raw = player.summary?.[key];
+      if ((typeof raw !== "number" && typeof raw !== "string")
+        || String(raw).trim() === "") return null;
+      const value = playerStat(player, key);
+      if (value == null) return null;
+      return key === "score" || (Number.isInteger(value) && value >= 0) ? value : null;
+    };
+    const awardTeam = (player) => {
+      const raw = player.team;
+      if ((typeof raw !== "number" && typeof raw !== "string")
+        || String(raw).trim() === "") return null;
+      const team = Number(raw);
+      return Number.isInteger(team) && team >= 0 ? team : null;
+    };
+    const teamRoster = players.filter((player) => !player.spectator && awardTeam(player) != null);
+    const fixedTeams = [2, 3].includes(Number(match?.alliance));
+    const departures = getPlayerDepartures(competitors, events);
+    const atMatchEnd = (player) => departureHistoryComplete && !departures.has(player);
     const isWinner = (player) => formatPlayerResult(player) === "Won";
     const isLoser = (player) => formatPlayerResult(player) === "Lost";
     const totalBuilt = (player) => stat(player, "droidsBuilt") + stat(player, "structuresBuilt");
@@ -1631,16 +1651,18 @@
       awardsByPlayer.get(player).push({ icon, label, details });
     };
 
-    const addTopAward = ({ icon, label, candidates = competitors, value, details }) => {
+    const addTopAward = ({ icon, label, candidates = competitors, value, details, allowNonPositive = false }) => {
       const scored = candidates
-        .map((player) => ({ player, value: Number(value(player)) }))
+        .map((player) => ({ player, value: value(player) }))
+        .filter((entry) => entry.value != null && entry.value !== "")
+        .map((entry) => ({ ...entry, value: Number(entry.value) }))
         .filter((entry) => Number.isFinite(entry.value));
       if (!scored.length) {
         return;
       }
 
       const bestValue = Math.max(...scored.map((entry) => entry.value));
-      if (bestValue <= 0) {
+      if (!allowNonPositive && bestValue <= 0) {
         return;
       }
 
@@ -1672,59 +1694,65 @@
     addTopAward({
       icon: "🏆",
       label: "Match MVP",
-      value: (player) => stat(player, "score"),
-      details: (player) => `Highest score: ${number(stat(player, "score"))}`
+      value: (player) => recordedAwardStat(player, "score"),
+      allowNonPositive: true,
+      details: (player) => `Highest recorded score: ${number(recordedAwardStat(player, "score"))}`
     });
     addTopAward({
       icon: "🎯",
-      label: "Top Fragger",
-      value: (player) => stat(player, "kills"),
-      details: (player) => `Most kills: ${number(stat(player, "kills"))}`
+      label: "Slayer",
+      value: (player) => recordedAwardStat(player, "kills"),
+      details: (player) => `Most enemy units destroyed: ${number(recordedAwardStat(player, "kills"))}`
     });
     addTopAward({
       icon: "🔥",
-      label: "Killing Streak",
+      label: "Flawless Combat",
       candidates: competitors.filter((player) => (
-        stat(player, "kills") > 0 && stat(player, "droidsLost") === 0
+        recordedAwardStat(player, "kills") >= 25 && recordedAwardStat(player, "droidsLost") === 0
       )),
-      value: (player) => stat(player, "kills"),
+      value: (player) => recordedAwardStat(player, "kills"),
       details: (player) => `${number(stat(player, "kills"))} kills without losing a unit`
     });
     addTopAward({
       icon: "💥",
       label: "Demolition Expert",
-      value: (player) => stat(player, "structuresDestroyed"),
+      value: (player) => recordedAwardStat(player, "structuresDestroyed"),
       details: (player) => `Most structures destroyed: ${number(stat(player, "structuresDestroyed"))}`
     });
     addTopAward({
       icon: "⚙️",
-      label: "War Machine",
-      value: (player) => stat(player, "droidsBuilt"),
+      label: "War Factory",
+      value: (player) => recordedAwardStat(player, "droidsBuilt"),
       details: (player) => `Most units built: ${number(stat(player, "droidsBuilt"))}`
     });
     addTopAward({
       icon: "🏗️",
-      label: "Master Builder",
-      value: (player) => stat(player, "structuresBuilt"),
+      label: "Master engineer",
+      value: (player) => recordedAwardStat(player, "structuresBuilt"),
       details: (player) => `Most structures built: ${number(stat(player, "structuresBuilt"))}`
     });
+    const researchActivity = calculateResearchActivity(competitors, events, match?.elapsedMilliseconds);
     addTopAward({
       icon: "🧪",
-      label: "Research Pioneer",
-      value: (player) => stat(player, "researchComplete"),
-      details: (player) => `Most research completed: ${number(stat(player, "researchComplete"))}`
+      label: "Mad scientist",
+      candidates: competitors.filter((player) => recordedAwardStat(player, "researchComplete") >= 10),
+      value: (player) => researchActivity.get(player),
+      allowNonPositive: true,
+      details: (player, value) => `Highest recorded research-lab activity: ${value.toFixed(2)}% (${number(recordedAwardStat(player, "researchComplete"))} topics completed; minimum 10)`
     });
     addTopAward({
       icon: "⚔️",
-      label: "Combat Efficiency",
-      candidates: competitors.filter((player) => stat(player, "droidsLost") >= 25),
-      value: (player) => stat(player, "kills") / stat(player, "droidsLost"),
+      label: "Combat veteran",
+      candidates: competitors.filter((player) => recordedAwardStat(player, "kills") != null
+        && recordedAwardStat(player, "droidsLost") >= 25),
+      value: (player) => recordedAwardStat(player, "kills") / recordedAwardStat(player, "droidsLost"),
       details: (player, value) => `Best kills-to-units-lost ratio: ${value.toFixed(2)}`
     });
     addTopAward({
       icon: "🛡️",
-      label: "Last Army Standing",
-      value: (player) => stat(player, "remainingDroids"),
+      label: "Supreme Force",
+      candidates: competitors.filter(atMatchEnd),
+      value: (player) => recordedAwardStat(player, "remainingDroids"),
       details: (player) => `Most units remaining: ${number(stat(player, "remainingDroids"))}`
     });
     addTopAward({
@@ -1772,14 +1800,8 @@
       details: (player) => `${number(stat(player, "kills"))} kills with ${number(stat(player, "droidsLost"))} units lost`
     });
     addTopAward({
-      icon: "🪦",
-      label: "Army Grinder",
-      value: (player) => stat(player, "droidsLost"),
-      details: (player) => `Most units lost: ${number(stat(player, "droidsLost"))}`
-    });
-    addTopAward({
       icon: "🧱",
-      label: "Structure Casualty",
+      label: "Camper Hill",
       value: (player) => stat(player, "structuresLost"),
       details: (player) => `Most structures lost: ${number(stat(player, "structuresLost"))}`
     });
@@ -1790,45 +1812,42 @@
       value: (player) => totalRemaining(player) / totalBuilt(player),
       details: (player, value) => `Best remaining-assets-to-production ratio: ${(value * 100).toFixed(1)}%`
     });
-    addTopAward({
-      icon: "🌅",
-      label: "Comeback Survivor",
-      candidates: competitors.filter((player) => isLoser(player) && totalRemaining(player) > 0),
-      value: (player) => totalDestruction(player) / totalRemaining(player),
-      details: (player, value) => `Best destruction per remaining asset among losing survivors: ${value.toFixed(2)}`
-    });
     competitors
-      .filter((player) => isWinner(player) && stat(player, "structuresLost") === 0)
-      .forEach((player) => giveAward(player, "🧹", "Clean Sweep", "Won without losing a structure"));
+      .filter((player) => isWinner(player) && atMatchEnd(player)
+        && recordedAwardStat(player, "structuresLost") === 0
+        && (recordedAwardStat(player, "structuresBuilt") >= 25
+          || recordedAwardStat(player, "remainingStructures") >= 25))
+      .forEach((player) => giveAward(player, "🧹", "Rat Hunter", "Won with zero recorded structure losses and at least 25 structures built or remaining"));
     addTopAward({
       icon: "🩹",
-      label: "Army Preservation",
-      candidates: competitors.filter((player) => stat(player, "remainingDroids") + stat(player, "droidsLost") >= 25),
-      value: (player) => stat(player, "remainingDroids") / (
-        stat(player, "remainingDroids") + stat(player, "droidsLost")
+      label: "No Soldier Left Behind",
+      candidates: competitors.filter((player) => departureHistoryComplete && !departures.has(player)
+        && recordedAwardStat(player, "remainingDroids") != null
+        && recordedAwardStat(player, "droidsLost") != null
+        && recordedAwardStat(player, "remainingDroids") + recordedAwardStat(player, "droidsLost") >= 25),
+      value: (player) => recordedAwardStat(player, "remainingDroids") / (
+        recordedAwardStat(player, "remainingDroids") + recordedAwardStat(player, "droidsLost")
       ),
       details: (player, value) => `Best unit survival share: ${(value * 100).toFixed(1)}%`
     });
     addTopAward({
       icon: "🏯",
-      label: "Perfect Defense",
-      candidates: competitors.filter((player) => stat(player, "remainingStructures") + stat(player, "structuresLost") >= 25),
-      value: (player) => stat(player, "remainingStructures") / (
-        stat(player, "remainingStructures") + stat(player, "structuresLost")
+      label: "Hold the Line",
+      candidates: competitors.filter((player) => atMatchEnd(player)
+        && recordedAwardStat(player, "remainingStructures") != null
+        && recordedAwardStat(player, "structuresLost") != null
+        && recordedAwardStat(player, "remainingStructures") + recordedAwardStat(player, "structuresLost") >= 25),
+      value: (player) => recordedAwardStat(player, "remainingStructures") / (
+        recordedAwardStat(player, "remainingStructures") + recordedAwardStat(player, "structuresLost")
       ),
       details: (player, value) => `Best structure survival share: ${(value * 100).toFixed(1)}%`
     });
     addTopAward({
-      icon: "🔨",
-      label: "Rebuild Master",
-      value: (player) => stat(player, "structuresBuilt") * stat(player, "structuresLost"),
-      details: (player) => `${number(stat(player, "structuresBuilt"))} structures built despite ${number(stat(player, "structuresLost"))} lost`
-    });
-    addTopAward({
       icon: "🗡️",
-      label: "Siege Efficiency",
-      candidates: competitors.filter((player) => stat(player, "droidsLost") >= 25),
-      value: (player) => stat(player, "structuresDestroyed") / stat(player, "droidsLost"),
+      label: "Siege expert",
+      candidates: competitors.filter((player) => recordedAwardStat(player, "structuresDestroyed") != null
+        && recordedAwardStat(player, "droidsLost") >= 25),
+      value: (player) => recordedAwardStat(player, "structuresDestroyed") / recordedAwardStat(player, "droidsLost"),
       details: (player, value) => `Best structures-destroyed-to-units-lost ratio: ${value.toFixed(2)}`
     });
     addTopAward({
@@ -1856,16 +1875,9 @@
       ),
       details: (player, value) => `Strongest balanced combat, production, research, and survival rating: ${(value * 100).toFixed(1)}%`
     });
-    addBottomAward({
-      icon: "🐺",
-      label: "Underdog Victor",
-      candidates: competitors.filter((player) => isWinner(player) && stat(player, "score") >= 0),
-      value: (player) => stat(player, "score"),
-      details: (player) => `Victory with the lowest winning score: ${number(stat(player, "score"))}`
-    });
     addTopAward({
       icon: "🧨",
-      label: "All-Out Assault",
+      label: "Gladiator",
       candidates: competitors.filter(isWinner),
       value: totalLost,
       details: (player) => `Winner with most combined losses: ${number(totalLost(player))}`
@@ -1883,14 +1895,8 @@
       details: (player) => `Fewest unit losses among major combatants: ${number(stat(player, "droidsLost"))}`
     });
     addTopAward({
-      icon: "🛠️",
-      label: "Industrial Recovery",
-      value: (player) => totalRemaining(player) * totalLost(player),
-      details: (player) => `${number(totalRemaining(player))} assets remained after ${number(totalLost(player))} losses`
-    });
-    addTopAward({
       icon: "🚀",
-      label: "Overproducer",
+      label: "Made in China",
       value: (player) => Math.max(0, totalBuilt(player) - totalRemaining(player)),
       details: (player) => `Production exceeded remaining assets by ${number(Math.max(0, totalBuilt(player) - totalRemaining(player)))}`
     });
@@ -1913,13 +1919,17 @@
     teams.forEach((teamPlayers, team) => {
       const teamScore = teamPlayers.reduce((sum, player) => sum + Math.max(0, stat(player, "score")), 0);
       const teamKills = teamPlayers.reduce((sum, player) => sum + stat(player, "kills"), 0);
-      addTopAward({
-        icon: "⭐",
-        label: "Team MVP",
-        candidates: teamPlayers,
-        value: (player) => stat(player, "score"),
-        details: (player) => `Highest score on team ${team}: ${number(stat(player, "score"))}`
-      });
+      if (fixedTeams && Number.isInteger(team) && team >= 0
+        && teamRoster.filter((player) => awardTeam(player) === team).length >= 2) {
+        addTopAward({
+          icon: "⭐",
+          label: "Team MVP",
+          candidates: teamPlayers.filter((player) => awardTeam(player) === team),
+          value: (player) => recordedAwardStat(player, "score"),
+          allowNonPositive: true,
+          details: (player) => `Highest recorded score on team ${team}: ${number(recordedAwardStat(player, "score"))}`
+        });
+      }
       addTopAward({
         icon: "👑",
         label: "Team Carry",
@@ -1936,18 +1946,38 @@
       });
     });
 
-    const competitorsByPosition = new Map(
-      competitors.map((player) => [Number(player.position), player])
-    );
-    const timelineEvents = events.filter((event) => (
-      competitorsByPosition.has(Number(event.player))
-      && event.time != null
-      && Number.isFinite(Number(event.time))
-    ));
-    const playerForEvent = (event) => competitorsByPosition.get(Number(event.player));
+    const eventIndex = (raw) => {
+      if ((typeof raw !== "number" && typeof raw !== "string")
+        || String(raw).trim() === "") return null;
+      const value = Number(raw);
+      return Number.isInteger(value) && value >= 0 ? value : null;
+    };
+    const eventTime = (event) => {
+      const raw = event.time;
+      if ((typeof raw !== "number" && typeof raw !== "string")
+        || String(raw).trim() === "") return null;
+      const value = Number(raw);
+      return Number.isFinite(value) && value >= 0 ? value : null;
+    };
+    const allPlayersByPosition = new Map(players
+      .filter((player) => eventIndex(player.position) != null)
+      .map((player) => [eventIndex(player.position), player]));
+    const eventPlayers = [...allPlayersByPosition.values()].filter((player) => !player.spectator);
+    const playerForEvent = (event) => allPlayersByPosition.get(eventIndex(event.player));
+    // Recorded commands remain countable without a timestamp or summary stats.
+    // Time-based achievements use a separate, stricter validation path below.
+    const countableEvents = events.filter((event) => {
+      const player = playerForEvent(event);
+      return player && !player.spectator;
+    });
+    const completeEventType = (type) => Number.isFinite(match?.elapsedMilliseconds)
+      && match.elapsedMilliseconds > 0 && Array.isArray(messageTypes)
+      && messageTypes.every((message) => Number(message.type) !== type || (
+        Number(message.decodeErrors) === 0 && Number(message.decodedEvents) === Number(message.count)
+      ));
     const countEvents = (predicate) => {
-      const counts = new Map(competitors.map((player) => [player, 0]));
-      timelineEvents.filter(predicate).forEach((event) => {
+      const counts = new Map(eventPlayers.map((player) => [player, 0]));
+      countableEvents.filter(predicate).forEach((event) => {
         const player = playerForEvent(event);
         counts.set(player, counts.get(player) + 1);
       });
@@ -1958,19 +1988,29 @@
       addTopAward({
         icon,
         label,
+        candidates: eventPlayers,
         value: (player) => counts.get(player) || 0,
         details: (player, value) => details(player, value)
       });
     };
-    const addEarliestEventAward = (icon, label, predicate, details) => {
-      const matching = timelineEvents.filter(predicate);
+    const addEarliestEventAward = (icon, label, predicate, details, messageType = null) => {
+      if (messageType != null && !completeEventType(messageType)) return;
+      const candidates = messageType == null ? countableEvents : events.filter((event) => (
+        !playerForEvent(event)?.spectator
+      ));
+      const matching = candidates.filter(predicate);
       if (!matching.length) {
         return;
       }
-      const earliestTime = Math.min(...matching.map((event) => Number(event.time)));
+      if (messageType != null && matching.some((event) => (
+        !playerForEvent(event) || eventTime(event) == null
+      ))) return;
+      const timed = matching.filter((event) => eventTime(event) != null);
+      if (!timed.length) return;
+      const earliestTime = timed.reduce((earliest, event) => Math.min(earliest, eventTime(event)), Infinity);
       const awarded = new Set();
-      matching
-        .filter((event) => Number(event.time) === earliestTime)
+      timed
+        .filter((event) => eventTime(event) === earliestTime)
         .forEach((event) => {
           const player = playerForEvent(event);
           if (!awarded.has(player)) {
@@ -1980,20 +2020,33 @@
         });
     };
 
-    const gifts = timelineEvents.filter((event) => event.category === "Gift");
+    const gifts = countableEvents.filter((event) => {
+      if (!fixedTeams || event.category !== "Gift") return false;
+      const sender = playerForEvent(event);
+      const recipient = allPlayersByPosition.get(eventIndex(event.data?.to));
+      const giftType = eventIndex(event.data?.giftType);
+      if (!recipient || recipient.spectator || sender === recipient
+        || eventIndex(event.data?.from) !== eventIndex(sender.position)
+        || awardTeam(sender) == null || awardTeam(sender) !== awardTeam(recipient)
+        || ![1, 2, 3, 4, 5].includes(giftType)) return false;
+      // Asset and power gift messages must identify an object or positive value.
+      return ![2, 4, 5].includes(giftType) || eventIndex(event.data?.objectId) > 0;
+    });
+    const validGifts = new Set(gifts);
     addCountAward(
       "🎁",
-      "Generous Ally",
-      (event) => event.category === "Gift",
-      (player, value) => `Most gifts sent: ${number(value)}`
+      "Brother in Arms",
+      (event) => validGifts.has(event),
+      (player, value) => `Most valid recorded teammate gifts: ${number(value)}`
     );
-    const giftRecipients = new Map(competitors.map((player) => [player, new Set()]));
+    const giftRecipients = new Map(eventPlayers.map((player) => [player, new Set()]));
     gifts.forEach((event) => {
       giftRecipients.get(playerForEvent(event)).add(Number(event.data && event.data.to));
     });
     addTopAward({
       icon: "🤝",
       label: "Team Support",
+      candidates: eventPlayers,
       value: (player) => giftRecipients.get(player).size,
       details: (player, value) => `Helped the most distinct players: ${number(value)}`
     });
@@ -2001,25 +2054,17 @@
       "🔬",
       "Research Sprinter",
       (event) => event.category === "Research" && event.action === "Research started",
-      (event, time) => `Started the match's first recorded research at ${formatDuration(time)}`
+      (event, time) => `Started the match's first recorded research at ${formatDuration(time)}`,
+      114
     );
     addEarliestEventAward(
       "🏭",
       "Early Industrialist",
       (event) => event.category === "Production" && event.action === "Manufacture",
-      (event, time) => `Issued the first manufacturing order at ${formatDuration(time)}`
+      (event, time) => `Issued the first manufacturing order at ${formatDuration(time)}`,
+      113
     );
     const attackActions = new Set(["Attack", "Attack target"]);
-    addEarliestEventAward(
-      "🩸",
-      "First Blood",
-      (event) => (
-        event.category === "Droid order"
-        && attackActions.has(event.action)
-        && stat(playerForEvent(event), "kills") > 0
-      ),
-      (event, time) => `Earliest recorded attack by a player who finished with kills, at ${formatDuration(time)}`
-    );
     addEarliestEventAward(
       "⚔️",
       "First Mobilization",
@@ -2047,7 +2092,6 @@
       (event) => event.category === "Droid order" && defensiveActions.has(event.action),
       (player, value) => `Most defensive orders issued: ${number(value)}`
     );
-    const departures = getPlayerDepartures(competitors, events);
     competitors
       .filter((player) => departureHistoryComplete && !departures.has(player))
       .forEach((player) => giveAward(player, "⏱️", "Endurance Award", "No recorded departure through the end of the match"));
@@ -2062,7 +2106,7 @@
     addCountAward(
       "📡",
       "Field Coordinator",
-      (event) => event.category === "Gift" || (
+      (event) => validGifts.has(event) || (
         event.category === "Droid order" && coordinationActions.has(event.action)
       ),
       (player, value) => `Most support gifts and coordination orders: ${number(value)}`
@@ -2275,12 +2319,19 @@
       if (player.summary?.statsSource !== "replay-engine") {
         return [player, null];
       }
+      const hasRecordedValue = (key) => {
+        const raw = player.summary[key];
+        return (typeof raw === "number" || typeof raw === "string") && String(raw).trim() !== "";
+      };
+      if (!hasRecordedValue("labResearchPerformance") || !hasRecordedValue("labResearchPotential")) {
+        return [player, null];
+      }
       const performance = playerStat(player, "labResearchPerformance");
       const potential = playerStat(player, "labResearchPotential");
       if (player.spectator) {
         return [player, null];
       }
-      if (performance != null && potential != null && potential > 0) {
+      if (performance != null && performance >= 0 && potential != null && potential > 0) {
         return [player, Math.max(0, Math.min(1, performance / potential)) * 100];
       }
       return [player, null];
@@ -5968,7 +6019,87 @@
     if (previewSupported) setBattlefieldViewMode(battlefieldViewMode?.value || "3d");
   }
 
+  function renderExtendedTelemetry(extraction) {
+    const panel = document.getElementById("replayTelemetryPanel");
+    const library = window.BohaReplayTelemetry;
+    if (!panel || !library) return;
+    const received = extraction.engineAnalysis?.extended?.telemetry;
+    const duration = extraction.engineAnalysis?.game?.elapsedMilliseconds ?? extraction.match?.elapsedMilliseconds;
+    const data = library.compile(received?.schemaVersion === 1 ? received.events : [], {
+      complete: received?.complete === true, durationMilliseconds: duration,
+      malformedRecords: received?.rejectedRecords || 0
+    });
+    panel.hidden = false;
+    document.getElementById("replayTelemetryStatus").textContent = data.complete ? "Verified event coverage · v1"
+      : data.observedRecords == null ? "Reanalysis needed" : "Partial / unverified coverage";
+    document.getElementById("replayTelemetryNote").textContent = "Unavailable is not zero. Observed destructions are not confirmed enemy kills; ownership transfers are not necessarily donations. Completed-asset value is nominal build value, not exact power spent.";
+    const metrics = [
+      ["objectHistory", "Object-event history"], ["construction", "Completed construction"],
+      ["research", "Research completions"], ["ownershipTransfers", "Ownership transfers"],
+      ["armyValueHistory", "Sampled army value"], ["powerBalanceHistory", "Sampled power balance"],
+      ["killHistory", "Confirmed kill history"], ["combatValue", "Enemy-unit value trades"],
+      ["damage", "Exact damage"], ["repairs", "Attributed repairs"],
+      ["donations", "Confirmed donations"], ["economy", "Exact economy flows"]
+    ];
+    replaceChildren(document.getElementById("replayTelemetryCoverage"), metrics.map(([key, name]) => {
+      const state = data.availability[key];
+      const row = document.createElement("tr"), status = createCell(state.available ? "Recorded" : "Unavailable");
+      status.className = state.available ? "replay-telemetry-available" : "replay-telemetry-unavailable";
+      row.append(createCell(name), status, createCell(state.reason || "Complete coverage of the instrumented callbacks; see event details."));
+      return row;
+    }));
+    const playerName = index => {
+      const player = extraction.players.find(player => Number(player.index) === index);
+      return player ? player.name : `Engine player ${index}`;
+    };
+    const display = value => value == null ? "—" : Number(value).toLocaleString();
+    const playerRows = data.players.map(player => {
+      const row = document.createElement("tr");
+      row.append(createCell(playerName(player.player)), createCell(display(player.completedUnits)),
+        createCell(display(player.completedStructures)), createCell(display(player.completedUnitValue)),
+        createCell(display(player.observedDestroyedUnits)),
+        createCell(`${display(player.ownershipTransfersIn)} / ${display(player.ownershipTransfersOut)}`),
+        createCell(display(player.locallyCompletedResearch)), createCell(display(player.structuresReplaced)));
+      return row;
+    });
+    if (!playerRows.length) {
+      const row = document.createElement("tr"), cell = createCell("No verified extended player totals. Reanalyse this replay with telemetry v1.");
+      cell.colSpan = 8; row.append(cell); playerRows.push(row);
+    }
+    replaceChildren(document.getElementById("replayTelemetryPlayers"), playerRows);
+    const eventNames = { unitBuilt: "Unit completed", structureBuilt: "Structure completed", destroyed: "Destruction observed",
+      demolitionStarted: "Demolition started", ownershipTransfer: "Ownership transfer", researchCompleted: "Research completed",
+      attackNotice: "Attack notice (not a hit/kill counter)", sample: "Army / power sample" };
+    const events = data.events.filter(event => event.type !== "start");
+    const filter = document.getElementById("replayTelemetryFilter"), more = document.getElementById("replayTelemetryMore");
+    filter.replaceChildren(); appendOption(filter, "", "All events");
+    [...new Set(events.map(event => event.type))].forEach(type => appendOption(filter, type, eventNames[type] || type));
+    let limit = 50;
+    const render = () => {
+      const matching = events.filter(event => !filter.value || event.type === filter.value);
+      const rows = matching.slice(0, limit).map(event => {
+        const row = document.createElement("tr");
+        let details = event.object ? `${event.object.name || event.object.kind} #${event.object.id}; nominal cost ${display(event.object.cost)}` : "";
+        if (event.type === "destroyed") details += "; cause and killer unknown";
+        if (event.type === "ownershipTransfer") details += `; ${playerName(event.from)} → ${playerName(event.to)}; gift/capture reason unknown`;
+        if (event.type === "researchCompleted") details = `${event.research}; ${event.locallyCompleted ? "completed in own lab" : "shared or unattributed lab"}`;
+        if (event.type === "sample") details = event.players.map(player => `${playerName(player.player)}: army value ${display(player.unitValue)}, power balance ${display(player.powerBalance)}`).join(" · ");
+        row.append(createCell(formatDuration(event.timeMilliseconds)), createCell(eventNames[event.type] || event.type),
+          createCell(event.object ? playerName(event.object.player) : event.player != null ? playerName(event.player) : "—"), createCell(details));
+        return row;
+      });
+      if (!rows.length) { const row = document.createElement("tr"), cell = createCell("No recorded events of this type."); cell.colSpan = 4; row.append(cell); rows.push(row); }
+      replaceChildren(document.getElementById("replayTelemetryEvents"), rows);
+      more.hidden = matching.length <= limit;
+      more.textContent = `Show more events (${Math.min(limit, matching.length)} / ${matching.length})`;
+    };
+    filter.onchange = () => { limit = 50; render(); };
+    more.onclick = () => { limit += 50; render(); };
+    render();
+  }
+
   function renderExtendedAnalysis(extraction) {
+    renderExtendedTelemetry(extraction);
     const engineAnalysis = extraction.engineAnalysis;
     const extended = engineAnalysis?.extended;
     const timeline = Array.isArray(extended?.researchTimeline) ? extended.researchTimeline : [];
@@ -6111,7 +6242,9 @@
     const awardsByPlayer = calculatePlayerAwards(
       extraction.players,
       extraction.events.records,
-      hasCompletePlayerDepartureHistory(extraction)
+      hasCompletePlayerDepartureHistory(extraction),
+      extraction.match,
+      extraction.messages.types
     );
     const researchActivityByPlayer = calculateResearchActivity(
       extraction.players,

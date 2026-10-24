@@ -1,20 +1,5 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
-import { BOHAN_PREFERENCE_KEY, loadBohanCalculation, calculatePublishedRatings, readBohanPreference, writeBohanPreference, mountBohanControl } from "./bohan-live-rating.mjs?v=20261022-2";
 
-const GITHUB_RAW_STATS_BASE_URL = "https://raw.githubusercontent.com/MaWay2000/boha/main/stats/";
-const USE_REMOTE_MIRROR_JSON = window.location.hostname.endsWith("github.io");
-const MANIFEST_URL = USE_REMOTE_MIRROR_JSON
-  ? new URL("upstream-manifest.json", GITHUB_RAW_STATS_BASE_URL)
-  : new URL("./upstream-manifest.json", import.meta.url);
-const CALCULATE_URL = new URL("./calculate.js", import.meta.url);
-const LEADERBOARDS_URL = new URL("./leaderboards.js", import.meta.url);
-const SNAPSHOT_URL = USE_REMOTE_MIRROR_JSON
-  ? new URL("results-snapshot.json", GITHUB_RAW_STATS_BASE_URL)
-  : new URL("./results-snapshot.json", import.meta.url);
-const PLAYER_KEYS_URL = USE_REMOTE_MIRROR_JSON
-  ? new URL("player-public-keys.json", GITHUB_RAW_STATS_BASE_URL)
-  : new URL("./player-public-keys.json", import.meta.url);
-const LIVE_RESULTS_URL = new URL("../results.json", import.meta.url);
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
@@ -30,7 +15,6 @@ const PLAYER_RESEARCH_AVERAGES = Object.freeze({"FKdfSbErkD2UQEwdKQNu9Ljvm+5gIih
 const COMPACT_COMPARISON_PARAM = "C";
 const COMPACT_PLAYER_PARAM = "p";
 const RATE_SORT_MIN_GAMES = 10;
-const HIDDEN_LEADERBOARDS = new Set(["NTW >= 6 Players", "1v1 High Oil"]);
 const SORT_DEFAULTS = {
   ranks: { key: "rank", direction: "asc" },
   "player-games": { key: "date", direction: "desc" },
@@ -116,22 +100,12 @@ const matchesUpsetsOnlyElement = document.getElementById("statsMatchesUpsetsOnly
 const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data-sort-key]")];
 
 let selectedLeaderboard = "Global";
-let resultsData = { format: 0, results: [] };
 let leaderboardData = null;
 let leaderboardDataSignature = "";
-let bohanCalculation = null;
-const bohanBoardCache = new Map();
-let bohanControl = null;
-let changingCalculation = false;
 let bannedAccountIds = new Set();
 let liveFeedState = "idle";
-let playerPublicKeys = {};
 let upstreamManifest = null;
-let runtime = createRuntime();
-let currentRuntimeKey = "";
-let currentPlayerKeysKey = "";
-let currentSnapshotKey = "";
-let eventSource = null;
+let runtime = {leaderboards: ["Global"]};
 let refreshTimer = null;
 let visibilityListenerAttached = false;
 let visiblePlayerCount = INITIAL_PLAYER_LIMIT;
@@ -167,17 +141,6 @@ let matchesSortState = cloneSortState(SORT_DEFAULTS.matches);
 const allTeamsLostDrawCache = new WeakMap();
 const accountDisplayStatsCache = new WeakMap();
 
-function createRuntime() {
-  return {
-    gather: null,
-    calculate: null,
-    leaderboards: ["Global"],
-    filterGame() {
-      return true;
-    }
-  };
-}
-
 function cloneSortState(sortState) {
   return {
     key: sortState.key,
@@ -187,10 +150,6 @@ function cloneSortState(sortState) {
 
 function stripBom(text) {
   return text.replace(/^\uFEFF/, "");
-}
-
-function getAssetHash(name) {
-  return upstreamManifest?.files?.[name]?.sha256?.slice(0, 16) || "local";
 }
 
 function getSortState(table) {
@@ -384,61 +343,6 @@ async function readJson(baseUrl, version, bust = false) {
   return JSON.parse(stripBom(await response.text()));
 }
 
-async function readManifest() {
-  try {
-    return await readJson(MANIFEST_URL, "manifest", true);
-  } catch (error) {
-    console.warn("Unable to refresh the upstream manifest.", error);
-    return null;
-  }
-}
-
-async function ensureRuntime(force = false) {
-  const runtimeKey = `${getAssetHash("calculate.js")}:${getAssetHash("leaderboards.js")}`;
-  if (!force && runtimeKey === currentRuntimeKey) {
-    return false;
-  }
-
-  const [calculateModule, leaderboardsModule] = await Promise.all([
-    import(buildVersionedUrl(CALCULATE_URL, getAssetHash("calculate.js")).href),
-    import(buildVersionedUrl(LEADERBOARDS_URL, getAssetHash("leaderboards.js")).href)
-  ]);
-
-  runtime = {
-    gather: calculateModule.gather,
-    calculate: calculateModule.calculate,
-    leaderboards: leaderboardsModule.leaderboards,
-    filterGame: leaderboardsModule.filterGame
-  };
-
-  currentRuntimeKey = runtimeKey;
-  ensureSelectedLeaderboard();
-  renderButtons();
-  return true;
-}
-
-async function ensurePlayerKeys(force = false) {
-  const playerKeysKey = getAssetHash("player-public-keys.json");
-  if (!force && playerKeysKey === currentPlayerKeysKey) {
-    return false;
-  }
-
-  playerPublicKeys = await readJson(PLAYER_KEYS_URL, playerKeysKey);
-  currentPlayerKeysKey = playerKeysKey;
-  return true;
-}
-
-async function ensureSnapshot(force = false) {
-  const snapshotKey = getAssetHash("results-snapshot.json");
-  if (!force && snapshotKey === currentSnapshotKey) {
-    return false;
-  }
-
-  resultsData = await readJson(SNAPSHOT_URL, snapshotKey);
-  currentSnapshotKey = snapshotKey;
-  return true;
-}
-
 async function ensureLeaderboardData(force = false) {
   const payload = await readJson(
     WZSTATS_LEADERBOARDS_URL,
@@ -539,16 +443,6 @@ function hydratePublishedBoard(name) {
   // Preserve historical slots without republishing omitted player profiles.
   for (const id of accounts.keys()) if (!listedAccountIds.has(id)) accounts.delete(id);
   return { accounts, games };
-}
-
-function getRatingBoard(name) {
-  if (!bohanCalculation) return hydratePublishedBoard(name);
-  if (!bohanBoardCache.has(name)) {
-    const result = hydratePublishedBoard(name);
-    calculatePublishedRatings(result, bohanCalculation);
-    bohanBoardCache.set(name, result);
-  }
-  return bohanBoardCache.get(name);
 }
 
 function getFavoriteUnitNameCandidates() {
@@ -2429,7 +2323,7 @@ function getPlayerLeaderboardRanks(account) {
     : Object.keys(leaderboardData.leaderboards);
 
   return leaderboards.flatMap((leaderboard) => {
-    const { accounts } = getRatingBoard(leaderboard);
+    const { accounts } = hydratePublishedBoard(leaderboard);
     const rankedAccounts = filterRankedAccounts(sortAccounts(accounts.values()));
     const rankIndex = rankedAccounts.findIndex((candidate) => getAccountExpandKey(candidate) === accountKey);
     return rankIndex >= 0 ? [{ leaderboard, rank: rankIndex + 1 }] : [];
@@ -3742,9 +3636,8 @@ function render() {
     return;
   }
 
-  const { accounts: globalAccounts, games: globalGames } = getRatingBoard("Global");
+  const { accounts: globalAccounts, games: globalGames } = hydratePublishedBoard("Global");
 
-  const allGames = [...globalGames];
   const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !account.banned);
   resolveActivePlayerShareKey(globalAccountList);
   globalRankMap = buildGlobalRankMap(globalAccountList);
@@ -3752,7 +3645,7 @@ function render() {
   leaderboardGameCounts = new Map(Object.entries(leaderboardData.leaderboards)
     .map(([leaderboard, board]) => [leaderboard, Number(board.matches || 0)]));
 
-  const { accounts, games } = getRatingBoard(selectedLeaderboard);
+  const { accounts, games } = hydratePublishedBoard(selectedLeaderboard);
 
   const accountList = sortAccounts(accounts.values()).filter((account) => !account.banned);
   renderedAccountList = accountList;
@@ -3815,7 +3708,6 @@ function getOrderedLeaderboards() {
   const availableLeaderboards = runtime.leaderboards?.length ? runtime.leaderboards : ["Global"];
 
   return [...availableLeaderboards]
-    .filter((leaderboard) => !HIDDEN_LEADERBOARDS.has(leaderboard))
     .sort((left, right) => {
     const countDelta = getLeaderboardGameCount(right) - getLeaderboardGameCount(left);
     if (countDelta !== 0) {
@@ -3943,105 +3835,11 @@ window.addEventListener("popstate", () => {
   render();
 });
 
-function closeLiveFeed() {
-  if (eventSource) {
-    eventSource.close();
-    eventSource = null;
-  }
-}
-
-function startLiveSync() {
-  if (window.location.protocol === "file:" || USE_REMOTE_MIRROR_JSON) {
-    liveFeedState = "unavailable";
-    render();
-    return;
-  }
-
-  closeLiveFeed();
-
-  const latestEndDate = getLatestEndDate(resultsData.results);
-  const feedUrl = new URL(LIVE_RESULTS_URL);
-  feedUrl.search = `?id=${encodeURIComponent(`${resultsData.format} ${resultsData.results.length} ${latestEndDate}`)}`;
-
-  let sawSignal = false;
-  eventSource = new EventSource(feedUrl);
-
-  eventSource.addEventListener("reset", (event) => {
-    sawSignal = true;
-    resultsData.format = Number(event.data);
-    resultsData.results = [];
-  });
-
-  eventSource.onmessage = (event) => {
-    try {
-      sawSignal = true;
-      resultsData.results.push(JSON.parse(event.data));
-    } catch (error) {
-      console.warn("Unable to parse live results event.", error);
-    }
-  };
-
-  eventSource.addEventListener("synced", () => {
-    sawSignal = true;
-    liveFeedState = "live";
-    render();
-  });
-
-  eventSource.onerror = () => {
-    if (!sawSignal) {
-      liveFeedState = "unavailable";
-      closeLiveFeed();
-      render();
-    }
-  };
-}
-
 async function refreshFromMirror(force = false) {
   const leaderboardChanged = await ensureLeaderboardData(force);
 
   if (leaderboardChanged || force) {
-    bohanBoardCache.clear();
-    try {
-      render();
-    } catch (error) {
-      if (!bohanCalculation) throw error;
-      bohanCalculation = null;
-      bohanBoardCache.clear();
-      if (bohanControl) {
-        bohanControl.checkbox.checked = false;
-        bohanControl.status.textContent = "Live calculation failed. Showing published ratings.";
-      }
-      console.error("Live rating refresh failed", error);
-      render();
-    }
-  }
-}
-
-async function changeBohanCalculation(enabled) {
-  if (changingCalculation) return;
-  changingCalculation = true;
-  bohanControl.checkbox.disabled = true;
-  const previous = bohanCalculation;
-  bohanControl.status.textContent = enabled ? "Loading from bohan’s website…" : "Restoring published ratings…";
-  try {
-    bohanCalculation = enabled ? await loadBohanCalculation() : null;
-    bohanBoardCache.clear();
     render();
-    bohanControl.checkbox.checked = enabled;
-    bohanControl.status.textContent = enabled ? "Live Elo · our published matches" : "Published ratings";
-    try { writeBohanPreference(window.localStorage, enabled); } catch {}
-  } catch (error) {
-    bohanCalculation = previous;
-    bohanBoardCache.clear();
-    render();
-    bohanControl.checkbox.checked = Boolean(previous);
-    bohanControl.status.textContent = previous
-      ? "Could not switch. Keeping the previous live calculation."
-      : "Could not load live calculation. Showing published ratings.";
-    console.error("Calculation source switch failed", error);
-  } finally {
-    bohanControl.checkbox.disabled = false;
-    changingCalculation = false;
   }
 }
 
@@ -4066,16 +3864,6 @@ function startRefreshLoop() {
   }
 }
 
-window.addEventListener("beforeunload", () => {
-  closeLiveFeed();
-  if (refreshTimer) {
-    window.clearInterval(refreshTimer);
-  }
-  if (statusRefreshTimer) {
-    window.clearInterval(statusRefreshTimer);
-  }
-});
-
 document.addEventListener("click", (event) => {
   const replayLink = event.target.closest(".stats-replay-link[data-replay-analyzer-url]");
   if (!replayLink || window.parent === window) {
@@ -4097,11 +3885,6 @@ document.addEventListener("click", (event) => {
 async function init() {
   applyStateFromUrl();
   setupSortHeaders();
-  const sourceHost = document.querySelector(".stats-grid") || document.querySelector(".stats-shell") || document.querySelector("main");
-  if (sourceHost) {
-    bohanControl = mountBohanControl(sourceHost);
-    bohanControl.checkbox.addEventListener("change", () => changeBohanCalculation(bohanControl.checkbox.checked));
-  }
 
   try {
     await refreshFromMirror(true);
@@ -4113,20 +3896,6 @@ async function init() {
     return;
   }
 
-  if (bohanControl) {
-    bohanControl.checkbox.disabled = false;
-    let preferLive = false;
-    try { preferLive = readBohanPreference(window.localStorage); } catch {}
-    if (preferLive) {
-      bohanControl.checkbox.checked = true;
-      await changeBohanCalculation(true);
-    }
-    window.addEventListener("storage", (event) => {
-      if (event.key === BOHAN_PREFERENCE_KEY && !changingCalculation) {
-        changeBohanCalculation(event.newValue === "true");
-      }
-    });
-  }
   startRefreshLoop();
 }
 

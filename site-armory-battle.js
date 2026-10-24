@@ -5,12 +5,13 @@
     weapons: require('./mapmaker/pies/components/weapons/weapons.json'),
     templates: require('./mapmaker/pies/components/templates.json')
   } : null;
-  const api = factory(definitions);
+  const api = factory(definitions, typeof module === 'object' && module.exports ? require('./site-armory-loot.js') : root.SiteArmoryLoot);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.SiteArmoryBattle = api;
-})(typeof globalThis === 'object' ? globalThis : this, function (definitions) {
+})(typeof globalThis === 'object' ? globalThis : this, function (definitions, lootModule) {
   'use strict';
   const START_BANK = 500, MAX_UNITS = 8;
+  const BOSS_LOOT_POWER = 250;
   const WAVE_BREAK_MS = 4000;
   function waveStrength(state) { return Math.min(20, Math.max(0, (state.waves?.number || 1) - 1)); }
   const MAX_ALLIES = 4, ALLY_HEALTH = 120, ALLY_KEY = 'A-Python-Trk-HC';
@@ -34,16 +35,31 @@
       x: Math.max(12, Math.min(bounds.maxX, from.x + (distance ? dx / distance : 1) * step)),
       y: Math.max(20, Math.min(bounds.maxY, from.y + (distance ? dy / distance : 0) * step)) };
   }
-  function createAllies() { return { units: [], reserves: 0, created: 0, lost: 0, nextId: 1 }; }
+  function createAllies() { return { units: [], reserves: 0, created: 0, lost: 0, nextId: 1, healthBonus: 0 }; }
   function deployAllies(state) {
     const next = { ...state, units: [...state.units] };
     while (next.reserves > 0 && next.units.length < MAX_ALLIES) {
       next.reserves--;
-      next.units.push({ id: next.nextId++, key: ALLY_KEY, health: ALLY_HEALTH, maxHealth: ALLY_HEALTH });
+      const health = ALLY_HEALTH + next.healthBonus;
+      next.units.push({ id: next.nextId++, key: ALLY_KEY, health, maxHealth: health });
     }
     return next;
   }
-  function recruitAlly(state) { return deployAllies({ ...state, reserves: state.reserves + 1, created: state.created + 1 }); }
+  function recruitAllies(state, count) {
+    if (!Number.isSafeInteger(count) || count <= 0 || !Number.isSafeInteger(state.created + count) || !Number.isSafeInteger(state.reserves + count)) return state;
+    return deployAllies({ ...state, reserves: state.reserves + count, created: state.created + count });
+  }
+  function recruitAlly(state) { return recruitAllies(state, 1); }
+  function repairAllies(state) { return { ...state, units: state.units.map(unit => ({ ...unit, health: unit.maxHealth })) }; }
+  function fortifyAllies(state, amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return state;
+    const bonus = Math.min(200, state.healthBonus + amount), gained = bonus - state.healthBonus;
+    return { ...state, healthBonus: bonus, units: state.units.map(unit => ({ ...unit, maxHealth: unit.maxHealth + gained, health: unit.health + gained })) };
+  }
+  function healAllies(state, amount) {
+    if (!Number.isFinite(amount) || amount <= 0) return state;
+    return { ...state, units: state.units.map(unit => ({ ...unit, health: Math.min(unit.maxHealth, unit.health + amount) })) };
+  }
   function damageAlly(state, id, amount) {
     const target = state.units.find(unit => unit.id === id);
     if (!target || !Number.isFinite(amount) || amount <= 0) return { state, killed: false };
@@ -86,7 +102,38 @@
     })).then(([bodies, propulsions, weapons, templates]) => makeCatalog({ bodies, propulsions, weapons, templates }));
     return catalogPromise;
   }
-  function createBattle() { return { active: false, score: 0, unitKills: 0, bank: 0, earned: 0, spent: 0, units: [], nextId: 1, lastReward: 0, waves: null }; }
+  function rollBossDrop(random = Math.random) {
+    const item = lootModule.roll(random);
+    return { power: item.kind === 'power' ? item.amount : BOSS_LOOT_POWER,
+      fighters: item.kind === 'fighters' ? item.amount : 0, repairs: Number(item.kind === 'repair'), reloads: Number(item.kind === 'reload'), id: item.id };
+  }
+  function lootDescription(state) {
+    const extras = state.extraLoot;
+    return [`+${state.loot} power`, extras.fighters ? `+${extras.fighters} fighter${extras.fighters === 1 ? '' : 's'}` : '',
+      extras.repairs ? 'Full army repair' : '', extras.reloads ? 'Reload all guns' : '',
+      ...Object.entries(state.lootRewards).filter(([id]) => !['power', 'fighters', 'repair', 'reload'].includes(lootModule.BY_ID[id].kind))
+        .map(([id, count]) => `${lootModule.BY_ID[id].name}${lootModule.BY_ID[id].kind === 'timed' ? ' (30s)' : ''}${count > 1 ? ' ×' + count : ''}`)].filter(Boolean).join(' · ');
+  }
+  function validExtras(extras) { return !!extras && ['fighters', 'repairs', 'reloads'].every(key => Number.isSafeInteger(extras[key]) && extras[key] >= 0); }
+  function createBattle() { return { active: false, score: 0, unitKills: 0, bank: 0, earned: 0, spent: 0, loot: 0,
+    extraLoot: { fighters: 0, repairs: 0, reloads: 0 }, lootRewards: {}, bonusEarned: 0, units: [], nextId: 1, lastReward: 0, waves: null }; }
+  function dropBossLoot(state, random = Math.random, canRepair = true) {
+    if (!state.active || !Number.isSafeInteger(state.loot) || state.loot < 0 || !validExtras(state.extraLoot) || !lootModule.validRewards(state.lootRewards)) return state;
+    const drop = rollBossDrop(random), extraLoot = { ...state.extraLoot };
+    // A repair roll without a friendly army becomes a fighter, not an empty perk.
+    if ((drop.repairs || drop.id === 'heal50') && !canRepair) { drop.repairs = 0; drop.fighters = 1; drop.id = 'fighter1'; }
+    const lootRewards = { ...state.lootRewards, [drop.id]: (state.lootRewards[drop.id] || 0) + 1 };
+    for (const key of ['fighters', 'repairs', 'reloads']) extraLoot[key] += drop[key];
+    if (!Number.isSafeInteger(state.loot + drop.power) || !validExtras(extraLoot) || !lootModule.validRewards(lootRewards)) return state;
+    return { ...state, loot: state.loot + drop.power, extraLoot, lootRewards };
+  }
+  function collectBossLoot(state, catalog, random = Math.random) {
+    const amount = state.loot;
+    if (!state.active || !Number.isSafeInteger(amount) || amount <= 0 || !validExtras(state.extraLoot) || !lootModule.validRewards(state.lootRewards) ||
+        ![state.bank, state.earned, state.bonusEarned].every(value => Number.isFinite(value) && value >= 0 && value + amount <= Number.MAX_SAFE_INTEGER)) return state;
+    return spawnAffordable({ ...state, loot: 0, extraLoot: { fighters: 0, repairs: 0, reloads: 0 }, lootRewards: {}, bank: state.bank + amount, earned: state.earned + amount,
+      bonusEarned: state.bonusEarned + amount }, catalog, random);
+  }
   function spawnAffordable(state, catalog, random = Math.random) {
     if (!state.active || state.waves?.phase === 'break') return state;
     const next = { ...state, units: [...state.units], waves: state.waves ? { ...state.waves } : null };
@@ -143,7 +190,8 @@
     }
     return { state: spawned, killed: true, reward, damage: dealt };
   }
-  return { START_BANK, MAX_UNITS, MAX_ALLIES, ALLY_HEALTH, ALLY_KEY, createAllies, recruitAlly, damageAlly,
+  return { START_BANK, MAX_UNITS, BOSS_LOOT_POWER, rollBossDrop, lootDescription, dropBossLoot, collectBossLoot,
+    MAX_ALLIES, ALLY_HEALTH, ALLY_KEY, createAllies, recruitAlly, recruitAllies, repairAllies, fortifyAllies, healAllies, damageAlly,
     WORLD_UNITS_PER_TILE, PIXELS_PER_TILE, inWeaponRange, moveIntoRange,
     WAVE_BREAK_MS, waveStrength, startWaveBattle, advanceWave, callReinforcements,
     CATALOG, PRESETS, makeCatalog, loadCatalog, createBattle, startBattle, spawnAffordable, damageUnit };

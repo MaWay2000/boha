@@ -2,6 +2,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const battle = require('../site-armory-battle.js');
+const loot = require('../site-armory-loot.js');
+const rollFor = id => (loot.CATALOG.findIndex(item => item.id === id) + .5) / loot.CATALOG.length;
 
 test('catalog uses bundled component costs with propulsion as a percentage of body cost', () => {
   assert.equal(battle.CATALOG.length, 9);
@@ -199,5 +201,138 @@ test('long wave campaigns keep difficulty bounded, unique units and exact money/
     }
     assert.equal(state.waves.phase, 'break');
     state = battle.advanceWave(state, 4000, battle.CATALOG, () => 0);
+  }
+});
+
+test('each defeated boss drops 250 power; uncollected drops stack and pay exactly once', () => {
+  const initial = battle.startWaveBattle(battle.CATALOG, () => 0);
+  let state = battle.dropBossLoot(initial, () => 0);
+  assert.equal(initial.loot, 0); assert.equal(state.loot, 250);
+  assert.equal(state.bank, initial.bank); assert.equal(state.earned, 0);
+  state = battle.dropBossLoot(state, () => 0); assert.equal(state.loot, 500);
+  const collected = battle.collectBossLoot(state, battle.CATALOG, () => 0);
+  assert.equal(collected.loot, 0); assert.equal(collected.bonusEarned, 500);
+  assert.equal(collected.earned, 500); assert.equal(collected.bank, initial.bank + 500);
+  assert.equal(collected.bank + collected.spent, 500 + collected.earned);
+  assert.equal(collected.score, initial.score); assert.equal(collected.unitKills, 0);
+  assert.equal(battle.collectBossLoot(collected, battle.CATALOG), collected);
+  const killed = battle.damageUnit(collected, collected.units[0].id, 10000, battle.CATALOG).state;
+  assert.equal(killed.loot, 0); assert.equal(killed.bonusEarned, 500);
+  assert.equal(killed.bank + killed.spent, 500 + killed.earned);
+});
+
+test('crate collection funds pending enemies but never interrupts a rest or changes the wave quota', () => {
+  let state = battle.startWaveBattle(battle.CATALOG, () => .99);
+  const initial = state;
+  state = battle.collectBossLoot(battle.dropBossLoot(state, () => 0), battle.CATALOG, () => 0);
+  assert.ok(state.units.length > initial.units.length); assert.ok(state.units.length <= 8);
+  assert.equal(state.waves.limit, initial.waves.limit);
+  assert.equal(state.bank + state.spent, 500 + state.earned);
+  while (state.waves.phase === 'combat') state = battle.damageUnit(state, state.units[0].id, 10000, battle.CATALOG, () => 0).state;
+  const rest = state;
+  state = battle.collectBossLoot(battle.dropBossLoot(state, () => 0), battle.CATALOG);
+  assert.equal(state.units.length, 0); assert.deepEqual(state.waves, rest.waves);
+  assert.equal(state.bank, rest.bank + 250); assert.equal(state.earned, rest.earned + 250);
+});
+
+test('invalid, inactive or overflowing loot cannot mint power', () => {
+  const inactive = battle.createBattle();
+  assert.equal(battle.dropBossLoot(inactive), inactive);
+  assert.equal(battle.collectBossLoot(inactive, battle.CATALOG), inactive);
+  const active = battle.startWaveBattle(battle.CATALOG);
+  for (const loot of [NaN, Infinity, -1, 0, .5, '250', Number.MAX_SAFE_INTEGER + 1]) {
+    const invalid = { ...active, loot };
+    assert.equal(battle.collectBossLoot(invalid, battle.CATALOG), invalid);
+  }
+  const huge = { ...active, loot: Number.MAX_SAFE_INTEGER };
+  assert.equal(battle.dropBossLoot(huge), huge);
+  const overflow = { ...active, loot: 250, bank: Number.MAX_SAFE_INTEGER };
+  assert.equal(battle.collectBossLoot(overflow, battle.CATALOG), overflow);
+});
+
+test('all 30 random rewards have unique IDs, explicit effects, equal roll intervals and safe boundaries', () => {
+  assert.equal(loot.CATALOG.length, 30); assert.equal(new Set(loot.CATALOG.map(item => item.id)).size, 30);
+  for (const [index, item] of loot.CATALOG.entries()) {
+    assert.ok(item.name && item.description && Object.isFrozen(item));
+    assert.equal(loot.roll(() => (index + .5) / 30).id, item.id);
+    assert.equal(loot.roll(() => index / 30).id, item.id);
+    const rolled = battle.rollBossDrop(() => rollFor(item.id));
+    assert.equal(rolled.id, item.id); assert.ok(rolled.power >= 250);
+    assert.ok(['power', 'fighters', 'repair', 'heal', 'reload', 'timed', 'passive'].includes(item.kind));
+  }
+  assert.equal(loot.roll(() => 1).id, loot.CATALOG.at(-1).id);
+  for (const roll of [-1, NaN, Infinity, '0.5']) assert.deepEqual(battle.rollBossDrop(() => roll), battle.rollBossDrop(() => 0));
+  for (let i = 0; i < 1000; i++) {
+    const drop = battle.rollBossDrop(() => i / 1000);
+    assert.ok([250, 500, 750, 1000].includes(drop.power));
+    assert.ok(drop.fighters <= 4 && drop.repairs <= 1 && drop.reloads <= 1);
+    assert.ok(Number(!!drop.fighters) + drop.repairs + drop.reloads <= 1);
+  }
+  const withoutArmy = battle.dropBossLoot(battle.startWaveBattle(battle.CATALOG), () => rollFor('repair'), false);
+  assert.deepEqual(withoutArmy.extraLoot, { fighters: 1, repairs: 0, reloads: 0 });
+});
+
+test('mixed uncollected rewards stack immutably into one bounded bundle and clear exactly once', () => {
+  const initial = battle.startWaveBattle(battle.CATALOG, () => 0);
+  let state = initial;
+  for (const id of ['fighter1', 'fighter2', 'repair', 'reload', 'power750']) state = battle.dropBossLoot(state, () => rollFor(id));
+  assert.equal(state.loot, 1750); assert.deepEqual(state.extraLoot, { fighters: 3, repairs: 1, reloads: 1 });
+  assert.deepEqual(initial.extraLoot, { fighters: 0, repairs: 0, reloads: 0 });
+  assert.match(battle.lootDescription(state), /1750 power.*3 fighters.*Full army repair.*Reload all guns/);
+  const next = battle.collectBossLoot(state, battle.CATALOG, () => 0);
+  assert.equal(next.loot, 0); assert.deepEqual(next.extraLoot, { fighters: 0, repairs: 0, reloads: 0 });
+  assert.equal(next.bonusEarned, 1750); assert.equal(next.bank + next.spent, 500 + next.earned);
+  assert.equal(battle.collectBossLoot(next, battle.CATALOG), next);
+  const bad = { ...state, extraLoot: { fighters: -1, repairs: 0, reloads: 0 } };
+  assert.equal(battle.collectBossLoot(bad, battle.CATALOG), bad); assert.equal(battle.dropBossLoot(bad), bad);
+});
+
+test('fighter drops use bounded bulk recruitment, and army repairs never resurrect dead units', () => {
+  const initial = battle.createAllies(), army = battle.recruitAllies(initial, 1000000);
+  assert.equal(initial.created, 0); assert.equal(army.units.length, 4); assert.equal(army.reserves, 999996);
+  assert.equal(army.created, army.units.length + army.reserves + army.lost);
+  for (const count of [0, -1, NaN, Infinity, .5, '2']) assert.equal(battle.recruitAllies(army, count), army);
+  const wounded = battle.damageAlly(army, army.units[0].id, 35).state;
+  const healed = battle.repairAllies(wounded);
+  assert.equal(wounded.units[0].health, 85); assert.equal(healed.units[0].health, 120);
+  assert.equal(healed.created, wounded.created); assert.equal(healed.reserves, wounded.reserves);
+  assert.equal(healed.lost, wounded.lost); assert.equal(healed.units.length, wounded.units.length);
+});
+
+test('every timed reward changes its intended combat modifier, refreshes once and expires at 30 seconds', () => {
+  const fields = { doubleDamage: ['damage', 2], rapidFire: ['reload', .5], allyFury: ['allyDamage', 2], allyHaste: ['allyReload', .5],
+    shield: ['enemyDamage', 0], slowEnemies: ['enemySpeed', .5], weakenEnemies: ['enemyDamage', .5],
+    wideBlast: ['cannonRadius', 1.5], wideFlame: ['flameArea', 1.5], mgBoost: ['damage', 1.5, 'machinegun'],
+    cannonBoost: ['damage', 1.5, 'cannon'], laserBoost: ['damage', 1.5, 'laser'], rocketBoost: ['damage', 1.5, 'rockets'], flamerBoost: ['damage', 1.5, 'flamer'] };
+  assert.equal(loot.CATALOG.filter(item => item.kind === 'timed').length, Object.keys(fields).length);
+  for (const [id, [field, value, weapon]] of Object.entries(fields)) {
+    const fresh = loot.createEffects(), applied = loot.apply(fresh, { [id]: 50 });
+    assert.equal(applied.timed[id], 30000); assert.deepEqual(fresh.timed, {});
+    assert.equal(loot.modifiers(applied, weapon)[field], value, id);
+    const almost = loot.tick(applied, 29999); assert.equal(almost.timed[id], 1);
+    assert.equal(loot.modifiers(almost, weapon)[field], value);
+    const expired = loot.tick(almost, 1); assert.deepEqual(expired.timed, {});
+    assert.equal(loot.modifiers(expired, weapon)[field], 1);
+    assert.equal(loot.apply(almost, { [id]: 1 }).timed[id], 30000);
+  }
+  for (const value of [NaN, Infinity, -1, 0]) { const initial = loot.createEffects(); assert.equal(loot.tick(initial, value), initial); }
+});
+
+test('passive upgrades stack with explicit caps, and hull upgrades affect existing and future friendlies', () => {
+  const effects = loot.apply(loot.createEffects(), { health10: 1000, damage10: 1000, allyDamage10: 1000, reload5: 1000, armor5: 1000 });
+  assert.deepEqual(effects.passive, loot.CAPS);
+  const m = loot.modifiers(effects);
+  assert.equal(m.damage, 2); assert.equal(m.allyDamage, 2); assert.equal(m.reload, .6); assert.equal(m.enemyDamage, .5);
+  let army = battle.recruitAlly(battle.createAllies()); army = battle.damageAlly(army, 1, 50).state;
+  const fortified = battle.fortifyAllies(army, 10);
+  assert.equal(army.units[0].health, 70); assert.equal(fortified.units[0].health, 80); assert.equal(fortified.units[0].maxHealth, 130);
+  const recruits = battle.recruitAllies(fortified, 5);
+  assert.ok(recruits.units.every(unit => unit.maxHealth === 130));
+  const capped = battle.fortifyAllies(recruits, 10000);
+  assert.equal(capped.healthBonus, 200); assert.ok(capped.units.every(unit => unit.maxHealth === 320));
+  const healed = battle.healAllies(fortified, 50); assert.equal(healed.units[0].health, 130);
+  assert.equal(healed.units[0].maxHealth, 130); assert.equal(healed.created, fortified.created);
+  for (const counts of [{ unknown: 1 }, { health10: -1 }, { health10: Infinity }, { health10: .5 }, { constructor: 1 }]) {
+    const initial = loot.createEffects(); assert.equal(loot.apply(initial, counts), initial);
   }
 });

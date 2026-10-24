@@ -1,10 +1,12 @@
 (function (root, factory) {
   const api = factory(typeof module === 'object' && module.exports ? require('./site-armory-audio.js') : root.SiteArmoryAudio,
     typeof module === 'object' && module.exports ? require('./site-armory-battle.js') : root.SiteArmoryBattle,
-    typeof module === 'object' && module.exports ? require('./site-armory-tech.js') : root.SiteArmoryTech);
+    typeof module === 'object' && module.exports ? require('./site-armory-tech.js') : root.SiteArmoryTech,
+    typeof module === 'object' && module.exports ? require('./site-armory-loot.js') : root.SiteArmoryLoot,
+    typeof module === 'object' && module.exports ? require('./site-armory-scores.js') : root.SiteArmoryScores);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root.document) api.mount(root);
-})(typeof globalThis === 'object' ? globalThis : this, function (audioModule, battleModule, techModule) {
+})(typeof globalThis === 'object' ? globalThis : this, function (audioModule, battleModule, techModule, lootModule, scoresModule) {
   'use strict';
   const WEAPONS = Object.freeze({
     machinegun: Object.freeze({ name: 'Machine gun', damage: 12, pellets: 3, radius: 43, hole: 14, cooldown: 160 }),
@@ -20,6 +22,16 @@
     model: 'mapmaker/pies/fxlthrow.pie', atlasSize: 256, x: 168, y: 28, width: 9, height: 26, frames: 7, frameMs: 66 });
   const BALLOON_MAX_HEALTH = 1000, BALLOON_RESPAWN_MS = 5000;
   const ROCKET_SPEED = 1600, ROCKET_IMPACT_DEADLINE_MS = 3000;
+  // The reward is already rolled by the crate. Only the number of visual laps
+  // varies here: never reroll the reward or change the player's equipped gun.
+  function rouletteSteps(order, winner, random = Math.random) {
+    if (!Array.isArray(order) || !order.length || new Set(order).size !== order.length ||
+      order.some(key => !Object.hasOwn(WEAPONS, key)) || !order.includes(winner)) return [];
+    const roll = random(), fraction = Number.isFinite(roll) ? Math.max(0, Math.min(.999999999, roll)) : 0;
+    const count = order.length * (3 + Math.floor(fraction * 2)) + order.indexOf(winner) + 1;
+    return Array.from({ length: count }, (_, i) => ({ weapon: order[i % order.length],
+      delay: 65 + Math.round(195 * (i / (count - 1)) ** 3) }));
+  }
   function homeRocket(point, target, elapsed) {
     const dx = target.x - point.x, dy = target.y - point.y, distance = Math.hypot(dx, dy);
     const step = ROCKET_SPEED * Math.max(0, Math.min(.05, elapsed));
@@ -44,7 +56,14 @@
     if (!Object.hasOwn(WEAPONS, weapon)) return null;
     const base = WEAPONS[weapon], upgrade = upgradeProgress(state.powerEarned);
     const tech = techModule.tierFor(weapon, upgrade.level);
-    return { ...base, ...tech, ...upgrade, shotDamage: Math.round(base.damage * base.pellets * (1 + upgrade.bonusPercent / 100)) };
+    const modifiers = lootModule.modifiers(state.effects, weapon);
+    const upgradedDamage = Math.round(base.damage * base.pellets * (1 + upgrade.bonusPercent / 100));
+    return { ...base, ...tech, ...upgrade, cooldown: Math.max(50, Math.round(base.cooldown * modifiers.reload)),
+      splashRadius: base.splashRadius && base.splashRadius * modifiers.cannonRadius,
+      flameLength: base.flameLength && base.flameLength * modifiers.flameArea,
+      flameWidth: base.flameWidth && base.flameWidth * modifiers.flameArea,
+      flameSplashRadius: base.flameSplashRadius && base.flameSplashRadius * modifiers.flameArea,
+      shotDamage: Math.round(upgradedDamage * modifiers.damage) };
   }
   function cannonBlast(targets, x, y, primaryId, profile) {
     const splash = Math.round(profile.shotDamage * profile.splashFraction);
@@ -111,10 +130,10 @@
     return { weapon: null, health: BALLOON_MAX_HEALTH, bossKills: 0, bossEnraged: false, hits: 0, shots: 0, lastShot: -Infinity,
       lastShots: Object.fromEntries(Object.keys(WEAPONS).map(key => [key, -Infinity])),
       unitDamage: 0, lastUnitHit: null, powerEarned: 0, allyStats: { damage: 0, hits: 0, kills: 0 },
-      weaponStats: Object.fromEntries(Object.keys(WEAPONS).map(key => [key, { damage: 0, hits: 0, kills: 0 }])) };
+      weaponStats: Object.fromEntries(Object.keys(WEAPONS).map(key => [key, { damage: 0, hits: 0, kills: 0 }])), effects: lootModule.createEffects() };
   }
   function reloadState(state, weapon, now) {
-    const spec = Object.hasOwn(WEAPONS, weapon) ? WEAPONS[weapon] : null;
+    const spec = weaponProfile(state, weapon);
     if (!spec || !Number.isFinite(now)) return { progress: 1, remainingMs: 0, ready: true };
     const last = state.lastShots?.[weapon] ?? state.lastShot;
     const remainingMs = Math.max(0, Math.min(spec.cooldown, spec.cooldown - (now - last)));
@@ -152,13 +171,22 @@
     }
     return paths;
   }
-  function mount(win) {
+  function mount(win, options = {}) {
     const doc = win.document, rack = doc.getElementById('siteArmory');
     const balloon = doc.getElementById('siteNewsBalloon'), shield = doc.getElementById('armoryShield');
     if (!rack || !balloon || !shield || rack.dataset.mounted) return;
     rack.dataset.mounted = 'true';
     const damage = doc.getElementById('armoryDamage'), hud = doc.getElementById('armoryHud');
     const targetLayer = doc.getElementById('armoryTargets'), battleStats = doc.getElementById('armoryBattleStats');
+    const lootButton = doc.getElementById('armoryLoot');
+    const lobby = doc.getElementById('armoryStartDialog'), nameInput = doc.getElementById('armoryPlayerName');
+    const startButton = doc.getElementById('armoryStart'), topsButton = doc.getElementById('armoryTops');
+    const scoreStore = scoresModule.createStore(win);
+    const onlineScores = options.onlineScores || scoresModule.createOnline(win, () => { if (lobby?.open) renderScores(); });
+    let playerName = '', pendingWeapon = 'machinegun', savedScoreKey = '', lobbyReturn = null;
+    let lootPoint = null, lootNotice = '';
+    let effectTimer = null, effectPrevious = null;
+    let rouletteTimer = null, rouletteQueue = [];
     const unitNodes = new Map();
     const allyNodes = new Map();
     let allies = battleModule.createAllies();
@@ -191,6 +219,9 @@
     const marks = [], transient = new Set(), timers = new Set();
     const reduced = win.matchMedia('(prefers-reduced-motion: reduce)');
     const localPreview = ['127.0.0.1', 'localhost', '[::1]'].includes(win.location?.hostname);
+    // Match the existing owner-local balloon/model preview opt-in. Public
+    // reduced-motion visitors still get a static reward, never a flashing draw.
+    rack.dataset.rouletteMotion = localPreview ? 'full' : '';
     const blocked = () => !!doc.querySelector('dialog[open]') || doc.body.classList.contains('replay-analyzer-modal-open') || doc.body.classList.contains('radio-playlist-open');
     const event = () => balloon.dispatchEvent(new win.CustomEvent('boha:news-balloon-state'));
     function syncScrollLock() {
@@ -239,7 +270,7 @@
         const limits = arena();
         for (const item of unitNodes.values()) {
           if (!allies.units.length && (localPreview || !reduced.matches)) {
-            const speed = 1 + battleModule.waveStrength(battle) * .04;
+            const speed = (1 + battleModule.waveStrength(battle) * .04) * lootModule.modifiers(state.effects).enemySpeed;
             item.point.x += item.point.vx * dt * speed; item.point.y += item.point.vy * dt * speed;
           }
           if (item.point.x < 12 || item.point.x > limits.maxX) item.point.vx *= -1;
@@ -253,11 +284,13 @@
       battleFrame = win.requestAnimationFrame(tick);
     }
     function syncBattleView() {
+      saveScore();
       if (battleStats) battleStats.hidden = !battle.active;
       if (targetLayer) { targetLayer.hidden = (!battle.active && !allies.units.length) || !state.weapon || doc.hidden || blocked(); targetLayer.dataset.armed = String(!!state.weapon); }
       const text = (id, value) => { const node = doc.getElementById(id); if (node) node.textContent = String(value); };
       text('armoryScore', battle.score); text('armoryBank', battle.bank); text('armoryTargetCount', `${battle.units.length} / ${battleModule.MAX_UNITS}`);
       text('armoryUnitDamage', state.unitDamage);
+      syncLoot();
       const waveView = doc.getElementById('armoryWave');
       if (waveView) {
         waveView.hidden = !battle.waves;
@@ -298,7 +331,7 @@
           node.append(visual, label, cost, health);
           item = { node, health, type, point: newPosition(), nextFire: win.performance.now() + 1500 }; unitNodes.set(unit.id, item); targetLayer.append(node); placeUnit(item);
         }
-        if (item) { item.health.value = unit.health; item.type = catalog.find(type => type.key === unit.key); }
+        if (item) { item.health.max = unit.maxHealth; item.health.value = unit.health; item.type = catalog.find(type => type.key === unit.key); }
       }
       for (const [id, item] of allyNodes) if (!allies.units.some(unit => unit.id === id)) { item.node.remove(); allyNodes.delete(id); }
       for (const unit of allies.units) {
@@ -307,7 +340,7 @@
           const node = doc.createElement('div'); node.className = 'armory-unit'; node.dataset.unitId = 'ally-' + unit.id;
           node.dataset.unitKey = unit.key; node.dataset.team = 'ally'; node.dataset.renderSeed = String(10000 + unit.id);
           const type = catalog.find(type => type.key === unit.key);
-          node.title = `Friendly Heavy Cannon · 120 HP · advances into range and fights enemy tanks · ${rangeDescription(type)}`;
+          node.title = `Friendly Heavy Cannon · ${unit.maxHealth} HP · advances into range and fights enemy tanks · ${rangeDescription(type)}`;
           const visual = doc.createElement('span'); visual.className = 'armory-unit-visual';
           const placeholder = doc.createElement('i'); placeholder.className = 'armory-unit-placeholder'; visual.append(placeholder);
           const label = doc.createElement('span'); label.className = 'armory-unit-name'; label.textContent = 'ALLY · Heavy Cannon';
@@ -318,10 +351,121 @@
           item = { node, health, type, point, nextFire: win.performance.now() + 1200 };
           allyNodes.set(unit.id, item); targetLayer.append(node); placeUnit(item);
         }
-        if (item) { item.health.value = unit.health; item.type = catalog.find(type => type.key === unit.key); }
+        if (item) {
+          item.health.max = unit.maxHealth; item.health.value = unit.health; item.type = catalog.find(type => type.key === unit.key);
+          item.node.title = `Friendly Heavy Cannon · ${unit.health}/${unit.maxHealth} HP · ${rangeDescription(item.type)}`;
+        }
       }
       syncBattleMotion();
       syncWaveClock();
+      syncEffectClock();
+    }
+    function syncLoot() {
+      if (!state.weapon || doc.hidden || blocked() || !focused) stopRoulette();
+      for (const button of weaponButtons) button.dataset.lootBoosted = String((state.effects.timed[lootModule.GUN_BOOSTS[button.dataset.weapon]] || 0) > 0);
+      if (lootButton) {
+        lootButton.hidden = !battle.loot || !state.weapon || doc.hidden || blocked() || !focused;
+        const description = battleModule.lootDescription(battle);
+        lootButton.setAttribute('aria-label', `Collect balloon supply crate: ${description}`);
+        lootButton.title = description;
+        const kind = battle.extraLoot.fighters ? 'fighters' : battle.extraLoot.repairs || battle.lootRewards.heal50 || battle.lootRewards.health10 ? 'repair'
+          : Object.keys(battle.lootRewards).some(id => !['power', 'fighters'].includes(lootModule.BY_ID[id].kind)) ? 'reload' : 'power';
+        lootButton.dataset.kind = kind;
+        const icon = doc.getElementById('armoryLootIcon'); if (icon) icon.textContent = { power: '⚡', fighters: '▰', repair: '✚', reload: '↻' }[kind];
+        const amount = doc.getElementById('armoryLootAmount'); if (amount) amount.textContent = description.length > 120 ? description.slice(0, 117) + '…' : description;
+        if (lootPoint) {
+          const rackBox = rack.getBoundingClientRect(), hudBox = hud.getBoundingClientRect();
+          const top = (rackBox.bottom ?? rackBox.top + rackBox.height) + 8;
+          const bottom = Math.max(top, Math.min(300, hudBox.top - (lootButton.offsetHeight || 110) - 8));
+          lootButton.style.left = Math.max(8, Math.min((doc.documentElement.clientWidth || 1200) - 152, lootPoint.x - 72)) + 'px';
+          lootButton.style.top = Math.max(top, Math.min(bottom, lootPoint.y)) + 'px';
+        }
+      }
+      const note = doc.getElementById('armoryLootStatus');
+      if (note) {
+        note.hidden = !battle.loot && !battle.bonusEarned;
+        note.textContent = battle.loot ? `Balloon drop: ${battleModule.lootDescription(battle)} · click the crate`
+          : lootNotice || `Balloon crates: +${battle.bonusEarned} power collected`;
+      }
+      const effects = doc.getElementById('armoryEffects');
+      if (effects) { effects.textContent = lootModule.summary(state.effects); effects.hidden = !effects.textContent; }
+    }
+    function collectLoot() {
+      if (!state.weapon || doc.hidden || blocked() || !focused || !battle.loot) return;
+      const extras = { ...battle.extraLoot }, rewards = { ...battle.lootRewards }, description = battleModule.lootDescription(battle);
+      const next = battleModule.collectBossLoot(battle, catalog);
+      if (next === battle) return;
+      stopEffectClock();
+      const effects = lootModule.apply(state.effects, rewards);
+      battle = next; state = { ...state, powerEarned: battle.earned };
+      allies = battleModule.fortifyAllies(allies, effects.passive.health - state.effects.passive.health);
+      state = { ...state, effects };
+      allies = battleModule.recruitAllies(allies, extras.fighters);
+      if (rewards.heal50) allies = battleModule.healAllies(allies, 50 * rewards.heal50);
+      if (extras.repairs) allies = battleModule.repairAllies(allies);
+      if (extras.reloads) state = { ...state, lastShot: -Infinity, lastShots: Object.fromEntries(Object.keys(WEAPONS).map(weapon => [weapon, -Infinity])) };
+      lootNotice = `Collected: ${description} · ${battle.bonusEarned} power collected total`;
+      sync();
+      startRoulette(rewards);
+      weaponButtons.find(button => button.dataset.weapon === state.weapon)?.focus?.({ preventScroll: true });
+    }
+    function stopRoulette() {
+      if (rouletteTimer != null) win.clearTimeout(rouletteTimer);
+      rouletteTimer = null; rouletteQueue = []; rack.dataset.roulette = '';
+      for (const button of weaponButtons) button.dataset.lootPick = '';
+      const notice = doc.getElementById('armoryRouletteStatus');
+      if (notice) notice.textContent = '';
+    }
+    function startRoulette(rewards) {
+      const winners = weaponButtons.map(button => button.dataset.weapon).filter(key => rewards[lootModule.GUN_BOOSTS[key]]);
+      if (!winners.length) return;
+      // Merge rapid pickups instead of running competing timers. Every distinct
+      // earned gun boost is revealed, including stacked crates.
+      rouletteQueue = [...new Set([...rouletteQueue, ...winners])];
+      if (rouletteTimer == null) nextRoulette();
+    }
+    function nextRoulette() {
+      if (!state.weapon || doc.hidden || blocked() || !focused) { stopRoulette(); return; }
+      const winner = rouletteQueue.shift();
+      if (!winner) { stopRoulette(); return; }
+      const order = weaponButtons.map(button => button.dataset.weapon);
+      const steps = reduced.matches && !localPreview ? [] : rouletteSteps(order, winner);
+      let index = 0;
+      const notice = doc.getElementById('armoryRouletteStatus');
+      const paint = (weapon, phase) => {
+        rack.dataset.roulette = phase;
+        for (const button of weaponButtons) button.dataset.lootPick = button.dataset.weapon === weapon ? phase : '';
+      };
+      if (notice) notice.textContent = 'Drawing a gun boost…';
+      const advance = () => {
+        rouletteTimer = null;
+        if (!state.weapon || doc.hidden || blocked() || !focused) { stopRoulette(); return; }
+        const step = steps[index++];
+        if (step) {
+          paint(step.weapon, 'running');
+          rouletteTimer = win.setTimeout(advance, step.delay);
+        } else {
+          paint(winner, 'winner');
+          if (notice) notice.textContent = `${weaponProfile(state, winner).name} wins! +50% damage boost.`;
+          rouletteTimer = win.setTimeout(nextRoulette, 1600);
+        }
+      };
+      advance();
+    }
+    function stopEffectClock() {
+      if (effectTimer != null) win.clearTimeout(effectTimer);
+      effectTimer = null; effectPrevious = null;
+    }
+    function syncEffectClock() {
+      if (!Object.keys(state.effects.timed).length || !state.weapon || doc.hidden || blocked() || !focused) { stopEffectClock(); return; }
+      if (effectTimer != null) return;
+      effectPrevious = win.performance.now();
+      effectTimer = win.setTimeout(() => {
+        effectTimer = null;
+        if (!state.weapon || doc.hidden || blocked() || !focused) { stopEffectClock(); return; }
+        state = { ...state, effects: lootModule.tick(state.effects, Math.max(0, Math.min(250, win.performance.now() - effectPrevious))) };
+        sync();
+      }, 250);
     }
     function stopWaveClock() {
       if (waveTimer != null) win.clearTimeout(waveTimer);
@@ -358,7 +502,7 @@
         moveTime = now >= (item.nextMove || 0) ? 1 : 0;
         if (moveTime) item.nextMove = now + 1000;
       }
-      const speed = item.node.dataset.team === 'enemy' ? 35 * (1 + battleModule.waveStrength(battle) * .04) : 35;
+      const speed = item.node.dataset.team === 'enemy' ? 35 * (1 + battleModule.waveStrength(battle) * .04) * lootModule.modifiers(state.effects).enemySpeed : 35;
       item.point = battleModule.moveIntoRange(item.type, item.point, target.point, speed, moveTime, arena());
       placeUnit(item);
     }
@@ -389,8 +533,9 @@
         const target = nearestTank(item.point.x + 62, item.point.y + 40);
         if (!target) continue;
         if (now >= item.nextFire && battleModule.inWeaponRange(item.type, item.point, target[1].point)) {
-          item.nextFire = now + 1200; armyBeam(item.point, target[1].point, 'ally');
-          const result = damageTank('allies', target[0], Math.round(18 * (1 + upgradeProgress(state.powerEarned).bonusPercent / 100)), target[1].point.x + 62, target[1].point.y + 40);
+          const modifiers = lootModule.modifiers(state.effects);
+          item.nextFire = now + 1200 * modifiers.allyReload; armyBeam(item.point, target[1].point, 'ally');
+          const result = damageTank('allies', target[0], Math.round(18 * (1 + upgradeProgress(state.powerEarned).bonusPercent / 100) * modifiers.allyDamage), target[1].point.x + 62, target[1].point.y + 40);
           if (result.killed) burst(target[1].point.x + 62, target[1].point.y + 40, true);
           changed ||= result.damage > 0;
         }
@@ -400,7 +545,8 @@
         const target = nearestAlly(enemy);
         if (!target || !battleModule.inWeaponRange(enemy.type, enemy.point, target[1].point)) continue;
         enemy.nextFire = now + 1500; armyBeam(enemy.point, target[1].point, 'enemy');
-        const result = battleModule.damageAlly(allies, target[0], Math.round(12 * (1 + battleModule.waveStrength(battle) * .1))); allies = result.state; changed = true;
+        const result = battleModule.damageAlly(allies, target[0], Math.round(12 * (1 + battleModule.waveStrength(battle) * .1) * lootModule.modifiers(state.effects).enemyDamage));
+        changed ||= result.state !== allies; allies = result.state;
         if (result.killed) burst(target[1].point.x + 62, target[1].point.y + 40, true);
       }
       return changed;
@@ -518,12 +664,77 @@
     }
     function select(weapon) {
       if (weapon !== null && !Object.hasOwn(WEAPONS, weapon)) return;
+      if (weapon && !playerName) { openLobby(weapon); return; }
       stopHolding();
       state = { ...state, weapon: weapon === state.weapon ? null : weapon };
+      if (!state.weapon) onlineScores.flush();
       if (!state.weapon) clearRocketFlights();
       if (state.weapon) sound?.select?.(state.weapon); else sound?.stop();
       if (!state.weapon && !state.health) restoreBalloon();
       sync();
+    }
+    function saveScore() {
+      if (!playerName || !battle.score) return;
+      const key = [playerName, battle.score, battle.waves?.number, battle.earned].join('|');
+      if (savedScoreKey === key) return;
+      savedScoreKey = key;
+      const entry = { name: playerName, score: battle.score, wave: battle.waves?.number || 1,
+        kills: battle.unitKills, bosses: state.bossKills, power: battle.earned, savedAt: Date.now() };
+      scoreStore.record(entry); onlineScores.save(entry);
+    }
+    function renderScores() {
+      const rows = doc.getElementById('armoryTopRows');
+      if (!rows) return;
+      rows.replaceChildren();
+      const entries = onlineScores.entries(), service = onlineScores.status();
+      const empty = doc.getElementById('armoryTopEmpty');
+      if (empty) { empty.hidden = !!entries.length; empty.textContent = service.phase === 'error' ? 'Online scores could not be loaded. Reopen Top scores to retry.' : ['idle', 'loading', 'connecting'].includes(service.phase) ? 'Loading shared scores…' : 'No scores yet. Defeat the balloon to earn your first point!'; }
+      for (const [index, entry] of entries.entries()) {
+        const row = doc.createElement('tr');
+        if (entry.name.toLowerCase() === playerName.toLowerCase()) row.dataset.current = 'true';
+        for (const value of [index + 1, entry.name, entry.score, entry.wave, entry.power]) {
+          const cell = doc.createElement('td'); cell.textContent = String(value); row.append(cell);
+        }
+        rows.append(row);
+      }
+      const note = doc.getElementById('armoryScoreStorage');
+      if (note) note.textContent = service.phase === 'error' ? `Shared Top 10 · ${service.error}${service.pending ? ' Your latest score is waiting to sync.' : ''}`
+        : `Shared Top 10 · ${['loading', 'connecting'].includes(service.phase) ? 'Connecting… ' : service.pending ? 'Saving… ' : ''}Your chosen nickname and run stats are public. No account or password is required.`;
+    }
+    function syncNameEntry(showError = false) {
+      if (!nameInput) return;
+      const valid = scoresModule.validName(nameInput.value);
+      const submit = doc.getElementById('armoryStartSubmit'); if (submit) submit.disabled = !valid;
+      const error = doc.getElementById('armoryNameError');
+      if (error) { error.hidden = valid || (!showError && !nameInput.value); error.textContent = 'Enter a nickname of 1–24 characters, without control characters.'; }
+      nameInput.setAttribute('aria-invalid', String(!valid && (showError || !!nameInput.value)));
+    }
+    function openLobby(weapon = state.weapon || 'machinegun') {
+      if (!lobby || blocked()) return;
+      pendingWeapon = weapon; lobbyReturn = doc.activeElement;
+      if (state.weapon) select(null);
+      nameInput.value = playerName || scoreStore.lastName(); nameInput.readOnly = !!playerName;
+      const submit = doc.getElementById('armoryStartSubmit'); if (submit) submit.textContent = playerName ? 'Resume game' : 'Start game';
+      const change = doc.getElementById('armoryNewPlayer'); if (change) change.hidden = !playerName;
+      renderScores(); syncNameEntry(); lobby.showModal(); onlineScores.refresh();
+      if (playerName) submit?.focus?.(); else nameInput.focus?.();
+    }
+    function closeLobby() {
+      lobby?.close();
+      if (!state.weapon) (lobbyReturn || startButton)?.focus?.({ preventScroll: true });
+    }
+    function startPlayer(e) {
+      e?.preventDefault();
+      if (!lobby?.open || !scoresModule.validName(nameInput.value)) { syncNameEntry(true); return; }
+      if (!playerName) {
+        playerName = scoresModule.normalizeName(nameInput.value); scoreStore.remember(playerName); onlineScores.begin(playerName);
+        savedScoreKey = '';
+      }
+      const weapon = pendingWeapon;
+      lobby.close();
+      const label = doc.getElementById('armoryPlayerLabel'); if (label) label.textContent = playerName;
+      if (startButton) startButton.textContent = 'Resume';
+      select(weapon); weaponButtons.find(button => button.dataset.weapon === weapon)?.focus?.({ preventScroll: true });
     }
     const ephemeral = (node, duration) => {
       transient.add(node); damage.append(node);
@@ -782,24 +993,50 @@
         state = { ...state, bossKills: state.bossKills + 1 };
         // Only the first boss starts the economy. Later defeats never reseed it.
         battle = battle.active ? { ...battle, score: battle.score + 1 } : battleModule.startWaveBattle(catalog);
+        battle = battleModule.dropBossLoot(battle, Math.random, allies.units.length > 0); lootPoint = { x, y };
         respawnBalloonLater();
       }
       sync();
     }
-    function reset() {
+    function reset(restartOnline = true) {
+      saveScore();
+      onlineScores.flush();
       stopHolding();
+      stopRoulette();
       stopWaveClock();
+      stopEffectClock();
       clearRocketFlights();
       sound?.stop();
       marks.splice(0).forEach(node => node.remove());
       for (const timer of timers) win.clearTimeout(timer); timers.clear();
       for (const node of transient) node.remove(); transient.clear();
       battle = battleModule.createBattle();
+      savedScoreKey = '';
+      lootPoint = null; lootNotice = '';
       allies = battleModule.createAllies();
       const weapon = state.weapon; state = { ...createState(), weapon }; restoreBalloon(); sync();
+      if (playerName && restartOnline !== false) onlineScores.begin(playerName);
     }
     for (const button of weaponButtons) button.addEventListener('click', () => select(button.dataset.weapon));
+    startButton?.addEventListener('click', () => openLobby());
+    topsButton?.addEventListener('click', () => openLobby());
+    doc.getElementById('armoryHudTops')?.addEventListener('click', () => openLobby());
+    doc.getElementById('armoryStartForm')?.addEventListener('submit', startPlayer);
+    nameInput?.addEventListener('input', () => syncNameEntry());
+    doc.getElementById('armoryStartClose')?.addEventListener('click', closeLobby);
+    lobby?.addEventListener('cancel', e => { e.preventDefault(); closeLobby(); });
+    doc.getElementById('armoryNewPlayer')?.addEventListener('click', () => {
+      reset(false); onlineScores.clear(); scoreStore.forgetName(); playerName = ''; savedScoreKey = ''; pendingWeapon = 'machinegun';
+      nameInput.value = ''; nameInput.readOnly = false;
+      const label = doc.getElementById('armoryPlayerLabel'); if (label) label.textContent = '';
+      if (startButton) startButton.textContent = 'Start';
+      doc.getElementById('armoryNewPlayer').hidden = true;
+      doc.getElementById('armoryStartSubmit').textContent = 'Start game';
+      renderScores(); syncNameEntry(); nameInput.focus?.();
+    });
+    win.addEventListener('storage', e => { if (e.key === scoresModule.STORAGE_KEY && lobby?.open) onlineScores.refresh(); });
     off.addEventListener('click', () => select(null)); repair.addEventListener('click', reset);
+    lootButton?.addEventListener('click', collectLoot);
     soundButton?.addEventListener('click', () => sound?.setEnabled(!sound.isEnabled()));
     function stopHolding() {
       const previous = held; held = null;
@@ -826,6 +1063,7 @@
     }
     doc.addEventListener('pointerdown', e => {
       if (!state.weapon || held || e.button !== 0 || e.isPrimary === false || doc.hidden || blocked()) return;
+      if (e.target === lootButton || e.target.closest?.('#armoryLoot')) return;
       const autoAim = e.target === fireButton || !!e.target.closest?.('#armoryFire');
       if (!autoAim && e.target.closest?.('#siteArmory, #armoryHud, dialog')) return;
       if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
@@ -845,7 +1083,7 @@
     doc.addEventListener('pointercancel', release, true);
     shield.addEventListener('lostpointercapture', release);
     fireButton.addEventListener('lostpointercapture', release);
-    win.addEventListener('blur', () => { focused = false; stopHolding(); stopWaveClock(); clearRocketFlights(); sound?.stop(); syncBattleView(); });
+    win.addEventListener('blur', () => { focused = false; stopHolding(); stopWaveClock(); stopEffectClock(); clearRocketFlights(); sound?.stop(); syncBattleView(); });
     win.addEventListener('focus', () => { focused = true; syncBattleView(); });
     fireButton.addEventListener('click', e => {
       // Mouse/touch already fired on pointerdown. Preserve keyboard activation.
@@ -853,7 +1091,7 @@
       const target = autoTarget(); if (target) shoot(target.x, target.y);
     });
     doc.addEventListener('click', e => {
-      if (!state.weapon || blocked() || e.target.closest?.('#siteArmory, #armoryHud, dialog')) return;
+      if (!state.weapon || blocked() || e.target === lootButton || e.target.closest?.('#siteArmory, #armoryHud, #armoryLoot, dialog')) return;
       // The armed shield also covers nested frames, so shooting cannot follow a
       // leaderboard link or submit a form. No listeners are injected into frames.
       e.preventDefault(); e.stopImmediatePropagation();
@@ -875,18 +1113,23 @@
     win.addEventListener('resize', syncDamageScroll);
     win.addEventListener('resize', syncBattleView);
     win.addEventListener('pageshow', syncDamageScroll);
-    win.addEventListener('pagehide', () => { select(null); reset(); sound?.dispose(); });
+    win.addEventListener('pagehide', () => { select(null); reset(false); sound?.dispose(); });
     const ready = battleModule.loadCatalog(win).then(next => {
       catalog = next;
       if (battle.active) battle = battleModule.spawnAffordable(battle, catalog);
       sync();
     }).catch(() => { catalogError = true; sync(); });
+    const guide = doc.getElementById('armoryLootGuide');
+    if (guide) for (const item of lootModule.CATALOG) {
+      const row = doc.createElement('li'), label = doc.createElement('b'), detail = doc.createElement('span');
+      label.textContent = item.name; detail.textContent = item.description; row.append(label, detail); guide.append(row);
+    }
     syncDamageScroll(); sync();
-    return { select, shoot, reset, ready, getState: () => ({ ...state, lastShots: { ...state.lastShots }, allyStats: { ...state.allyStats },
+    return { select, shoot, reset, ready, getPlayer: () => playerName, getScores: () => onlineScores.entries(), getState: () => ({ ...state, effects: { timed: { ...state.effects.timed }, passive: { ...state.effects.passive } }, lastShots: { ...state.lastShots }, allyStats: { ...state.allyStats },
       weaponStats: Object.fromEntries(Object.entries(state.weaponStats).map(([key, stats]) => [key, { ...stats }])) }),
-      getBattle: () => ({ ...battle, waves: battle.waves ? { ...battle.waves } : null, units: battle.units.map(unit => ({ ...unit, point: { ...unitNodes.get(unit.id)?.point } })) }),
+      getBattle: () => ({ ...battle, extraLoot: { ...battle.extraLoot }, lootRewards: { ...battle.lootRewards }, waves: battle.waves ? { ...battle.waves } : null, units: battle.units.map(unit => ({ ...unit, point: { ...unitNodes.get(unit.id)?.point } })) }),
       getProjectiles: () => [...rocketFlights.values()].map(({ id, targetId, x, y, damage }) => ({ id, targetId, x, y, damage })),
       getAllies: () => ({ ...allies, units: allies.units.map(unit => ({ ...unit, point: { ...allyNodes.get(unit.id)?.point } })) }) };
   }
-  return { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount };
+  return { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, rouletteSteps, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount };
 });

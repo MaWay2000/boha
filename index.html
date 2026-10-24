@@ -21,11 +21,13 @@
   <link rel="stylesheet" href="site-news.css?v=20261023-news-cleanup-1">
   <script src="site-news.js?v=20261023-news-cleanup-1" defer></script>
   <script src="site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
-  <link rel="stylesheet" href="site-armory.css?v=20261024-waves-1">
+  <link rel="stylesheet" href="site-armory.css?v=20261024-tops-1">
+  <script src="site-armory-loot.js?v=20261024-roulette-1" defer></script>
   <script src="site-armory-tech.js?v=20261024-tech-tiers-1" defer></script>
   <script src="site-armory-audio.js?v=20261024-flamer-1" defer></script>
-  <script src="site-armory-battle.js?v=20261024-waves-1" defer></script>
-  <script src="site-armory.js?v=20261024-hide-panel-1" defer></script>
+  <script src="site-armory-battle.js?v=20261024-loot30-1" defer></script>
+  <script src="site-armory-scores.js?v=20261024-shared-2" defer></script>
+  <script src="site-armory.js?v=20261024-shared-2" defer></script>
   <script src="site-armory-model.js?v=20261024-tech-tiers-1" type="module"></script>
   <script src="site-armory-units.js?v=20261024-allies-1" type="module"></script>
   <style>
@@ -247,6 +249,11 @@
             <span class="armory-reload-label" id="armoryReloadLabel-flamer">Ready</span>
           </button>
         </div>
+        <div class="armory-entry-controls">
+          <span id="armoryPlayerLabel"></span>
+          <button type="button" id="armoryStart">Start</button>
+          <button type="button" id="armoryTops">Top scores</button>
+        </div>
       </section>
     </div>
 
@@ -278,6 +285,9 @@
   <div class="armory-shield" id="armoryShield" hidden aria-hidden="true"></div>
   <div class="armory-damage" id="armoryDamage" aria-hidden="true"></div>
   <div class="armory-targets" id="armoryTargets" aria-hidden="true" hidden></div>
+  <button class="armory-loot" id="armoryLoot" type="button" aria-label="Collect balloon power crate" hidden>
+    <span class="armory-loot-icon" id="armoryLootIcon" aria-hidden="true">⚡</span><b id="armoryLootAmount">Random supplies</b><small>Collect crate</small>
+  </button>
   <aside class="armory-hud" id="armoryHud" aria-label="Target practice controls" hidden>
     <div><span class="armory-live-dot" aria-hidden="true"></span><strong id="armoryWeaponName">Target practice</strong><p id="armoryStatus" role="status" aria-live="polite">Select a weapon to play.</p></div>
     <div class="armory-tech" id="armoryTech" hidden>
@@ -288,6 +298,13 @@
       <span id="armoryBossStatus">Balloon boss · 1000/1000 HP</span>
       <progress id="armoryBossHealth" value="1000" max="1000" aria-label="Balloon boss health"></progress>
     </div>
+    <p class="armory-loot-status" id="armoryLootStatus" role="status" aria-live="polite" hidden></p>
+    <p class="armory-roulette-status" id="armoryRouletteStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+    <p class="armory-effects" id="armoryEffects" hidden></p>
+    <details class="armory-loot-guide"><summary>Balloon drops — all 30 rewards</summary>
+      <p>Each reward is equally likely. Timed boosts last 30 active seconds and pause when you leave the game. Repeats refresh the timer. Passive upgrades stack up to their listed caps and reset with Repair page.</p>
+      <ol id="armoryLootGuide"></ol>
+    </details>
     <div class="armory-wave" id="armoryWave" aria-label="Enemy wave progress" hidden>
       <strong id="armoryWaveTitle" role="status" aria-live="polite">Wave 1</strong>
       <span id="armoryWaveDetail"></span>
@@ -323,10 +340,29 @@
       <button type="button" id="armoryFire">Fire at balloon</button>
       <button type="button" id="armoryRepair">Repair page</button>
       <button type="button" id="armorySound" aria-label="Gun sounds" aria-pressed="true" title="Toggle gun sounds">Sound: on</button>
+      <button type="button" id="armoryHudTops">Top scores</button>
       <button type="button" id="armoryOff">Disarm <kbd>Esc</kbd></button>
     </div>
     <p class="armory-help">Cannon: splash + fighter · rockets auto-lock · flamer: cone + splash · hold to fire · 1–5 switch · Esc pauses</p>
   </aside>
+
+  <dialog class="armory-start-dialog" id="armoryStartDialog" aria-labelledby="armoryStartTitle" aria-describedby="armoryScoreStorage">
+    <header><div><small>WARZONE 2100 · BALLOON BATTLE</small><h2 id="armoryStartTitle">Ready to play?</h2></div><button type="button" id="armoryStartClose" aria-label="Close game lobby">×</button></header>
+    <form id="armoryStartForm" novalidate>
+      <label for="armoryPlayerName">Your nickname</label>
+      <div class="armory-name-entry"><input id="armoryPlayerName" name="nickname" type="text" required maxlength="48" autocomplete="nickname" autocapitalize="off" spellcheck="false" aria-describedby="armoryNameHint armoryNameError"><button type="submit" id="armoryStartSubmit" disabled>Start game</button></div>
+      <p id="armoryNameHint">Enter 1–24 characters before starting. Nickname only — no account needed.</p>
+      <p id="armoryNameError" class="armory-name-error" role="alert" hidden></p>
+    </form>
+    <section class="armory-tops" aria-labelledby="armoryTopsTitle">
+      <h3 id="armoryTopsTitle">Top scores <span>SHARED TOP 10</span></h3>
+      <p id="armoryScoreStorage">Shared online. Your chosen nickname and run stats will be public. No account or password is required.</p>
+      <div class="armory-tops-scroll"><table><caption>Best run per nickname · score first, then wave and earned power</caption><thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">Score</th><th scope="col">Wave</th><th scope="col">Power</th></tr></thead><tbody id="armoryTopRows"></tbody></table></div>
+      <p id="armoryTopEmpty">No scores yet. Defeat the balloon to earn your first point!</p>
+      <p class="armory-score-rules">Each destroyed balloon or enemy = +1 score. Best scores sync automatically, including friendly-unit kills. Nicknames are unverified; this is a casual leaderboard, not a competition.</p>
+    </section>
+    <footer><button type="button" id="armoryNewPlayer" hidden>New player / reset round</button></footer>
+  </dialog>
 
   <div
     class="replay-analyzer-modal"

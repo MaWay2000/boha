@@ -1,5 +1,59 @@
 # Local target-practice game
 
+## Start, nicknames and shared online Top 10
+
+Before any weapon can arm (including keys 1–5), the player must enter a nickname
+and press Start game in the lobby. Names accept 1–24 Unicode characters after
+whitespace normalization; blank names, control characters and directional
+override characters are rejected. A remembered name is prefilled but never
+auto-starts a new page session. Names are rendered only as text, not HTML.
+
+Start and Top scores buttons sit below the disarmed gun rack; Top scores is
+also available in the game HUD. Opening the lobby disarms/pauses the game,
+retains the selected gun and offers Resume game for the same player. The name
+is locked during an existing round. New player / reset round saves the previous
+best, clears round progress and requires a fresh nickname and Start. Repair
+resets the round but retains its player and never deletes saved best scores.
+
+The table is shared online through the existing public API at
+`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/armory`:
+
+- GET `/scores` loads the same public Top 10 for every browser.
+- POST `/sessions` with `{name}` creates a 24-hour anonymous run token.
+- POST `/scores` submits `{token,score,kills,bosses,wave,power}`. Names and
+  timestamps come from the server, not from the submitted score body.
+
+One best run per case-insensitive nickname is retained, ordered by score, wave,
+earned power and first-achieved time. Score is existing unit kills plus balloon
+defeats, including friendly kills; earned power is total gained, not the bank.
+The client batches updates over two seconds and flushes on disarm/reset/exit,
+using credential-free keepalive requests. Temporary failures retain the latest
+pending score with bounded backoff; rate limits wait a minute. Errors are shown
+honestly, never as a local table pretending to be online. Play is not blocked by
+an outage, but pending unsynced scores can be lost on page exit or starting a
+new run. Reset/new-player starts a new server session rather than submitting
+lower counters into the old session. Old async responses cannot replace a new
+session or its token. Existing local scores are not automatically uploaded.
+
+The lobby explicitly says that the chosen nickname and run statistics become
+public. Nicknames are unverified: another player can use the same name, and this
+is casual competition rather than an anti-cheat-protected ranking. No account,
+password, replay identity, player key or admin credential is used. A separate
+browser-only cache under `boha.armory.scores.v1` remembers the nickname and local
+best for resilience; it is not the source for the shared table. Corrupt/blocked
+storage cannot stop play. Session tokens stay in memory, not in localStorage.
+
+The independent API stores at most 512 unexpired runs and 1,000 personal bests,
+returning only the top ten public rows. JSON bodies are capped at 2 KiB; CORS is
+limited to the production origin and port-4173 local previews. It validates
+finite counters, kills+bosses=score, monotonic runs, possible wave progression
+and generous elapsed-time bounds, plus per-session/client rate limits. Private
+token hashes/rate state are never returned. File locking and atomic replacement
+preserve data across restarts without touching replay MariaDB or admin access.
+The backend/storage remain private and are never published in the Pages repo.
+
+## Game rules
+
 The balloon boss has 1,000 HP and a health bar. Defeating it for the first time
 starts a round with score 1 and 500 power. It returns at full health after five
 seconds, even while the unit round continues, and can be defeated again for
@@ -8,6 +62,95 @@ upgrades, and do not grant another starting budget. Unit hits take priority
 where a unit visually overlaps the balloon. Disarm restores a defeated balloon
 immediately for news access; switching/rearming never hides a living balloon.
 Repair/page exit cancels any pending respawn so it cannot affect a fresh round.
+
+Every actual balloon defeat also drops a clickable random supply crate,
+including the introductory boss. The pool contains 30 equally likely rewards,
+listed in the in-game "Balloon drops — all 30 rewards" guide and below.
+Every non-power reward includes 250 power. A repair/heal roll without an army
+becomes one fighter instead. Crate labels, icons
+and colors show the actual reward before collection. Friendly reinforcements
+respect the four-unit limit, with surplus going to reserves; repairs heal only
+living friendlies and never resurrect casualties. Reloads reset cooldowns
+without firing or changing ammo/damage statistics.
+
+Rewards apply only on collection, not on drop. Uncollected power and fighter
+counts stack into one crate, keeping the DOM bounded without losing rewards;
+duplicate full-repair/reload effects apply once together at collection.
+Clicking it (or Enter/Space on the focused button) does not fire
+the selected gun or spend its cooldown. Collection adds power to bank and earned
+upgrade power once; it does not count as a kill, score or unit damage. The
+existing wave quota and budget rules still apply to purchased enemies; no new
+wave starts early when collecting during a rest. `bonusEarned` records collected
+crate power, while `earned` includes both unit rewards and collected crates, so
+bank + spent = 500 + earned still holds.
+
+The crate hides on disarm, hidden tabs, blur and modals, retaining its pending
+reward on resume. It is positioned near the boss's last hit within viewport
+bounds and above the game HUD, with a short reduced-motion-aware drop animation.
+Repair/page exit removes pending drops and collected bonus totals. Like the rest
+of the mini-game, rewards exist only in the current page session.
+
+## All 30 balloon drops
+
+`site-armory-loot.js` is the shared source for the random pool, effects and UI
+guide. Timed boosts last 30 active-play seconds, pausing while disarmed, hidden,
+unfocused or covered by a modal. Repeat drops refresh to 30 seconds rather than
+stacking damage or storing extra duration. Different effects multiply together;
+rocket damage is snapshotted at launch. Passive upgrades last until Repair/page
+exit and stack only to their explicit caps. The HUD shows timers and passives.
+
+Collecting a gun-specific +50% damage boost reveals it with a roulette highlight
+across all five gun tabs in their visible order. It makes three or four laps,
+slows down, stops on the gun already selected by the random drop, then gives it
+two gentle gold pulses. A small +50% badge remains while its boost is active.
+This is a visual reward reveal, not an auto-equip: shots, cooldowns and the
+equipped weapon do not change. Stacked gun rewards reveal each distinct winner
+in turn; power and army drops do not start a gun draw. Disarm, blur, hidden tabs,
+modals and Repair cancel the animation without losing earned effects. Reduced
+motion skips the running highlight and pulses for public visitors, showing a
+static gold winner. The owner-local preview opts into full requested motion,
+matching the existing local balloon and model-preview behavior.
+
+Power-only crates award the total shown; every other row also includes 250 power.
+
+| # | Reward | Effect |
+| --- | --- | --- |
+| 1 | Power Cache | 250 power |
+| 2 | Power Chest | 500 power |
+| 3 | Power Vault | 750 power |
+| 4 | Jackpot | 1,000 power |
+| 5 | Wingman | 1 friendly fighter |
+| 6 | Backup Pair | 2 friendly fighters |
+| 7 | Strike Team | 3 friendly fighters |
+| 8 | Full Squad | 4 friendly fighters |
+| 9 | Field Workshop | Full repair for all living friendlies |
+| 10 | Repair Kit | Heal every living friendly by 50 HP, capped at max HP |
+| 11 | Ammo Drop | Instantly reload every player gun |
+| 12 | Double Damage | ×2 player damage for 30s |
+| 13 | Rapid Fire | 50% shorter player reloads for 30s |
+| 14 | Army Fury | ×2 friendly damage for 30s |
+| 15 | Army Overdrive | 50% shorter friendly firing intervals for 30s |
+| 16 | Army Shield | Invulnerable friendlies for 30s |
+| 17 | Stasis Field | 50% slower enemies for 30s |
+| 18 | Enemy Jammer | 50% less enemy damage for 30s |
+| 19 | Wide Blast | 50% larger cannon splash radius for 30s |
+| 20 | Firestorm | 50% larger flame cone and splash for 30s |
+| 21 | Machinegun Boost | +50% machinegun damage for 30s |
+| 22 | Cannon Boost | +50% cannon damage for 30s |
+| 23 | Laser Boost | +50% laser damage for 30s |
+| 24 | Rocket Boost | +50% rocket damage for 30s |
+| 25 | Flamer Boost | +50% flamer damage for 30s |
+| 26 | Reinforced Hulls | Passive +10 max/current HP to living and future friendlies; cap +200 |
+| 27 | Weapon Tuning | Passive +10% player damage; cap +100% |
+| 28 | Veteran Crews | Passive +10% friendly damage; cap +100% |
+| 29 | Quick Loaders | Passive 5 percentage points shorter player reloads; cap 40% |
+| 30 | Reactive Armor | Passive 5 percentage points less incoming friendly damage; cap 50% |
+
+The hull passive adds ten HP rather than fully healing; dead units never return.
+Future reserve deployments inherit the accumulated max HP. Player reloads have
+a 50ms safety minimum. Paused clocks do not burn buff time, and delayed callbacks
+account for at most one 250ms tick, without catch-up attacks. Effect maps and
+reward counts have a fixed set of allowed IDs; snapshots are deep-copied.
 
 Every unit
 kill adds one score and credits exactly 1.5 times that unit's power cost. After
@@ -139,7 +282,7 @@ animation enabled. Splash has the same per-burst damage as the stream; there
 is no extra damage for overlapping effects. Attribution/license/source hash are in
 assets/vendor/warzone-effects/README.md, COPYING and COPYING.README.
 
-All guns upgrade automatically from cumulative kill rewards in the current
+All guns upgrade automatically from cumulative kill rewards and collected boss crates in the current
 round, not the leftover bank. There are 20 levels. Levels 2/3/4/5 still unlock
 at 500/1,500/3,000/6,000 earned power; level 6 starts at 10,000. Later levels
 require progressively more power, reaching level 20 at 300,000. Each level adds

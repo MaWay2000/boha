@@ -1,7 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount } = require('../site-armory.js');
+const loot = require('../site-armory-loot.js');
+const scores = require('../site-armory-scores.js');
+const rollFor = id => (loot.CATALOG.findIndex(item => item.id === id) + .5) / loot.CATALOG.length;
+const { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, rouletteSteps, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount } = require('../site-armory.js');
 
 test('five distinct optional weapons start disarmed with no damage', () => {
   assert.deepEqual(Object.keys(WEAPONS), ['machinegun', 'cannon', 'laser', 'rockets', 'flamer']);
@@ -9,6 +12,149 @@ test('five distinct optional weapons start disarmed with no damage', () => {
   assert.equal(initial.weapon, null); assert.equal(initial.health, BALLOON_MAX_HEALTH);
   assert.equal(fire(initial, true, 100).fired, false);
   assert.equal(fire({ ...initial, weapon: 'constructor' }, true, 100).fired, false);
+});
+
+test('gun roulette follows rack order, visits every tab, slows down and stops on the actual reward', () => {
+  const order = ['rockets', 'machinegun', 'cannon', 'laser', 'flamer'];
+  for (const winner of order) for (const roll of [-1, 0, .5, 1, Infinity, NaN]) {
+    const steps = rouletteSteps(order, winner, () => roll);
+    assert.ok(steps.length >= 16 && steps.length <= 25);
+    assert.equal(steps.at(-1).weapon, winner);
+    assert.deepEqual(steps.slice(0, 5).map(step => step.weapon), order);
+    for (let i = 0; i < steps.length; i++) {
+      assert.equal(steps[i].weapon, order[i % order.length]);
+      assert.ok(steps[i].delay >= 65 && steps[i].delay <= 260);
+      if (i) assert.ok(steps[i].delay >= steps[i - 1].delay);
+    }
+  }
+  for (const [order, winner] of [[[], 'laser'], [['laser', 'laser'], 'laser'], [['bad'], 'bad'], [['laser'], 'constructor']]) {
+    assert.deepEqual(rouletteSteps(order, winner), []);
+  }
+});
+
+const scoreEntry = (name = 'Pilot', score = 4, extra = {}) => ({ name, score, wave: 1, power: 500,
+  kills: score - 1, bosses: 1, savedAt: 100, ...extra });
+
+test('nickname validation preserves Unicode, normalizes whitespace, rejects blank/oversized/control names', () => {
+  assert.equal(scores.normalizeName('  Žaibas   2100  '), 'Žaibas 2100');
+  assert.equal(scores.normalizeName('e\u0301'), 'é');
+  for (const name of ['A', 'a'.repeat(24), '🚀'.repeat(24), '<img src=x>']) assert.equal(scores.validName(name), true);
+  for (const name of ['', '   ', '\u200b', '\u0301', 'a'.repeat(25), '🚀'.repeat(25), 'pilot\u202e', '\u0000bad', null, {}, 4]) assert.equal(scores.validName(name), false);
+});
+
+test('local rankings retain ten best distinct nicknames, merge case variants and use stable tie-breaks', () => {
+  const entries = Array.from({ length: 15 }, (_, i) => scoreEntry('Pilot ' + i, i + 1));
+  const rows = scores.rank([...entries, scoreEntry('PILOT 14', 20), scoreEntry('Pilot 14', 2)]);
+  assert.equal(rows.length, 10); assert.equal(rows[0].score, 20); assert.equal(rows[0].name, 'PILOT 14');
+  assert.equal(rows.at(-1).score, 6);
+  assert.deepEqual(scores.rank([
+    scoreEntry('Early', 5), scoreEntry('Later', 5, { savedAt: 200 }),
+    scoreEntry('Power', 5, { power: 500.5 }), scoreEntry('Wave', 5, { wave: 2 })
+  ]).map(entry => entry.name), ['Wave', 'Power', 'Early', 'Later']);
+  const input = scoreEntry(); const ranked = scores.rank([input]); ranked[0].name = 'changed'; assert.equal(input.name, 'Pilot');
+});
+
+test('score parsing fails safely on bad payloads and strips unknown fields without accepting impossible counters', () => {
+  for (const raw of ['', '{', 'x'.repeat(70000), 'null', '[]', '{"version":2}']) assert.deepEqual(scores.parse(raw), { lastName: '', entries: [] });
+  for (const change of [{ score: NaN }, { score: 0 }, { score: 1.2 }, { kills: -1 }, { bosses: 100 }, { wave: 0 }, { power: Infinity }, { savedAt: -1 }, { name: '' }]) {
+    assert.equal(scores.normalizeEntry(scoreEntry('Pilot', 4, change)), null);
+  }
+  const parsed = scores.parse(JSON.stringify({ version: 1, lastName: '  Pilot ', entries: [scoreEntry('Pilot', 4, { privateKey: 'not copied' }), { bogus: true }] }));
+  assert.equal(parsed.lastName, 'Pilot'); assert.equal(parsed.entries.length, 1); assert.equal(parsed.entries[0].privateKey, undefined);
+});
+
+test('local score storage remembers only the nickname and personal best, with immutable snapshots and no unrelated keys', () => {
+  const data = new Map(), writes = [];
+  const win = { localStorage: { getItem: key => data.get(key) ?? null, setItem: (key, value) => { writes.push(key); data.set(key, value); } } };
+  const store = scores.createStore(win);
+  assert.equal(store.remember('  Pilot  '), true); assert.equal(store.lastName(), 'Pilot');
+  assert.equal(store.record(scoreEntry()), true); assert.equal(store.record(scoreEntry()), false);
+  assert.equal(store.record(scoreEntry('PILOT', 2)), false); assert.equal(store.record(scoreEntry('Pilot', 8)), true);
+  assert.equal(scores.createStore(win).entries()[0].score, 8);
+  const copy = store.entries(); copy[0].score = 10000; assert.equal(store.entries()[0].score, 8);
+  assert.deepEqual([...new Set(writes)], [scores.STORAGE_KEY]);
+  assert.equal(store.remember(' '), false); assert.equal(store.record({ score: 999 }), false);
+});
+
+test('blocked, corrupt and quota-exhausted storage never prevents in-memory scores or nickname entry', () => {
+  for (const storage of [
+    { getItem() { throw Error('blocked'); }, setItem() { throw Error('blocked'); } },
+    { getItem: () => '{broken', setItem() { throw Error('quota'); } }
+  ]) {
+    const store = scores.createStore({ localStorage: storage });
+    assert.equal(store.remember('Pilot'), true); assert.equal(store.record(scoreEntry()), true);
+    assert.equal(store.lastName(), 'Pilot'); assert.equal(store.entries()[0].score, 4); assert.equal(store.isPersistent(), false);
+  }
+});
+
+function onlineFixture(fetch) {
+  let now = 0, id = 0, changes = 0; const timers = new Map(), requests = [];
+  const win = { fetch: async (url, options) => { requests.push({ url, ...options }); return fetch(url, options); },
+    setTimeout(fn, delay) { timers.set(++id, { fn, at: now + delay }); return id; }, clearTimeout: key => timers.delete(key) };
+  const online = scores.createOnline(win, () => changes++);
+  return { win, online, requests, timers, changes: () => changes,
+    advance(ms) { now += ms; for (const [key, timer] of [...timers]) if (timer.at <= now) { timers.delete(key); timer.fn(); } } };
+}
+const settleScores = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
+const scoreResponse = (entries = [], extra = {}) => ({ ok: true, status: 200, json: async () => ({ schemaVersion: 1, entries, ...extra }) });
+
+test('shared client creates an anonymous session, batches latest scores, flushes and renders only public fields', async () => {
+  const f = onlineFixture(async (url, options) => url.endsWith('/sessions') ? scoreResponse([], { token: 'a'.repeat(64) })
+    : options.method === 'POST' ? scoreResponse([scoreEntry('Pilot', JSON.parse(options.body).score, { privateKey: 'not rendered' })]) : scoreResponse());
+  await f.online.begin('  Pilot  ');
+  assert.equal(JSON.parse(f.requests[0].body).name, 'Pilot');
+  f.online.save(scoreEntry('Pilot', 2)); f.online.save(scoreEntry('Pilot', 9));
+  assert.equal(f.requests.length, 1); f.online.flush(); await settleScores();
+  assert.equal(f.requests.length, 2); const body = JSON.parse(f.requests[1].body);
+  assert.equal(body.score, 9); assert.equal(body.name, undefined); assert.equal(body.token, 'a'.repeat(64));
+  assert.equal(f.online.entries()[0].score, 9); assert.equal(f.online.entries()[0].privateKey, undefined);
+  assert.equal(f.online.status().pending, false); assert.equal(f.online.status().phase, 'ready');
+  assert.ok(f.requests.every(request => request.credentials === 'omit' && request.url.startsWith(scores.ENDPOINT)));
+  assert.equal(f.requests[1].keepalive, true); assert.ok(f.changes() > 3);
+});
+
+test('shared client retries network failures with the latest score, but never loops on expired or invalid sessions', async () => {
+  let failure = 503;
+  const f = onlineFixture(async url => url.endsWith('/sessions') ? scoreResponse([], { token: 'b'.repeat(64) })
+    : failure ? { ok: false, status: failure } : scoreResponse([scoreEntry('Pilot', 8)]));
+  await f.online.begin('Pilot'); f.online.save(scoreEntry('Pilot', 4)); f.online.flush(); await settleScores();
+  assert.equal(f.online.status().phase, 'error'); assert.equal(f.online.status().pending, true);
+  f.online.save(scoreEntry('Pilot', 8)); failure = 0; f.advance(5000); await settleScores();
+  assert.equal(JSON.parse(f.requests.at(-1).body).score, 8); assert.equal(f.online.entries()[0].score, 8);
+  failure = 401; f.online.save(scoreEntry('Pilot', 9)); f.online.flush(); await settleScores();
+  assert.match(f.online.status().error, /expired/); assert.equal(f.timers.size, 0);
+});
+
+test('shared session creation failures retain pending scores and rate-limit retries wait a full minute', async () => {
+  let working = false;
+  const f = onlineFixture(async url => {
+    if (!working) return { ok: false, status: 429 };
+    return url.endsWith('/sessions') ? scoreResponse([], { token: 'c'.repeat(64) }) : scoreResponse([scoreEntry('Pilot', 1)]);
+  });
+  await f.online.begin('Pilot'); f.online.save(scoreEntry('Pilot', 1)); f.online.flush(); await settleScores();
+  const count = f.requests.length; f.advance(59999); await settleScores(); assert.equal(f.requests.length, count);
+  working = true; f.advance(1); await settleScores();
+  assert.equal(f.online.entries()[0].score, 1); assert.equal(f.online.status().pending, false);
+});
+
+test('old session responses cannot replace a new player or leak its token into score submissions', async () => {
+  let resolveOld;
+  const f = onlineFixture(async (url, options) => {
+    if (url.endsWith('/sessions') && JSON.parse(options.body).name === 'Old') return new Promise(resolve => { resolveOld = resolve; });
+    return url.endsWith('/sessions') ? scoreResponse([], { token: 'd'.repeat(64) }) : scoreResponse([scoreEntry('New', 1)]);
+  });
+  const old = f.online.begin('Old'); await f.online.begin('New');
+  resolveOld(scoreResponse([], { token: 'e'.repeat(64) })); await old;
+  f.online.save(scoreEntry('New', 1)); f.online.flush(); await settleScores();
+  assert.equal(JSON.parse(f.requests.at(-1).body).token, 'd'.repeat(64)); assert.equal(f.online.entries()[0].name, 'New');
+});
+
+test('shared reads reject malformed responses, retain the last good table and show a retryable error', async () => {
+  let valid = true;
+  const f = onlineFixture(async () => valid ? scoreResponse([scoreEntry('Online pilot', 12)]) : scoreResponse([{ name: '<img src=x>', score: Infinity }]));
+  await f.online.refresh(); assert.equal(f.online.entries()[0].score, 12);
+  valid = false; await f.online.refresh(); assert.equal(f.online.status().phase, 'error');
+  assert.equal(f.online.entries()[0].score, 12);
 });
 
 test('balloon hit testing excludes transparent corners, ropes, destroyed and invalid bounds', () => {
@@ -46,7 +192,7 @@ test('cracked glass geometry is bounded, variable, finite, and generated without
   assert.notDeepEqual(crackPaths(() => .2), crackPaths(() => .8));
 });
 
-function fixture({ reduced = false, hostname = '' } = {}) {
+function fixture({ reduced = false, hostname = '', signedIn = true, storage } = {}) {
   class Element {
     constructor(id) {
       this.id = id; this.listeners = {}; this.dataset = {}; this.children = []; this.attributes = {};
@@ -65,6 +211,9 @@ function fixture({ reduced = false, hostname = '' } = {}) {
     replaceChildren(...nodes) { this.children.forEach(node => { node.parent = null; }); this.children = []; this.append(...nodes); }
     remove() { if (this.parent) this.parent.children = this.parent.children.filter(node => node !== this); }
     setAttribute(key, value) { this.attributes[key] = value; }
+    focus() { doc.activeElement = this; }
+    showModal() { this.open = true; }
+    close() { this.open = false; this.emit('close'); }
     querySelectorAll() { return buttons; }
     getBoundingClientRect() { return { left: 100, top: 50, width: 132, height: 184 }; }
     closest() { return null; }
@@ -76,6 +225,10 @@ function fixture({ reduced = false, hostname = '' } = {}) {
   ids.push('armoryTargets', 'armoryBattleStats', 'armoryScore', 'armoryBank', 'armoryTargetCount', 'armoryBattleNote');
   ids.push('armoryUnitDamage', 'armoryLastHit');
   ids.push('armoryBossHealth', 'armoryBossStatus');
+  ids.push('armoryLoot', 'armoryLootAmount', 'armoryLootStatus', 'armoryLootIcon');
+  ids.push('armoryLootGuide', 'armoryEffects', 'armoryRouletteStatus');
+  ids.push('armoryStartDialog', 'armoryPlayerName', 'armoryStart', 'armoryTops', 'armoryHudTops', 'armoryStartForm', 'armoryStartSubmit',
+    'armoryStartClose', 'armoryNewPlayer', 'armoryPlayerLabel', 'armoryTopRows', 'armoryTopEmpty', 'armoryScoreStorage', 'armoryNameError');
   ids.push('armoryWave', 'armoryWaveTitle', 'armoryWaveDetail', 'armoryWaveProgress');
   ids.push('armoryAlliesStats', 'armoryAllyCount', 'armoryAllyReserves', 'armoryAllyKills', 'armoryAllyDamage');
   ids.push('armoryUpgradeNote', 'armoryUpgradeProgress', 'armoryUpgradeStatus');
@@ -86,12 +239,14 @@ function fixture({ reduced = false, hostname = '' } = {}) {
   const doc = new Element('document'); doc.body = new Element('body'); doc.hidden = false;
   const frame = new Element('contentFrame');
   doc.getElementById = id => nodes[id]; doc.createElement = tag => new Element(tag); doc.createElementNS = (_, tag) => new Element(tag);
-  doc.querySelectorAll = () => [frame]; doc.querySelector = () => doc.modalOpen ? new Element('dialog') : null;
+  doc.querySelectorAll = () => [frame]; doc.querySelector = () => doc.modalOpen || nodes.armoryStartDialog.open ? new Element('dialog') : null;
   let now = 0, observer;
   const timers = new Map(); let timerId = 0;
   const win = new Element('window'); win.document = doc; win.performance = { now: () => now };
   win.innerHeight = 800; doc.documentElement = new Element('html'); doc.documentElement.clientWidth = 1200;
   win.location = { hostname };
+  const stored = new Map();
+  win.localStorage = storage || { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value) };
   win.scrollTo = ({ left, top }) => { win.scrollX = left; win.scrollY = top; };
   const frames = new Map(); let frameId = 0;
   win.requestAnimationFrame = fn => { frames.set(++frameId, fn); return frameId; };
@@ -100,7 +255,13 @@ function fixture({ reduced = false, hostname = '' } = {}) {
   win.matchMedia = () => ({ matches: reduced });
   win.setTimeout = (fn, delay = 0) => { timers.set(++timerId, { fn, at: now + delay }); return timerId; }; win.clearTimeout = id => timers.delete(id);
   win.MutationObserver = class { constructor(fn) { observer = fn; } observe() {} };
-  const controller = mount(win);
+  const mockStore = scores.createStore(win);
+  const onlineScores = { entries: () => mockStore.entries(), status: () => ({ phase: 'ready', error: '', pending: false }),
+    begin() {}, save: entry => mockStore.record(entry), flush() {}, clear() {}, refresh() {} };
+  const controller = mount(win, { onlineScores });
+  if (signedIn) {
+    nodes.armoryStart.emit('click'); nodes.armoryPlayerName.value = 'Test pilot'; nodes.armoryStartForm.emit('submit'); controller.select(null);
+  }
   return { ...controller, win, doc, nodes, buttons, timers, frame, frames,
     step(ms = 16) { now += ms; const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(now)); },
     next(ms = 1000) { now += ms; }, observe() { observer(); },
@@ -115,6 +276,77 @@ function fixture({ reduced = false, hostname = '' } = {}) {
       throw Error('Timer loop did not settle');
     } };
 }
+
+test('every gun and hotkey requires a nickname plus explicit Start before any game activity', async () => {
+  for (const weapon of Object.keys(WEAPONS)) {
+    const f = fixture({ signedIn: false }); await f.ready;
+    f.select(weapon);
+    assert.equal(f.nodes.armoryStartDialog.open, true); assert.equal(f.getPlayer(), '');
+    assert.equal(f.getState().weapon, null); assert.equal(f.frame.inert, false);
+    f.shoot(166, 122); assert.equal(f.getState().shots, 0); assert.equal(f.getBattle().active, false);
+    for (const invalid of ['', ' ', 'x'.repeat(25)]) {
+      f.nodes.armoryPlayerName.value = invalid; f.nodes.armoryStartForm.emit('submit');
+      assert.equal(f.getPlayer(), ''); assert.equal(f.nodes.armoryStartSubmit.disabled, true);
+      assert.equal(f.nodes.armoryStartDialog.open, true);
+    }
+    f.nodes.armoryPlayerName.value = '  Žaibas  '; f.nodes.armoryPlayerName.emit('input');
+    assert.equal(f.nodes.armoryStartSubmit.disabled, false);
+    f.nodes.armoryStartForm.emit('submit');
+    assert.equal(f.getPlayer(), 'Žaibas'); assert.equal(f.getState().weapon, weapon);
+    assert.equal(f.nodes.armoryStartDialog.open, false); assert.equal(f.getState().shots, 0);
+  }
+  const f = fixture({ signedIn: false });
+  f.doc.emit('keydown', { key: '2' }); assert.equal(f.nodes.armoryStartDialog.open, true);
+  f.nodes.armoryStartDialog.emit('cancel'); assert.equal(f.nodes.armoryStartDialog.open, false);
+  assert.equal(f.getState().weapon, null);
+});
+
+test('Top scores pauses and resumes the same player/weapon; reset and new players preserve personal bests', async () => {
+  const f = fixture({ reduced: true }); await f.ready; popBalloon(f);
+  const before = f.getBattle(); assert.equal(f.getScores()[0].score, before.score);
+  f.select('laser'); f.nodes.armoryHudTops.emit('click');
+  assert.equal(f.getState().weapon, null); assert.equal(f.nodes.armoryStartDialog.open, true);
+  assert.equal(f.nodes.armoryPlayerName.readOnly, true); assert.equal(f.nodes.armoryStartSubmit.textContent, 'Resume game');
+  assert.equal(f.nodes.armoryTopRows.children.length, 1);
+  assert.equal(f.nodes.armoryTopRows.children[0].children[1].textContent, 'Test pilot');
+  f.advance(10000); assert.deepEqual(f.getBattle(), before);
+  f.nodes.armoryStartForm.emit('submit'); assert.equal(f.getState().weapon, 'laser'); assert.equal(f.getPlayer(), 'Test pilot');
+  f.reset(); assert.equal(f.getScores()[0].score, before.score); assert.equal(f.getBattle().score, 0);
+  f.nodes.armoryHudTops.emit('click'); f.nodes.armoryNewPlayer.emit('click');
+  assert.equal(f.getPlayer(), ''); assert.equal(f.getState().weapon, null); assert.equal(f.nodes.armoryPlayerName.readOnly, false);
+  assert.equal(f.nodes.armoryStartSubmit.disabled, true); assert.equal(f.getScores().length, 1);
+  f.nodes.armoryPlayerName.value = 'Second pilot'; f.nodes.armoryStartForm.emit('submit');
+  assert.equal(f.getPlayer(), 'Second pilot'); assert.equal(f.getState().weapon, 'machinegun');
+  f.select(null); popBalloon(f); f.nodes.armoryHudTops.emit('click');
+  assert.equal(f.nodes.armoryTopRows.children.length, 2);
+});
+
+test('remembered nicknames still require Start on reload, and names render as text rather than markup', async () => {
+  const data = new Map(), storage = { getItem: key => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) };
+  const f = fixture({ storage, signedIn: false }); await f.ready;
+  f.nodes.armoryStart.emit('click'); f.nodes.armoryPlayerName.value = '<img src=x>';
+  f.nodes.armoryStartForm.emit('submit'); f.select(null); popBalloon(f);
+  const reload = fixture({ storage, signedIn: false }); await reload.ready;
+  assert.equal(reload.getPlayer(), ''); assert.equal(reload.getState().weapon, null);
+  reload.nodes.armoryTops.emit('click'); assert.equal(reload.nodes.armoryPlayerName.value, '<img src=x>');
+  const cell = reload.nodes.armoryTopRows.children[0].children[1];
+  assert.equal(cell.textContent, '<img src=x>'); assert.equal(cell.children.length, 0);
+  assert.match(reload.nodes.armoryScoreStorage.textContent, /Shared Top 10/);
+  scores.createStore(reload.win).record(scoreEntry('Other tab', 99));
+  reload.win.emit('storage', { key: scores.STORAGE_KEY });
+  reload.nodes.armoryStartClose.emit('click'); reload.nodes.armoryTops.emit('click');
+  assert.equal(reload.nodes.armoryTopRows.children[0].children[1].textContent, 'Other tab');
+});
+
+test('storage-denied lobby remains playable; shared scoreboard identity does not depend on local storage', async () => {
+  const storage = { getItem() { throw Error('denied'); }, setItem() { throw Error('denied'); } };
+  const f = fixture({ signedIn: false, storage }); await f.ready;
+  f.nodes.armoryStart.emit('click'); assert.match(f.nodes.armoryScoreStorage.textContent, /Shared Top 10/);
+  f.nodes.armoryPlayerName.value = 'Session pilot'; f.nodes.armoryStartForm.emit('submit');
+  assert.equal(f.getPlayer(), 'Session pilot'); f.select(null); popBalloon(f);
+  f.nodes.armoryHudTops.emit('click'); assert.equal(f.nodes.armoryTopRows.children.length, 1);
+  assert.match(f.nodes.armoryScoreStorage.textContent, /nickname and run stats are public/);
+});
 
 test('arming and disarming are reversible and preserve nested-frame keyboard state', () => {
   const f = fixture(); assert.equal(f.nodes.armoryShield.hidden, true); assert.equal(f.nodes.armoryHud.hidden, true);
@@ -178,11 +410,14 @@ test('reduced motion omits explosion animations while keeping weapon and repair 
   f.reset(); assert.equal(f.nodes.armoryDamage.children.length, 0); assert.equal(f.getState().weapon, 'cannon');
 });
 
-test('armory never writes site data or storage, posts gameplay, or injects into nested documents', () => {
+test('game core never injects into nested documents; shared score requests are isolated in their adapter', () => {
   const script = fs.readFileSync(require.resolve('../site-armory.js'), 'utf8');
   assert.doesNotMatch(script, /fetch\(|XMLHttpRequest|localStorage|sessionStorage|innerHTML|contentDocument|contentWindow|postMessage/);
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
   assert.match(html, /id="armoryShield" hidden/); assert.match(html, /id="armoryHud"[^>]*hidden/);
+  const scoreScript = fs.readFileSync(require.resolve('../site-armory-scores.js'), 'utf8');
+  assert.doesNotMatch(scoreScript, /XMLHttpRequest|innerHTML|contentDocument|contentWindow|postMessage/);
+  assert.match(scoreScript, /credentials: 'omit'/); assert.match(scoreScript, /wzstats\/api\/v1\/armory/);
 });
 
 function hold(f, overrides = {}) {
@@ -945,6 +1180,300 @@ function clearWave(f) {
   }
   assert.equal(f.getBattle().waves.phase, 'break');
 }
+
+test('a balloon drops a visible crate; pointer/keyboard collection awards power without firing or double payment', async () => {
+  const savedRandom = Math.random; Math.random = () => 0;
+  try {
+  const f = fixture({ reduced: true }); await f.ready;
+  assert.equal(f.nodes.armoryLoot.hidden, true); popBalloon(f);
+  assert.equal(f.getBattle().loot, 250); assert.equal(f.getBattle().bonusEarned, 0);
+  assert.equal(f.nodes.armoryLoot.hidden, false); assert.equal(f.nodes.armoryLootAmount.textContent, '+250 power');
+  const before = f.getBattle(), shotState = f.getState();
+  hold(f, { target: f.nodes.armoryLoot });
+  assert.equal(f.nodes.siteArmory.dataset.firing, 'false'); assert.equal(f.getState().shots, shotState.shots);
+  const click = f.doc.emit('click', { target: f.nodes.armoryLoot, detail: 1, button: 0 });
+  assert.equal(click.prevented, undefined);
+  f.nodes.armoryLoot.emit('click', { detail: 1 });
+  const after = f.getBattle();
+  assert.equal(after.earned, before.earned + 250); assert.equal(after.bonusEarned, 250);
+  assert.equal(after.loot, 0); assert.equal(after.bank + after.spent, 500 + after.earned);
+  assert.equal(f.getState().powerEarned, 250); assert.equal(f.getState().shots, shotState.shots);
+  assert.deepEqual(f.getState().weaponStats, shotState.weaponStats);
+  assert.equal(f.nodes.armoryLoot.hidden, true); assert.match(f.nodes.armoryLootStatus.textContent, /250 power collected/);
+  f.nodes.armoryLoot.emit('click', { detail: 0 }); assert.deepEqual(f.getBattle(), after);
+  } finally { Math.random = savedRandom; }
+});
+
+test('repeat boss drops stack into one crate and collecting them advances the real gun upgrade ladder', async () => {
+  const savedRandom = Math.random; Math.random = () => 0;
+  try {
+  const f = fixture({ reduced: true }); await f.ready; popBalloon(f); f.advance(5000);
+  f.nodes.siteNewsBalloon.getBoundingClientRect = () => ({ left: 1300, top: 50, width: 132, height: 184 });
+  for (let i = 0; i < 28; i++) { f.next(160); f.shoot(1366, 122); }
+  assert.equal(f.getState().bossKills, 2); assert.equal(f.getBattle().loot, 500);
+  assert.equal(f.nodes.armoryLootAmount.textContent, '+500 power'); assert.equal(f.getBattle().earned, 0);
+  f.nodes.armoryLoot.emit('click', { detail: 0 });
+  assert.equal(f.getBattle().bonusEarned, 500); assert.equal(f.getState().powerEarned, 500);
+  assert.equal(f.nodes['armoryLevel-machinegun'].textContent, 'Lv 2');
+  assert.equal(f.nodes.armoryLoot.hidden, true); assert.equal(f.getBattle().score, 2);
+  } finally { Math.random = savedRandom; }
+});
+
+test('crate visibility follows game safety, pending power survives pauses, and Repair removes it', async () => {
+  const savedRandom = Math.random; Math.random = () => 0;
+  try {
+  const f = fixture({ reduced: true }); await f.ready; popBalloon(f);
+  for (const action of ['disarm', 'hidden', 'blur', 'modal']) {
+    if (action === 'disarm') f.select(null);
+    if (action === 'hidden') { f.doc.hidden = true; f.doc.emit('visibilitychange'); }
+    if (action === 'blur') f.win.emit('blur');
+    if (action === 'modal') { f.doc.modalOpen = true; f.observe(); }
+    assert.equal(f.nodes.armoryLoot.hidden, true, action);
+    f.nodes.armoryLoot.emit('click'); assert.equal(f.getBattle().loot, 250); assert.equal(f.getBattle().earned, 0);
+    if (action === 'hidden') { f.doc.hidden = false; f.doc.emit('visibilitychange'); }
+    if (action === 'blur') f.win.emit('focus');
+    if (action === 'modal') f.doc.modalOpen = false;
+    if (!f.getState().weapon) f.select('machinegun');
+    assert.equal(f.nodes.armoryLoot.hidden, false, action);
+  }
+  f.doc.documentElement.clientWidth = 320; f.win.emit('resize');
+  assert.ok(parseFloat(f.nodes.armoryLoot.style.left) >= 8 && parseFloat(f.nodes.armoryLoot.style.left) <= 200);
+  f.reset(); assert.equal(f.nodes.armoryLoot.hidden, true); assert.equal(f.getBattle().loot, 0);
+  assert.equal(f.getBattle().bonusEarned, 0); assert.equal(f.nodes.armoryLootStatus.hidden, true);
+  f.nodes.armoryLoot.emit('click'); f.advance(10000); assert.equal(f.getBattle().earned, 0);
+  } finally { Math.random = savedRandom; }
+});
+
+test('random crate extras apply the advertised fighter, repair, power or reload effect once without firing', async () => {
+  const savedRandom = Math.random;
+  try {
+    for (const [roll, kind, power, fighters] of [[rollFor('power500'), 'power', 500, 0], [rollFor('fighter1'), 'fighters', 250, 1], [rollFor('fighter2'), 'fighters', 250, 2], [rollFor('repair'), 'repair', 250, 0], [rollFor('reload'), 'reload', 250, 0]]) {
+      Math.random = () => roll;
+      const f = fixture({ reduced: true }); await f.ready;
+      f.select('cannon'); f.shoot(1100, 700); f.select(null); popBalloon(f);
+      assert.equal(f.nodes.armoryLoot.dataset.kind, kind);
+      assert.equal(f.getBattle().loot, power);
+      const copy = f.getBattle(); copy.extraLoot.fighters = 999;
+      assert.notEqual(f.getBattle().extraLoot.fighters, 999);
+      if (kind === 'repair') {
+        f.fly(1700); assert.ok(f.getAllies().units.some(unit => unit.health < unit.maxHealth));
+      }
+      if (kind === 'reload') {
+        f.select('laser'); f.shoot(1100, 700);
+        assert.equal(reloadState(f.getState(), 'laser', 0).ready, false);
+      }
+      const before = f.getBattle(), army = f.getAllies(), shots = f.getState().shots;
+      f.nodes.armoryLoot.emit('click', { detail: 0 });
+      assert.equal(f.getBattle().bonusEarned, power); assert.equal(f.getBattle().earned, before.earned + power);
+      assert.equal(f.getBattle().bank + f.getBattle().spent, 500 + f.getBattle().earned);
+      assert.equal(f.getState().shots, shots); assert.equal(f.getBattle().score, before.score);
+      assert.equal(f.getAllies().created, army.created + fighters);
+      assert.equal(f.getAllies().created, f.getAllies().units.length + f.getAllies().reserves + f.getAllies().lost);
+      if (kind === 'repair') assert.ok(f.getAllies().units.every(unit => unit.health === unit.maxHealth));
+      if (kind === 'reload') {
+        for (const weapon of Object.keys(WEAPONS)) assert.equal(reloadState(f.getState(), weapon, 0).ready, true);
+        f.shoot(1100, 700); assert.equal(f.getState().shots, shots + 1);
+      }
+      const paid = f.getBattle(), paidArmy = f.getAllies();
+      f.nodes.armoryLoot.emit('click'); assert.deepEqual(f.getBattle(), paid); assert.deepEqual(f.getAllies(), paidArmy);
+      assert.equal(f.nodes.armoryLoot.hidden, true); assert.match(f.nodes.armoryLootStatus.textContent, /Collected:/);
+      f.reset(); assert.deepEqual(f.getBattle().extraLoot, { fighters: 0, repairs: 0, reloads: 0 });
+    }
+  } finally { Math.random = savedRandom; }
+});
+
+test('double damage doubles actual shots for exactly 30 active seconds and never mutates snapshots', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => rollFor('doubleDamage');
+    const f = fixture({ reduced: true }); await f.ready; popBalloon(f); f.nodes.armoryLoot.emit('click');
+    assert.equal(f.getState().effects.timed.doubleDamage, 30000);
+    assert.equal(weaponProfile(f.getState(), 'machinegun').shotDamage, 72);
+    f.select(null); f.select('laser');
+    f.nodes.siteNewsBalloon.getBoundingClientRect = () => ({ left: 1300, top: 50, width: 132, height: 184 });
+    f.shoot(1366, 122); assert.equal(f.getState().health, 932);
+    const copy = f.getState(); copy.effects.timed.doubleDamage = -1; copy.effects.passive.health = 999;
+    assert.equal(f.getState().effects.timed.doubleDamage, 30000); assert.equal(f.getState().effects.passive.health, 0);
+    f.advance(29750); assert.equal(f.getState().effects.timed.doubleDamage, 250);
+    f.advance(249); assert.equal(weaponProfile(f.getState(), 'laser').shotDamage, 68);
+    f.advance(1); assert.equal(f.getState().effects.timed.doubleDamage, undefined);
+    assert.equal(weaponProfile(f.getState(), 'laser').shotDamage, 34); assert.equal(f.nodes.armoryEffects.hidden, true);
+  } finally { Math.random = savedRandom; }
+});
+
+test('each random gun boost runs through all tabs then marks its real winner without switching or shooting', async () => {
+  const savedRandom = Math.random;
+  try {
+    for (const [weapon, reward] of Object.entries(loot.GUN_BOOSTS)) {
+      Math.random = () => rollFor(reward);
+      const f = fixture(); await f.ready; popBalloon(f);
+      const before = f.getState();
+      f.nodes.armoryLoot.emit('click');
+      const steps = rouletteSteps(f.buttons.map(button => button.dataset.weapon), weapon);
+      for (const step of steps) {
+        const picked = f.buttons.filter(button => button.dataset.lootPick === 'running');
+        assert.equal(picked.length, 1); assert.equal(picked[0].dataset.weapon, step.weapon);
+        f.advance(step.delay);
+      }
+      assert.equal(f.nodes.siteArmory.dataset.roulette, 'winner');
+      assert.deepEqual(f.buttons.filter(button => button.dataset.lootPick === 'winner').map(button => button.dataset.weapon), [weapon]);
+      assert.match(f.nodes.armoryRouletteStatus.textContent, /wins! \+50% damage boost/);
+      assert.equal(f.buttons.find(button => button.dataset.weapon === weapon).dataset.lootBoosted, 'true');
+      assert.equal(f.getState().weapon, before.weapon);
+      assert.equal(f.getState().shots, before.shots);
+      assert.deepEqual(f.getState().lastShots, before.lastShots);
+      assert.equal(f.getBattle().bonusEarned, 250);
+      f.advance(1600);
+      assert.ok(f.buttons.every(button => !button.dataset.lootPick));
+      assert.equal(f.nodes.siteArmory.dataset.roulette, '');
+      assert.ok(f.getState().effects.timed[reward] > 0);
+      f.advance(30000);
+      assert.equal(f.buttons.find(button => button.dataset.weapon === weapon).dataset.lootBoosted, 'false');
+    }
+  } finally { Math.random = savedRandom; }
+});
+
+test('roulette stops cleanly on safe exits and Repair; reduced motion shows a static winner', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => rollFor('rocketBoost');
+    for (const reduced of [false, true]) for (const action of ['disarm', 'hidden', 'blur', 'modal', 'reset']) {
+      const f = fixture({ reduced }); await f.ready; popBalloon(f); f.nodes.armoryLoot.emit('click');
+      assert.equal(f.nodes.siteArmory.dataset.roulette, reduced ? 'winner' : 'running');
+      if (reduced) assert.equal(f.buttons.find(button => button.dataset.weapon === 'rockets').dataset.lootPick, 'winner');
+      const earned = f.getBattle().earned, before = f.getState();
+      if (action === 'disarm') f.select(null);
+      if (action === 'hidden') { f.doc.hidden = true; f.doc.emit('visibilitychange'); }
+      if (action === 'blur') f.win.emit('blur');
+      if (action === 'modal') { f.doc.modalOpen = true; f.observe(); }
+      if (action === 'reset') f.reset();
+      f.advance(12000);
+      assert.equal(f.nodes.siteArmory.dataset.roulette, '', action);
+      assert.ok(f.buttons.every(button => !button.dataset.lootPick));
+      assert.equal(f.nodes.armoryRouletteStatus.textContent, '');
+      if (action !== 'reset') {
+        assert.equal(f.getState().shots, before.shots);
+        assert.equal(f.getBattle().earned, earned);
+        assert.equal(f.getState().effects.timed.rocketBoost, 30000);
+      } else assert.deepEqual(f.getState().effects, loot.createEffects());
+    }
+    const css = fs.readFileSync(require.resolve('../site-armory.css'), 'utf8');
+    assert.match(css, /armory-gun-winner \.8s ease-in-out 2/);
+    assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*button\[data-loot-pick="winner"\] \{ animation: none; \}/);
+  } finally { Math.random = savedRandom; }
+});
+
+test('stacked gun boosts reveal each winner once, and ordinary power drops never spin the guns', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => rollFor('mgBoost');
+    const f = fixture(); await f.ready; popBalloon(f); f.advance(5000);
+    f.nodes.siteNewsBalloon.getBoundingClientRect = () => ({ left: 1300, top: 50, width: 132, height: 184 });
+    Math.random = () => rollFor('laserBoost');
+    for (let i = 0; i < 28; i++) { f.next(160); f.shoot(1366, 122); }
+    assert.equal(f.getState().bossKills, 2);
+    f.nodes.armoryLoot.emit('click');
+    for (const weapon of ['machinegun', 'laser']) {
+      const steps = rouletteSteps(f.buttons.map(button => button.dataset.weapon), weapon);
+      f.advance(steps.reduce((sum, step) => sum + step.delay, 0));
+      assert.equal(f.buttons.find(button => button.dataset.weapon === weapon).dataset.lootPick, 'winner');
+      f.advance(1600);
+    }
+    assert.equal(f.nodes.siteArmory.dataset.roulette, ''); assert.equal(f.getBattle().bonusEarned, 500);
+    assert.equal(f.getState().weapon, 'machinegun');
+    Math.random = () => 0;
+    const power = fixture(); await power.ready; popBalloon(power); power.nodes.armoryLoot.emit('click');
+    assert.ok(power.buttons.every(button => !button.dataset.lootPick));
+  } finally { Math.random = savedRandom; }
+});
+
+test('owner-local preview opts into the requested roulette motion, as with existing balloon previews', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => rollFor('rocketBoost');
+    for (const hostname of ['127.0.0.1', 'localhost', '[::1]']) {
+      const f = fixture({ reduced: true, hostname }); await f.ready; popBalloon(f); f.nodes.armoryLoot.emit('click');
+      assert.equal(f.nodes.siteArmory.dataset.rouletteMotion, 'full');
+      assert.equal(f.nodes.siteArmory.dataset.roulette, 'running');
+      const steps = rouletteSteps(f.buttons.map(button => button.dataset.weapon), 'rockets');
+      f.advance(steps.reduce((sum, step) => sum + step.delay, 0));
+      assert.equal(f.buttons.find(button => button.dataset.weapon === 'rockets').dataset.lootPick, 'winner');
+      f.select(null); assert.ok(f.buttons.every(button => !button.dataset.lootPick));
+    }
+  } finally { Math.random = savedRandom; }
+});
+
+test('timed loot pauses on every safe exit, resumes without catch-up and resets with Repair', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => rollFor('doubleDamage');
+    const f = fixture({ reduced: true }); await f.ready; popBalloon(f); f.nodes.armoryLoot.emit('click'); f.advance(1000);
+    assert.equal(f.getState().effects.timed.doubleDamage, 29000);
+    for (const action of ['disarm', 'hidden', 'blur', 'modal']) {
+      if (action === 'disarm') f.select(null);
+      if (action === 'hidden') { f.doc.hidden = true; f.doc.emit('visibilitychange'); }
+      if (action === 'blur') f.win.emit('blur');
+      if (action === 'modal') { f.doc.modalOpen = true; f.observe(); }
+      f.advance(10000); assert.equal(f.getState().effects.timed.doubleDamage, 29000, action);
+      if (action === 'hidden') { f.doc.hidden = false; f.doc.emit('visibilitychange'); }
+      if (action === 'blur') f.win.emit('focus');
+      if (action === 'modal') f.doc.modalOpen = false;
+      if (!f.getState().weapon) f.select('machinegun');
+    }
+    const [timerId, timer] = [...f.timers.entries()].find(([, timer]) => timer.fn.toString().includes('lootModule.tick'));
+    f.timers.delete(timerId); f.next(60000); timer.fn();
+    assert.equal(f.getState().effects.timed.doubleDamage, 28750); // A stalled callback accounts for at most 250ms.
+    f.reset(); f.advance(40000); assert.deepEqual(f.getState().effects, loot.createEffects());
+  } finally { Math.random = savedRandom; }
+});
+
+test('passive +10 health fortifies living and future friendlies, and the in-game guide lists all 30 rewards', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => rollFor('health10');
+    const f = fixture({ reduced: true }); await f.ready;
+    assert.equal(f.nodes.armoryLootGuide.children.length, 30);
+    assert.deepEqual(f.nodes.armoryLootGuide.children.map(row => row.children[0].textContent), loot.CATALOG.map(item => item.name));
+    const firstGuideRow = f.nodes.armoryLootGuide.children[0];
+    f.select('cannon'); f.shoot(1100, 700); f.select(null); popBalloon(f); f.fly(1700);
+    const army = f.getAllies(); assert.ok(army.units.some(unit => unit.health < unit.maxHealth));
+    f.nodes.armoryLoot.emit('click');
+    assert.equal(f.getState().effects.passive.health, 10);
+    for (const unit of f.getAllies().units) {
+      const before = army.units.find(before => before.id === unit.id);
+      assert.equal(unit.maxHealth, 130); assert.equal(unit.health, before.health + 10);
+    }
+    f.select('cannon'); f.shoot(1100, 700);
+    assert.equal(f.getAllies().units.at(-1).maxHealth, 130); assert.equal(f.getAllies().units.at(-1).health, 130);
+    assert.match(f.nodes.armoryEffects.textContent, /Army \+10 HP/);
+    assert.equal(f.nodes.armoryLootGuide.children[0], firstGuideRow);
+    f.reset(); assert.equal(f.getAllies().healthBonus, 0); assert.equal(f.getState().effects.passive.health, 0);
+  } finally { Math.random = savedRandom; }
+});
+
+test('combat profiles apply every gun boost, faster reloads and larger flame/cannon areas without changing base rules', () => {
+  const state = createState();
+  state.effects = loot.apply(state.effects, { doubleDamage: 1, rapidFire: 1, wideBlast: 1, wideFlame: 1,
+    mgBoost: 1, cannonBoost: 1, laserBoost: 1, rocketBoost: 1, flamerBoost: 1 });
+  for (const weapon of Object.keys(WEAPONS)) {
+    const profile = weaponProfile(state, weapon);
+    assert.equal(profile.shotDamage, WEAPONS[weapon].damage * WEAPONS[weapon].pellets * 3);
+    assert.equal(profile.cooldown, WEAPONS[weapon].cooldown * .5);
+    const fired = fire({ ...state, weapon }, false, 0).state;
+    assert.equal(reloadState(fired, weapon, profile.cooldown - 1).ready, false);
+    assert.equal(reloadState(fired, weapon, profile.cooldown).ready, true);
+  }
+  assert.equal(weaponProfile(state, 'cannon').splashRadius, 300);
+  assert.equal(weaponProfile(state, 'flamer').flameLength, 330);
+  assert.equal(weaponProfile(state, 'flamer').flameSplashRadius, 127.5);
+  for (const powerEarned of UPGRADE_MILESTONES) for (const weapon of Object.keys(WEAPONS)) {
+    const original = { ...createState(), powerEarned };
+    const doubled = { ...original, effects: loot.apply(original.effects, { doubleDamage: 1 }) };
+    assert.equal(weaponProfile(doubled, weapon).shotDamage, weaponProfile(original, weapon).shotDamage * 2);
+  }
+  const docs = fs.readFileSync(require.resolve('./ARMORY-GAME.md'), 'utf8');
+  for (const item of loot.CATALOG) assert.ok(docs.includes(item.name));
+});
 
 test('mounted waves clear, rest for four active seconds, pause on safe exits, and reset completely', async () => {
   const f = fixture({ reduced: true }); await f.ready;

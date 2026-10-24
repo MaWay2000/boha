@@ -1,12 +1,33 @@
 import { Group, Mesh, Box3, Vector3, MeshLambertMaterial } from './mapmaker/js/three.module.js';
+import * as techSource from './site-armory-tech.js?v=20261024-tech-tiers-1';
 
 // The same bundled classic components used by the player-profile unit gallery.
-export const TURRETS = Object.freeze({
-  machinegun: Object.freeze({ definition: 'MG3Mk1', mount: 'trmmg.pie', barrel: 'gnmmg1.pie' }),
-  cannon: Object.freeze({ definition: 'Cannon375mmMk1', mount: 'trhcan.pie', barrel: 'gnhcan.pie' }),
-  laser: Object.freeze({ definition: 'Laser2PULSEMk1', mount: 'trmlas.pie', barrel: 'gnmlas.pie' }),
-  rockets: Object.freeze({ definition: 'Rocket-LtA-T', mount: 'trmrckta.pie', barrel: 'gnmrckta.pie' })
-});
+const tech = techSource.default || globalThis.SiteArmoryTech;
+export const TECH_PATHS = tech.PATHS;
+export const turretFor = tech.tierFor;
+export const TURRETS = Object.freeze(Object.fromEntries(Object.keys(TECH_PATHS).map(key => [key, TECH_PATHS[key][0]])));
+
+// Swapping tiers may race a slow old download against a newer tier/reset.
+// Only the latest selection can change the displayed model. Ownership stays
+// with the shared model cache, not with an individual weapon slot.
+export function createTierLoader(loadModel, onState) {
+  let generation = 0, requested = '', disposed = false;
+  return {
+    async select(files) {
+      if (disposed || requested === files.definition) return;
+      requested = files.definition;
+      const token = ++generation;
+      onState({ status: 'loading', definition: files.definition });
+      try {
+        const model = await loadModel(files);
+        if (!disposed && token === generation) onState({ status: 'ready', definition: files.definition, model });
+      } catch {
+        if (!disposed && token === generation) onState({ status: 'fallback', definition: files.definition });
+      }
+    },
+    dispose() { disposed = true; generation++; }
+  };
+}
 
 export function buildTurret(mountGeometry, barrelGeometry, texture = null) {
   for (const geometry of [mountGeometry, barrelGeometry]) {

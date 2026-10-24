@@ -152,7 +152,7 @@ test('audio is self-contained and is loaded before gameplay with accessible mute
 
 test('each gun has a distinct short selection sound, without firing or starting autoplay on load', () => {
   const signatures = [];
-  for (const weapon of ['machinegun', 'cannon', 'laser', 'rockets']) {
+  for (const weapon of ['machinegun', 'cannon', 'laser', 'rockets', 'flamer']) {
     const f = fixture(); assert.equal(f.contexts.length, 0);
     assert.equal(f.audio.select(weapon), true); assert.equal(f.reports.at(-1).lastSound, weapon + '-select');
     assert.equal(f.sources().length, 3);
@@ -160,7 +160,7 @@ test('each gun has a distinct short selection sound, without firing or starting 
     signatures.push(JSON.stringify(signature));
     for (const source of f.sources()) assert.ok(source.stops[0][0] < 10.3);
   }
-  assert.equal(new Set(signatures).size, 4);
+  assert.equal(new Set(signatures).size, 5);
 });
 
 test('selection sound respects mute, and selecting another gun cancels old selection sounds', () => {
@@ -181,4 +181,16 @@ test('rockets have two bounded launch sounds 70ms apart and obey mute and stop',
   f.audio.stop(); assert.equal(f.sources().every(source => source.disconnected), true);
   f.audio.setEnabled(false); const count = f.sources().length;
   assert.equal(f.audio.play('rockets'), false); assert.equal(f.sources().length, count);
+});
+
+test('flamer uses a short layered hiss, stops on mute, and never accumulates unbounded voices', () => {
+  const f = fixture(); assert.equal(f.audio.play('flamer'), true);
+  assert.equal(f.reports.at(-1).lastSound, 'flamer');
+  assert.deepEqual(f.sources().map(source => source.kind), ['noise', 'noise', 'oscillator']);
+  assert.ok(f.sources().every(source => source.stops[0][0] < 10.22));
+  for (let i = 0; i < 100; i++) f.audio.play('flamer');
+  assert.ok(f.sources().filter(source => !source.disconnected).length <= MAX_VOICES);
+  f.audio.setEnabled(false);
+  assert.equal(f.sources().every(source => source.disconnected), true);
+  assert.equal(f.audio.play('flamer'), false);
 });

@@ -6,7 +6,8 @@
   color: #cce8f4;
   font-family: "Oxanium", sans-serif;
 }
-.armory-rack { display: flex; gap: 6px; }
+.armory-rack { display: flex; gap: 6px; max-width: 100%; }
+.site-armory[data-armed]:not([data-armed=""]) { position: fixed; z-index: 1400; top: 12px; right: 12px; margin: 0; }
 .armory-rack button {
   position: relative;
   width: 80px;
@@ -26,11 +27,14 @@
 .armory-rack .armory-gun-preview { position: relative; display: block; width: 68px; height: 44px; margin: 0 auto 2px; overflow: hidden; pointer-events: none; }
 .armory-gun-preview svg, .armory-gun-preview canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
 .armory-gun-preview svg { filter: drop-shadow(0 3px 2px #0009); }
-.armory-gun-preview canvas { top: 50%; height: 80px; transform: translateY(-50%); filter: brightness(1.3) drop-shadow(0 2px 1px #000a); }
+.armory-gun-preview canvas { top: 50%; height: 44px; transform: translateY(-50%); filter: brightness(1.3) drop-shadow(0 2px 1px #000a); }
 .armory-gun-preview.has-model svg { display: none; }
 .armory-rack span { display: block; font-size: 9px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
 .armory-rack kbd { position: absolute; right: 4px; top: 3px; color: #809ba8; font: 9px monospace; }
 .armory-rack .armory-level { position: absolute; top: 3px; left: 4px; padding: 1px 3px; border-radius: 3px; background: #06131bca; color: #9ec3d2; font: 700 8px 'Oxanium', sans-serif; }
+.armory-rack .armory-tech-tier { position: absolute; left: 50%; top: 3px; transform: translateX(-50%); color: #e8ba77; font-size: 8px; }
+.armory-rack .armory-weapon-label { overflow: hidden; text-overflow: ellipsis; }
+.armory-gun-preview:not(.has-model) canvas { visibility: hidden; }
 .armory-rack button:not([data-level="1"]) .armory-level { color: #ffe1a1; box-shadow: 0 0 5px #ffc45744; }
 .armory-reload { display: block; width: calc(100% - 6px); height: 4px; margin: 7px 3px 0; border: 0; border-radius: 2px; overflow: hidden; appearance: none; background: #020a10; accent-color: #79dca7; }
 .armory-reload::-webkit-progress-bar { background: #020a10; border-radius: 2px; box-shadow: inset 0 0 0 1px #85b4c125; }
@@ -53,6 +57,17 @@
 .armory-mark { position: absolute; transform: translate(-50%, -50%); overflow: visible; }
 .armory-crater { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(var(--rotation)); width: var(--hole); height: var(--hole); border-radius: 43% 53% 38% 48%; background: radial-gradient(ellipse, #000 22%, #010408 44%, #080b0d 54%, #b6c7cc 58%, #415362 63%, #070c10bb 71%, #01030655 79%, transparent 82%); box-shadow: 0 0 5px 2px #000b; }
 .armory-mark[data-kind="laser"] .armory-crater { background: radial-gradient(ellipse, #011119 20%, #032027 44%, #84f5ff 53%, #0b6e7d 60%, #0009 68%, transparent 79%); box-shadow: 0 0 9px #5af4ff77; }
+.armory-mark[data-kind="rockets"]::before, .armory-mark[data-kind="flamer"]::before { content: ''; position: absolute; inset: 15%; border-radius: 44% 55% 47% 39%; transform: rotate(-18deg); background: radial-gradient(ellipse, #000b 15%, #15090599 35%, #33160888 47%, #6d351b44 56%, #0005 65%, transparent 73%); }
+.armory-mark[data-kind="rockets"] .armory-crater, .armory-mark[data-kind="flamer"] .armory-crater { background: radial-gradient(ellipse, #000 25%, #090401 45%, #4a1b06 57%, #c45e1a 63%, #1a0b04bb 72%, transparent 85%); box-shadow: 0 0 12px 6px #140901bb, 0 0 28px 8px #0007; }
+.armory-mark[data-kind="flamer"]::before { inset: 25%; opacity: .45; }
+.armory-mark[data-kind="flamer"] .armory-crater { width: calc(var(--hole) * 1.5); height: calc(var(--hole) * .8); background: radial-gradient(ellipse, #130802aa 15%, #39160777 40%, #68351944 60%, transparent 78%); box-shadow: 0 0 8px #1a0a0277; }
+.armory-flame-jet { position: absolute; transform-origin: left center; transform: translateY(-50%) rotate(var(--flame-angle)); pointer-events: none; }
+.armory-flame-particle { position: absolute; opacity: .9; pointer-events: none; }
+.armory-flame-sprite { position: absolute; display: block; width: calc(9px * var(--sprite-scale)); height: calc(26px * var(--sprite-scale)); transform: translate(-50%, -50%) rotate(var(--sprite-rotation)); background-image: url('assets/vendor/warzone-effects/page-21-fx.png'); background-repeat: no-repeat; background-size: calc(256px * var(--sprite-scale)) calc(256px * var(--sprite-scale)); background-position: calc(-168px * var(--sprite-scale)) calc(-28px * var(--sprite-scale)); mix-blend-mode: screen; pointer-events: none; }
+.armory-flame-jet[data-motion="true"] .armory-flame-particle { opacity: 0; animation: armory-flame-travel var(--flame-duration) ease-out var(--flame-delay) both; }
+.armory-flame-jet[data-motion="true"] .armory-flame-sprite { animation: armory-flame-frames .462s steps(7) infinite; animation-delay: var(--sprite-phase); }
+@keyframes armory-flame-travel { 0% { opacity: 0; transform: scale(.45); } 12% { opacity: 1; } 70% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--flame-dx), var(--flame-dy)) scale(1.3); } }
+@keyframes armory-flame-frames { from { background-position-x: calc(-168px * var(--sprite-scale)); } to { background-position-x: calc(-231px * var(--sprite-scale)); } }
 .armory-cracks { display: block; width: 100%; height: 100%; filter: drop-shadow(1px 1px 0 #000b); }
 .armory-cracks path { fill: none; stroke: #c9e6f3aa; stroke-width: .7; }
 .armory-cracks .crack-core { stroke: #edfaffd9; stroke-width: 1; }
@@ -66,6 +81,15 @@
 .armory-rocket.is-homing { animation: none; will-change: left, top, transform; }
 @keyframes armory-rocket-flight { 0% { opacity: 1; transform: rotate(var(--rocket-angle)); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--rocket-dx), var(--rocket-dy)) rotate(var(--rocket-angle)); } }
 .news-balloon.is-shot-down { visibility: hidden; pointer-events: none; }
+.armory-scroll-locked .news-balloon[data-boss-phase="enraged"] { filter: drop-shadow(0 0 13px #ff7733); }
+.armory-boss-health progress[data-phase="enraged"] { accent-color: #ff703d; }
+.armory-wave { display: grid; grid-template-columns: auto 1fr; gap: 5px 12px; margin: 10px 0; padding: 9px 11px; border: 1px solid #58d6e055; border-radius: 5px; background: #08232aaa; }
+.armory-wave[hidden] { display: none; }
+.armory-wave strong { color: #91f2ff; font-size: 13px; }
+.armory-wave span { align-self: center; color: #bbd0da; font-size: 11px; }
+.armory-wave progress { grid-column: 1 / -1; width: 100%; height: 5px; accent-color: #68e0c0; }
+.armory-wave[data-phase="break"] { border-color: #68e0c0aa; background: #0b302caa; }
+.armory-wave[data-phase="break"] strong { color: #8be5b5; }
 .armory-hud {
   position: fixed;
   z-index: 1300;
@@ -84,11 +108,24 @@
 .armory-hud strong { color: #ffdca4; font: 700 13px "Oxanium", sans-serif; text-transform: uppercase; letter-spacing: .08em; }
 .armory-live-dot { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: #ffd57f; box-shadow: 0 0 7px #ffd57f55; }
 .armory-hud p { margin: 6px 0 10px; }
+.armory-tech { padding: 8px 0; border-top: 1px solid #7ac5d72e; font-size: 10px; }
+.armory-tech[hidden] { display: none; }
+.armory-tech b { color: #ffdb9d; }
+.armory-tech small { display: block; margin-top: 4px; color: #94b8c8; }
+.armory-tech summary { width: fit-content; margin-top: 6px; color: #95d9eb; cursor: pointer; }
+.armory-tech ol { margin: 8px 0; padding-left: 20px; max-height: 120px; overflow-y: auto; color: #78909f; }
+.armory-tech li { padding: 3px 0; }
+.armory-tech li[data-state="complete"] { color: #98dab6; }
+.armory-tech li[data-state="current"] { color: #ffdc9d; font-weight: 700; }
+.armory-tech details p { font-size: 9px; color: #829ead; }
+.armory-hud { max-height: calc(100dvh - 126px); overflow-y: auto; }
 .armory-boss-health { margin: 8px 0 12px; color: #e6cbb2; font-size: 10px; }
 .armory-boss-health progress { display: block; width: 100%; height: 6px; margin-top: 5px; border: 0; background: #160d10; accent-color: #f59568; }
 .armory-boss-health progress::-webkit-progress-bar { background: #160d10; }
 .armory-boss-health progress::-webkit-progress-value { background: linear-gradient(90deg, #b94538, #ffb774); }
 .armory-boss-health progress::-moz-progress-bar { background: #f59568; }
+.armory-boss-health progress[data-phase="enraged"]::-webkit-progress-value { background: linear-gradient(90deg, #bc3024, #ff703d); }
+.armory-boss-health progress[data-phase="enraged"]::-moz-progress-bar { background: #ff703d; }
 .armory-allies-stats { display: flex; flex-wrap: wrap; gap: 5px 15px; margin: 8px 0; color: #94dcea; font-size: 10px; }
 .armory-allies-stats[hidden] { display: none; }
 .armory-allies-stats b { color: #c5f6ff; }
@@ -148,7 +185,10 @@ html.armory-scroll-locked, body.armory-scroll-locked { overflow: hidden !importa
 }
 @media (max-width: 600px) {
   .site-armory { margin: 12px 0 0; justify-content: center; flex-wrap: wrap; gap: 4px 12px; }
-  .armory-rack button { width: clamp(64px, 20vw, 80px); }
+  .site-armory[data-armed]:not([data-armed=""]) { left: 12px; right: 12px; }
+  .armory-rack { gap: 4px; }
+  .armory-rack button { width: clamp(48px, 17vw, 80px); min-width: 0; }
+  .armory-rack button > span:not(.armory-gun-preview):not(.armory-level):not(.armory-reload-label) { font-size: clamp(7px, 1.65vw, 9px); }
   .armory-rack .armory-gun-preview { width: min(68px, 100%); }
 }
 @media (prefers-reduced-motion: reduce) {

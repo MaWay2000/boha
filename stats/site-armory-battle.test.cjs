@@ -14,6 +14,56 @@ test('catalog uses bundled component costs with propulsion as a percentage of bo
   }
 });
 
+test('every unit keeps its own bundled weapon range, scaled consistently into the arena', () => {
+  const weapons = require('../mapmaker/pies/components/weapons/weapons.json');
+  const templates = require('../mapmaker/pies/components/templates.json');
+  for (const unit of battle.CATALOG) {
+    const id = templates[unit.key].weapons[0], weapon = weapons[id];
+    assert.equal(unit.weapon, id);
+    assert.equal(unit.range, weapon.longRange / 128 * 24);
+    assert.equal(unit.minRange, (weapon.minRange || 0) / 128 * 24);
+  }
+  assert.equal(battle.CATALOG.find(unit => unit.key === battle.ALLY_KEY).range, 216);
+  assert.equal(battle.CATALOG[0].range, 144);
+  assert.equal(battle.CATALOG.find(unit => unit.key === 'A-Mantis-Trk-Pulse').range, 336);
+  assert.equal(battle.CATALOG.find(unit => unit.key === 'A-Mantis-Trk-Lancer').minRange, 24);
+  const defs = { templates, weapons: { ...weapons },
+    bodies: require('../mapmaker/pies/components/bodies/body.json'), propulsions: require('../mapmaker/pies/components/prop/propulsion.json') };
+  for (const longRange of [undefined, NaN, Infinity, 0, -1, '768']) {
+    defs.weapons.MG1Mk1 = { ...weapons.MG1Mk1, longRange };
+    assert.throws(() => battle.makeCatalog(defs), /weapon range/);
+  }
+  for (const minRange of [-1, NaN, Infinity, 769]) {
+    defs.weapons.MG1Mk1 = { ...weapons.MG1Mk1, minRange };
+    assert.throws(() => battle.makeCatalog(defs), /weapon range/);
+  }
+});
+
+test('combat gates both range edges and moves toward firing range without overshoot or mutation', () => {
+  const type = { range: 216, minRange: 24 }, origin = { x: 400, y: 100, vx: 20 };
+  const bounds = { maxX: 1064, maxY: 188 };
+  for (const [distance, expected] of [[0, false], [23.99, false], [24, true], [216, true], [216.01, false], [1000, false], [NaN, false]]) {
+    assert.equal(battle.inWeaponRange(type, origin, { x: 400 + distance, y: 100 }), expected);
+  }
+  for (const bad of [null, {}, { range: Infinity, minRange: 0 }, { range: 10, minRange: 11 }]) {
+    assert.equal(battle.inWeaponRange(bad, origin, origin), false);
+  }
+  const far = { x: 900, y: 100 };
+  const moved = battle.moveIntoRange(type, origin, far, 35, .05, bounds);
+  assert.equal(moved.x, 401.75); assert.equal(moved.y, 100); assert.equal(moved.vx, 20);
+  const reached = battle.moveIntoRange(type, origin, far, 35, 100, bounds);
+  assert.ok(battle.inWeaponRange(type, reached, far));
+  assert.deepEqual(battle.moveIntoRange(type, reached, far, 35, 1, bounds), reached);
+  const retreat = battle.moveIntoRange(type, origin, { x: 410, y: 100 }, 35, 1, bounds);
+  assert.ok(retreat.x < origin.x); assert.ok(battle.inWeaponRange(type, retreat, { x: 410, y: 100 }));
+  const overlap = battle.moveIntoRange(type, origin, origin, 35, 1, bounds);
+  assert.ok(battle.inWeaponRange(type, overlap, origin));
+  const edge = battle.moveIntoRange(type, { x: 12, y: 20 }, { x: 13, y: 20 }, 35, 10, bounds);
+  assert.equal(edge.x, 12); assert.equal(edge.y, 20);
+  for (const dt of [0, -1, Infinity, NaN]) assert.deepEqual(battle.moveIntoRange(type, origin, far, 35, dt, bounds), origin);
+  assert.deepEqual(origin, { x: 400, y: 100, vx: 20 });
+});
+
 test('balloon awards one score and spends a 500-power budget only on affordable units', () => {
   assert.equal(battle.createBattle().active, false);
   const state = battle.startBattle(battle.CATALOG, () => .99);
@@ -95,4 +145,59 @@ test('friendly recruitment conserves every cannon recruit between field, reserve
   }
   assert.equal(state.units.length, 0); assert.equal(state.reserves, 0); assert.equal(state.lost, 100);
   for (const amount of [0, -1, NaN, Infinity]) assert.equal(battle.damageAlly(empty, 1, amount).state, empty);
+});
+
+test('finite waves retain the bank, rest exactly four seconds and strengthen the next wave', () => {
+  let state = battle.startWaveBattle(battle.CATALOG, () => 0);
+  const initial = state;
+  assert.equal(state.waves.number, 1); assert.equal(state.waves.limit, 8); assert.equal(state.units.length, 8);
+  for (let i = 0; i < 8; i++) state = battle.damageUnit(state, state.units[0].id, 10000, battle.CATALOG, () => 0).state;
+  assert.equal(state.waves.phase, 'break'); assert.equal(state.waves.kills, 8); assert.equal(state.units.length, 0);
+  assert.equal(initial.waves.kills, 0); assert.equal(state.bank + state.spent, 500 + state.earned);
+  assert.equal(battle.spawnAffordable(state, battle.CATALOG), state);
+  for (const elapsed of [NaN, Infinity, -1, 0]) assert.equal(battle.advanceWave(state, elapsed, battle.CATALOG), state);
+  const rest = battle.advanceWave(state, 3999, battle.CATALOG);
+  assert.equal(rest.waves.remainingMs, 1); assert.equal(rest.units.length, 0);
+  state = battle.advanceWave(rest, 1, battle.CATALOG, () => 0);
+  assert.equal(state.waves.number, 2); assert.equal(state.waves.limit, 10);
+  assert.equal(state.waves.kills, 0); assert.equal(state.waves.phase, 'combat');
+  assert.equal(state.units[0].maxHealth, Math.round(battle.CATALOG[0].maxHealth * 1.15));
+  assert.equal(state.bank + state.spent, 500 + state.earned);
+  assert.equal(battle.advanceWave(state, 10000, battle.CATALOG), state);
+});
+
+test('boss calls respect the eight-enemy cap, wave quota and original budget, including queued break calls', () => {
+  const initial = battle.startWaveBattle(battle.CATALOG, () => 0);
+  let state = battle.callReinforcements(initial, battle.CATALOG, () => 0);
+  assert.equal(state.waves.limit, 10); assert.equal(state.waves.calls, 1); assert.equal(state.units.length, 8);
+  assert.equal(initial.waves.limit, 8); assert.equal(state.bank + state.spent, 500);
+  while (state.waves.phase === 'combat') state = battle.damageUnit(state, state.units[0].id, 10000, battle.CATALOG, () => 0).state;
+  assert.equal(state.waves.kills, 10);
+  const money = state.bank + state.spent;
+  state = battle.callReinforcements(state, battle.CATALOG);
+  assert.equal(state.units.length, 0); assert.equal(state.waves.pending, 2);
+  assert.equal(state.bank + state.spent, money);
+  state = battle.advanceWave(state, 4000, battle.CATALOG, () => 0);
+  assert.equal(state.waves.number, 2); assert.equal(state.waves.limit, 12);
+  assert.ok(state.units.length <= 8); assert.equal(state.bank + state.spent, money);
+  assert.equal(battle.callReinforcements(battle.createBattle(), battle.CATALOG).waves, null);
+});
+
+test('long wave campaigns keep difficulty bounded, unique units and exact money/reward conservation', () => {
+  let state = battle.startWaveBattle(battle.CATALOG, () => 0), kills = 0;
+  for (let wave = 1; wave <= 60; wave++) {
+    assert.equal(state.waves.number, wave);
+    assert.ok(state.waves.limit <= 32); assert.ok(battle.waveStrength(state) <= 20);
+    for (let guard = 0; state.waves.phase === 'combat' && guard < 100; guard++) {
+      assert.ok(state.units.length > 0 && state.units.length <= 8);
+      assert.equal(new Set(state.units.map(unit => unit.id)).size, state.units.length);
+      const id = state.units[0].id;
+      state = battle.damageUnit(state, id, 10000, battle.CATALOG, () => 0).state; kills++;
+      assert.equal(state.bank + state.spent, 500 + state.earned);
+      assert.equal(state.unitKills, kills); assert.equal(state.score, 1 + kills);
+      assert.equal(battle.damageUnit(state, id, 10000, battle.CATALOG).state, state);
+    }
+    assert.equal(state.waves.phase, 'break');
+    state = battle.advanceWave(state, 4000, battle.CATALOG, () => 0);
+  }
 });

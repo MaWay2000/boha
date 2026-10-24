@@ -1,13 +1,13 @@
 import { TextureLoader, NearestFilter } from './mapmaker/js/three.module.js';
 import { parsePie } from './mapmaker/js/pie.js';
 import { drawSoftwareUnit } from './mapmaker/js/softwareUnitPreview.js?v=20261010-software-3d-1';
-import { TURRETS, buildTurret, disposeTurret } from './site-armory-model-utils.mjs?v=20261024-rockets-1';
+import { TECH_PATHS, turretFor, createTierLoader, buildTurret, disposeTurret } from './site-armory-model-utils.mjs?v=20261024-tech-tiers-1';
 
 const rack = document.getElementById('siteArmory');
 if (rack) mountTurrets();
 
 function mountTurrets() {
-  const items = [], textures = new Map();
+  const items = [], textures = new Map(), geometries = new Map(), models = new Map();
   let frame = null, lastFrame = -Infinity, phase = -.65, previous = null, visible = true, disposed = false;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const localPreview = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
@@ -19,6 +19,7 @@ function mountTurrets() {
   const stop = () => { if (frame != null) cancelAnimationFrame(frame); frame = null; previous = null; };
   const draw = () => {
     for (const [index, item] of items.entries()) {
+      if (!item.model) continue;
       item.model.rotation.y = phase + index * .2;
       try {
         drawSoftwareUnit(item.model, item.canvas);
@@ -43,20 +44,27 @@ function mountTurrets() {
   observer.observe(rack);
   const overlays = new MutationObserver(sync);
   overlays.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  const tiers = new MutationObserver(() => { for (const item of items) item.loader.select(turretFor(item.weapon, Number(item.button.dataset.level) || 1)); });
+  tiers.observe(rack, { attributes: true, subtree: true, attributeFilter: ['data-definition'] });
   const resize = new ResizeObserver(draw); resize.observe(rack);
   document.addEventListener('visibilitychange', sync); motion.addEventListener('change', sync);
   window.addEventListener('pageshow', sync);
   window.addEventListener('pagehide', event => {
     stop();
     if (event.persisted) return;
-    disposed = true; observer.disconnect(); overlays.disconnect(); resize.disconnect();
-    items.forEach(item => disposeTurret(item.model));
+    disposed = true; observer.disconnect(); overlays.disconnect(); tiers.disconnect(); resize.disconnect();
+    items.forEach(item => item.loader.dispose());
+    for (const pending of models.values()) pending.then(disposeTurret).catch(() => {});
+    for (const pending of geometries.values()) pending.then(geometry => geometry.dispose()).catch(() => {});
     for (const pending of textures.values()) pending.then(texture => texture?.dispose());
   });
   const loadGeometry = async name => {
-    const response = await fetch(new URL('./mapmaker/pies/components/weapons/' + name, import.meta.url));
-    if (!response.ok) throw new Error('Turret model unavailable.');
-    return parsePie(await response.text());
+    if (!geometries.has(name)) geometries.set(name, (async () => {
+      const response = await fetch(new URL('./mapmaker/pies/components/weapons/' + name, import.meta.url));
+      if (!response.ok) throw new Error('Turret model unavailable.');
+      return parsePie(await response.text());
+    })());
+    return geometries.get(name);
   };
   const loadTexture = name => {
     if (!/^[a-z0-9_-]+\.png$/i.test(name || '')) return Promise.resolve(null);
@@ -66,20 +74,30 @@ function mountTurrets() {
     }
     return textures.get(name);
   };
-  for (const [weapon, files] of Object.entries(TURRETS)) {
-    const stage = rack.querySelector(`[data-weapon="${weapon}"] .armory-gun-preview`);
-    if (!stage) continue;
-    stage.dataset.modelState = 'loading';
-    (async () => {
+  const loadModel = files => {
+    if (!models.has(files.definition)) models.set(files.definition, (async () => {
       const [mount, barrel] = await Promise.all([loadGeometry(files.mount), loadGeometry(files.barrel)]);
       const texture = await loadTexture(mount.userData.textureName);
-      const model = buildTurret(mount, barrel, texture);
-      if (disposed) { disposeTurret(model); return; }
-      const canvas = document.createElement('canvas'); canvas.dataset.engine = 'software-3d';
-      stage.append(canvas); items.push({ stage, canvas, model }); draw(); sync();
-    })().catch(error => {
-      stage.dataset.modelState = 'fallback'; stage.classList.remove('has-model');
-      console.warn('Armory turret preview unavailable; using the icon.', error);
+      // Each cached model owns its geometry clones; shared texture ownership is
+      // retained by the texture cache until page exit.
+      return buildTurret(mount.clone(), barrel.clone(), texture);
+    })());
+    return models.get(files.definition);
+  };
+  for (const weapon of Object.keys(TECH_PATHS)) {
+    const button = rack.querySelector(`[data-weapon="${weapon}"]`), stage = button?.querySelector('.armory-gun-preview');
+    if (!stage) continue;
+    const canvas = document.createElement('canvas'); canvas.dataset.engine = 'software-3d'; stage.append(canvas);
+    const item = { weapon, button, stage, canvas, model: null, loader: null }; items.push(item);
+    item.loader = createTierLoader(loadModel, result => {
+      stage.dataset.modelState = result.status;
+      if (result.status === 'loading') return; // Keep the old model until the new tier is ready.
+      item.model = result.model || null;
+      stage.dataset.modelDefinition = result.model ? result.definition : '';
+      canvas.dataset.definition = result.model ? result.definition : '';
+      if (!result.model) stage.classList.remove('has-model');
+      draw(); sync();
     });
+    item.loader.select(turretFor(weapon, Number(button.dataset.level) || 1));
   }
 }

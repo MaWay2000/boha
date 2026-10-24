@@ -1,0 +1,227 @@
+{
+  "source": "https://github.com/Warzone2100/warzone2100/blob/master/data/mp/stats/research.json",
+  "retrieved": "2026-10-24",
+  "sourceSha256": "40815905e0ce63468d6fd607fd9b8e318146693d1a797f3d612c1eb3f8fc1ba7",
+  "topics": {
+    "R-Wpn-MG1Mk1": {
+      "name": "Machinegun",
+      "requiredResearch": [],
+      "resultComponents": [
+        "CyborgChaingun",
+        "MG1-VTOL",
+        "MG1Mk1"
+      ]
+    },
+    "R-Wpn-MG2Mk1": {
+      "name": "Twin Machinegun",
+      "requiredResearch": [
+        "R-Wpn-MG-Damage02"
+      ],
+      "resultComponents": [
+        "MG2-VTOL",
+        "MG2Mk1"
+      ]
+    },
+    "R-Wpn-MG3Mk1": {
+      "name": "Heavy Machinegun",
+      "requiredResearch": [
+        "R-Wpn-MG-Damage03"
+      ],
+      "resultComponents": [
+        "MG3-VTOL",
+        "MG3Mk1"
+      ]
+    },
+    "R-Wpn-MG4": {
+      "name": "Assault Gun",
+      "requiredResearch": [
+        "R-Wpn-MG3Mk1",
+        "R-Wpn-MG-ROF02"
+      ],
+      "resultComponents": [
+        "CyborgRotMG",
+        "MG4ROTARY-VTOL",
+        "MG4ROTARYMk1"
+      ]
+    },
+    "R-Wpn-MG5": {
+      "name": "Twin Assault Gun",
+      "requiredResearch": [
+        "R-Struc-Research-Upgrade06",
+        "R-Wpn-MG4"
+      ],
+      "resultComponents": [
+        "MG5TWINROTARY"
+      ]
+    },
+    "R-Wpn-Cannon1Mk1": {
+      "name": "Light Cannon",
+      "requiredResearch": [
+        "R-Wpn-MG-Damage01"
+      ],
+      "resultComponents": [
+        "Cannon1-VTOL",
+        "Cannon1Mk1",
+        "CyborgCannon"
+      ]
+    },
+    "R-Wpn-Cannon2Mk1": {
+      "name": "Medium Cannon",
+      "requiredResearch": [
+        "R-Struc-Factory-Module",
+        "R-Wpn-Cannon-Damage01"
+      ],
+      "resultComponents": [
+        "Cannon2A-TMk1"
+      ]
+    },
+    "R-Wpn-Cannon3Mk1": {
+      "name": "Heavy Cannon",
+      "requiredResearch": [
+        "R-Wpn-Cannon-Damage05",
+        "R-Vehicle-Metals03",
+        "R-Wpn-Cannon2Mk1"
+      ],
+      "resultComponents": [
+        "Cannon375mmMk1"
+      ]
+    },
+    "R-Wpn-Cannon4AMk1": {
+      "name": "Hyper Velocity Cannon",
+      "requiredResearch": [
+        "R-Wpn-Cannon-Accuracy01"
+      ],
+      "resultComponents": [
+        "Cannon4AUTO-VTOL",
+        "Cannon4AUTOMk1"
+      ]
+    },
+    "R-Wpn-Cannon5": {
+      "name": "Assault Cannon",
+      "requiredResearch": [
+        "R-Wpn-Cannon-ROF01"
+      ],
+      "resultComponents": [
+        "Cannon5VulcanMk1",
+        "Cannon5Vulcan-VTOL"
+      ]
+    },
+    "R-Wpn-Cannon6TwinAslt": {
+      "name": "Twin Assault Cannon",
+      "requiredResearch": [
+        "R-Wpn-Cannon5",
+        "R-Struc-Research-Upgrade06"
+      ],
+      "resultComponents": [
+        "Cannon6TwinAslt"
+      ]
+    },
+    "R-Wpn-Laser01": {
+      "name": "Laser - Flashlight",
+      "requiredResearch": [
+        "R-Struc-Research-Upgrade07",
+        "R-Sys-Sensor-Upgrade02"
+      ],
+      "resultComponents": [
+        "Cyb-Wpn-Laser",
+        "Laser3BEAM-VTOL",
+        "Laser3BEAMMk1"
+      ]
+    },
+    "R-Wpn-Laser02": {
+      "name": "Pulse Laser",
+      "requiredResearch": [
+        "R-Wpn-Laser01"
+      ],
+      "resultComponents": [
+        "Laser2PULSE-VTOL",
+        "Laser2PULSEMk1"
+      ]
+    },
+    "R-Wpn-HvyLaser": {
+      "name": "Heavy Laser",
+      "requiredResearch": [
+        "R-Wpn-Laser02"
+      ],
+      "resultComponents": [
+        "HeavyLaser",
+        "HeavyLaser-VTOL"
+      ]
+    },
+    "R-Wpn-Rocket05-MiniPod": {
+      "name": "Mini-Rocket Pod",
+      "requiredResearch": [
+        "R-Vehicle-Engine01"
+      ],
+      "resultComponents": [
+        "Rocket-Pod",
+        "Rocket-VTOL-Pod"
+      ]
+    },
+    "R-Wpn-Rocket01-LtAT": {
+      "name": "Lancer AT Rocket",
+      "requiredResearch": [
+        "R-Wpn-Rocket-Damage03"
+      ],
+      "resultComponents": [
+        "CyborgRocket",
+        "Rocket-LtA-T",
+        "Rocket-VTOL-LtA-T"
+      ]
+    },
+    "R-Wpn-Rocket07-Tank-Killer": {
+      "name": "Tank Killer Rocket",
+      "requiredResearch": [
+        "R-Wpn-RocketSlow-Accuracy01",
+        "R-Wpn-Rocket-Damage05"
+      ],
+      "resultComponents": [
+        "Rocket-HvyA-T",
+        "Rocket-VTOL-HvyA-T"
+      ]
+    },
+    "R-Wpn-Missile2A-T": {
+      "name": "Scourge Missile",
+      "requiredResearch": [
+        "R-Wpn-Rocket07-Tank-Killer",
+        "R-Wpn-RocketSlow-Accuracy02",
+        "R-Struc-Research-Upgrade07"
+      ],
+      "resultComponents": [
+        "Cyb-Wpn-Atmiss",
+        "Missile-A-T",
+        "Missile-VTOL-AT"
+      ]
+    },
+    "R-Wpn-Flamer01Mk1": {
+      "name": "Flamer",
+      "requiredResearch": [
+        "R-Sys-Engineering01"
+      ],
+      "resultComponents": [
+        "CyborgFlamer01",
+        "Flame1Mk1"
+      ]
+    },
+    "R-Wpn-Flame2": {
+      "name": "Heavy Flamer - Inferno",
+      "requiredResearch": [
+        "R-Wpn-Flamer-Damage04"
+      ],
+      "resultComponents": [
+        "Cyb-Wpn-Thermite",
+        "Flame2"
+      ]
+    },
+    "R-Wpn-Plasmite-Flamer": {
+      "name": "Plasmite Flamer",
+      "requiredResearch": [
+        "R-Wpn-Flame2",
+        "R-Struc-Research-Upgrade07"
+      ],
+      "resultComponents": [
+        "PlasmiteFlamer"
+      ]
+    }
+  }
+}

@@ -21,11 +21,12 @@
   <link rel="stylesheet" href="site-news.css?v=20261023-news-cleanup-1">
   <script src="site-news.js?v=20261023-news-cleanup-1" defer></script>
   <script src="site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
-  <link rel="stylesheet" href="site-armory.css?v=20261024-cannon-splash-1">
-  <script src="site-armory-audio.js?v=20261024-rocket-salvo-1" defer></script>
-  <script src="site-armory-battle.js?v=20261024-allies-1" defer></script>
-  <script src="site-armory.js?v=20261024-cannon-splash-1" defer></script>
-  <script src="site-armory-model.js?v=20261024-rockets-1" type="module"></script>
+  <link rel="stylesheet" href="site-armory.css?v=20261024-waves-1">
+  <script src="site-armory-tech.js?v=20261024-tech-tiers-1" defer></script>
+  <script src="site-armory-audio.js?v=20261024-flamer-1" defer></script>
+  <script src="site-armory-battle.js?v=20261024-waves-1" defer></script>
+  <script src="site-armory.js?v=20261024-hide-panel-1" defer></script>
+  <script src="site-armory-model.js?v=20261024-tech-tiers-1" type="module"></script>
   <script src="site-armory-units.js?v=20261024-allies-1" type="module"></script>
   <style>
     body.radio-playlist-open {
@@ -209,7 +210,7 @@
             <span class="armory-gun-preview" aria-hidden="true">
               <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M10 29 20 18H57L66 30 55 39H16Z"/><path class="gun-metal" d="M15 16 23 7H58L65 16V29H15Z"/><path class="gun-dark" d="M22 13H34V24H22ZM43 13H55V24H43Z"/><path class="gun-accent" d="M25 16H31V21H25ZM46 16H52V21H46Z"/><path class="gun-barrel" d="M30 30H51V36H30Z"/></svg>
             </span>
-            <span>Rockets</span><kbd>4</kbd><span class="armory-level" id="armoryLevel-rockets">Lv 1</span>
+            <span class="armory-weapon-label" id="armoryLabel-rockets">Mini-Rocket Pod</span><kbd>4</kbd><span class="armory-level" id="armoryLevel-rockets">Lv 1</span><span class="armory-tech-tier" id="armoryTier-rockets">T1</span>
             <progress class="armory-reload" id="armoryReload-rockets" value="1" max="1" aria-hidden="true"></progress>
             <span class="armory-reload-label" id="armoryReloadLabel-rockets">Ready</span>
           </button>
@@ -217,7 +218,7 @@
             <span class="armory-gun-preview" aria-hidden="true">
             <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M9 29 20 19H51L58 29 51 38H17Z"/><path class="gun-metal" d="M15 20 24 11H48L56 20 48 29H19Z"/><path class="gun-dark" d="M27 11V29H37V11Z"/><path class="gun-barrel" d="M38 14H73V19H38ZM38 23H73V28H38Z"/><path class="gun-light" d="M22 12H31V16H22ZM61 13H72V17H61Z"/><path class="gun-accent" d="M16 24H24V28H16ZM42 33H50V36H42Z"/></svg>
             </span>
-            <span>Machine gun</span><kbd>1</kbd><span class="armory-level" id="armoryLevel-machinegun">Lv 1</span>
+            <span class="armory-weapon-label" id="armoryLabel-machinegun">Machinegun</span><kbd>1</kbd><span class="armory-level" id="armoryLevel-machinegun">Lv 1</span><span class="armory-tech-tier" id="armoryTier-machinegun">T1</span>
             <progress class="armory-reload" id="armoryReload-machinegun" value="1" max="1" aria-hidden="true"></progress>
             <span class="armory-reload-label" id="armoryReloadLabel-machinegun">Ready</span>
           </button>
@@ -225,7 +226,7 @@
             <span class="armory-gun-preview" aria-hidden="true">
             <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M7 29 18 18H48L59 29 50 39H15Z"/><path class="gun-metal" d="M14 20 25 9H46L56 20 46 31H21Z"/><path class="gun-dark" d="M29 10H40V31H29Z"/><path class="gun-barrel" d="M37 16H68V25H37ZM65 13H77V28H65Z"/><path class="gun-light" d="M23 10H32V14H23ZM67 14H75V18H67Z"/><path class="gun-accent" d="M18 24H26V28H18Z"/></svg>
             </span>
-            <span>Heavy cannon</span><kbd>2</kbd><span class="armory-level" id="armoryLevel-cannon">Lv 1</span>
+            <span class="armory-weapon-label" id="armoryLabel-cannon">Light Cannon</span><kbd>2</kbd><span class="armory-level" id="armoryLevel-cannon">Lv 1</span><span class="armory-tech-tier" id="armoryTier-cannon">T1</span>
             <progress class="armory-reload" id="armoryReload-cannon" value="1" max="1" aria-hidden="true"></progress>
             <span class="armory-reload-label" id="armoryReloadLabel-cannon">Ready</span>
           </button>
@@ -233,9 +234,17 @@
             <span class="armory-gun-preview" aria-hidden="true">
             <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M9 29 21 18H48L59 29 49 39H16Z"/><path class="gun-metal" d="M16 20 26 10H45L56 20 46 30H22Z"/><path class="gun-dark" d="M30 11H40V29H30Z"/><path class="gun-barrel" d="M39 17H72V25H39Z"/><path class="gun-energy" d="M45 19H77V22H45ZM49 12H54V29H49ZM60 12H65V29H60Z"/><path class="gun-light" d="M24 11H33V15H24Z"/></svg>
             </span>
-            <span>Pulse laser</span><kbd>3</kbd><span class="armory-level" id="armoryLevel-laser">Lv 1</span>
+            <span class="armory-weapon-label" id="armoryLabel-laser">Flashlight</span><kbd>3</kbd><span class="armory-level" id="armoryLevel-laser">Lv 1</span><span class="armory-tech-tier" id="armoryTier-laser">T1</span>
             <progress class="armory-reload" id="armoryReload-laser" value="1" max="1" aria-hidden="true"></progress>
             <span class="armory-reload-label" id="armoryReloadLabel-laser">Ready</span>
+          </button>
+          <button type="button" data-weapon="flamer" aria-pressed="false" aria-describedby="armoryReloadLabel-flamer" title="Flamer — hold for a flame cone and 85px splash around your aim; key 5">
+            <span class="armory-gun-preview" aria-hidden="true">
+              <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M9 29 20 18H49L59 29 49 39H16Z"/><path class="gun-metal" d="M16 20 26 10H45L55 20 45 30H22Z"/><path class="gun-dark" d="M29 11H40V30H29Z"/><path class="gun-barrel" d="M39 16H66V25H39Z"/><path class="gun-accent" d="M62 15 71 10 69 18 78 21 68 25 70 33 61 26Z"/></svg>
+            </span>
+            <span class="armory-weapon-label" id="armoryLabel-flamer">Flamer</span><kbd>5</kbd><span class="armory-level" id="armoryLevel-flamer">Lv 1</span><span class="armory-tech-tier" id="armoryTier-flamer">T1</span>
+            <progress class="armory-reload" id="armoryReload-flamer" value="1" max="1" aria-hidden="true"></progress>
+            <span class="armory-reload-label" id="armoryReloadLabel-flamer">Ready</span>
           </button>
         </div>
       </section>
@@ -271,9 +280,18 @@
   <div class="armory-targets" id="armoryTargets" aria-hidden="true" hidden></div>
   <aside class="armory-hud" id="armoryHud" aria-label="Target practice controls" hidden>
     <div><span class="armory-live-dot" aria-hidden="true"></span><strong id="armoryWeaponName">Target practice</strong><p id="armoryStatus" role="status" aria-live="polite">Select a weapon to play.</p></div>
+    <div class="armory-tech" id="armoryTech" hidden>
+      <b id="armoryTechName"></b><small id="armoryTechNext"></small>
+      <details><summary>Weapon research path</summary><ol id="armoryTechPath"></ol><p>Game research variants mapped to mini-game power levels. Cannon branches are condensed; reload speeds and special abilities stay with each weapon slot.</p></details>
+    </div>
     <div class="armory-boss-health">
       <span id="armoryBossStatus">Balloon boss · 1000/1000 HP</span>
       <progress id="armoryBossHealth" value="1000" max="1000" aria-label="Balloon boss health"></progress>
+    </div>
+    <div class="armory-wave" id="armoryWave" aria-label="Enemy wave progress" hidden>
+      <strong id="armoryWaveTitle" role="status" aria-live="polite">Wave 1</strong>
+      <span id="armoryWaveDetail"></span>
+      <progress id="armoryWaveProgress" value="0" max="8" aria-label="Enemies defeated in this wave"></progress>
     </div>
     <div class="armory-allies-stats" id="armoryAlliesStats" hidden>
       <span>Allies <b id="armoryAllyCount">0</b> / 4</span>
@@ -291,6 +309,7 @@
         <span>Cannon <b id="armoryDamage-cannon">0</b> dmg · <b id="armoryKills-cannon">0</b> kills</span>
         <span>Laser <b id="armoryDamage-laser">0</b> dmg · <b id="armoryKills-laser">0</b> kills</span>
         <span>Rockets <b id="armoryDamage-rockets">0</b> dmg · <b id="armoryKills-rockets">0</b> kills</span>
+        <span>Flamer <b id="armoryDamage-flamer">0</b> dmg · <b id="armoryKills-flamer">0</b> kills</span>
       </div>
       <small id="armoryLastHit">Unit damage counts HP actually removed; misses and the balloon do not count.</small>
       <div class="armory-upgrade">
@@ -306,7 +325,7 @@
       <button type="button" id="armorySound" aria-label="Gun sounds" aria-pressed="true" title="Toggle gun sounds">Sound: on</button>
       <button type="button" id="armoryOff">Disarm <kbd>Esc</kbd></button>
     </div>
-    <p class="armory-help">Cannon: 50% splash / 200px, +1 fighter · rockets auto-lock tanks · hold to fire · 1–4 switch · Esc pauses</p>
+    <p class="armory-help">Cannon: splash + fighter · rockets auto-lock · flamer: cone + splash · hold to fire · 1–5 switch · Esc pauses</p>
   </aside>
 
   <div

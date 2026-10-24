@@ -1,17 +1,23 @@
 (function (root, factory) {
   const api = factory(typeof module === 'object' && module.exports ? require('./site-armory-audio.js') : root.SiteArmoryAudio,
-    typeof module === 'object' && module.exports ? require('./site-armory-battle.js') : root.SiteArmoryBattle);
+    typeof module === 'object' && module.exports ? require('./site-armory-battle.js') : root.SiteArmoryBattle,
+    typeof module === 'object' && module.exports ? require('./site-armory-tech.js') : root.SiteArmoryTech);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root.document) api.mount(root);
-})(typeof globalThis === 'object' ? globalThis : this, function (audioModule, battleModule) {
+})(typeof globalThis === 'object' ? globalThis : this, function (audioModule, battleModule, techModule) {
   'use strict';
   const WEAPONS = Object.freeze({
     machinegun: Object.freeze({ name: 'Machine gun', damage: 12, pellets: 3, radius: 43, hole: 14, cooldown: 160 }),
     cannon: Object.freeze({ name: 'Heavy cannon', damage: 55, pellets: 1, radius: 145, hole: 42, cooldown: 3000, splashRadius: 200, splashFraction: .5 }),
     laser: Object.freeze({ name: 'Pulse laser', damage: 34, pellets: 1, radius: 100, hole: 21, cooldown: 1000 }),
-    rockets: Object.freeze({ name: 'Rockets', damage: 75, pellets: 2, radius: 125, hole: 34, cooldown: 1000 })
+    rockets: Object.freeze({ name: 'Rockets', damage: 75, pellets: 2, radius: 125, hole: 34, cooldown: 1000 }),
+    flamer: Object.freeze({ name: 'Flamer', damage: 24, pellets: 1, radius: 85, hole: 25, cooldown: 180, flameLength: 220, flameWidth: 160, flameSplashRadius: 85 })
   });
   const MAX_MARKS = 48;
+  // Sprite strip specified by the real FXLThrow.PIE projectile, not a painted
+  // CSS wedge. The original atlas is bundled locally with its GPL notices.
+  const FLAME_SPRITE = Object.freeze({ texture: 'assets/vendor/warzone-effects/page-21-fx.png',
+    model: 'mapmaker/pies/fxlthrow.pie', atlasSize: 256, x: 168, y: 28, width: 9, height: 26, frames: 7, frameMs: 66 });
   const BALLOON_MAX_HEALTH = 1000, BALLOON_RESPAWN_MS = 5000;
   const ROCKET_SPEED = 1600, ROCKET_IMPACT_DEADLINE_MS = 3000;
   function homeRocket(point, target, elapsed) {
@@ -37,18 +43,72 @@
   function weaponProfile(state, weapon) {
     if (!Object.hasOwn(WEAPONS, weapon)) return null;
     const base = WEAPONS[weapon], upgrade = upgradeProgress(state.powerEarned);
-    return { ...base, ...upgrade, shotDamage: Math.round(base.damage * base.pellets * (1 + upgrade.bonusPercent / 100)) };
+    const tech = techModule.tierFor(weapon, upgrade.level);
+    return { ...base, ...tech, ...upgrade, shotDamage: Math.round(base.damage * base.pellets * (1 + upgrade.bonusPercent / 100)) };
   }
   function cannonBlast(targets, x, y, primaryId, profile) {
     const splash = Math.round(profile.shotDamage * profile.splashFraction);
     return targets.filter(target => target.id === primaryId || Math.hypot(target.x - x, target.y - y) <= profile.splashRadius)
       .map(target => ({ ...target, damage: target.id === primaryId ? profile.shotDamage : splash }));
   }
+  // The short jet surrounds the crosshair, so it stays usable anywhere on the
+  // page. Its direction points away from the selected turret toward the aim.
+  function flameShape(x, y, angle, profile) {
+    return { x: x - Math.cos(angle) * profile.flameLength * .65,
+      y: y - Math.sin(angle) * profile.flameLength * .65, angle,
+      length: profile.flameLength, width: profile.flameWidth,
+      aimX: x, aimY: y, splashRadius: profile.flameSplashRadius };
+  }
+  function flameVictims(targets, shape, primaryId) {
+    const c = Math.cos(shape.angle), s = Math.sin(shape.angle);
+    const segmentDistance = (x, y, ax, ay, bx, by) => {
+      const dx = bx - ax, dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+      return Math.hypot(x - ax - t * dx, y - ay - t * dy);
+    };
+    return targets.filter(target => {
+      if (target.id === primaryId) return true;
+      if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return false;
+      const radius = Number.isFinite(target.radius) ? Math.max(0, target.radius) : 0;
+      // Contact with the tank body counts, not only its center or the cursor.
+      if (shape.splashRadius > 0 && Math.hypot(target.x - shape.aimX, target.y - shape.aimY) <= shape.splashRadius + radius) return true;
+      const dx = target.x - shape.x, dy = target.y - shape.y;
+      const along = dx * c + dy * s, across = dy * c - dx * s;
+      if (along >= 0 && along <= shape.length && Math.abs(across) <= along / shape.length * shape.width / 2) return true;
+      if (!radius) return false;
+      return Math.min(segmentDistance(along, across, 0, 0, shape.length, -shape.width / 2),
+        segmentDistance(along, across, 0, 0, shape.length, shape.width / 2),
+        segmentDistance(along, across, shape.length, -shape.width / 2, shape.length, shape.width / 2)) <= radius;
+    });
+  }
+  function flameSplashParticles(shape, motion = true) {
+    const count = motion ? 7 : 3, reach = shape.splashRadius * .58;
+    return Array.from({ length: count }, (_, i) => {
+      const angle = i * Math.PI * 2 / count;
+      return { x: shape.length * .65 + (motion ? 0 : Math.cos(angle) * reach),
+        y: motion ? 0 : Math.sin(angle) * reach,
+        dx: Math.cos(angle) * reach, dy: Math.sin(angle) * reach,
+        scale: 2.5, rotation: angle + Math.PI / 2, duration: 340, delay: i * 12, frame: i };
+    });
+  }
+  function flameParticles(shape, random = Math.random, motion = true) {
+    const count = motion ? 9 : 3;
+    return Array.from({ length: count }, (_, i) => {
+      const row = Math.floor(i / 3), fan = ((i % 3) - 1) * .2;
+      const reach = shape.length * (.78 + random() * .22);
+      return { x: motion ? row * 12 : shape.length * (.25 + i * .28),
+        y: motion ? ((i % 3) - 1) * 3 : ((i % 3) - 1) * 10,
+        dx: Math.cos(fan) * reach - row * 12, dy: Math.sin(fan) * reach,
+        scale: 2.5 + random() * 1.5, rotation: Math.PI / 2 + fan,
+        duration: 330 + row * 35, delay: row * 28,
+        frame: i % FLAME_SPRITE.frames };
+    });
+  }
   function documentPoint(x, y, scrollX = 0, scrollY = 0) {
     return { x: x + (Number.isFinite(scrollX) ? scrollX : 0), y: y + (Number.isFinite(scrollY) ? scrollY : 0) };
   }
   function createState() {
-    return { weapon: null, health: BALLOON_MAX_HEALTH, bossKills: 0, hits: 0, shots: 0, lastShot: -Infinity,
+    return { weapon: null, health: BALLOON_MAX_HEALTH, bossKills: 0, bossEnraged: false, hits: 0, shots: 0, lastShot: -Infinity,
       lastShots: Object.fromEntries(Object.keys(WEAPONS).map(key => [key, -Infinity])),
       unitDamage: 0, lastUnitHit: null, powerEarned: 0, allyStats: { damage: 0, hits: 0, kills: 0 },
       weaponStats: Object.fromEntries(Object.keys(WEAPONS).map(key => [key, { damage: 0, hits: 0, kills: 0 }])) };
@@ -106,6 +166,7 @@
     let rocketFrame = null, rocketPrevious = null, nextRocketId = 1;
     let battle = battleModule.createBattle(), catalog = battleModule.CATALOG, catalogError = false;
     let battleFrame = null, battlePrevious = null, browsingScroll = null, balloonRespawnTimer = null;
+    let waveTimer = null, wavePrevious = null, focused = true;
     const status = doc.getElementById('armoryStatus'), name = doc.getElementById('armoryWeaponName');
     const fireButton = doc.getElementById('armoryFire'), off = doc.getElementById('armoryOff'), repair = doc.getElementById('armoryRepair');
     const soundButton = doc.getElementById('armorySound');
@@ -125,6 +186,7 @@
     const frames = [...doc.querySelectorAll('iframe')].map(node => ({ node, inert: node.inert }));
     let state = createState();
     let displayedLevel = 1;
+    let displayedTechPath = '';
     let held = null, holdTimer = null, reloadTimer = null;
     const marks = [], transient = new Set(), timers = new Set();
     const reduced = win.matchMedia('(prefers-reduced-motion: reduce)');
@@ -169,14 +231,17 @@
     }
     function syncBattleMotion() {
       stopBattleMotion();
-      if (!battle.active || !state.weapon || doc.hidden || blocked() || !unitNodes.size || !win.requestAnimationFrame) return;
+      if (!battle.active || !state.weapon || doc.hidden || !focused || blocked() || !unitNodes.size || !win.requestAnimationFrame) return;
       const tick = now => {
         battleFrame = null;
-        if (!state.weapon || doc.hidden || blocked() || !battle.active) { battlePrevious = null; return; }
+        if (!state.weapon || doc.hidden || !focused || blocked() || !battle.active) { battlePrevious = null; return; }
         const dt = battlePrevious == null ? 0 : Math.min((now - battlePrevious) / 1000, .05); battlePrevious = now;
         const limits = arena();
         for (const item of unitNodes.values()) {
-          if (localPreview || !reduced.matches) { item.point.x += item.point.vx * dt; item.point.y += item.point.vy * dt; }
+          if (!allies.units.length && (localPreview || !reduced.matches)) {
+            const speed = 1 + battleModule.waveStrength(battle) * .04;
+            item.point.x += item.point.vx * dt * speed; item.point.y += item.point.vy * dt * speed;
+          }
           if (item.point.x < 12 || item.point.x > limits.maxX) item.point.vx *= -1;
           if (item.point.y < 20 || item.point.y > limits.maxY) item.point.vy *= -1;
           item.point.x = Math.max(12, Math.min(limits.maxX, item.point.x)); item.point.y = Math.max(20, Math.min(limits.maxY, item.point.y));
@@ -193,6 +258,20 @@
       const text = (id, value) => { const node = doc.getElementById(id); if (node) node.textContent = String(value); };
       text('armoryScore', battle.score); text('armoryBank', battle.bank); text('armoryTargetCount', `${battle.units.length} / ${battleModule.MAX_UNITS}`);
       text('armoryUnitDamage', state.unitDamage);
+      const waveView = doc.getElementById('armoryWave');
+      if (waveView) {
+        waveView.hidden = !battle.waves;
+        waveView.dataset.phase = battle.waves?.phase || '';
+        if (battle.waves) {
+          const wave = battle.waves, resting = wave.phase === 'break';
+          text('armoryWaveTitle', `Wave ${wave.number}${resting ? ' cleared!' : ''}`);
+          text('armoryWaveDetail', resting
+            ? `Wave ${wave.number + 1} in ${Math.ceil(wave.remainingMs / 1000)}s${!state.weapon || doc.hidden || !focused ? ' · paused' : ' · catch your breath'}`
+            : `${wave.kills}/${wave.limit} defeated · ${wave.limit - wave.spawned} waiting · enemy HP +${battleModule.waveStrength(battle) * 15}%`);
+          const bar = doc.getElementById('armoryWaveProgress');
+          if (bar) { bar.max = wave.limit; bar.value = wave.kills; }
+        }
+      }
       text('armoryAllyCount', allies.units.length); text('armoryAllyReserves', allies.reserves);
       text('armoryAllyKills', state.allyStats.kills); text('armoryAllyDamage', state.allyStats.damage);
       const armyStats = doc.getElementById('armoryAlliesStats'); if (armyStats) armyStats.hidden = !allies.created;
@@ -210,16 +289,16 @@
         if (!item && targetLayer) {
           const type = catalog.find(type => type.key === unit.key);
           const node = doc.createElement('div'); node.className = 'armory-unit'; node.dataset.unitId = String(unit.id); node.dataset.unitKey = unit.key; node.dataset.team = 'enemy';
-          node.title = `${type?.name || unit.key} · ${unit.cost} power · kill reward ${unit.cost * 1.5}`;
+          node.title = `${type?.name || unit.key} · ${unit.cost} power · kill reward ${unit.cost * 1.5} · ${rangeDescription(type)}`;
           const visual = doc.createElement('span'); visual.className = 'armory-unit-visual';
           const placeholder = doc.createElement('i'); placeholder.className = 'armory-unit-placeholder'; visual.append(placeholder);
           const label = doc.createElement('span'); label.className = 'armory-unit-name'; label.textContent = type?.name || unit.key;
           const cost = doc.createElement('span'); cost.className = 'armory-unit-cost'; cost.textContent = unit.cost + ' power';
           const health = doc.createElement('progress'); health.className = 'armory-unit-health'; health.max = unit.maxHealth;
           node.append(visual, label, cost, health);
-          item = { node, health, point: newPosition(), nextFire: win.performance.now() + 1500 }; unitNodes.set(unit.id, item); targetLayer.append(node); placeUnit(item);
+          item = { node, health, type, point: newPosition(), nextFire: win.performance.now() + 1500 }; unitNodes.set(unit.id, item); targetLayer.append(node); placeUnit(item);
         }
-        if (item) item.health.value = unit.health;
+        if (item) { item.health.value = unit.health; item.type = catalog.find(type => type.key === unit.key); }
       }
       for (const [id, item] of allyNodes) if (!allies.units.some(unit => unit.id === id)) { item.node.remove(); allyNodes.delete(id); }
       for (const unit of allies.units) {
@@ -227,7 +306,8 @@
         if (!item && targetLayer) {
           const node = doc.createElement('div'); node.className = 'armory-unit'; node.dataset.unitId = 'ally-' + unit.id;
           node.dataset.unitKey = unit.key; node.dataset.team = 'ally'; node.dataset.renderSeed = String(10000 + unit.id);
-          node.title = 'Friendly Heavy Cannon · 120 HP · automatically fights enemy tanks';
+          const type = catalog.find(type => type.key === unit.key);
+          node.title = `Friendly Heavy Cannon · 120 HP · advances into range and fights enemy tanks · ${rangeDescription(type)}`;
           const visual = doc.createElement('span'); visual.className = 'armory-unit-visual';
           const placeholder = doc.createElement('i'); placeholder.className = 'armory-unit-placeholder'; visual.append(placeholder);
           const label = doc.createElement('span'); label.className = 'armory-unit-name'; label.textContent = 'ALLY · Heavy Cannon';
@@ -235,12 +315,29 @@
           const health = doc.createElement('progress'); health.className = 'armory-unit-health'; health.max = unit.maxHealth;
           node.append(visual, label, badge, health);
           const point = newPosition(); point.y = arena().maxY;
-          item = { node, health, point, nextFire: win.performance.now() + 1200 };
+          item = { node, health, type, point, nextFire: win.performance.now() + 1200 };
           allyNodes.set(unit.id, item); targetLayer.append(node); placeUnit(item);
         }
-        if (item) item.health.value = unit.health;
+        if (item) { item.health.value = unit.health; item.type = catalog.find(type => type.key === unit.key); }
       }
       syncBattleMotion();
+      syncWaveClock();
+    }
+    function stopWaveClock() {
+      if (waveTimer != null) win.clearTimeout(waveTimer);
+      waveTimer = null; wavePrevious = null;
+    }
+    function syncWaveClock() {
+      if (battle.waves?.phase !== 'break' || !state.weapon || doc.hidden || blocked() || !focused) { stopWaveClock(); return; }
+      if (waveTimer != null) return;
+      wavePrevious = win.performance.now();
+      waveTimer = win.setTimeout(() => {
+        waveTimer = null;
+        if (!state.weapon || doc.hidden || blocked() || !focused) { stopWaveClock(); return; }
+        const elapsed = Math.max(0, Math.min(250, win.performance.now() - wavePrevious));
+        battle = battleModule.advanceWave(battle, elapsed, catalog);
+        sync();
+      }, 250);
     }
     function armyBeam(from, to, team) {
       if (reduced.matches) return;
@@ -250,19 +347,48 @@
       beam.style.transform = `rotate(${Math.atan2(to.y - from.y, to.x - from.x)}rad)`;
       ephemeral(beam, 140);
     }
+    function rangeDescription(type) {
+      return type ? `range ${type.range / battleModule.PIXELS_PER_TILE} tiles (${type.range}px in this arena)` : 'range unavailable';
+    }
+    function advanceArmy(item, target, now, dt) {
+      // Necessary tactical movement remains functional with reduced motion, but
+      // is shown as one small reposition per second, without wandering/effects.
+      let moveTime = dt;
+      if (reduced.matches && !localPreview) {
+        moveTime = now >= (item.nextMove || 0) ? 1 : 0;
+        if (moveTime) item.nextMove = now + 1000;
+      }
+      const speed = item.node.dataset.team === 'enemy' ? 35 * (1 + battleModule.waveStrength(battle) * .04) : 35;
+      item.point = battleModule.moveIntoRange(item.type, item.point, target.point, speed, moveTime, arena());
+      placeUnit(item);
+    }
+    function nearestAlly(enemy) {
+      let target = null, best = Infinity;
+      for (const entry of allyNodes) {
+        if (!allies.units.some(unit => unit.id === entry[0])) continue;
+        const distance = Math.hypot(entry[1].point.x - enemy.point.x, entry[1].point.y - enemy.point.y);
+        if (distance < best) { best = distance; target = entry; }
+      }
+      return target;
+    }
     function stepArmy(now, dt) {
       let changed = false;
+      // Finish both teams' movement before checking firing distances.
+      for (const [id, item] of allyNodes) {
+        if (!allies.units.some(unit => unit.id === id)) continue;
+        const target = nearestTank(item.point.x + 62, item.point.y + 40);
+        if (target) advanceArmy(item, target[1], now, dt);
+      }
+      for (const [id, enemy] of unitNodes) {
+        if (!battle.units.some(unit => unit.id === id)) continue;
+        const target = nearestAlly(enemy);
+        if (target) advanceArmy(enemy, target[1], now, dt);
+      }
       for (const [id, item] of allyNodes) {
         if (!allies.units.some(unit => unit.id === id)) continue;
         const target = nearestTank(item.point.x + 62, item.point.y + 40);
         if (!target) continue;
-        const dx = target[1].point.x - item.point.x, dy = target[1].point.y - item.point.y, distance = Math.hypot(dx, dy);
-        if ((localPreview || !reduced.matches) && distance > 100) {
-          const step = Math.min(distance - 100, 35 * dt), limits = arena();
-          item.point.x = Math.max(12, Math.min(limits.maxX, item.point.x + dx / distance * step));
-          item.point.y = Math.max(20, Math.min(limits.maxY, item.point.y + dy / distance * step)); placeUnit(item);
-        }
-        if (now >= item.nextFire) {
+        if (now >= item.nextFire && battleModule.inWeaponRange(item.type, item.point, target[1].point)) {
           item.nextFire = now + 1200; armyBeam(item.point, target[1].point, 'ally');
           const result = damageTank('allies', target[0], Math.round(18 * (1 + upgradeProgress(state.powerEarned).bonusPercent / 100)), target[1].point.x + 62, target[1].point.y + 40);
           if (result.killed) burst(target[1].point.x + 62, target[1].point.y + 40, true);
@@ -271,15 +397,10 @@
       }
       for (const [id, enemy] of unitNodes) {
         if (now < enemy.nextFire || !battle.units.some(unit => unit.id === id)) continue;
-        let target = null, best = Infinity;
-        for (const entry of allyNodes) {
-          if (!allies.units.some(unit => unit.id === entry[0])) continue;
-          const distance = Math.hypot(entry[1].point.x - enemy.point.x, entry[1].point.y - enemy.point.y);
-          if (distance < best) { best = distance; target = entry; }
-        }
-        if (!target) continue;
+        const target = nearestAlly(enemy);
+        if (!target || !battleModule.inWeaponRange(enemy.type, enemy.point, target[1].point)) continue;
         enemy.nextFire = now + 1500; armyBeam(enemy.point, target[1].point, 'enemy');
-        const result = battleModule.damageAlly(allies, target[0], 12); allies = result.state; changed = true;
+        const result = battleModule.damageAlly(allies, target[0], Math.round(12 * (1 + battleModule.waveStrength(battle) * .1))); allies = result.state; changed = true;
         if (result.killed) burst(target[1].point.x + 62, target[1].point.y + 40, true);
       }
       return changed;
@@ -287,7 +408,7 @@
     function autoTarget() {
       if (battle.active) {
         const first = unitNodes.values().next().value;
-        return first ? { x: first.point.x + 62, y: first.point.y + 40 } : null;
+        if (first) return { x: first.point.x + 62, y: first.point.y + 40 };
       }
       if (!state.health) return null;
       const box = balloon.getBoundingClientRect(); return { x: box.left + box.width * .5, y: box.top + box.height * .39 };
@@ -295,7 +416,7 @@
     const restoreBalloon = () => {
       if (balloonRespawnTimer != null) win.clearTimeout(balloonRespawnTimer);
       balloonRespawnTimer = null;
-      state = { ...state, health: BALLOON_MAX_HEALTH }; balloon.dataset.destroyed = 'false'; balloon.classList.remove('is-shot-down');
+      state = { ...state, health: BALLOON_MAX_HEALTH, bossEnraged: false }; balloon.dataset.destroyed = 'false'; balloon.classList.remove('is-shot-down');
       balloon.dispatchEvent(new win.CustomEvent('boha:news-balloon-repaired')); event();
     };
     function respawnBalloonLater() {
@@ -322,42 +443,77 @@
     function sync() {
       syncScrollLock();
       shield.hidden = !state.weapon;
-      hud.hidden = !state.weapon && !marks.length && !battle.active && !allies.created;
-      fireButton.disabled = !state.weapon || (battle.active ? !battle.units.length : !state.health);
-      fireButton.textContent = battle.active ? 'Fire at unit' : 'Fire at balloon';
+      hud.hidden = !state.weapon;
+      fireButton.disabled = !state.weapon || (!battle.units.length && !state.health);
+      fireButton.textContent = battle.units.length ? 'Fire at unit' : 'Fire at balloon';
       off.disabled = !state.weapon;
       // Keep keyboard focus out of nested documents while the shooting shield
       // covers them. Restore their original state immediately on disarm.
       for (const frame of frames) frame.node.inert = state.weapon ? true : frame.inert;
-      name.textContent = state.weapon ? `${WEAPONS[state.weapon].name} · Lv ${upgradeProgress(state.powerEarned).level} · armed` : 'Target practice · safe';
+      const currentGun = state.weapon && weaponProfile(state, state.weapon);
+      name.textContent = currentGun ? `${currentGun.name} · Lv ${currentGun.level} · armed` : 'Target practice · safe';
       status.textContent = battle.active ? `${state.weapon ? 'Unit hunt' : 'Round paused — select a gun to resume'} · ${battle.unitKills} units destroyed · ${state.shots} shot${state.shots === 1 ? '' : 's'}`
         : state.health ? `Balloon boss ${state.health}/${BALLOON_MAX_HEALTH} · ${state.hits} hit${state.hits === 1 ? '' : 's'} · ${state.shots} shot${state.shots === 1 ? '' : 's'}${!state.weapon ? ' · normal browsing restored' : ''}`
         : 'Balloon boss defeated! Respawning in 5 seconds.';
       const bossHealth = doc.getElementById('armoryBossHealth'), bossStatus = doc.getElementById('armoryBossStatus');
-      if (bossHealth) { bossHealth.max = BALLOON_MAX_HEALTH; bossHealth.value = state.health; }
-      if (bossStatus) bossStatus.textContent = `Balloon boss · ${state.health}/${BALLOON_MAX_HEALTH} HP · ${state.bossKills} defeated${!state.health ? ' · respawning in 5s' : ''}`;
+      const bossPhase = !state.health ? 'defeated' : state.bossEnraged ? 'enraged' : battle.active ? 'patrolling' : 'intro';
+      balloon.dataset.bossPhase = bossPhase;
+      if (bossHealth) { bossHealth.max = BALLOON_MAX_HEALTH; bossHealth.value = state.health; bossHealth.dataset.phase = bossPhase; }
+      if (bossStatus) bossStatus.textContent = `Balloon boss · ${state.health}/${BALLOON_MAX_HEALTH} HP · ${state.bossKills} defeated${!state.health ? ' · respawning in 5s' : state.bossEnraged ? ' · ENRAGED! +2 enemies called' : battle.active ? ' · calls reinforcements at half HP' : ' · defeat to start Wave 1'}`;
       for (const button of weaponButtons) button.setAttribute('aria-pressed', String(button.dataset.weapon === state.weapon));
       rack.dataset.armed = state.weapon || '';
       syncUpgrades();
+      syncTechPanel();
       updateReload();
       syncBattleView();
     }
     function syncUpgrades() {
       const upgrade = upgradeProgress(state.powerEarned);
+      const newTech = [];
       for (const button of weaponButtons) {
         const profile = weaponProfile(state, button.dataset.weapon);
         button.dataset.level = String(upgrade.level);
-        button.title = `${profile.name} · Lv ${profile.level} · ${profile.shotDamage} damage${button.dataset.weapon === 'rockets' ? ' per 2-rocket salvo · auto-lock tanks' : profile.pellets > 1 ? ' per burst' : ' per shot'} · ${profile.cooldown / 1000}s reload${button.dataset.weapon === 'cannon' ? ` · 50% splash (${Math.round(profile.shotDamage * profile.splashFraction)} damage) within ${profile.splashRadius}px · +1 friendly fighter` : ''} · hold to fire`;
+        if (button.dataset.definition !== profile.definition) {
+          if (button.dataset.definition && upgrade.level > displayedLevel) newTech.push(profile.name);
+          button.dataset.definition = profile.definition;
+        }
+        button.dataset.tier = String(profile.tier);
+        button.title = `${profile.name} · Tier ${profile.tier}/${profile.tierCount} · Lv ${profile.level} · ${profile.shotDamage} damage${button.dataset.weapon === 'rockets' ? ' per 2-rocket salvo · auto-lock tanks' : button.dataset.weapon === 'flamer' ? ` per flame burst · 220px cone + ${profile.flameSplashRadius}px splash around your aim · tank body contact counts` : profile.pellets > 1 ? ' per burst' : ' per shot'} · ${profile.cooldown / 1000}s reload${button.dataset.weapon === 'cannon' ? ` · 50% splash (${Math.round(profile.shotDamage * profile.splashFraction)} damage) within ${profile.splashRadius}px · +1 friendly fighter` : ''}${profile.nextTier ? ` · next: ${profile.nextTier.name} at Lv ${profile.nextTier.level}` : ' · final weapon tier'} · hold to fire`;
         const badge = doc.getElementById('armoryLevel-' + button.dataset.weapon);
         if (badge) badge.textContent = 'Lv ' + upgrade.level;
+        const tierBadge = doc.getElementById('armoryTier-' + button.dataset.weapon);
+        if (tierBadge) tierBadge.textContent = 'T' + profile.tier;
+        const label = doc.getElementById('armoryLabel-' + button.dataset.weapon);
+        if (label && label.textContent !== profile.name) label.textContent = profile.name;
       }
       const note = doc.getElementById('armoryUpgradeNote'), bar = doc.getElementById('armoryUpgradeProgress');
       if (note) note.textContent = `All guns Lv ${upgrade.level}/${UPGRADE_MILESTONES.length} · +${upgrade.bonusPercent}% damage · ${upgrade.earned} power earned · ${upgrade.next == null ? 'MAX LEVEL' : `${upgrade.remaining} to Lv ${upgrade.level + 1}`}`;
       if (bar) { bar.value = upgrade.progress; bar.setAttribute('aria-valuetext', upgrade.next == null ? 'Maximum weapon level' : `${upgrade.remaining} more earned power to level ${upgrade.level + 1}`); }
       if (upgrade.level !== displayedLevel) {
         const notice = doc.getElementById('armoryUpgradeStatus');
-        if (notice) notice.textContent = upgrade.level > displayedLevel ? `All guns upgraded to Lv ${upgrade.level}! +${upgrade.bonusPercent}% damage.` : '';
+        if (notice) notice.textContent = upgrade.level > displayedLevel ? `All guns upgraded to Lv ${upgrade.level}! +${upgrade.bonusPercent}% damage.${newTech.length ? ' New tech: ' + newTech.join(', ') + '.' : ''}` : '';
         displayedLevel = upgrade.level;
+      }
+    }
+    function syncTechPanel() {
+      const panel = doc.getElementById('armoryTech');
+      if (!panel) return;
+      panel.hidden = !state.weapon;
+      if (!state.weapon) return;
+      const profile = weaponProfile(state, state.weapon), path = techModule.PATHS[state.weapon];
+      doc.getElementById('armoryTechName').textContent = `Tier ${profile.tier}/${profile.tierCount} · ${profile.name}`;
+      doc.getElementById('armoryTechNext').textContent = profile.nextTier
+        ? `Next: ${profile.nextTier.name} · Lv ${profile.nextTier.level} · ${Math.max(0, UPGRADE_MILESTONES[profile.nextTier.level - 1] - state.powerEarned)} more earned power`
+        : 'Final weapon tier · all research variants unlocked';
+      const key = state.weapon + ':' + profile.tier, list = doc.getElementById('armoryTechPath');
+      if (key === displayedTechPath) return;
+      displayedTechPath = key; list.replaceChildren();
+      for (const [i, tech] of path.entries()) {
+        const item = doc.createElement('li');
+        item.dataset.state = i + 1 < profile.tier ? 'complete' : i + 1 === profile.tier ? 'current' : 'locked';
+        if (i + 1 === profile.tier) item.setAttribute('aria-current', 'step');
+        item.textContent = `T${i + 1} ${tech.name} · Lv ${tech.level} / ${UPGRADE_MILESTONES[tech.level - 1]} power`;
+        item.title = `Warzone research: ${tech.research}`; list.append(item);
       }
     }
     function select(weapon) {
@@ -401,7 +557,9 @@
       }
       const hole = doc.createElement('span'); hole.className = 'armory-crater';
       hole.style.setProperty('--hole', spec.hole + 'px'); hole.style.setProperty('--rotation', Math.random() * 360 + 'deg');
-      node.append(svg, hole); damage.append(node); marks.push(node);
+      // Explosive/heat damage leaves soot and a burnt hole, not glass spokes.
+      if (weapon !== 'rockets' && weapon !== 'flamer') node.append(svg);
+      node.append(hole); damage.append(node); marks.push(node);
       if (marks.length > MAX_MARKS) marks.shift().remove();
     }
     function burst(x, y, destroyed) {
@@ -436,6 +594,25 @@
       const ring = at(doc.createElement('div'), x, y); ring.className = 'armory-cannon-blast';
       ring.style.width = ring.style.height = radius * 2 + 'px'; ephemeral(ring, 500);
     }
+    function flameEffect(shape) {
+      const jet = at(doc.createElement('i'), shape.x, shape.y); jet.className = 'armory-flame-jet';
+      jet.style.width = shape.length + 'px'; jet.style.height = shape.width + 'px';
+      const motion = localPreview || !reduced.matches;
+      jet.dataset.motion = String(motion); jet.dataset.effectModel = FLAME_SPRITE.model;
+      jet.style.setProperty('--flame-angle', shape.angle + 'rad');
+      for (const spec of [...flameParticles(shape, Math.random, motion), ...flameSplashParticles(shape, motion)]) {
+        const particle = doc.createElement('span'); particle.className = 'armory-flame-particle';
+        particle.style.left = spec.x + 'px'; particle.style.top = `calc(50% + ${spec.y}px)`;
+        particle.style.setProperty('--flame-dx', spec.dx + 'px'); particle.style.setProperty('--flame-dy', spec.dy + 'px');
+        particle.style.setProperty('--flame-duration', spec.duration + 'ms'); particle.style.setProperty('--flame-delay', spec.delay + 'ms');
+        const sprite = doc.createElement('i'); sprite.className = 'armory-flame-sprite';
+        sprite.style.setProperty('--sprite-scale', String(spec.scale));
+        sprite.style.setProperty('--sprite-rotation', spec.rotation + 'rad');
+        sprite.style.setProperty('--sprite-phase', (-spec.frame * FLAME_SPRITE.frameMs) + 'ms');
+        particle.append(sprite); jet.append(particle);
+      }
+      ephemeral(jet, 500);
+    }
     function nearestTank(x, y) {
       let closest = null, best = Infinity;
       for (const entry of unitNodes) {
@@ -455,9 +632,10 @@
       for (const rocket of rocketFlights.values()) rocket.node?.remove();
       rocketFlights.clear(); updateRocketLocks();
     }
-    function damageTank(weapon, id, amount, x, y) {
+    function damageTank(weapon, id, amount, x, y, firedName = null) {
       const unit = battle.units.find(unit => unit.id === id);
       if (!unit) return { damage: 0, killed: false };
+      const gunName = weapon === 'allies' ? 'Friendly tank' : firedName || weaponProfile(state, weapon).name;
       const result = battleModule.damageUnit(battle, id, amount, catalog);
       battle = result.state;
       state = { ...state, powerEarned: battle.earned };
@@ -467,7 +645,7 @@
         const totals = { damage: stats.damage + result.damage, hits: stats.hits + 1, kills: stats.kills + Number(result.killed) };
         state = { ...state, hits: state.hits + Number(!friendly), unitDamage: state.unitDamage + result.damage,
           ...(friendly ? { allyStats: totals } : { weaponStats: { ...state.weaponStats, [weapon]: totals } }),
-          lastUnitHit: `${friendly ? 'Friendly tank' : WEAPONS[weapon].name} → ${unitName}: ${result.damage} damage · ${Math.max(0, unit.health - result.damage)}/${unit.maxHealth} HP${result.killed ? ' · destroyed' : ''}` };
+          lastUnitHit: `${gunName} → ${unitName}: ${result.damage} damage · ${Math.max(0, unit.health - result.damage)}/${unit.maxHealth} HP${result.killed ? ' · destroyed' : ''}` };
         const number = at(doc.createElement('span'), x, y); number.className = 'armory-hit-number'; number.textContent = '−' + result.damage;
         ephemeral(number, 700);
       }
@@ -479,10 +657,17 @@
         ? [rocket.targetId, current] : nearestTank(rocket.x, rocket.y);
     }
     function impactRocket(rocket, target) {
-      if (!target) return;
+      if (!target) {
+        if (battle.waves?.phase === 'break') {
+          rocket.node?.remove(); rocketFlights.delete(rocket.id);
+          mark(rocket.x, rocket.y, 'rockets'); // No legal enemies remain: ground impact, no reward or phantom hit.
+        }
+        return;
+      }
       rocket.node?.remove(); rocketFlights.delete(rocket.id);
       const x = target[1].point.x + 62, y = target[1].point.y + 40;
-      const result = damageTank('rockets', target[0], rocket.damage, x, y);
+      const result = damageTank('rockets', target[0], rocket.damage, x, y, rocket.name);
+      if (result.damage > 0) mark(x, y, 'rockets');
       if (result.damage > 0) burst(x, y, result.killed);
       sync();
     }
@@ -500,7 +685,7 @@
         const id = nextRocketId++, node = !reduced.matches || localPreview ? doc.createElement('i') : null;
         const rocket = { id, targetId: target[0], x: startX + (i === 0 ? -6 : 6), y: startY,
           launchAt: now + i * 70, impactDeadline: now + ROCKET_IMPACT_DEADLINE_MS,
-          damage: i === 0 ? Math.ceil(profile.shotDamage / 2) : Math.floor(profile.shotDamage / 2), node };
+          damage: i === 0 ? Math.ceil(profile.shotDamage / 2) : Math.floor(profile.shotDamage / 2), name: profile.name, node };
         if (node) {
           node.className = 'armory-rocket is-homing'; node.dataset.projectileIndex = String(i + 1);
           node.dataset.targetId = String(target[0]); node.style.opacity = '0'; damage.append(node);
@@ -517,7 +702,7 @@
         for (const rocket of rocketFlights.values()) {
           if (time < rocket.launchAt) continue;
           const target = rocketTarget(rocket);
-          if (!target) continue; // Wait for an enemy, never turn a lost lock into a miss.
+          if (!target) { impactRocket(rocket, null); continue; }
           rocket.targetId = target[0]; const targetNode = target[1];
           // Slow frames or repeatedly dying targets must not discard a rocket.
           if (time >= rocket.impactDeadline) { impactRocket(rocket, target); continue; }
@@ -548,42 +733,62 @@
       const result = fire(state, hit, win.performance.now());
       if (!result.fired) return;
       const weapon = state.weapon, profile = weaponProfile(state, weapon); state = result.state;
+      // Intro defeat unlocks the battle. Each returning boss can call once per
+      // life, even if a powerful shot jumps straight from above half HP to zero.
+      if (hit && battle.active && !state.bossEnraged && state.health <= BALLOON_MAX_HEALTH / 2) {
+        state = { ...state, bossEnraged: true };
+        battle = battleModule.callReinforcements(battle, catalog);
+      }
       if (weapon === 'cannon') allies = battleModule.recruitAlly(allies);
       sound?.play(weapon);
       if (weapon === 'rockets' && target) { launchHomingRockets(target, profile); sync(); return; }
       if (weapon === 'rockets') rocketSalvo(x, y);
       let unitDestroyed = false;
-      if (weapon === 'cannon') {
+      if (weapon === 'flamer') {
+        const origin = weaponButtons.find(button => button.dataset.weapon === 'flamer').getBoundingClientRect();
+        const dx = x - origin.left - origin.width / 2, dy = y - origin.top - origin.height / 2;
+        const shape = flameShape(x, y, Math.hypot(dx, dy) > 1 ? Math.atan2(dy, dx) : -Math.PI / 2, profile);
+        const victims = flameVictims(battle.units.map(unit => ({ id: unit.id,
+          x: unitNodes.get(unit.id).point.x + 62, y: unitNodes.get(unit.id).point.y + 40, radius: 28 })), shape, target?.[0]);
+        // Snapshot victims and launch-time damage: replacements cannot be
+        // scorched by the same burst and a mid-burst upgrade is not retroactive.
+        for (const victim of victims) {
+          const impact = damageTank('flamer', victim.id, profile.shotDamage, victim.x, victim.y, profile.name);
+          unitDestroyed ||= impact.killed;
+        }
+        flameEffect(shape); mark(x, y, 'flamer');
+      } else if (weapon === 'cannon') {
         // Snapshot victims before any kill spawns replacements. The primary
         // takes full damage once, everyone else in the blast takes half.
         const victims = cannonBlast(battle.units.map(unit => ({ id: unit.id,
           x: unitNodes.get(unit.id).point.x + 62, y: unitNodes.get(unit.id).point.y + 40 })), x, y, target?.[0], profile);
         for (const victim of victims) {
-          const impact = damageTank('cannon', victim.id, victim.damage, victim.x, victim.y);
+          const impact = damageTank('cannon', victim.id, victim.damage, victim.x, victim.y, profile.name);
           unitDestroyed ||= impact.killed;
         }
         cannonBlastEffect(x, y, profile.splashRadius);
       } else if (target) {
         unitDestroyed = damageTank(weapon, target[0], profile.shotDamage, x, y).killed;
       }
-      if (!hit && !target) for (let i = 0; i < WEAPONS[weapon].pellets; i++) {
+      if (weapon !== 'flamer' && (weapon === 'rockets' || (!hit && !target))) for (let i = 0; i < WEAPONS[weapon].pellets; i++) {
         const spread = weapon === 'machinegun' ? 18 : 0;
         const pairOffset = weapon === 'rockets' ? (i === 0 ? -7 : 7) : 0;
         mark(x + pairOffset + (Math.random() - .5) * spread, y + pairOffset * .5 + (Math.random() - .5) * spread, weapon);
       }
-      burst(x, y, result.destroyed || unitDestroyed);
+      if (weapon !== 'flamer') burst(x, y, result.destroyed || unitDestroyed);
       if (result.destroyed) {
         balloon.dataset.destroyed = 'true'; balloon.classList.add('is-shot-down');
         balloon.dispatchEvent(new win.CustomEvent('boha:news-balloon-destroyed')); event();
         state = { ...state, bossKills: state.bossKills + 1 };
         // Only the first boss starts the economy. Later defeats never reseed it.
-        battle = battle.active ? { ...battle, score: battle.score + 1 } : battleModule.startBattle(catalog);
+        battle = battle.active ? { ...battle, score: battle.score + 1 } : battleModule.startWaveBattle(catalog);
         respawnBalloonLater();
       }
       sync();
     }
     function reset() {
       stopHolding();
+      stopWaveClock();
       clearRocketFlights();
       sound?.stop();
       marks.splice(0).forEach(node => node.remove());
@@ -598,6 +803,7 @@
     soundButton?.addEventListener('click', () => sound?.setEnabled(!sound.isEnabled()));
     function stopHolding() {
       const previous = held; held = null;
+      if (previous && state.weapon === 'flamer') sound?.stop();
       if (holdTimer != null) win.clearTimeout(holdTimer);
       holdTimer = null; rack.dataset.firing = 'false';
       try { if (previous?.capture.hasPointerCapture?.(previous.id)) previous.capture.releasePointerCapture(previous.id); } catch {}
@@ -607,7 +813,11 @@
       if (!held || !state.weapon || doc.hidden || blocked()) { stopHolding(); return; }
       if (held.autoAim) {
         const target = autoTarget();
-        if (!target) { stopHolding(); return; }
+        if (!target) {
+          if (battle.waves?.phase === 'break') holdTimer = win.setTimeout(repeatShot, 250);
+          else stopHolding();
+          return;
+        }
         shoot(target.x, target.y);
       } else shoot(held.x, held.y);
       // One shot per interval, never a catch-up burst after a stalled frame.
@@ -635,7 +845,8 @@
     doc.addEventListener('pointercancel', release, true);
     shield.addEventListener('lostpointercapture', release);
     fireButton.addEventListener('lostpointercapture', release);
-    win.addEventListener('blur', () => { stopHolding(); clearRocketFlights(); sound?.stop(); });
+    win.addEventListener('blur', () => { focused = false; stopHolding(); stopWaveClock(); clearRocketFlights(); sound?.stop(); syncBattleView(); });
+    win.addEventListener('focus', () => { focused = true; syncBattleView(); });
     fireButton.addEventListener('click', e => {
       // Mouse/touch already fired on pointerdown. Preserve keyboard activation.
       if (e.detail !== 0) return;
@@ -651,7 +862,7 @@
     doc.addEventListener('keydown', e => {
       if (e.key === 'Escape' && state.weapon) { select(null); e.preventDefault(); return; }
       if (blocked() || e.ctrlKey || e.altKey || e.metaKey || e.repeat || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
-      const key = ['machinegun', 'cannon', 'laser', 'rockets'][Number(e.key) - 1];
+      const key = ['machinegun', 'cannon', 'laser', 'rockets', 'flamer'][Number(e.key) - 1];
       if (key) { select(key); e.preventDefault(); }
     });
     // A modal can open programmatically while armed. Disarm before it appears;
@@ -673,9 +884,9 @@
     syncDamageScroll(); sync();
     return { select, shoot, reset, ready, getState: () => ({ ...state, lastShots: { ...state.lastShots }, allyStats: { ...state.allyStats },
       weaponStats: Object.fromEntries(Object.entries(state.weaponStats).map(([key, stats]) => [key, { ...stats }])) }),
-      getBattle: () => ({ ...battle, units: battle.units.map(unit => ({ ...unit, point: { ...unitNodes.get(unit.id)?.point } })) }),
+      getBattle: () => ({ ...battle, waves: battle.waves ? { ...battle.waves } : null, units: battle.units.map(unit => ({ ...unit, point: { ...unitNodes.get(unit.id)?.point } })) }),
       getProjectiles: () => [...rocketFlights.values()].map(({ id, targetId, x, y, damage }) => ({ id, targetId, x, y, damage })),
       getAllies: () => ({ ...allies, units: allies.units.map(unit => ({ ...unit, point: { ...allyNodes.get(unit.id)?.point } })) }) };
   }
-  return { WEAPONS, MAX_MARKS, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, cannonBlast, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount };
+  return { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount };
 });

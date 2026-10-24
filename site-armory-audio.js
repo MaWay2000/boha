@@ -74,6 +74,10 @@
           noise(time, .08, .28, 'bandpass', 850);
           noise(time + .09, .06, .32, 'highpass', 1800);
           tone(time + .07, .15, .23, 'triangle', 110, 280);
+        } else if (kind === 'flamer') {
+          noise(time, .08, .22, 'bandpass', 600);
+          tone(time + .07, .1, .16, 'triangle', 150, 70);
+          noise(time + .07, .12, .25, 'highpass', 1300);
         } else {
           tone(time, .14, .19, 'sine', 380, 760);
           tone(time + .1, .12, .14, 'triangle', 950, 1500);
@@ -97,6 +101,10 @@
           tone(at, .26, .22, 'sawtooth', 90, 360);
           noise(at + .12, .4, .55, 'lowpass', 450);
         }
+      } else if (kind === 'flamer') {
+        noise(time, .19, .48, 'bandpass', 650);
+        noise(time, .16, .2, 'highpass', 2200);
+        tone(time, .17, .12, 'sawtooth', 95, 52);
       } else {
         tone(time, .23, .3, 'sawtooth', 1350, 150);
         tone(time, .16, .25, 'sine', 2350, 340);
@@ -106,7 +114,7 @@
     }
     function unavailable() { stop(); available = false; report(); }
     function play(kind, action = 'fire') {
-      if (!enabled || !available || !['machinegun', 'cannon', 'laser', 'rockets'].includes(kind)) return false;
+      if (!enabled || !available || !['machinegun', 'cannon', 'laser', 'rockets', 'flamer'].includes(kind)) return false;
       if (!['fire', 'select'].includes(action)) return false;
       try {
         initialize();

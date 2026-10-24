@@ -1,0 +1,156 @@
+.site-armory {
+  position: absolute;
+  z-index: 1200;
+  top: 12px;
+  right: 195px;
+  color: #cce8f4;
+  font-family: "Oxanium", sans-serif;
+}
+.armory-rack { display: flex; gap: 6px; }
+.armory-rack button {
+  position: relative;
+  width: 80px;
+  padding: 5px 4px 6px;
+  border: 1px solid #5a899c99;
+  border-top-color: #9cd8ec;
+  border-radius: 5px;
+  background: linear-gradient(150deg, #213b47e8, #07131dec 65%);
+  color: #accbd9;
+  box-shadow: inset 0 1px #d1f7ff16, 0 4px 12px #0008;
+  cursor: pointer;
+}
+.armory-rack button:hover { background: linear-gradient(150deg, #395b68, #0a2837); border-color: #9de9ff; }
+.armory-rack button[aria-pressed="true"] { border-color: #ffd174; background: linear-gradient(150deg, #5d4328, #251d19); color: #ffe2a9; box-shadow: 0 0 18px #ffb83833; }
+.site-armory[data-firing="true"] button[aria-pressed="true"] { border-color: #fff1c9; box-shadow: 0 0 20px #ffb83877, inset 0 0 12px #ffb83833; }
+.armory-rack button:focus-visible, .armory-hud button:focus-visible { outline: 2px solid #9eeeff; outline-offset: 3px; }
+.armory-rack .armory-gun-preview { position: relative; display: block; width: 68px; height: 44px; margin: 0 auto 2px; overflow: hidden; pointer-events: none; }
+.armory-gun-preview svg, .armory-gun-preview canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; pointer-events: none; }
+.armory-gun-preview svg { filter: drop-shadow(0 3px 2px #0009); }
+.armory-gun-preview canvas { top: 50%; height: 80px; transform: translateY(-50%); filter: brightness(1.3) drop-shadow(0 2px 1px #000a); }
+.armory-gun-preview.has-model svg { display: none; }
+.armory-rack span { display: block; font-size: 9px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.armory-rack kbd { position: absolute; right: 4px; top: 3px; color: #809ba8; font: 9px monospace; }
+.armory-rack .armory-level { position: absolute; top: 3px; left: 4px; padding: 1px 3px; border-radius: 3px; background: #06131bca; color: #9ec3d2; font: 700 8px 'Oxanium', sans-serif; }
+.armory-rack button:not([data-level="1"]) .armory-level { color: #ffe1a1; box-shadow: 0 0 5px #ffc45744; }
+.armory-reload { display: block; width: calc(100% - 6px); height: 4px; margin: 7px 3px 0; border: 0; border-radius: 2px; overflow: hidden; appearance: none; background: #020a10; accent-color: #79dca7; }
+.armory-reload::-webkit-progress-bar { background: #020a10; border-radius: 2px; box-shadow: inset 0 0 0 1px #85b4c125; }
+.armory-reload::-webkit-progress-value { background: #79dca7; border-radius: 2px; }
+.armory-reload::-moz-progress-bar { background: #79dca7; border-radius: 2px; }
+.armory-rack button[data-loading="true"] .armory-reload { accent-color: #ffcc78; }
+.armory-rack button[data-loading="true"] .armory-reload::-webkit-progress-value { background: linear-gradient(90deg, #b07731, #ffcf82); }
+.armory-rack button[data-loading="true"] .armory-reload::-moz-progress-bar { background: #ffcc78; }
+.armory-rack .armory-reload-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.gun-shadow { fill: #040b12; stroke: #4b6776; }
+.gun-metal { fill: #90adba; stroke: #d3edf5; stroke-width: 1.3; }
+.gun-dark { fill: #304b5c; stroke: #5f8095; }
+.gun-barrel { fill: #516c7c; stroke: #b2cbd7; stroke-width: 1.2; }
+.gun-light { fill: #e5f7fa; }
+.gun-accent { fill: #ff9c5c; }
+.gun-energy { fill: #5df2fc; filter: drop-shadow(0 0 2px #1adcff); }
+.armory-shield { position: fixed; inset: 0; z-index: 100; cursor: crosshair; touch-action: manipulation; background: transparent; }
+.armory-shield[hidden], .armory-hud[hidden] { display: none; }
+.armory-damage { position: fixed; inset: 0; z-index: 110; overflow: hidden; pointer-events: none; contain: strict; }
+.armory-mark { position: absolute; transform: translate(-50%, -50%); overflow: visible; }
+.armory-crater { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(var(--rotation)); width: var(--hole); height: var(--hole); border-radius: 43% 53% 38% 48%; background: radial-gradient(ellipse, #000 22%, #010408 44%, #080b0d 54%, #b6c7cc 58%, #415362 63%, #070c10bb 71%, #01030655 79%, transparent 82%); box-shadow: 0 0 5px 2px #000b; }
+.armory-mark[data-kind="laser"] .armory-crater { background: radial-gradient(ellipse, #011119 20%, #032027 44%, #84f5ff 53%, #0b6e7d 60%, #0009 68%, transparent 79%); box-shadow: 0 0 9px #5af4ff77; }
+.armory-cracks { display: block; width: 100%; height: 100%; filter: drop-shadow(1px 1px 0 #000b); }
+.armory-cracks path { fill: none; stroke: #c9e6f3aa; stroke-width: .7; }
+.armory-cracks .crack-core { stroke: #edfaffd9; stroke-width: 1; }
+.armory-spark { position: absolute; width: 4px; height: 4px; background: #ffdb99; border-radius: 50%; box-shadow: 0 0 8px #ffb25c; animation: armory-spark .4s ease-out forwards; }
+.armory-burst { position: absolute; width: 65px; height: 65px; border: 2px solid #ffd69c; border-radius: 50%; transform: translate(-50%, -50%); animation: armory-burst .35s ease-out forwards; box-shadow: 0 0 20px #ffb14966; }
+.armory-cannon-blast { position: absolute; border: 2px solid #ffbc70; border-radius: 50%; background: radial-gradient(circle, #ffd28c66, #ff852b22 55%, transparent 70%); box-shadow: 0 0 24px #ff9c4c66, inset 0 0 20px #ffc67b55; animation: armory-cannon-blast .45s ease-out forwards; }
+@keyframes armory-cannon-blast { from { transform: translate(-50%, -50%) scale(.15); opacity: .9; } to { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+.armory-debris { position: absolute; width: 12px; height: 17px; background: linear-gradient(130deg, #e4f5ff, #588cb0 60%, #12314b); clip-path: polygon(0 0, 100% 20%, 65% 100%, 12% 72%); animation: armory-debris .9s ease-in forwards; }
+.armory-rocket { position: absolute; width: 19px; height: 6px; border-radius: 2px 60% 60% 2px; background: linear-gradient(90deg, #8c9ca8, #e2f1f5 75%, #ffbc6c); box-shadow: -12px 0 8px 2px #ff9e39aa, -25px 0 15px #ffd28788; opacity: 0; animation: armory-rocket-flight .22s linear forwards; animation-delay: var(--rocket-delay); }
+.armory-rocket::before { content: ''; position: absolute; right: 100%; top: 1px; width: 24px; height: 4px; border-radius: 80% 0 0 80%; background: linear-gradient(90deg, transparent, #ff7a24, #fff5ce); }
+.armory-rocket.is-homing { animation: none; will-change: left, top, transform; }
+@keyframes armory-rocket-flight { 0% { opacity: 1; transform: rotate(var(--rocket-angle)); } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--rocket-dx), var(--rocket-dy)) rotate(var(--rocket-angle)); } }
+.news-balloon.is-shot-down { visibility: hidden; pointer-events: none; }
+.armory-hud {
+  position: fixed;
+  z-index: 1300;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  width: min(640px, calc(100vw - 24px));
+  padding: 14px 18px 10px;
+  border: 1px solid #e6af5b88;
+  border-radius: 9px;
+  background: linear-gradient(125deg, #152937f5, #0a111af8);
+  color: #d4eaf3;
+  box-shadow: 0 12px 40px #000a;
+  font: 12px "Space Grotesk", sans-serif;
+}
+.armory-hud strong { color: #ffdca4; font: 700 13px "Oxanium", sans-serif; text-transform: uppercase; letter-spacing: .08em; }
+.armory-live-dot { display: inline-block; width: 6px; height: 6px; margin-right: 8px; border-radius: 50%; background: #ffd57f; box-shadow: 0 0 7px #ffd57f55; }
+.armory-hud p { margin: 6px 0 10px; }
+.armory-boss-health { margin: 8px 0 12px; color: #e6cbb2; font-size: 10px; }
+.armory-boss-health progress { display: block; width: 100%; height: 6px; margin-top: 5px; border: 0; background: #160d10; accent-color: #f59568; }
+.armory-boss-health progress::-webkit-progress-bar { background: #160d10; }
+.armory-boss-health progress::-webkit-progress-value { background: linear-gradient(90deg, #b94538, #ffb774); }
+.armory-boss-health progress::-moz-progress-bar { background: #f59568; }
+.armory-allies-stats { display: flex; flex-wrap: wrap; gap: 5px 15px; margin: 8px 0; color: #94dcea; font-size: 10px; }
+.armory-allies-stats[hidden] { display: none; }
+.armory-allies-stats b { color: #c5f6ff; }
+.armory-army-shot { position: absolute; height: 2px; background: #68ddff; box-shadow: 0 0 5px #68ddff; transform-origin: left center; }
+.armory-army-shot[data-team="enemy"] { background: #ff9278; box-shadow: 0 0 5px #ff9278; }
+.armory-hud-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.armory-hud button { padding: 7px 12px; border: 1px solid #71a2b377; border-radius: 4px; background: #163644; color: #d0f4ff; cursor: pointer; font: 600 11px "Oxanium", sans-serif; }
+.armory-hud button:hover { background: #285467; }
+.armory-hud #armoryOff { margin-left: auto; border-color: #b7905d88; color: #ffe0a3; }
+.armory-hud button:disabled { opacity: .45; cursor: default; }
+.armory-hud kbd { margin-left: 4px; color: #8ca4b1; font-size: 10px; }
+.armory-hud .armory-help { margin: 9px 0 0; color: #86a2b2; font-size: 10px; }
+.armory-battle-stats { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 10px 0; padding: 10px 0; border-top: 1px solid #7ac5d72e; border-bottom: 1px solid #7ac5d72e; color: #9ab8c7; font-size: 11px; }
+.armory-battle-stats[hidden], .armory-targets[hidden] { display: none; }
+.armory-battle-stats strong { margin-left: 6px; color: #b6edc6; font-size: 16px; }
+.armory-battle-stats small { flex-basis: 100%; color: #8fabbc; font-size: 10px; }
+.armory-weapon-totals { display: flex; flex-wrap: wrap; gap: 6px 16px; flex-basis: 100%; font-size: 10px; }
+.armory-weapon-totals b { color: #dfedfa; font-variant-numeric: tabular-nums; }
+.armory-upgrade { flex-basis: 100%; }
+.armory-upgrade progress { display: block; width: 100%; height: 4px; margin: 6px 0; border: 0; accent-color: #ffc66e; background: #06111a; }
+.armory-upgrade progress::-webkit-progress-bar { background: #06111a; }
+.armory-upgrade progress::-webkit-progress-value { background: linear-gradient(90deg, #bd8136, #ffdc90); }
+.armory-upgrade progress::-moz-progress-bar { background: #ffcc7e; }
+.armory-upgrade #armoryUpgradeStatus { color: #ffde9c; }
+.armory-upgrade #armoryUpgradeStatus:empty { display: none; }
+.armory-hit-number { position: absolute; transform: translate(-50%, -100%); color: #ffe0a0; font: 700 18px 'Oxanium', sans-serif; text-shadow: 0 2px 3px #000, 0 0 4px #000; animation: armory-hit-number .7s ease-out forwards; }
+@keyframes armory-hit-number { to { transform: translate(-50%, -170%); opacity: 0; } }
+html.armory-scroll-locked, body.armory-scroll-locked { overflow: hidden !important; overscroll-behavior: none; }
+.armory-targets { position: fixed; inset: 0 0 auto; height: min(300px, 100vh); height: min(300px, 100dvh); z-index: 105; pointer-events: none; overflow: hidden; contain: strict; }
+.armory-unit { position: absolute; left: 0; top: 0; width: 124px; height: 100px; pointer-events: none; will-change: transform; filter: drop-shadow(0 5px 4px #000a); }
+.armory-unit-visual { position: relative; display: block; width: 124px; height: 74px; }
+.armory-unit-visual canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.armory-unit[data-rocket-lock="true"] .armory-unit-visual::after { content: ''; position: absolute; inset: 9px 16px; border: 1px dashed #ffda83; border-radius: 12px; box-shadow: 0 0 8px #ffaf4744; }
+.armory-unit-placeholder { position: absolute; width: 48px; height: 24px; top: 25px; left: 38px; border: 5px solid #142733; border-radius: 6px; background: #a1c6d0; transform: rotate(-15deg); box-shadow: 0 3px 6px #0009; }
+.armory-unit-placeholder::after { content: ''; position: absolute; width: 28px; height: 6px; top: 4px; left: 20px; border: 1px solid #d1f1f9; background: #435d70; }
+.armory-unit-visual.has-model .armory-unit-placeholder { display: none; }
+.armory-unit-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center; color: #d4f0fc; font: 600 9px 'Oxanium', sans-serif; text-shadow: 0 1px 3px #000, 0 0 4px #000; }
+.armory-unit-cost { position: absolute; top: 0; right: 5px; padding: 2px 5px; background: #092335df; border: 1px solid #83dfad55; border-radius: 3px; color: #a9efc1; font: 700 9px 'Oxanium', sans-serif; }
+.armory-unit-health { display: block; margin: 4px auto 0; width: 76px; height: 3px; border: 0; accent-color: #89e8bc; background: #06111a; }
+.armory-unit-health::-webkit-progress-bar { background: #06111a; }
+.armory-unit-health::-webkit-progress-value { background: #89e8bc; }
+.armory-unit-health::-moz-progress-bar { background: #89e8bc; }
+.armory-unit[data-team="enemy"] .armory-unit-health { accent-color: #ec917a; }
+.armory-unit[data-team="enemy"] .armory-unit-health::-webkit-progress-value { background: #ec917a; }
+.armory-unit[data-team="enemy"] .armory-unit-health::-moz-progress-bar { background: #ec917a; }
+.armory-unit[data-team="ally"] { filter: drop-shadow(0 0 4px #42c9ff77); }
+.armory-unit[data-team="ally"] .armory-unit-name { color: #91e8ff; }
+.armory-unit[data-team="ally"] .armory-unit-cost { background: #083342ed; color: #91e8ff; border-color: #53d9ff; }
+.armory-unit[data-team="ally"] .armory-unit-health { accent-color: #68ddff; }
+.armory-unit[data-team="ally"] .armory-unit-health::-webkit-progress-value { background: #68ddff; }
+.armory-unit[data-team="ally"] .armory-unit-health::-moz-progress-bar { background: #68ddff; }
+@keyframes armory-spark { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+@keyframes armory-burst { to { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
+@keyframes armory-debris { to { transform: translate(var(--dx), var(--dy)) rotate(var(--spin)); opacity: 0; } }
+@media (max-width: 1700px) {
+  .site-armory { position: relative; top: auto; right: auto; display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin: 10px 28px 0; }
+}
+@media (max-width: 600px) {
+  .site-armory { margin: 12px 0 0; justify-content: center; flex-wrap: wrap; gap: 4px 12px; }
+  .armory-rack button { width: clamp(64px, 20vw, 80px); }
+  .armory-rack .armory-gun-preview { width: min(68px, 100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .armory-spark, .armory-burst, .armory-debris, .armory-hit-number { animation: none; }
+}

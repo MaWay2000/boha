@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { NEWS, bounds, createFlight, advanceFlight, mount } = require('../site-news.js');
+const { NEWS, normalizeArchive, bounds, createFlight, advanceFlight, mount } = require('../site-news.js');
 
 test('flight is bounded to the viewport and a maximum 300px vertical range', () => {
   for (const dimensions of [[1440, 900, 132, 184], [375, 600, 108, 152], [80, 100, 132, 184]]) {
@@ -60,19 +60,20 @@ test('integration is shell-only with a native accessible dialog and safe text re
   assert.doesNotMatch(script, /innerHTML|insertAdjacentHTML/);
 });
 
-function browserFixture({ reduced = false, blockedStorage = false, read = null, motion = null, url = null } = {}) {
+function browserFixture({ reduced = false, blockedStorage = false, read = null, motion = null, url = null, records = NEWS, fetch = null } = {}) {
   class Element {
     constructor(id) { this.id = id; this.listeners = {}; this.dataset = {}; this.style = {}; this.attributes = {}; this.children = []; this.hidden = false; this.open = false; this.offsetWidth = 132; this.offsetHeight = 184; }
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
     emit(type, details = {}) { for (const fn of this.listeners[type] || []) fn({ target: this, ...details }); }
     append(...children) { this.children.push(...children); }
+    replaceChildren(...children) { this.children = children; }
     setAttribute(key, value) { this.attributes[key] = value; }
     focus() { doc.activeElement = this; this.emit('focus'); }
     showModal() { this.open = true; }
     close() { this.open = false; this.emit('close'); }
     getBoundingClientRect() { return { left: 100, right: 700, top: 50, bottom: 650 }; }
   }
-  const ids = ['siteNewsBalloon', 'siteNewsDialog', 'siteNewsClose', 'siteNewsUnread', 'siteNewsList', 'siteNewsMotion', 'siteNewsMotionNote'];
+  const ids = ['siteNewsBalloon', 'siteNewsDialog', 'siteNewsClose', 'siteNewsUnread', 'siteNewsList', 'siteNewsMotion', 'siteNewsArchiveStatus', 'siteNewsOlder'];
   const elements = Object.fromEntries(ids.map(id => [id, new Element(id)]));
   const bodyClasses = new Set();
   const doc = new Element('document');
@@ -82,6 +83,8 @@ function browserFixture({ reduced = false, blockedStorage = false, read = null, 
   doc.body = { classList: { add: value => bodyClasses.add(value), remove: value => bodyClasses.delete(value) } };
   const media = new Element('media'); media.matches = reduced;
   const win = new Element('window'); win.document = doc; win.innerHeight = 800;
+  doc.baseURI = url || 'http://localhost/index.html';
+  if (fetch) win.fetch = fetch;
   if (url) {
     win.location = { href: url };
     win.history = { replaceState(_, __, next) { win.location.href = String(next); } };
@@ -97,8 +100,8 @@ function browserFixture({ reduced = false, blockedStorage = false, read = null, 
   const timers = new Map();
   win.setTimeout = (fn, delay) => { timers.set(++id, { fn, delay }); return id; };
   win.clearTimeout = id => timers.delete(id);
-  mount(win);
-  return { win, doc, elements, bodyClasses, frames, storage, media, timers,
+  const controller = mount(win, records);
+  return { win, doc, elements, bodyClasses, frames, storage, media, timers, ready: controller.ready,
     finishHoverPause() { const pending = [...timers.values()]; timers.clear(); pending.forEach(timer => timer.fn()); },
     step() { const pending = [...frames.values()]; frames.clear(); now += 16; pending.forEach(fn => fn(now)); } };
 }
@@ -208,5 +211,139 @@ test('public visitors still default to reduced motion and an explicit local off 
   const local = browserFixture({ reduced: true, motion: 'off', url: 'http://127.0.0.1:4173/index.html' });
   assert.equal(local.elements.siteNewsMotion.checked, false);
   assert.equal(local.elements.siteNewsBalloon.dataset.flying, 'false');
-  assert.match(local.elements.siteNewsMotionNote.textContent, /Flight is off/);
+  assert.match(local.elements.siteNewsMotion.title, /Flight is off/);
+});
+
+function archiveRecords(count) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `record-${i}`, date: '2026-10-23', category: 'Interface', title: `Update ${i}`, text: `Details ${i}`
+  }));
+}
+
+test('archive validates complete records and real dates, rejects duplicate IDs, and keeps same-day order', () => {
+  const records = archiveRecords(3);
+  records[0].date = '2026-10-22';
+  records[1].privateField = 'not part of a news record';
+  const archive = { schemaVersion: 1, entries: records };
+  assert.deepEqual(normalizeArchive(archive).map(entry => entry.id), ['record-1', 'record-2', 'record-0']);
+  assert.equal('privateField' in normalizeArchive(archive)[0], false);
+  for (const invalid of [null, { schemaVersion: 2, entries: [] },
+    { schemaVersion: 1, entries: [{ ...records[0], date: '2026-02-30' }] },
+    { schemaVersion: 1, entries: [{ ...records[0], text: ' ' }] },
+    { schemaVersion: 1, entries: [records[0], records[0]] }]) {
+    assert.throws(() => normalizeArchive(invalid));
+  }
+});
+
+test('archive preserves all original published news records', () => {
+  for (const id of ['2026-10-23-awards', '2026-10-23-telemetry', '2026-10-22-match-details']) {
+    assert.equal(NEWS.filter(entry => entry.id === id).length, 1);
+  }
+  const f = browserFixture();
+  assert.equal(f.elements.siteNewsList.children.length, 3);
+  assert.equal(f.elements.siteNewsOlder.hidden, false);
+  f.elements.siteNewsOlder.emit('click');
+  assert.equal(f.elements.siteNewsList.children.length, NEWS.length);
+  assert.equal(f.elements.siteNewsOlder.hidden, true);
+});
+
+test('load older news reaches the entire archive without replacing or duplicating existing cards', () => {
+  const records = archiveRecords(14), f = browserFixture({ records });
+  const { siteNewsList: list, siteNewsOlder: older, siteNewsArchiveStatus: status } = f.elements;
+  const first = list.children[0];
+  f.elements.siteNewsBalloon.emit('click');
+  for (const count of [6, 9, 12, 14]) {
+    older.emit('click');
+    assert.equal(list.children.length, count);
+    assert.equal(list.children[0], first);
+    assert.equal(older.hidden, count === 14);
+    assert.match(status.textContent, new RegExp(`Showing ${count} of 14`));
+  }
+  assert.deepEqual(list.children.map(item => item.children[1].textContent), records.map(item => item.title));
+  f.elements.siteNewsClose.emit('click');
+  f.elements.siteNewsBalloon.emit('click');
+  assert.equal(list.children.length, 14);
+  assert.equal(f.storage.get('boha.siteNews.lastRead'), records[0].id);
+  assert.equal(records.length, 14);
+});
+
+test('browser loads the complete canonical archive with revalidation under the GitHub Pages subpath', async () => {
+  let request;
+  const f = browserFixture({ records: [], url: 'https://maway2000.github.io/boha/index.html?tab=compare',
+    fetch: async (...args) => { request = args; return { ok: true, json: async () => ({ schemaVersion: 1, entries: archiveRecords(8) }) }; } });
+  await f.ready;
+  assert.deepEqual(request, ['https://maway2000.github.io/boha/news/records.json', { cache: 'no-cache', credentials: 'same-origin' }]);
+  assert.equal(f.elements.siteNewsList.children.length, 3);
+  f.elements.siteNewsOlder.emit('click'); f.elements.siteNewsOlder.emit('click');
+  assert.equal(f.elements.siteNewsList.children.length, 8);
+  assert.equal(f.elements.siteNewsOlder.hidden, true);
+  assert.equal(f.elements.siteNewsUnread.hidden, false);
+});
+
+test('opening while news is loading marks the actual newest ID read only after it arrives', async () => {
+  let complete;
+  const response = new Promise(resolve => { complete = resolve; });
+  const f = browserFixture({ records: [], fetch: () => response });
+  f.elements.siteNewsBalloon.emit('click');
+  assert.equal(f.storage.has('boha.siteNews.lastRead'), false);
+  complete({ ok: true, json: async () => ({ schemaVersion: 1, entries: archiveRecords(5) }) });
+  await f.ready;
+  assert.equal(f.storage.get('boha.siteNews.lastRead'), 'record-0');
+  assert.equal(f.elements.siteNewsUnread.hidden, true);
+  assert.equal(f.elements.siteNewsList.children.length, 3);
+});
+
+test('failed archive loading offers a working retry without stopping balloon flight', async () => {
+  let calls = 0;
+  const f = browserFixture({ records: [], fetch: async () => {
+    if (++calls === 1) return { ok: false };
+    return { ok: true, json: async () => ({ schemaVersion: 1, entries: archiveRecords(7) }) };
+  } });
+  await f.ready;
+  assert.match(f.elements.siteNewsArchiveStatus.textContent, /Could not load/);
+  assert.equal(f.elements.siteNewsOlder.textContent, 'Retry loading news');
+  assert.equal(f.elements.siteNewsBalloon.dataset.flying, 'true');
+  f.elements.siteNewsOlder.emit('click');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(calls, 2);
+  assert.match(f.elements.siteNewsArchiveStatus.textContent, /Showing 3 of 7/);
+  assert.equal(f.elements.siteNewsOlder.textContent, 'Load older news');
+});
+
+test('invalid fetched archive leaves already loaded records intact and empty archives have no unread badge', async () => {
+  const f = browserFixture({ fetch: async () => ({ ok: true, json: async () => ({ schemaVersion: 1, entries: [NEWS[0], NEWS[0]] }) }) });
+  const first = f.elements.siteNewsList.children[0];
+  await f.ready;
+  assert.equal(f.elements.siteNewsList.children[0], first);
+  assert.match(f.elements.siteNewsArchiveStatus.textContent, /could not be refreshed/);
+  const empty = browserFixture({ records: [] });
+  assert.equal(empty.elements.siteNewsOlder.hidden, true);
+  assert.equal(empty.elements.siteNewsUnread.hidden, true);
+  empty.win.emit('storage', { key: 'boha.siteNews.lastRead' });
+  assert.equal(empty.elements.siteNewsUnread.hidden, true);
+});
+
+test('destroying the balloon stops flight and repair resumes it without changing news records', () => {
+  const f = browserFixture(), button = f.elements.siteNewsBalloon;
+  const first = f.elements.siteNewsList.children[0];
+  button.dataset.destroyed = 'true'; button.emit('boha:news-balloon-destroyed');
+  assert.equal(f.frames.size, 0); assert.equal(button.dataset.flying, 'false');
+  button.emit('click'); assert.equal(f.elements.siteNewsDialog.open, false);
+  button.dataset.destroyed = 'false'; button.emit('boha:news-balloon-repaired');
+  assert.equal(f.frames.size, 1); assert.equal(button.dataset.flying, 'true');
+  button.emit('click'); assert.equal(f.elements.siteNewsDialog.open, true);
+  assert.equal(f.elements.siteNewsList.children[0], first);
+});
+
+test('balloon is anchored to the top of the document and pauses while scrolled out of view', () => {
+  const css = fs.readFileSync(require.resolve('../site-news.css'), 'utf8');
+  assert.match(css, /\.news-balloon \{\s*position: absolute;/);
+  const f = browserFixture(), button = f.elements.siteNewsBalloon;
+  const original = button.style.transform;
+  f.win.scrollY = 900; f.win.emit('scroll');
+  assert.equal(f.frames.size, 0); assert.equal(button.dataset.flying, 'false');
+  assert.equal(button.style.transform, original);
+  f.win.scrollY = 0; f.win.emit('scroll');
+  assert.equal(f.frames.size, 1); assert.equal(button.dataset.flying, 'true');
+  f.step(); f.step(); assert.notEqual(button.style.transform, original);
 });

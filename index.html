@@ -17,10 +17,16 @@
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <script src="assets/atom-icon-renderer.js?v=20261021-circle-1" defer></script>
   <script src="assets/atom-favicon.js?v=20261022-static-1" defer></script>
-  <link rel="stylesheet" href="styles.css?v=20260929-beta3-1">
-  <link rel="stylesheet" href="site-news.css?v=20261023-balloon-3d-1">
-  <script src="site-news.js?v=20261023-balloon-flight-3" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20261023-header-cleanup-1">
+  <link rel="stylesheet" href="site-news.css?v=20261023-news-cleanup-1">
+  <script src="site-news.js?v=20261023-news-cleanup-1" defer></script>
   <script src="site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
+  <link rel="stylesheet" href="site-armory.css?v=20261024-cannon-splash-1">
+  <script src="site-armory-audio.js?v=20261024-rocket-salvo-1" defer></script>
+  <script src="site-armory-battle.js?v=20261024-allies-1" defer></script>
+  <script src="site-armory.js?v=20261024-cannon-splash-1" defer></script>
+  <script src="site-armory-model.js?v=20261024-rockets-1" type="module"></script>
+  <script src="site-armory-units.js?v=20261024-allies-1" type="module"></script>
   <style>
     body.radio-playlist-open {
       overflow: hidden;
@@ -151,17 +157,19 @@
     <span class="news-balloon-label" aria-hidden="true">NEWS</span>
     <span class="news-balloon-unread" id="siteNewsUnread" aria-hidden="true">NEW</span>
   </button>
-  <dialog class="site-news-dialog" id="siteNewsDialog" aria-labelledby="siteNewsTitle" aria-describedby="siteNewsDescription">
+  <dialog class="site-news-dialog" id="siteNewsDialog" aria-labelledby="siteNewsTitle">
     <header>
       <div><p class="site-news-eyebrow">WARZONE 2100 · WEB STATS</p><h2 id="siteNewsTitle">What's new</h2></div>
       <button class="site-news-close" id="siteNewsClose" type="button" aria-label="Close news" autofocus>×</button>
     </header>
     <ol class="site-news-list" id="siteNewsList"></ol>
+    <div class="site-news-archive-controls">
+      <p id="siteNewsArchiveStatus" role="status" aria-live="polite">Loading news archive…</p>
+      <button id="siteNewsOlder" type="button" hidden>Load older news</button>
+    </div>
     <div class="site-news-settings">
       <label><input type="checkbox" id="siteNewsMotion"> Animate balloon</label>
-      <p class="site-news-motion-note" id="siteNewsMotionNote"></p>
     </div>
-    <footer id="siteNewsDescription">Latest site updates. Click the balloon anytime to read them again.</footer>
   </dialog>
   <div class="page-shell">
     <div class="page-noise" aria-hidden="true"></div>
@@ -195,6 +203,42 @@
           ></iframe>
         </div>
       </header>
+      <section class="site-armory" id="siteArmory" aria-label="Optional balloon shooting game">
+        <div class="armory-rack" role="group" aria-label="Choose a weapon; select again to disarm">
+          <button type="button" data-weapon="rockets" aria-pressed="false" aria-describedby="armoryReloadLabel-rockets" title="Homing rockets — auto-lock enemy tanks; two rockets per salvo, one salvo per second; hold to fire">
+            <span class="armory-gun-preview" aria-hidden="true">
+              <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M10 29 20 18H57L66 30 55 39H16Z"/><path class="gun-metal" d="M15 16 23 7H58L65 16V29H15Z"/><path class="gun-dark" d="M22 13H34V24H22ZM43 13H55V24H43Z"/><path class="gun-accent" d="M25 16H31V21H25ZM46 16H52V21H46Z"/><path class="gun-barrel" d="M30 30H51V36H30Z"/></svg>
+            </span>
+            <span>Rockets</span><kbd>4</kbd><span class="armory-level" id="armoryLevel-rockets">Lv 1</span>
+            <progress class="armory-reload" id="armoryReload-rockets" value="1" max="1" aria-hidden="true"></progress>
+            <span class="armory-reload-label" id="armoryReloadLabel-rockets">Ready</span>
+          </button>
+          <button type="button" data-weapon="machinegun" aria-pressed="false" aria-describedby="armoryReloadLabel-machinegun" title="Machine gun — three-round burst">
+            <span class="armory-gun-preview" aria-hidden="true">
+            <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M9 29 20 19H51L58 29 51 38H17Z"/><path class="gun-metal" d="M15 20 24 11H48L56 20 48 29H19Z"/><path class="gun-dark" d="M27 11V29H37V11Z"/><path class="gun-barrel" d="M38 14H73V19H38ZM38 23H73V28H38Z"/><path class="gun-light" d="M22 12H31V16H22ZM61 13H72V17H61Z"/><path class="gun-accent" d="M16 24H24V28H16ZM42 33H50V36H42Z"/></svg>
+            </span>
+            <span>Machine gun</span><kbd>1</kbd><span class="armory-level" id="armoryLevel-machinegun">Lv 1</span>
+            <progress class="armory-reload" id="armoryReload-machinegun" value="1" max="1" aria-hidden="true"></progress>
+            <span class="armory-reload-label" id="armoryReloadLabel-machinegun">Ready</span>
+          </button>
+          <button type="button" data-weapon="cannon" aria-pressed="false" aria-describedby="armoryReloadLabel-cannon" title="Heavy cannon — full direct damage, 50% splash within 200px, +1 friendly fighter; one shot every 3 seconds">
+            <span class="armory-gun-preview" aria-hidden="true">
+            <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M7 29 18 18H48L59 29 50 39H15Z"/><path class="gun-metal" d="M14 20 25 9H46L56 20 46 31H21Z"/><path class="gun-dark" d="M29 10H40V31H29Z"/><path class="gun-barrel" d="M37 16H68V25H37ZM65 13H77V28H65Z"/><path class="gun-light" d="M23 10H32V14H23ZM67 14H75V18H67Z"/><path class="gun-accent" d="M18 24H26V28H18Z"/></svg>
+            </span>
+            <span>Heavy cannon</span><kbd>2</kbd><span class="armory-level" id="armoryLevel-cannon">Lv 1</span>
+            <progress class="armory-reload" id="armoryReload-cannon" value="1" max="1" aria-hidden="true"></progress>
+            <span class="armory-reload-label" id="armoryReloadLabel-cannon">Ready</span>
+          </button>
+          <button type="button" data-weapon="laser" aria-pressed="false" aria-describedby="armoryReloadLabel-laser" title="Pulse laser — one shot per second; hold to fire">
+            <span class="armory-gun-preview" aria-hidden="true">
+            <svg viewBox="0 0 80 44" aria-hidden="true"><path class="gun-shadow" d="M9 29 21 18H48L59 29 49 39H16Z"/><path class="gun-metal" d="M16 20 26 10H45L56 20 46 30H22Z"/><path class="gun-dark" d="M30 11H40V29H30Z"/><path class="gun-barrel" d="M39 17H72V25H39Z"/><path class="gun-energy" d="M45 19H77V22H45ZM49 12H54V29H49ZM60 12H65V29H60Z"/><path class="gun-light" d="M24 11H33V15H24Z"/></svg>
+            </span>
+            <span>Pulse laser</span><kbd>3</kbd><span class="armory-level" id="armoryLevel-laser">Lv 1</span>
+            <progress class="armory-reload" id="armoryReload-laser" value="1" max="1" aria-hidden="true"></progress>
+            <span class="armory-reload-label" id="armoryReloadLabel-laser">Ready</span>
+          </button>
+        </div>
+      </section>
     </div>
 
     <main class="frame-shell-main" id="top">
@@ -221,6 +265,49 @@
       <p><a href="https://mit-license.org/" target="_blank" rel="noreferrer">MIT License</a>. Warzone 2100 - webstats viewer by Maway2000</p>
     </footer>
   </div>
+
+  <div class="armory-shield" id="armoryShield" hidden aria-hidden="true"></div>
+  <div class="armory-damage" id="armoryDamage" aria-hidden="true"></div>
+  <div class="armory-targets" id="armoryTargets" aria-hidden="true" hidden></div>
+  <aside class="armory-hud" id="armoryHud" aria-label="Target practice controls" hidden>
+    <div><span class="armory-live-dot" aria-hidden="true"></span><strong id="armoryWeaponName">Target practice</strong><p id="armoryStatus" role="status" aria-live="polite">Select a weapon to play.</p></div>
+    <div class="armory-boss-health">
+      <span id="armoryBossStatus">Balloon boss · 1000/1000 HP</span>
+      <progress id="armoryBossHealth" value="1000" max="1000" aria-label="Balloon boss health"></progress>
+    </div>
+    <div class="armory-allies-stats" id="armoryAlliesStats" hidden>
+      <span>Allies <b id="armoryAllyCount">0</b> / 4</span>
+      <span>Reserves <b id="armoryAllyReserves">0</b></span>
+      <span>Ally kills <b id="armoryAllyKills">0</b></span>
+      <span>Allied damage <b id="armoryAllyDamage">0</b></span>
+    </div>
+    <div class="armory-battle-stats" id="armoryBattleStats" hidden>
+      <span>Score <strong id="armoryScore">0</strong></span>
+      <span>Power bank <strong id="armoryBank">0</strong></span>
+      <span>Targets <strong id="armoryTargetCount">0 / 8</strong></span>
+      <span>Unit damage <strong id="armoryUnitDamage">0</strong></span>
+      <div class="armory-weapon-totals" aria-label="Damage and unit kills by weapon">
+        <span>MG <b id="armoryDamage-machinegun">0</b> dmg · <b id="armoryKills-machinegun">0</b> kills</span>
+        <span>Cannon <b id="armoryDamage-cannon">0</b> dmg · <b id="armoryKills-cannon">0</b> kills</span>
+        <span>Laser <b id="armoryDamage-laser">0</b> dmg · <b id="armoryKills-laser">0</b> kills</span>
+        <span>Rockets <b id="armoryDamage-rockets">0</b> dmg · <b id="armoryKills-rockets">0</b> kills</span>
+      </div>
+      <small id="armoryLastHit">Unit damage counts HP actually removed; misses and the balloon do not count.</small>
+      <div class="armory-upgrade">
+        <small id="armoryUpgradeNote">All guns Lv 1/20 · +0% damage · 500 power to Lv 2</small>
+        <progress id="armoryUpgradeProgress" value="0" max="1" aria-label="Progress to the next weapon upgrade"></progress>
+        <small id="armoryUpgradeStatus" role="status" aria-live="polite"></small>
+      </div>
+      <small id="armoryBattleNote">Unit kills pay 1.5× their cost. New units spend the bank.</small>
+    </div>
+    <div class="armory-hud-actions">
+      <button type="button" id="armoryFire">Fire at balloon</button>
+      <button type="button" id="armoryRepair">Repair page</button>
+      <button type="button" id="armorySound" aria-label="Gun sounds" aria-pressed="true" title="Toggle gun sounds">Sound: on</button>
+      <button type="button" id="armoryOff">Disarm <kbd>Esc</kbd></button>
+    </div>
+    <p class="armory-help">Cannon: 50% splash / 200px, +1 fighter · rockets auto-lock tanks · hold to fire · 1–4 switch · Esc pauses</p>
+  </aside>
 
   <div
     class="replay-analyzer-modal"
@@ -294,21 +381,6 @@
         // Fail open when the logging service is temporarily unavailable.
       });
     })();
-  </script>
-  <script>
-    // Experimental ratings are available only in the local development preview.
-    if (["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) {
-      const actions = document.querySelector(".topnav-actions");
-      for (const [tab, label] of [["beta1", "Beta 1"], ["beta3", "Beta 3"]]) {
-        const link = document.createElement("a");
-        link.className = tab + "-link";
-        link.href = tab + ".html";
-        link.target = "contentFrame";
-        link.dataset.tab = tab;
-        link.textContent = label;
-        actions.append(link);
-      }
-    }
   </script>
   <script src="shell-frame.js?v=20261021-player-titles-3"></script>
   <script>

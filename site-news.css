@@ -1,5 +1,5 @@
 .news-balloon {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   z-index: 80;
@@ -56,7 +56,7 @@ body.radio-playlist-open .news-balloon { visibility: hidden; }
 body.site-news-open { overflow: hidden; }
 
 .site-news-dialog {
-  width: min(660px, calc(100vw - 32px));
+  width: min(1040px, calc(100vw - 32px));
   max-height: min(760px, calc(100dvh - 32px));
   margin: auto;
   padding: 0;
@@ -102,17 +102,21 @@ body.site-news-open { overflow: hidden; }
 .site-news-category { padding: 4px 7px; border: 1px solid #75dfff33; border-radius: 4px; background: #16425355; color: #82e6ff; }
 .site-news-entry h3 { margin: 0 0 9px; font: 600 18px "Oxanium", sans-serif; color: #e4f6ff; }
 .site-news-entry p { margin: 0; color: #b0c6d5; font-size: 14px; line-height: 1.65; }
-.site-news-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 26px; padding: 14px 0; border-top: 1px solid #6de8ff26; }
+.site-news-archive-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 26px; padding: 18px 0; }
+.site-news-archive-controls p { margin: 0; color: #8fa7bc; font-size: 12px; }
+.site-news-archive-controls button { padding: 10px 14px; border: 1px solid #75dfff66; border-radius: 6px; background: #12394a; color: #c7f4ff; font: 600 12px "Oxanium", sans-serif; cursor: pointer; }
+.site-news-archive-controls button:hover, .site-news-archive-controls button:focus-visible { background: #215569; outline: 2px solid #79e8ff; }
+.site-news-archive-controls button:disabled { cursor: wait; opacity: 0.6; }
+.site-news-archive-controls button[hidden] { display: none; }
+.site-news-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 26px; padding: 14px 0 20px; border-top: 1px solid #6de8ff26; }
 .site-news-settings label { display: flex; align-items: center; gap: 8px; color: #c5e7f6; font-size: 13px; cursor: pointer; }
 .site-news-settings input { accent-color: #6de8ff; }
-.site-news-motion-note { margin: 0; color: #8fa7bc; font-size: 12px; }
-.site-news-dialog footer { padding: 14px 26px 20px; color: #809aaa; font-size: 12px; }
 @media (max-width: 600px) {
   .news-balloon { width: 108px; height: 152px; }
   .news-balloon-unread { top: 10px; right: 5px; }
   .site-news-dialog header { padding: 20px; }
   .site-news-list { padding: 0 20px; }
+  .site-news-archive-controls { margin: 0 20px; }
   .site-news-settings { margin: 0 20px; }
-  .site-news-dialog footer { padding: 12px 20px 18px; }
 }
 @media (prefers-reduced-motion: reduce) { .news-balloon { will-change: auto; } }

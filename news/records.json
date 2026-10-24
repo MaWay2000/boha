@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "id": "2026-10-24-target-practice",
+      "date": "2026-10-24",
+      "category": "Mini-game",
+      "title": "A little Warzone in your browser",
+      "text": "Choose a header weapon to start optional target practice. The balloon is now a 1,000-HP boss that returns after defeat. Hunt moving tanks, earn power and unlock 20 weapon levels. Rockets fire guided pairs, while Heavy cannon adds a friendly fighter with every shot and deals 50% splash damage within 200px. Hold to keep firing; use Disarm or Esc to pause and return to browsing. Repair page resets the round. Older site news stays available through Load older news."
+    },
+    {
+      "id": "2026-10-23-news-balloon",
+      "date": "2026-10-23",
+      "category": "Interface",
+      "title": "A flying home for site news",
+      "text": "The news balloon is now live. Click it to read site updates without leaving your current page. Its real 3D model floats across the header, and flight can be switched on or off in the news popup."
+    },
+    {
+      "id": "2026-10-23-awards",
+      "date": "2026-10-23",
+      "category": "Awards",
+      "title": "Awards, with clearer rules",
+      "text": "Meet Slayer, War Factory, Mad scientist, Camper Hill and more. Award names and explanations have been updated, several eligibility rules corrected, and unsupported achievement claims removed. Open the awards guide in the Replay Analyzer for the details."
+    },
+    {
+      "id": "2026-10-23-telemetry",
+      "date": "2026-10-23",
+      "category": "Replay statistics",
+      "title": "A closer look at each match",
+      "text": "New analyses can record completed construction, research, ownership changes, sampled army value and power balances. The new coverage panel shows exactly what is available. Older cached matches need reanalysis; exact damage and killer attribution are not available yet."
+    },
+    {
+      "id": "2026-10-22-match-details",
+      "date": "2026-10-22",
+      "category": "Interface",
+      "title": "Faster match details",
+      "text": "Opening a match in a player profile now updates only that match row, keeping the rest of the profile and unit previews in place. Recent Matches & Analysis is centered, and the replay column is now called Statistics."
+    }
+  ]
+}

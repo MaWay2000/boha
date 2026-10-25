@@ -269,9 +269,11 @@
         const dt = battlePrevious == null ? 0 : Math.min((now - battlePrevious) / 1000, .05); battlePrevious = now;
         const limits = arena();
         for (const item of unitNodes.values()) {
-          if (!allies.units.length && (localPreview || !reduced.matches)) {
+          const opponent = nearestAlly(item);
+          if (!opponent || battleModule.inWeaponRange(item.type, item.point, opponent[1].point)) {
+            const moveTime = unitMoveTime(item, now, dt);
             const speed = (1 + battleModule.waveStrength(battle) * .04) * lootModule.modifiers(state.effects).enemySpeed;
-            item.point.x += item.point.vx * dt * speed; item.point.y += item.point.vy * dt * speed;
+            item.point.x += item.point.vx * moveTime * speed; item.point.y += item.point.vy * moveTime * speed;
           }
           if (item.point.x < 12 || item.point.x > limits.maxX) item.point.vx *= -1;
           if (item.point.y < 20 || item.point.y > limits.maxY) item.point.vy *= -1;
@@ -494,14 +496,18 @@
     function rangeDescription(type) {
       return type ? `range ${type.range / battleModule.PIXELS_PER_TILE} tiles (${type.range}px in this arena)` : 'range unavailable';
     }
-    function advanceArmy(item, target, now, dt) {
-      // Necessary tactical movement remains functional with reduced motion, but
-      // is shown as one small reposition per second, without wandering/effects.
-      let moveTime = dt;
+    function unitMoveTime(item, now, dt) {
+      // Reduced motion limits gameplay movement to one reposition per second;
+      // it must not freeze targets, even before any friendly units exist.
       if (reduced.matches && !localPreview) {
-        moveTime = now >= (item.nextMove || 0) ? 1 : 0;
-        if (moveTime) item.nextMove = now + 1000;
+        if (now < (item.nextMove || 0)) return 0;
+        item.nextMove = now + 1000;
+        return 1;
       }
+      return dt;
+    }
+    function advanceArmy(item, target, now, dt) {
+      const moveTime = unitMoveTime(item, now, dt);
       const speed = item.node.dataset.team === 'enemy' ? 35 * (1 + battleModule.waveStrength(battle) * .04) * lootModule.modifiers(state.effects).enemySpeed : 35;
       item.point = battleModule.moveIntoRange(item.type, item.point, target.point, speed, moveTime, arena());
       placeUnit(item);

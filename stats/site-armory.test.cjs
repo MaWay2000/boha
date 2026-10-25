@@ -710,6 +710,30 @@ test('unit movement stays on screen, pauses in hidden tabs, and cannot produce e
   f.doc.hidden = false; f.doc.emit('visibilitychange'); assert.equal(f.frames.size, 1);
 });
 
+test('public reduced-motion games reposition wandering targets and pause when disarmed', async () => {
+  const f = fixture({reduced: true, hostname: 'maway2000.github.io'}); await f.ready; popBalloon(f);
+  const before = f.getBattle(); f.fly(1200);
+  const after = f.getBattle();
+  assert.ok(after.units.some((unit, i) => unit.point.x !== before.units[i].point.x || unit.point.y !== before.units[i].point.y));
+  assert.equal(after.score, before.score); assert.equal(after.bank, before.bank);
+  f.select(null); const paused = f.getBattle(); f.fly(1500);
+  assert.deepEqual(f.getBattle(), paused);
+});
+
+test('enemies keep wandering inside firing range when a friendly tank is present', async () => {
+  const savedRandom = Math.random;
+  try {
+    Math.random = () => 0;
+    const f = fixture(); f.win.innerHeight = 300; await f.ready; popBalloon(f);
+    f.select('cannon'); f.shoot(1100, 700);
+    assert.equal(f.getAllies().units.length, 1);
+    const before = f.getBattle(); f.fly(500);
+    const after = f.getBattle();
+    assert.ok(after.units.some((unit, i) => unit.point.x !== before.units[i].point.x));
+    assert.equal(after.score, before.score); assert.equal(after.bank, before.bank);
+  } finally { Math.random = savedRandom; }
+});
+
 test('arming locks scrolling at the top; switching guns keeps the saved browsing position', () => {
   const f = fixture(); f.win.scrollX = 25; f.win.scrollY = 700;
   f.select('machinegun');

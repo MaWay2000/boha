@@ -383,9 +383,11 @@ off-screen targets at unlimited range. Pause/hidden/modal/reset protections,
 friendly-fire exclusions and reward accounting remain unchanged.
 
 Models, geometry and textures are cached and reused across respawns. Target
-motion pauses when disarmed/hidden; public reduced-motion users get stationary
-wandering targets, with necessary combat repositioning limited to once per
-second. The owner's localhost preview keeps smooth movement enabled, like the balloon.
+motion pauses when disarmed/hidden or the window loses focus. Enemies keep
+wandering while inside firing range of friendlies and close the distance when
+outside range. Public reduced-motion users get one gameplay reposition per
+second, including wandering targets before friendlies are recruited. The owner's
+localhost preview keeps smooth movement enabled, like the balloon.
 The existing software 3D renderer draws units at no more than 20 frames/second.
 
 Tests: `node --test stats/site-armory-battle.test.cjs stats/site-armory.test.cjs stats/site-armory-units.test.mjs`

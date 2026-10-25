@@ -39,10 +39,7 @@ function updateDocumentTitle(tab) {
   const label = tabs[tab]?.label || "Leaderboards";
   const section = tab === "compare" ? "Compare" : label.replace(/\s+/g, " ").trim();
   const player = activeProfileName.replace(/\s+/g, " ").trim().slice(0, 80);
-  const supportsProfile = ["leaderboards", "beta1", "beta3"].includes(tab);
-  const suffix = supportsProfile && player
-    ? (tab === "leaderboards" ? player : `${player} — ${section}`)
-    : section;
+  const suffix = tab === "leaderboards" && player ? player : section;
   const title = `Warzone 2100 - ${suffix}`;
   if (document.title !== title) document.title = title;
 }
@@ -57,13 +54,12 @@ function observeFrameTitle() {
       if (frameIsLoading || contentFrame.dataset.currentTab !== tab) return;
       const heading = tab === "leaderboards"
         ? frameDocument.querySelector(".stats-player-profile-heading-name")
-        : ["beta1", "beta3"].includes(tab)
-          ? frameDocument.querySelector("#betaDetail .beta-profile-head > span") : null;
+        : null;
       activeProfileName = heading?.textContent || "";
       updateDocumentTitle(tab);
     };
     syncTitle();
-    if (frameDocument?.body && ["leaderboards", "beta1", "beta3"].includes(tab)) {
+    if (frameDocument?.body && tab === "leaderboards") {
       frameTitleObserver = new MutationObserver(syncTitle);
       frameTitleObserver.observe(frameDocument.body, {subtree: true, childList: true, characterData: true});
     }

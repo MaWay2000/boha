@@ -29,7 +29,7 @@ for (const file of files) {
   if (buffer.includes(0)) continue;
   const text = buffer.toString('utf8');
   if (signatures.some(pattern => pattern.test(text))) failures.push(`Possible credential in ${file}; value suppressed.`);
-  if (/^stats\/published\/(?:leaderboards|matches|beta1|beta3)\.json$/.test(file)) {
+  if (/^stats\/published\/(?:leaderboards|matches)\.json$/.test(file)) {
     try { assertNoPrivateFields(JSON.parse(text)); } catch { failures.push(`Private or invalid data in ${file}; details suppressed.`); }
   }
   if (file === 'stats/published/armory-scores.json') {

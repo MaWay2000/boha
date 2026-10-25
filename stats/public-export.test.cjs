@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const {sanitizeLeaderboards, sanitizeMatches, sanitizeBeta} = require('./public-export.cjs');
+const {sanitizeLeaderboards, sanitizeMatches} = require('./public-export.cjs');
 function fixture() {
   return {format: 1, generatedAt: '2026-10-21', games: [{id: 'game', slots: [{id: 'visible', name: 'Visible'}, {id: 'private', name: 'Historical alias'}]}],
     leaderboards: {Global: {players: [{id: 'visible', name: 'Visible', elo: 1600, banned: false}, {id: 'private', name: 'Private', banned: true}],
@@ -28,9 +28,6 @@ test('unknown profile properties are not exported and nickname map keys are not 
   source.leaderboards.Global.players[0].names = {password: 5};
   const p = sanitizeLeaderboards(source).leaderboards.Global.players[0];
   assert.ok(!Object.hasOwn(p, 'internalDetail')); assert.equal(p.names.password, 5);
-});
-test('Beta outputs omit moderation flags', () => {
-  assert.deepEqual(sanitizeBeta({players: [{id: 'a', banned: false}, {id: 'b', banned: true}]}), {players: [{id: 'a'}]});
 });
 test('the frontend keeps historical participants out of profile lists when their profile is omitted', () => {
   const fs = require('node:fs'), vm = require('node:vm');

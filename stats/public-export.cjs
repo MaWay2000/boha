@@ -52,13 +52,6 @@ function sanitizeMatches(input) {
   if (input.format !== 1 || !Array.isArray(input.matches)) throw new Error('Unsupported match export.');
   return {format: 1, matches: input.matches.map(match => ({...pick(match, 'match'), players: (match.players || []).map(player => pick(player, 'matchPlayer'))}))};
 }
-function sanitizeBeta(input) {
-  assertNoPrivateFields(input, '$', true);
-  const output = {...input, players: (input.players || []).filter(player => !player.banned).map(player => {
-    const {banned, ...publicPlayer} = player; return publicPlayer;
-  })};
-  assertNoPrivateFields(output); return output;
-}
 const encode = value => Buffer.from(JSON.stringify(value) + '\n');
 const digest = buffer => crypto.createHash('sha256').update(buffer).digest('hex');
 function exportDirectory(inputDirectory, outputDirectory) {
@@ -94,4 +87,4 @@ if (require.main === module) {
   exportDirectory(path.resolve(input), path.resolve(output));
   console.log('Privacy-filtered public stats exported.');
 }
-module.exports = {sanitizeLeaderboards, sanitizeMatches, sanitizeBeta, assertNoPrivateFields, exportDirectory};
+module.exports = {sanitizeLeaderboards, sanitizeMatches, assertNoPrivateFields, exportDirectory};

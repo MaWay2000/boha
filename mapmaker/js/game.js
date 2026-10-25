@@ -4,6 +4,7 @@ import { metadataText, mapPlayerIndex, parseLegacyIni, readMapArchiveMetadata, r
 import { materializeScriptMap, normalizeMapScriptSource, readMapScriptSource, writeMapScriptSource, runMapScript, buildScriptMapFiles } from './scriptMapImport.js';
 import { mountScriptEditor } from './scriptEditor.js';
 import { mountScriptPanelResize } from './scriptPanelResize.js';
+import { mountMapGenerator } from './mapGeneratorUI.js';
 
 function normalizeTexPath(name){
   let n = String(name || '').replace(/\\/g,'/').toLowerCase();
@@ -2996,7 +2997,7 @@ function populatePlayerSelect(select) {
   for (let i = 0; i <= 10; i++) {
     const opt = document.createElement('option');
     opt.value = String(i);
-    opt.textContent = 'Player ' + i;
+    opt.textContent = i === 10 ? 'Player 10 (Scavengers)' : 'Player ' + i;
     select.appendChild(opt);
   }
 }
@@ -6808,6 +6809,7 @@ function refreshObjectPreviewLayer() {
 
 function setMapDirty(dirty) {
   mapDirty = !!dirty;
+  updateScavengerInfoInput();
 }
 
 function markMapDirty() {
@@ -7187,6 +7189,7 @@ function makeLocalSaveSnapshot() {
   const name = getCurrentMapFilename();
   return {
     version: 1,
+    exportFormat: currentMapExportInfo?.gamma === false && currentMapExportInfo?.version === 40 ? 'classic40' : 'automatic',
     name,
     savedAt: Date.now(),
     tilesetIndex,
@@ -7694,13 +7697,34 @@ function updateUserMapInfoField(key, value) {
   markMapDirty();
 }
 
+function getDetectedMapScavengers() {
+  const structures = objectsGroup?.children || [];
+  const hasScavengers = structures.some(group =>
+    group?.userData?.structureExport && getStructurePlayer(group) === 10
+  ) || currentDroidEntries.some(entry => getObjectEntryPlayer(entry) === 10);
+  return hasScavengers ? '1' : '0';
+}
+
+function getSaveScavengers() {
+  const override = currentMapInfoOverrides.scavengers;
+  return override === '0' || override === '1' ? override : getDetectedMapScavengers();
+}
+
+function updateScavengerInfoInput() {
+  if (!settingsMapScavengersInput) return;
+  const autoOption = Array.from(settingsMapScavengersInput.options).find(option => option.value === '');
+  if (autoOption) autoOption.textContent = 'Auto (' + (getDetectedMapScavengers() === '1' ? 'Yes' : 'No') + ')';
+  const override = currentMapInfoOverrides.scavengers;
+  settingsMapScavengersInput.value = override === '0' || override === '1' ? override : '';
+}
+
 function updateMapInfoInputs() {
   if (settingsMapNameInput) settingsMapNameInput.value = getMetadataText(currentMapInfoOverrides.name, currentLevelJson?.name, currentServerMapMetadata?.name, getCurrentMapFilename());
   if (settingsMapAuthorInput) settingsMapAuthorInput.value = getMetadataText(currentMapInfoOverrides.author, currentLevelJson?.author, currentLevelJson?.authors, currentLevelJson?.creator, currentServerMapMetadata?.author);
   if (settingsMapCreatedInput) settingsMapCreatedInput.value = getMetadataText(currentMapInfoOverrides.created, currentServerMapMetadata?.created, currentLevelJson?.created).slice(0, 10);
   if (settingsMapTypeInput) settingsMapTypeInput.value = getMetadataText(currentMapInfoOverrides.mapType, currentServerMapMetadata?.type, currentLevelJson?.mapType, 'normal').toLowerCase() === 'script-generated' ? 'script-generated' : 'normal';
   if (settingsMapDescriptionInput) settingsMapDescriptionInput.value = getMetadataText(currentMapInfoOverrides.description, currentLevelJson?.description, currentLevelJson?.readme);
-  if (settingsMapScavengersInput) settingsMapScavengersInput.value = getMetadataText(currentMapInfoOverrides.scavengers, currentServerMapMetadata?.scavs, currentLevelJson?.scavs);
+  updateScavengerInfoInput();
   if (settingsMapSlotsInput) settingsMapSlotsInput.value = getMetadataText(currentMapInfoOverrides.slots, currentServerMapMetadata?.slots, currentLevelJson?.players);
   if (settingsMapUploadedInput) settingsMapUploadedInput.value = getMetadataText(currentMapInfoOverrides.uploaded, currentServerMapMetadata?.download?.uploaded, currentLevelJson?.uploaded).slice(0, 10);
   if (settingsMapVersionInput) settingsMapVersionInput.value = getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion);
@@ -7907,7 +7931,7 @@ function buildSaveResultDetails(blob = null, sha256 = '', timeLabel = 'Saved') {
     version: getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion),
     mapType: getMetadataText(currentMapInfoOverrides.mapType, currentServerMapMetadata?.type, currentLevelJson?.mapType),
     description: getMetadataText(currentMapInfoOverrides.description, currentLevelJson?.description, currentLevelJson?.readme),
-    scavengers: getMetadataText(currentMapInfoOverrides.scavengers, currentServerMapMetadata?.scavs, currentLevelJson?.scavs),
+    scavengers: getSaveScavengers(),
     tags: getMetadataText(currentMapInfoOverrides.tags, currentLevelJson?.tags),
     tileset: TILESETS[tilesetIndex]?.name || getOfficialTilesetName(tilesetIndex),
     size: mapW + ' x ' + mapH,
@@ -8450,13 +8474,14 @@ async function updateGammaMetadata(zip, base) {
     const level = JSON.parse(await zip.file('level.json').async('string'));
     level.name = getSaveMapName() || base;
     level.tileset = getOfficialTilesetName(tilesetIndex);
+    if (currentMapExportInfo?.gamma === false && currentMapExportInfo?.version === 40) level.mapmakerFormat = 'classic40';
     const slots = parseInt(currentMapInfoOverrides.slots, 10);
     if (Number.isFinite(slots) && slots > 0) level.players = Math.max(1, Math.min(10, slots));
     if (currentMapInfoOverrides.mapType) level.mapType = currentMapInfoOverrides.mapType;
     if (currentMapInfoOverrides.author) level.author = currentMapInfoOverrides.author;
     if (currentMapInfoOverrides.created) level.created = currentMapInfoOverrides.created;
     if (currentMapInfoOverrides.description) level.description = currentMapInfoOverrides.description;
-    if (currentMapInfoOverrides.scavengers !== '') level.scavs = parseInt(currentMapInfoOverrides.scavengers, 10) || 0;
+    level.scavs = Number(getSaveScavengers());
     if (currentMapInfoOverrides.uploaded) level.uploaded = currentMapInfoOverrides.uploaded;
     if (currentMapInfoOverrides.version) level.versionName = currentMapInfoOverrides.version;
     if (currentMapInfoOverrides.tags) level.tags = currentMapInfoOverrides.tags;
@@ -8820,6 +8845,7 @@ function jumpCameraToMinimapEvent(event) {
 }
 
 function isBuilderDroid(entry) {
+  if (entry?.construct) return true;
   const template = String(entry?.template || '').toLowerCase();
   if (template.includes('construction')) return true;
   const weapons = Array.isArray(entry?.weapons) ? entry.weapons : [entry?.weapon];
@@ -11581,6 +11607,7 @@ function setActiveTab(tab) {
   panels.forEach(p => { p.style.display = 'none'; });
   const panel = document.getElementById(tab + 'Panel');
   if (panel) panel.style.display = 'block';
+  if (tab === 'settings') updateScavengerInfoInput();
   if (previousTab !== tab) clearViewBulkSelection();
   if (tab === 'objects') {
     if (isFeatureGroup(selectedStructureGroup)) clearSelectedStructure();
@@ -12630,7 +12657,9 @@ async function loadLocalSaveSnapshot(snapshot) {
   resetLoadedMetadata();
   currentMapArchive = null;
   currentMapArchivePath = null;
-  currentMapExportInfo = null;
+  currentMapExportInfo = snapshot.exportFormat === 'classic40'
+    ? {gamma:false,version:40,width:snapshot.mapW,height:snapshot.mapH,tail:null}
+    : null;
   currentStructArchivePath = null;
   currentStructJsonStyle = snapshot.structureStyle || 'array';
   currentDroidArchivePath = null;
@@ -12850,8 +12879,10 @@ async function loadMapFile(file, options = {}) {
       setLoadingProgress('Extracting map grid', 50);
       let fileData = await zip.files[mapFileName].async("uint8array");
       currentMapExportInfo = getMapExportInfo(fileData);
+      const generatedClassic40 = currentLevelJson?.mapmakerFormat === 'classic40';
+      if (generatedClassic40 && currentMapExportInfo) currentMapExportInfo.gamma = false;
       setLoadingProgress('Converting map grid if needed', 56);
-      const converted = convertGammaGameMapToClassic(fileData, ttypesMap);
+      const converted = generatedClassic40 ? null : convertGammaGameMapToClassic(fileData, ttypesMap);
       if (converted) fileData = converted;
       setLoadingProgress('Loading tileset textures', 62);
       await setTileset(autoTs);
@@ -13939,3 +13970,24 @@ mapScriptEditor = mountScriptEditor(document.getElementById('scriptPanel'), {
 syncMapScriptEditor();
 
 mountScriptPanelResize(document.getElementById('scriptWidthHandle'), document.getElementById('editPanel'), resizeScriptViewport);
+
+mountMapGenerator(document.getElementById('generatePanel'), {
+  snapshot: () => ({...makeLocalSaveSnapshot(), id: currentLocalSaveId}),
+  catalog: async () => {
+    await Promise.all([loadStructureDefs(), loadFeatureDefs(), loadComponentDefs()]);
+    return {structures: STRUCTURE_DEFS, features: FEATURE_DEFS,
+      tileTypes: DEFAULT_TILE_TYPES_BY_TILESET, tileCounts: TILESETS.map(set => set.count), waterHints: SMART_WATER_TILE_HINTS,
+      bodyIds:Object.keys(bodyDefs||{}), propulsionIds:Object.keys(propDefs||{}), weaponIds:Object.keys(weaponDefs||{})};
+  },
+  apply: async snapshot => {
+    const copy = JSON.parse(JSON.stringify(snapshot));
+    copy.id = snapshot.id || makeLocalSaveId();
+    await loadLocalSaveSnapshot(copy);
+    markMapDirty();
+    saveLocalAutosaveNow();
+    setActiveTab('generate');
+    return copy.id;
+  },
+  validate: () => validateMapFromFileTab(),
+  save: () => saveCurrentMap()
+});

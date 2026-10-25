@@ -43,7 +43,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
     console,loadedDroids:null});
   for(const n of ['getStructurePlayer','getObjectEntryPlayer','getSaveAuthor','getSaveLicense','getSaveMapName','getSaveSourceName',
     'getStructureSaveCategory','getSavePlayerStats','formatSavePlayerStats','formatOilByPlayer','formatHqPositions','getSaveBalanceSummary',
-    'getDeclaredPlayerCount','getReadableFileSize','buildSaveResultDetails','readArchiveJson','syncMapScriptEditor','loadArchiveMetadata','loadDroidsFromZip','buildDefaultLevelJson'])
+    'getDeclaredPlayerCount','getReadableFileSize','getDetectedMapScavengers','getSaveScavengers','buildSaveResultDetails','readArchiveJson','syncMapScriptEditor','loadArchiveMetadata','loadDroidsFromZip','buildDefaultLevelJson'])
     vm.runInContext(extract(n),ctx);
   const stats=ctx.getSavePlayerStats();
   assert.equal(stats.get(0).structures,78);assert.equal(stats.get(0).droids,4);

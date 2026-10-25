@@ -68,6 +68,7 @@
     #uiBar.hidden { display:none; }
     #mapFilename { color:#8cf; }
     #menuBar {
+      flex-wrap: wrap;
       position: fixed; top:0; left:0; width:100%; height:var(--menu-height);
       display:flex; align-items:center; gap:6px; padding:4px 8px;
       background: var(--bar); border-bottom:1px solid var(--border); box-sizing:border-box;
@@ -872,8 +873,32 @@
     </style>
   </head>
   <body class="overlay-open">
+  <style>
+    .generator-box { max-height:calc(100vh - 100px); overflow:auto; padding-bottom:20px; }
+    .generator-note { font-size:11px; color:#a8bdcc; line-height:1.5; }
+    .generator-form details { border:1px solid #3a4b60; margin:7px 0; padding:8px; background:#182536; }
+    .generator-form summary { cursor:pointer; font-weight:bold; color:#a8dcf4; font-size:13px; }
+    .generator-field { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:8px; font-size:11px; }
+    .generator-field input:not([type=checkbox]):not([type=range]), .generator-field select { width:128px; min-width:0; background:#26384d; color:#eef5fc; border:1px solid #526780; padding:4px; }
+    .generator-field input[type=checkbox] { width:16px; height:16px; }
+    .generator-range-field { display:grid; grid-template-columns:minmax(0,1fr) minmax(80px,1.4fr) 40px; align-items:center; gap:7px; margin-top:10px; }
+    .generator-range-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .generator-range-field output { color:#a8edff; background:#26384d; border:1px solid #526780; border-radius:3px; padding:2px 4px; text-align:center; font-variant-numeric:tabular-nums; }
+    .generator-range-track { display:flex; align-items:center; gap:5px; min-width:0; color:#a8bdcc; font-size:10px; font-variant-numeric:tabular-nums; }
+    .generator-range-track input[type=range] { flex:1; width:0; min-width:0; margin:0; accent-color:#65d6fa; cursor:pointer; }
+    .generator-update-actions { position:fixed; left:calc(var(--editor-panel-width) + 16px); top:calc(var(--menu-height) + 14px); z-index:55; display:flex; align-items:stretch; gap:8px; }
+    .generator-update-actions[hidden] { display:none; }
+    .generator-update,.generator-cancel { padding:12px 24px; background:#297491; color:#fff; border:1px solid #70d6fa; border-radius:4px; font-weight:bold; box-shadow:0 4px 14px #0007; cursor:pointer; }
+    .generator-cancel { padding:4px 14px; font-size:26px; line-height:1; background:#3c2831; border-color:#d88686; }
+    .generator-update:disabled,.generator-cancel:disabled { opacity:.65; cursor:wait; }
+    .generator-report { position:fixed; left:calc(var(--editor-panel-width) + 16px); top:calc(var(--menu-height) + 74px); z-index:54; box-sizing:border-box; width:min(370px,calc(100vw - var(--editor-panel-width) - 32px)); max-height:min(260px,40vh); overflow-y:auto; padding:10px 12px; border:1px solid #3a4b60; border-left:3px solid #70d6fa; border-radius:4px; background:#172535f5; box-shadow:0 4px 14px #0007; font-size:11px; line-height:1.5; overflow-wrap:anywhere; }
+    .generator-report p { margin:4px 0; }
+    .generator-error { color:#ffb0a1; }
+    .generator-report.generator-error { border-left-color:#f28a79; }
+  </style>
   <div id="menuBar">
     <button type="button" class="tab-btn" data-tab="file">File</button>
+    <button type="button" class="tab-btn" data-tab="generate">Generate map</button>
     <button type="button" class="tab-btn" data-tab="settings">Settings</button>
     <button type="button" class="tab-btn" data-tab="view">Copy</button>
     <button type="button" class="tab-btn" data-tab="textures">Tiles</button>
@@ -924,6 +949,14 @@
           <button type="button" id="fileValidateBtn" class="action-btn">Validate map</button>
           <button type="button" id="fileSaveBtn" class="action-btn">Save map</button>
         </div>
+      </div>
+    </div>
+
+    <!-- GENERATE MAP TAB -->
+    <div id="generatePanel" class="panel" style="display:none;">
+      <div class="panel-box">
+        <div class="show-hide-title">Generate map</div>
+        <p>Loading generator controls…</p>
       </div>
     </div>
 
@@ -1015,7 +1048,7 @@
             <textarea id="settingsMapDescriptionInput" rows="4" autocomplete="off" spellcheck="true" style="resize:vertical;"></textarea>
             <label for="settingsMapScavengersInput" style="margin:0; font-size:0.85rem;">Scavengers:</label>
             <select id="settingsMapScavengersInput">
-              <option value="">Unknown</option>
+              <option value="">Auto (No)</option>
               <option value="0">No</option>
               <option value="1">Yes</option>
             </select>
@@ -1506,8 +1539,8 @@
           <select id="featureSelect" size="16" style="width:100%; font-size:0.9rem;"></select>
         </div>
         <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-          <button type="button" id="featureRotateLeft" class="rotate-btn">âŸ²</button>
-          <button type="button" id="featureRotateRight" class="rotate-btn">âŸ³</button>
+          <button type="button" id="featureRotateLeft" class="rotate-btn">&#10226;</button>
+          <button type="button" id="featureRotateRight" class="rotate-btn">&#10227;</button>
           <span id="featureNameLabel" style="flex:1; font-size:0.85rem; color:#ccd; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
         </div>
         <div id="featurePreview" style="width:100%; height:160px; background:#1a2735; border:1px solid #435066; border-radius:4px; margin-bottom:4px;"></div>

@@ -1,4 +1,4 @@
-import { Group, Mesh, Box3, Vector3, MeshLambertMaterial } from './mapmaker/js/three.module.js';
+import { Group, Mesh, Box3, Vector3, MeshLambertMaterial } from '../mapmaker/js/three.module.js';
 import * as techSource from './site-armory-tech.js?v=20261024-tech-tiers-1';
 
 // The same bundled classic components used by the player-profile unit gallery.

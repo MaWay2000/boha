@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Box3, Vector3, Sphere, PerspectiveCamera, MathUtils } from '../mapmaker/js/three.module.js';
 import { parsePie } from '../mapmaker/js/pie.js';
-import { TURRETS, TECH_PATHS, turretFor, createTierLoader, buildTurret, disposeTurret } from '../site-armory-model-utils.mjs';
+import { TURRETS, TECH_PATHS, turretFor, createTierLoader, buildTurret, disposeTurret } from '../balloon/site-armory-model-utils.mjs';
 
 const root = new URL('../', import.meta.url);
 const read = path => readFile(new URL(path, root), 'utf8');
@@ -83,9 +83,9 @@ test('all research tier models fit inside the compact stage throughout a revolut
 });
 
 test('preview reuses the existing textured 3D renderer without extra WebGL contexts or runtime CDN code', async () => {
-  const source = await read('site-armory-model.js');
-  assert.match(source, /import \{ drawSoftwareUnit \} from '.\/mapmaker\/js\/softwareUnitPreview.js/);
-  assert.match(source, /import \{ parsePie \} from '.\/mapmaker\/js\/pie.js/);
+  const source = await read('balloon/site-armory-model.js');
+  assert.match(source, /import \{ drawSoftwareUnit \} from '\.\.\/mapmaker\/js\/softwareUnitPreview.js/);
+  assert.match(source, /import \{ parsePie \} from '\.\.\/mapmaker\/js\/pie.js/);
   assert.match(source, /now - lastFrame >= 50/);
   assert.match(source, /IntersectionObserver/); assert.match(source, /document.hidden/);
   assert.match(source, /prefers-reduced-motion/); assert.match(source, /pagehide/);
@@ -94,7 +94,7 @@ test('preview reuses the existing textured 3D renderer without extra WebGL conte
 });
 
 test('reload text has no visible layout row while progress bars and accessible descriptions remain', async () => {
-  const css = await read('site-armory.css'), html = await read('index.html');
+  const css = await read('balloon/site-armory.css'), html = await read('index.html');
   assert.match(css, /\.armory-rack \.armory-reload-label \{[^}]*position: absolute;[^}]*height: 1px;[^}]*clip-path: inset\(50%\)/);
   assert.match(css, /width: 80px;/); assert.match(css, /height: 44px;/);
   for (const weapon of Object.keys(TURRETS)) {
@@ -102,7 +102,7 @@ test('reload text has no visible layout row while progress bars and accessible d
     assert.ok(html.includes(`id="armoryReload-${weapon}"`));
   }
   assert.equal((html.match(/class="armory-gun-preview"/g) || []).length, 5);
-  assert.match(html, /src="site-armory-model.js[^>]*type="module"/);
+  assert.match(html, /src="balloon\/site-armory-model.js[^>]*type="module"/);
   assert.doesNotMatch(html, /Balloon target practice · select to arm|class="armory-invitation"/);
 });
 
@@ -130,7 +130,7 @@ test('failed latest tier falls back without stale error overwrites; renderer swa
   assert.equal(states.at(-1).definition, high.definition); assert.equal(states.at(-1).status, 'loading');
   pending.get(high.definition).reject(Error('missing asset')); await second;
   assert.equal(states.at(-1).status, 'fallback');
-  const source = await read('site-armory-model.js');
+  const source = await read('balloon/site-armory-model.js');
   assert.match(source, /attributeFilter: \['data-definition'\]/);
   assert.match(source, /models = new Map\(\)/); assert.match(source, /geometries = new Map\(\)/);
   assert.match(source, /mount.clone\(\), barrel.clone\(\)/);

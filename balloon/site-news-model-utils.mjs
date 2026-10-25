@@ -1,5 +1,5 @@
-import { Group, Matrix4, Mesh } from './mapmaker/js/three.module.js';
-import { mergeBufferGeometries } from './assets/vendor/three-r149/BufferGeometryUtils.js';
+import { Group, Matrix4, Mesh } from '../mapmaker/js/three.module.js';
+import { mergeBufferGeometries } from '../assets/vendor/three-r149/BufferGeometryUtils.js';
 
 export function cameraFrame(size, aspect, padding = 1.14) {
   const ratio = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;

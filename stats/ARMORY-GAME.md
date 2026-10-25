@@ -1,5 +1,8 @@
 # Local target-practice game
 
+Feature scripts and styles live in `balloon/`, not in the repository root.
+The shared assets and permanent `news/` archive retain their existing locations.
+
 ## Start, nicknames and shared online Top 10
 
 Before any weapon can arm (including keys 1–5), the player must enter a nickname
@@ -12,7 +15,7 @@ Start and Top scores buttons sit below the disarmed gun rack; Top scores is
 also available in the game HUD. Opening the lobby disarms/pauses the game,
 retains the selected gun and offers Resume game for the same player. The name
 is locked during an existing round. New player / reset round saves the previous
-best, clears round progress and requires a fresh nickname and Start. Repair
+best, clears round progress and requires a fresh nickname and Start. Restart game
 resets the round but retains its player and never deletes saved best scores.
 
 The table is shared online through the existing public API at
@@ -61,7 +64,7 @@ one score. Repeat boss defeats do not reset units, bank, damage counters or
 upgrades, and do not grant another starting budget. Unit hits take priority
 where a unit visually overlaps the balloon. Disarm restores a defeated balloon
 immediately for news access; switching/rearming never hides a living balloon.
-Repair/page exit cancels any pending respawn so it cannot affect a fresh round.
+Restart game/page exit cancels any pending respawn so it cannot affect a fresh round.
 
 Every actual balloon defeat also drops a clickable random supply crate,
 including the introductory boss. The pool contains 30 equally likely rewards,
@@ -87,7 +90,7 @@ bank + spent = 500 + earned still holds.
 The crate hides on disarm, hidden tabs, blur and modals, retaining its pending
 reward on resume. It is positioned near the boss's last hit within viewport
 bounds and above the game HUD, with a short reduced-motion-aware drop animation.
-Repair/page exit removes pending drops and collected bonus totals. Like the rest
+Restart game/page exit removes pending drops and collected bonus totals. Like the rest
 of the mini-game, rewards exist only in the current page session.
 
 ## All 30 balloon drops
@@ -96,7 +99,7 @@ of the mini-game, rewards exist only in the current page session.
 guide. Timed boosts last 30 active-play seconds, pausing while disarmed, hidden,
 unfocused or covered by a modal. Repeat drops refresh to 30 seconds rather than
 stacking damage or storing extra duration. Different effects multiply together;
-rocket damage is snapshotted at launch. Passive upgrades last until Repair/page
+rocket damage is snapshotted at launch. Passive upgrades last until Restart game/page
 exit and stack only to their explicit caps. The HUD shows timers and passives.
 
 Collecting a gun-specific +50% damage boost reveals it with a roulette highlight
@@ -106,7 +109,7 @@ two gentle gold pulses. A small +50% badge remains while its boost is active.
 This is a visual reward reveal, not an auto-equip: shots, cooldowns and the
 equipped weapon do not change. Stacked gun rewards reveal each distinct winner
 in turn; power and army drops do not start a gun draw. Disarm, blur, hidden tabs,
-modals and Repair cancel the animation without losing earned effects. Reduced
+modals and Restart game cancel the animation without losing earned effects. Reduced
 motion skips the running highlight and pulses for public visitors, showing a
 static gold winner. The owner-local preview opts into full requested motion,
 matching the existing local balloon and model-preview behavior.
@@ -185,13 +188,26 @@ not summon enemies before the mini-game has unlocked.
 
 The rest clock and combat pause on disarm, hidden tabs, lost focus and modal
 opening. It runs only during rest, at 250ms intervals, and delayed callbacks
-never skip ahead through multiple waves. Repair/page exit removes it entirely.
+never skip ahead through multiple waves. Restart game/page exit removes it entirely.
 Friendlies and reserves survive wave transitions. Rockets with no remaining
 legal target when a wave clears finish as ground impacts: no phantom kills,
-rewards or missiles waiting to damage the next wave. The fire button can still
-target the living balloon during a rest. News and normal browsing stay intact.
-Held accessible fire waits without spending shots when both the wave and boss
-are absent, then resumes on a legal target; releasing still cancels immediately.
+rewards or missiles waiting to damage the next wave. The HUD has no Fire button:
+aim and click/hold directly on the page to shoot. Hold-to-fire, release-to-stop
+and rocket auto-lock remain unchanged. The living balloon can still be shot
+during a rest. News and normal browsing stay intact. The controller tolerates
+older shells that include the optional fire control, but the published page
+does not render it.
+
+All nine unit designs (including the friendly Python and Pulse Laser Mantis)
+use complete bundled PIE models and PNG textures. Geometry, texture and
+template caches share successful requests but evict rejected promises. A
+transient model failure retries three times with bounded 300/1,000ms waits,
+reusing already-loaded parts. A still-failed visible unit can retry on reconnect,
+game resume or returning to the page. Empty/non-finite geometry and zero-triangle
+canvas draws cannot be reported as ready. Page teardown aborts geometry requests
+and clears pending waits; late results never attach to removed/replaced units.
+After texture retries are exhausted, valid geometry remains visible untextured
+instead of being replaced by a flat silhouette.
 
 The nine designs use the site's existing Warzone templates and component data.
 Their cost is `floor(body power * (100 + propulsion power %) / 100) + weapon power`,
@@ -206,7 +222,7 @@ Disarm/Escape pauses the round and restores normal browsing, the previous scroll
 position, and news access. Opening a modal also disarms and releases the lock.
 The entire game HUD hides when disarmed, even with score, units or page marks
 remaining. Selecting a weapon shows it again without resetting progress.
-Selecting a gun resumes the same score, bank and targets. Repair page resets
+Selecting a gun resumes the same score, bank and targets. Restart game resets
 the round, removes damage and restores the balloon. Reloading also starts fresh;
 no score, bank or shooting data is saved or transmitted.
 
@@ -222,7 +238,7 @@ Friendly kills earn the usual score/power and contribute to total unit damage,
 with separate allied damage/kill counters rather than credit to a player gun.
 Blue ALLY labels/health bars distinguish friendlies from red enemy bars.
 Friendly fire and enemy rockets never target friendly units. Allies do not
-attack the balloon boss. Disarm/hidden tabs/modals pause the army; Repair and
+attack the balloon boss. Disarm/hidden tabs/modals pause the army; Restart game and
 page exit remove it and its reserves. Models and textures share the existing
 cache, with at most 12 unit previews total (8 enemies plus 4 friendlies).
 
@@ -257,7 +273,7 @@ radius is separate from actual cannon blast radius.
 Rocket impacts now leave black, ember-rimmed holes and soot at each actual tank
 impact (or both boss impacts). Cancelling a flight makes no scorch. These share
 the 48-mark cap and document-anchored scroll behavior with other page damage;
-Repair removes them all, including after disarming.
+Restart game removes them all, including after disarming.
 
 Flamer (key 5) deals 24 base damage per burst every 180ms while held, with the
 same 20 damage upgrade levels, reload bar, weapon counters and mute control.
@@ -292,7 +308,7 @@ is rounded to the nearest HP. Starting power does not count, no power is spent
 on upgrades, and all reload timings remain unchanged. A kill that unlocks a
 level uses the old damage; the next shot uses the new level. Gun badges/tooltips
 show the level/current damage, and the HUD shows progress and a level-up notice.
-Disarm and weapon switching preserve upgrades; Repair/reloading resets them.
+Disarm and weapon switching preserve upgrades; Restart game/reloading resets them.
 
 ## Research-based weapon tiers
 
@@ -321,7 +337,7 @@ cannon splash and free fighter recruitment are unchanged. Per-weapon counters
 remain grouped by slot, while hit messages retain the variant that fired.
 
 The HUD shows current tier, next variant, required level/power and an expandable
-research path. Disarm/weapon switching preserves tiers; Repair resets to basic
+research path. Disarm/weapon switching preserves tiers; Restart game resets to basic
 models. Preview models/geometries/textures are cached, with five canvases and
 at most five rendered models. Async model swaps discard stale completions so
 an old request cannot override an upgrade or reset. All 21 models are checked
@@ -331,7 +347,7 @@ The HUD counts unit HP actually removed, in total and per weapon, plus unit
 kills credited to each finishing weapon. A hit displays the damage and remaining
 HP; damage beyond the target's remaining HP is excluded. Balloon hits, misses
 and rejected cooldown shots never add unit damage. Disarming preserves the
-counters; Repair page resets them. These are simplified mini-game values,
+counters; Restart game resets them. These are simplified mini-game values,
 without Warzone's armor, weapon-vs-propulsion modifiers or research upgrades.
 
 ## Unit firing ranges

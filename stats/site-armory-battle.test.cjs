@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const battle = require('../site-armory-battle.js');
-const loot = require('../site-armory-loot.js');
+const battle = require('../balloon/site-armory-battle.js');
+const loot = require('../balloon/site-armory-loot.js');
 const rollFor = id => (loot.CATALOG.findIndex(item => item.id === id) + .5) / loot.CATALOG.length;
 
 test('catalog uses bundled component costs with propulsion as a percentage of body cost', () => {

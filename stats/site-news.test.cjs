@@ -1,7 +1,36 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const { NEWS, normalizeArchive, bounds, createFlight, advanceFlight, mount } = require('../site-news.js');
+const { NEWS, normalizeArchive, bounds, createFlight, advanceFlight, mount } = require('../balloon/site-news.js');
+
+test('all balloon/game source files live in balloon with no root compatibility copies', () => {
+  const path = require('node:path'), root = path.resolve(__dirname, '..');
+  const files = fs.readdirSync(path.join(root, 'balloon')).filter(name => /^site-(armory|news).*\.(js|mjs|css)$/.test(name));
+  assert.equal(files.length, 15);
+  for (const file of files) assert.equal(fs.existsSync(path.join(root, file)), false, `Root copy remains: ${file}`);
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const entrypoints = [...html.matchAll(/(?:src|href)="((?:balloon\/)?site-(?:armory|news)[^"?]+)(?:\?[^" ]*)?"/g)].map(match => match[1]);
+  assert.equal(entrypoints.length, 12);
+  for (const entry of entrypoints) {
+    assert.ok(entry.startsWith('balloon/')); assert.ok(fs.existsSync(path.join(root, entry)));
+    assert.equal(new URL(entry, 'https://example.test/boha/index.html').pathname, '/boha/' + entry);
+  }
+});
+
+test('relocated module imports, resource prefixes and CSS assets resolve from the balloon folder', () => {
+  const path = require('node:path'), directory = path.resolve(__dirname, '../balloon');
+  let checked = 0;
+  for (const file of fs.readdirSync(directory).filter(name => /\.(js|mjs|css)$/.test(name))) {
+    const source = fs.readFileSync(path.join(directory, file), 'utf8');
+    const references = [...source.matchAll(/(?:from\s+|require\(\s*|new URL\(\s*)(['"])(\.{1,2}\/[^'"]+)\1/g)].map(match => match[2]);
+    if (file.endsWith('.css')) references.push(...[...source.matchAll(/url\(['"]?(\.\.\/[^)'"\s]+)['"]?\)/g)].map(match => match[1]));
+    for (const reference of references) {
+      const target = path.resolve(directory, reference.split('?')[0]);
+      assert.ok(fs.existsSync(target), `${file} has an unresolved path: ${reference}`); checked++;
+    }
+  }
+  assert.ok(checked >= 30);
+});
 
 test('flight is bounded to the viewport and a maximum 300px vertical range', () => {
   for (const dimensions of [[1440, 900, 132, 184], [375, 600, 108, 152], [80, 100, 132, 184]]) {
@@ -50,7 +79,7 @@ test('release notes are unique, dated newest-first and contain no HTML payloads'
 });
 test('integration is shell-only with a native accessible dialog and safe text rendering', () => {
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
-  const script = fs.readFileSync(require.resolve('../site-news.js'), 'utf8');
+  const script = fs.readFileSync(require.resolve('../balloon/site-news.js'), 'utf8');
   assert.match(html, /<dialog[^>]+id="siteNewsDialog"[^>]+aria-labelledby="siteNewsTitle"/);
   assert.match(html, /aria-haspopup="dialog" aria-controls="siteNewsDialog"/);
   assert.match(script, /dialog\.showModal\(\)/);
@@ -336,7 +365,7 @@ test('destroying the balloon stops flight and repair resumes it without changing
 });
 
 test('balloon is anchored to the top of the document and pauses while scrolled out of view', () => {
-  const css = fs.readFileSync(require.resolve('../site-news.css'), 'utf8');
+  const css = fs.readFileSync(require.resolve('../balloon/site-news.css'), 'utf8');
   assert.match(css, /\.news-balloon \{\s*position: absolute;/);
   const f = browserFixture(), button = f.elements.siteNewsBalloon;
   const original = button.style.transform;

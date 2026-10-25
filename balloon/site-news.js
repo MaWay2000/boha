@@ -1,5 +1,5 @@
 (function (root, factory) {
-  const api = factory(typeof module === "object" && module.exports ? require("./news/records.json") : null);
+  const api = factory(typeof module === "object" && module.exports ? require("../news/records.json") : null);
   if (typeof module === "object" && module.exports) module.exports = api;
   if (root.document) api.mount(root);
 })(typeof globalThis === "object" ? globalThis : this, function (initialArchive) {

@@ -1,6 +1,6 @@
-import { TextureLoader, NearestFilter } from './mapmaker/js/three.module.js';
-import { parsePie } from './mapmaker/js/pie.js';
-import { drawSoftwareUnit } from './mapmaker/js/softwareUnitPreview.js?v=20261010-software-3d-1';
+import { TextureLoader, NearestFilter } from '../mapmaker/js/three.module.js';
+import { parsePie } from '../mapmaker/js/pie.js';
+import { drawSoftwareUnit } from '../mapmaker/js/softwareUnitPreview.js?v=20261010-software-3d-1';
 import { TECH_PATHS, turretFor, createTierLoader, buildTurret, disposeTurret } from './site-armory-model-utils.mjs?v=20261024-tech-tiers-1';
 
 const rack = document.getElementById('siteArmory');
@@ -60,7 +60,7 @@ function mountTurrets() {
   });
   const loadGeometry = async name => {
     if (!geometries.has(name)) geometries.set(name, (async () => {
-      const response = await fetch(new URL('./mapmaker/pies/components/weapons/' + name, import.meta.url));
+      const response = await fetch(new URL('../mapmaker/pies/components/weapons/' + name, import.meta.url));
       if (!response.ok) throw new Error('Turret model unavailable.');
       return parsePie(await response.text());
     })());
@@ -69,7 +69,7 @@ function mountTurrets() {
   const loadTexture = name => {
     if (!/^[a-z0-9_-]+\.png$/i.test(name || '')) return Promise.resolve(null);
     if (!textures.has(name)) {
-      textures.set(name, new TextureLoader().loadAsync(new URL('./mapmaker/classic/texpages/texpages/' + name, import.meta.url).href)
+      textures.set(name, new TextureLoader().loadAsync(new URL('../mapmaker/classic/texpages/texpages/' + name, import.meta.url).href)
         .then(texture => { texture.magFilter = NearestFilter; return texture; }).catch(() => null));
     }
     return textures.get(name);

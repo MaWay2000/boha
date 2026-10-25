@@ -1,9 +1,9 @@
 (function (root, factory) {
   const definitions = typeof module === 'object' && module.exports ? {
-    bodies: require('./mapmaker/pies/components/bodies/body.json'),
-    propulsions: require('./mapmaker/pies/components/prop/propulsion.json'),
-    weapons: require('./mapmaker/pies/components/weapons/weapons.json'),
-    templates: require('./mapmaker/pies/components/templates.json')
+    bodies: require('../mapmaker/pies/components/bodies/body.json'),
+    propulsions: require('../mapmaker/pies/components/prop/propulsion.json'),
+    weapons: require('../mapmaker/pies/components/weapons/weapons.json'),
+    templates: require('../mapmaker/pies/components/templates.json')
   } : null;
   const api = factory(definitions, typeof module === 'object' && module.exports ? require('./site-armory-loot.js') : root.SiteArmoryLoot);
   if (typeof module === 'object' && module.exports) module.exports = api;

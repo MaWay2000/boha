@@ -1,6 +1,6 @@
-import * as THREE from './mapmaker/js/three.module.js';
-import { GLTFLoader } from './assets/vendor/three-r149/GLTFLoader.js';
-import { RoomEnvironment } from './assets/vendor/three-r149/RoomEnvironment.js';
+import * as THREE from '../mapmaker/js/three.module.js';
+import { GLTFLoader } from '../assets/vendor/three-r149/GLTFLoader.js';
+import { RoomEnvironment } from '../assets/vendor/three-r149/RoomEnvironment.js';
 import { batchStaticRig, cameraFrame } from './site-news-model-utils.mjs';
 
 const button = document.getElementById('siteNewsBalloon');
@@ -43,7 +43,7 @@ async function mountModel() {
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.35;
-    const gltf = await new GLTFLoader().loadAsync(new URL('./assets/news-balloon-v01.glb', import.meta.url).href);
+    const gltf = await new GLTFLoader().loadAsync(new URL('../assets/news-balloon-v01.glb', import.meta.url).href);
     scene = new THREE.Scene();
     model = batchStaticRig(gltf.scene, gltf.animations);
     const box = new THREE.Box3().setFromObject(model);

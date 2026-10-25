@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Box3, Vector3, AnimationMixer } from '../mapmaker/js/three.module.js';
 import { GLTFLoader } from '../assets/vendor/three-r149/GLTFLoader.js';
-import { batchStaticRig, cameraFrame } from '../site-news-model-utils.mjs';
+import { batchStaticRig, cameraFrame } from '../balloon/site-news-model-utils.mjs';
 
 const path = new URL('../assets/news-balloon-v01.glb', import.meta.url);
 async function load() {
@@ -70,7 +70,7 @@ test('camera fitting keeps the complete balloon visible at both button sizes', (
 });
 
 test('renderer keeps the poster fallback and pauses 3D rendering when flight pauses', async () => {
-  const source = await readFile(new URL('../site-news-model.js', import.meta.url), 'utf8');
+  const source = await readFile(new URL('../balloon/site-news-model.js', import.meta.url), 'utf8');
   assert.match(source, /alpha: true, antialias: true/);
   assert.match(source, /setClearColor\(0x000000, 0\)/);
   assert.match(source, /dataset\.flying === 'true'/);

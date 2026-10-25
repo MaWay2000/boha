@@ -313,7 +313,7 @@
         text('armoryDamage-' + weapon, state.weaponStats[weapon].damage);
         text('armoryKills-' + weapon, state.weaponStats[weapon].kills);
       }
-      text('armoryBattleNote', catalogError ? 'Unit data unavailable. Repair page to reset.'
+      text('armoryBattleNote', catalogError ? 'Unit data unavailable. Use Restart game to reset.'
         : battle.lastReward ? `Last kill +${battle.lastReward} power · new targets spend the bank · max 8 on screen`
           : 'Balloon +1 score · starting budget 500 power · unit kills pay 1.5× their cost');
       for (const [id, item] of unitNodes) if (!battle.units.some(unit => unit.id === id)) { item.node.remove(); unitNodes.delete(id); }
@@ -590,8 +590,10 @@
       syncScrollLock();
       shield.hidden = !state.weapon;
       hud.hidden = !state.weapon;
-      fireButton.disabled = !state.weapon || (!battle.units.length && !state.health);
-      fireButton.textContent = battle.units.length ? 'Fire at unit' : 'Fire at balloon';
+      if (fireButton) {
+        fireButton.disabled = !state.weapon || (!battle.units.length && !state.health);
+        fireButton.textContent = battle.units.length ? 'Fire at unit' : 'Fire at balloon';
+      }
       off.disabled = !state.weapon;
       // Keep keyboard focus out of nested documents while the shooting shield
       // covers them. Restore their original state immediately on disarm.
@@ -1064,7 +1066,7 @@
     doc.addEventListener('pointerdown', e => {
       if (!state.weapon || held || e.button !== 0 || e.isPrimary === false || doc.hidden || blocked()) return;
       if (e.target === lootButton || e.target.closest?.('#armoryLoot')) return;
-      const autoAim = e.target === fireButton || !!e.target.closest?.('#armoryFire');
+      const autoAim = !!fireButton && (e.target === fireButton || !!e.target.closest?.('#armoryFire'));
       if (!autoAim && e.target.closest?.('#siteArmory, #armoryHud, dialog')) return;
       if (!Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
       e.preventDefault();
@@ -1082,10 +1084,10 @@
     doc.addEventListener('pointerup', release, true);
     doc.addEventListener('pointercancel', release, true);
     shield.addEventListener('lostpointercapture', release);
-    fireButton.addEventListener('lostpointercapture', release);
+    fireButton?.addEventListener('lostpointercapture', release);
     win.addEventListener('blur', () => { focused = false; stopHolding(); stopWaveClock(); stopEffectClock(); clearRocketFlights(); sound?.stop(); syncBattleView(); });
     win.addEventListener('focus', () => { focused = true; syncBattleView(); });
-    fireButton.addEventListener('click', e => {
+    fireButton?.addEventListener('click', e => {
       // Mouse/touch already fired on pointerdown. Preserve keyboard activation.
       if (e.detail !== 0) return;
       const target = autoTarget(); if (target) shoot(target.x, target.y);

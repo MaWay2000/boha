@@ -1,10 +1,10 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
-const loot = require('../site-armory-loot.js');
-const scores = require('../site-armory-scores.js');
+const loot = require('../balloon/site-armory-loot.js');
+const scores = require('../balloon/site-armory-scores.js');
 const rollFor = id => (loot.CATALOG.findIndex(item => item.id === id) + .5) / loot.CATALOG.length;
-const { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, rouletteSteps, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount } = require('../site-armory.js');
+const { WEAPONS, MAX_MARKS, FLAME_SPRITE, BALLOON_MAX_HEALTH, BALLOON_RESPAWN_MS, UPGRADE_MILESTONES, upgradeProgress, weaponProfile, rouletteSteps, cannonBlast, flameShape, flameVictims, flameParticles, flameSplashParticles, homeRocket, createState, reloadState, documentPoint, hitBalloon, fire, crackPaths, mount } = require('../balloon/site-armory.js');
 
 test('five distinct optional weapons start disarmed with no damage', () => {
   assert.deepEqual(Object.keys(WEAPONS), ['machinegun', 'cannon', 'laser', 'rockets', 'flamer']);
@@ -192,7 +192,7 @@ test('cracked glass geometry is bounded, variable, finite, and generated without
   assert.notDeepEqual(crackPaths(() => .2), crackPaths(() => .8));
 });
 
-function fixture({ reduced = false, hostname = '', signedIn = true, storage } = {}) {
+function fixture({ reduced = false, hostname = '', signedIn = true, storage, fireControl = true } = {}) {
   class Element {
     constructor(id) {
       this.id = id; this.listeners = {}; this.dataset = {}; this.children = []; this.attributes = {};
@@ -235,6 +235,7 @@ function fixture({ reduced = false, hostname = '', signedIn = true, storage } = 
   ids.push('armoryTech', 'armoryTechName', 'armoryTechNext', 'armoryTechPath');
   for (const weapon of Object.keys(WEAPONS)) ids.push('armoryReload-' + weapon, 'armoryReloadLabel-' + weapon, 'armoryDamage-' + weapon, 'armoryKills-' + weapon, 'armoryLevel-' + weapon, 'armoryLabel-' + weapon, 'armoryTier-' + weapon);
   const nodes = Object.fromEntries(ids.map(id => [id, new Element(id)]));
+  if (!fireControl) delete nodes.armoryFire;
   const buttons = Object.keys(WEAPONS).map(weapon => { const button = new Element(weapon); button.dataset.weapon = weapon; return button; });
   const doc = new Element('document'); doc.body = new Element('body'); doc.hidden = false;
   const frame = new Element('contentFrame');
@@ -357,6 +358,23 @@ test('arming and disarming are reversible and preserve nested-frame keyboard sta
   mount(f.win); assert.equal(f.buttons[0].listeners.click.length, 1);
 });
 
+test('published HUD has no Fire button and click-and-hold shooting still works without that optional control', async () => {
+  const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
+  assert.doesNotMatch(html, /id="armoryFire"/);
+  assert.match(html, /id="armoryRepair">Restart game<\/button>/);
+  assert.doesNotMatch(html, /Repair page/);
+  for (const weapon of Object.keys(WEAPONS)) {
+    const f = fixture({ fireControl: false }); await f.ready;
+    f.select(weapon); assert.equal(f.nodes.armoryHud.hidden, false);
+    hold(f); assert.equal(f.getState().shots, 1);
+    f.advance(weaponProfile(f.getState(), weapon).cooldown); assert.ok(f.getState().shots >= 2);
+    f.doc.emit('pointerup', { pointerId: 7 }); const shots = f.getState().shots;
+    f.advance(4000); assert.equal(f.getState().shots, shots);
+    f.select(null); assert.equal(f.nodes.armoryHud.hidden, true);
+    f.reset(); assert.equal(f.getState().shots, 0);
+  }
+});
+
 test('misses leave bounded visual-only damage; repair clears all marks and animation timers', () => {
   const f = fixture(); f.select('machinegun');
   for (let i = 0; i < 100; i++) { f.next(); f.shoot(400, 450); }
@@ -411,11 +429,11 @@ test('reduced motion omits explosion animations while keeping weapon and repair 
 });
 
 test('game core never injects into nested documents; shared score requests are isolated in their adapter', () => {
-  const script = fs.readFileSync(require.resolve('../site-armory.js'), 'utf8');
+  const script = fs.readFileSync(require.resolve('../balloon/site-armory.js'), 'utf8');
   assert.doesNotMatch(script, /fetch\(|XMLHttpRequest|localStorage|sessionStorage|innerHTML|contentDocument|contentWindow|postMessage/);
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
   assert.match(html, /id="armoryShield" hidden/); assert.match(html, /id="armoryHud"[^>]*hidden/);
-  const scoreScript = fs.readFileSync(require.resolve('../site-armory-scores.js'), 'utf8');
+  const scoreScript = fs.readFileSync(require.resolve('../balloon/site-armory-scores.js'), 'utf8');
   assert.doesNotMatch(scoreScript, /XMLHttpRequest|innerHTML|contentDocument|contentWindow|postMessage/);
   assert.match(scoreScript, /credentials: 'omit'/); assert.match(scoreScript, /wzstats\/api\/v1\/armory/);
 });
@@ -658,7 +676,7 @@ test('top arena keeps moving and bounded through resizing in the owner localhost
     assert.ok(unit.point.x >= 12 && unit.point.x + 124 <= 320);
     assert.ok(unit.point.y >= 20 && unit.point.y + 100 <= 206);
   }
-  const css = fs.readFileSync(require.resolve('../site-armory.css'), 'utf8');
+  const css = fs.readFileSync(require.resolve('../balloon/site-armory.css'), 'utf8');
   assert.match(css, /html\.armory-scroll-locked, body\.armory-scroll-locked \{ overflow: hidden !important/);
   assert.match(css, /\.armory-targets \{[^}]*height: min\(300px, 100dvh\)[^}]*overflow: hidden/);
 });
@@ -1357,7 +1375,7 @@ test('roulette stops cleanly on safe exits and Repair; reduced motion shows a st
         assert.equal(f.getState().effects.timed.rocketBoost, 30000);
       } else assert.deepEqual(f.getState().effects, loot.createEffects());
     }
-    const css = fs.readFileSync(require.resolve('../site-armory.css'), 'utf8');
+    const css = fs.readFileSync(require.resolve('../balloon/site-armory.css'), 'utf8');
     assert.match(css, /armory-gun-winner \.8s ease-in-out 2/);
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*button\[data-loot-pick="winner"\] \{ animation: none; \}/);
   } finally { Math.random = savedRandom; }
@@ -1616,7 +1634,7 @@ test('flamer uses the original projectile model atlas frames, with an unmodified
   assert.equal(require('node:crypto').createHash('sha256').update(image).digest('hex'), '20e3aa2a9ade8448e87c26edcb96e04d7dc3196d080544e3414119253cffc4d1');
   assert.ok(FLAME_SPRITE.x + FLAME_SPRITE.width * FLAME_SPRITE.frames <= FLAME_SPRITE.atlasSize);
   assert.match(fs.readFileSync(require.resolve('../assets/vendor/warzone-effects/COPYING'), 'utf8'), /GNU GENERAL PUBLIC LICENSE/);
-  const css = fs.readFileSync(require.resolve('../site-armory.css'), 'utf8');
+  const css = fs.readFileSync(require.resolve('../balloon/site-armory.css'), 'utf8');
   assert.ok(css.includes(FLAME_SPRITE.texture)); assert.match(css, /\.462s steps\(7\) infinite/);
   assert.match(css, /mix-blend-mode: screen/);
   const containerRule = css.match(/\.armory-flame-jet \{([^}]+)\}/)[1];
@@ -1670,7 +1688,7 @@ test('splash flames use bounded original sprites and finish with the jet, also i
 });
 
 test('research tiers use real unlocks and models, with sorted mini-game thresholds and safe boundaries', () => {
-  const tech = require('../site-armory-tech.js'), reference = require('./armory-tech-research.json');
+  const tech = require('../balloon/site-armory-tech.js'), reference = require('./armory-tech-research.json');
   const weapons = JSON.parse(fs.readFileSync(require.resolve('../mapmaker/pies/components/weapons/weapons.json'), 'utf8'));
   assert.equal(Object.values(tech.PATHS).flat().length, 21);
   for (const [weapon, path] of Object.entries(tech.PATHS)) {

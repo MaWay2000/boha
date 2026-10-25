@@ -18,18 +18,18 @@
   <script src="assets/atom-icon-renderer.js?v=20261021-circle-1" defer></script>
   <script src="assets/atom-favicon.js?v=20261022-static-1" defer></script>
   <link rel="stylesheet" href="styles.css?v=20261023-header-cleanup-1">
-  <link rel="stylesheet" href="site-news.css?v=20261023-news-cleanup-1">
-  <script src="site-news.js?v=20261023-news-cleanup-1" defer></script>
-  <script src="site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
-  <link rel="stylesheet" href="site-armory.css?v=20261024-tops-1">
-  <script src="site-armory-loot.js?v=20261024-roulette-1" defer></script>
-  <script src="site-armory-tech.js?v=20261024-tech-tiers-1" defer></script>
-  <script src="site-armory-audio.js?v=20261024-flamer-1" defer></script>
-  <script src="site-armory-battle.js?v=20261024-loot30-1" defer></script>
-  <script src="site-armory-scores.js?v=20261024-shared-2" defer></script>
-  <script src="site-armory.js?v=20261024-shared-2" defer></script>
-  <script src="site-armory-model.js?v=20261024-tech-tiers-1" type="module"></script>
-  <script src="site-armory-units.js?v=20261024-allies-1" type="module"></script>
+  <link rel="stylesheet" href="balloon/site-news.css?v=20261023-news-cleanup-1">
+  <script src="balloon/site-news.js?v=20261023-news-cleanup-1" defer></script>
+  <script src="balloon/site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
+  <link rel="stylesheet" href="balloon/site-armory.css?v=20261024-tops-1">
+  <script src="balloon/site-armory-loot.js?v=20261024-roulette-1" defer></script>
+  <script src="balloon/site-armory-tech.js?v=20261024-tech-tiers-1" defer></script>
+  <script src="balloon/site-armory-audio.js?v=20261024-flamer-1" defer></script>
+  <script src="balloon/site-armory-battle.js?v=20261024-loot30-1" defer></script>
+  <script src="balloon/site-armory-scores.js?v=20261024-shared-2" defer></script>
+  <script src="balloon/site-armory.js?v=20261025-restart-1" defer></script>
+  <script src="balloon/site-armory-model.js?v=20261024-tech-tiers-1" type="module"></script>
+  <script src="balloon/site-armory-units.js?v=20261025-model-recovery-1" type="module"></script>
   <style>
     body.radio-playlist-open {
       overflow: hidden;
@@ -302,7 +302,7 @@
     <p class="armory-roulette-status" id="armoryRouletteStatus" role="status" aria-live="polite" aria-atomic="true"></p>
     <p class="armory-effects" id="armoryEffects" hidden></p>
     <details class="armory-loot-guide"><summary>Balloon drops — all 30 rewards</summary>
-      <p>Each reward is equally likely. Timed boosts last 30 active seconds and pause when you leave the game. Repeats refresh the timer. Passive upgrades stack up to their listed caps and reset with Repair page.</p>
+      <p>Each reward is equally likely. Timed boosts last 30 active seconds and pause when you leave the game. Repeats refresh the timer. Passive upgrades stack up to their listed caps and reset with Restart game.</p>
       <ol id="armoryLootGuide"></ol>
     </details>
     <div class="armory-wave" id="armoryWave" aria-label="Enemy wave progress" hidden>
@@ -337,8 +337,7 @@
       <small id="armoryBattleNote">Unit kills pay 1.5× their cost. New units spend the bank.</small>
     </div>
     <div class="armory-hud-actions">
-      <button type="button" id="armoryFire">Fire at balloon</button>
-      <button type="button" id="armoryRepair">Repair page</button>
+      <button type="button" id="armoryRepair">Restart game</button>
       <button type="button" id="armorySound" aria-label="Gun sounds" aria-pressed="true" title="Toggle gun sounds">Sound: on</button>
       <button type="button" id="armoryHudTops">Top scores</button>
       <button type="button" id="armoryOff">Disarm <kbd>Esc</kbd></button>

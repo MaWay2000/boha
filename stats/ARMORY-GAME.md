@@ -26,6 +26,21 @@ The table is shared online through the existing public API at
 - POST `/scores` submits `{token,score,kills,bosses,wave,power}`. Names and
   timestamps come from the server, not from the submitted score body.
 
+Viewing the table also reads `stats/published/armory-scores.json`, a validated
+public Top 10 snapshot. A dedicated GitHub workflow checks the API about every
+ten minutes and commits only changed rankings. Browser reads use the public
+GitHub raw URL (bot commits do not trigger Pages builds), with the site copy
+as a fallback. GitHub scheduling/CDN delays can add time. Live responses take
+priority; slower snapshots cannot overwrite them. Failed publication retains
+the last good snapshot, including its original publication date.
+
+This lets visitors read the shared table when the PC-hosted API is unreachable
+or browser network rules block it. The lobby labels the publication date and
+live connection failure. Score submissions still require access to the live
+API; pending uploads are explicitly shown and are never inserted into the
+published table as if accepted. The snapshot contains only already-public
+nicknames and run statistics; no session tokens, IPs or private server state.
+
 One best run per case-insensitive nickname is retained, ordered by score, wave,
 earned power and first-achieved time. Score is existing unit kills plus balloon
 defeats, including friendly kills; earned power is total gained, not the bank.

@@ -700,7 +700,8 @@
         rows.append(row);
       }
       const note = doc.getElementById('armoryScoreStorage');
-      if (note) note.textContent = service.phase === 'error' ? `Shared Top 10 · ${service.error}${service.pending ? ' Your latest score is waiting to sync.' : ''}`
+      if (note) note.textContent = service.source === 'published' ? `Shared Top 10 · Published ${new Date(service.publishedAt).toLocaleString()}. ${service.phase === 'error' ? 'Live connection unavailable. ' : ''}${service.pending ? 'Your latest score is waiting to sync. ' : ''}New results appear here after publication.`
+        : service.phase === 'error' ? `Shared Top 10 · ${service.error}${service.pending ? ' Your latest score is waiting to sync.' : ''}`
         : `Shared Top 10 · ${['loading', 'connecting'].includes(service.phase) ? 'Connecting… ' : service.pending ? 'Saving… ' : ''}Your chosen nickname and run stats are public. No account or password is required.`;
     }
     function syncNameEntry(showError = false) {

@@ -6,6 +6,8 @@
   'use strict';
   const STORAGE_KEY = 'boha.armory.scores.v1', LIMIT = 10;
   const ENDPOINT = 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/armory';
+  const PUBLICATION = 'stats/published/armory-scores.json';
+  const PUBLICATION_ENDPOINT = 'https://raw.githubusercontent.com/MaWay2000/boha/main/' + PUBLICATION;
   function normalizeName(value) {
     return typeof value === 'string' ? value.normalize('NFC').replace(/\s+/gu, ' ').trim() : '';
   }
@@ -27,6 +29,12 @@
   function compare(a, b) {
     return b.score - a.score || b.wave - a.wave || b.power - a.power || a.savedAt - b.savedAt ||
       (identity(a.name) < identity(b.name) ? -1 : identity(a.name) > identity(b.name) ? 1 : 0);
+  }
+  function normalizePublication(value) {
+    if (value?.schemaVersion !== 1 || !Number.isSafeInteger(value.publishedAt) || value.publishedAt <= 0 ||
+      value.publishedAt > 8640000000000000 || !Array.isArray(value.entries) || value.entries.length > LIMIT ||
+      value.entries.some(row => !normalizeEntry(row))) throw Error('Invalid published leaderboard.');
+    return { schemaVersion: 1, publishedAt: value.publishedAt, entries: rank(value.entries) };
   }
   function rank(entries) {
     const best = new Map();
@@ -82,22 +90,29 @@
   function createOnline(win, changed = () => {}, endpoint = ENDPOINT) {
     let rows = [], player = '', token = '', pending = null, timer = null, connecting = null, posting = false;
     let generation = 0, sequence = 0, applied = 0, retries = 0, retryFloor = 5000, phase = 'idle', error = '';
+    let source = '', publishedAt = 0, liveCheckedAt = 0;
     const report = (next, message = '') => { phase = next; error = message; changed(); };
     const clearTimer = () => { if (timer != null) win.clearTimeout(timer); timer = null; };
-    async function request(path, payload) {
+    async function request(path, payload, published = false, publishedUrl = PUBLICATION_ENDPOINT) {
       const controller = win.AbortController ? new win.AbortController() : null;
       const timeout = controller && win.setTimeout(() => controller.abort(), 10000);
       try {
-        const response = await win.fetch(endpoint + path, { method: payload ? 'POST' : 'GET', cache: 'no-store', credentials: 'omit',
+        const response = await win.fetch(published ? publishedUrl : endpoint + path, { method: payload ? 'POST' : 'GET', cache: 'no-store', credentials: 'omit',
           ...(controller ? { signal: controller.signal } : {}),
           ...(payload ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), keepalive: true } : {}) });
         if (!response.ok) { const failure = Error(response.status === 401 ? 'Session expired — start a new round.' : response.status === 429 ? 'Score service busy — retrying shortly.' : 'Score service unavailable — try again.'); failure.status = response.status; throw failure; }
         const result = await response.json();
+        if (published) return normalizePublication(result);
         if (result?.schemaVersion !== 1 || !Array.isArray(result.entries) || result.entries.length > LIMIT || result.entries.some(row => !normalizeEntry(row))) throw Error('Invalid leaderboard response.');
         return result;
       } finally { if (timeout) win.clearTimeout(timeout); }
     }
-    const accept = (result, order) => { if (order >= applied) { rows = rank(result.entries); applied = order; } };
+    const accept = (result, order, origin = 'live') => {
+      if (order < applied) return false;
+      rows = rank(result.entries); applied = order; source = origin; publishedAt = origin === 'published' ? result.publishedAt : 0;
+      if (origin === 'live') liveCheckedAt = Date.now();
+      return true;
+    };
     function retry() {
       if (!pending || timer != null || retries >= 3) return;
       timer = win.setTimeout(() => { timer = null; pump(); }, Math.min(60000, Math.max(retryFloor, 5000 * 2 ** retries++)));
@@ -142,16 +157,29 @@
     function clear() { generation++; clearTimer(); token = ''; player = ''; pending = null; connecting = null; posting = false; retries = 0; retryFloor = 5000; }
     return {
       entries: () => rows.map(row => ({ ...row })),
-      status: () => ({ phase, error, pending: !!pending || posting }),
+      status: () => ({ phase, error, pending: !!pending || posting, source, publishedAt }),
       begin(name) { clear(); if (!validName(name)) return; player = normalizeName(name); return connect(); },
       save(entry) { const value = normalizeEntry(entry); if (!value || value.name !== player) return; pending = value; schedule(); },
       flush() { clearTimer(); pump(); }, clear,
       refresh() {
-        const order = ++sequence; report('loading');
-        return request('/scores').then(result => { accept(result, order); report('ready'); })
-          .catch(failure => report('error', failure.message || 'Leaderboard unavailable.'));
+        const snapshotOrder = ++sequence, order = ++sequence; report('loading');
+        // Public copies never contain local personal bests or session tokens.
+        // Start both reads together, so a blocked live connection cannot hide the public table.
+        // Read the scheduled publication directly: bot commits do not trigger Pages builds.
+        const snapshot = request('', null, true).catch(() => request('', null, true, PUBLICATION)).then(result => {
+          if ((source !== 'live' || result.publishedAt > liveCheckedAt) && accept(result, snapshotOrder, 'published')) changed();
+          return result;
+        }).catch(() => null);
+        return request('/scores').then(result => {
+          if (accept(result, order)) report('ready');
+        }).catch(async failure => {
+          const result = await snapshot;
+          if (order < applied) return;
+          if (result && source !== 'live') accept(result, snapshotOrder, 'published');
+          report('error', failure.message || 'Leaderboard unavailable.');
+        });
       }
     };
   }
-  return { STORAGE_KEY, ENDPOINT, LIMIT, normalizeName, validName, normalizeEntry, compare, rank, parse, createStore, createOnline };
+  return { STORAGE_KEY, ENDPOINT, PUBLICATION, PUBLICATION_ENDPOINT, LIMIT, normalizeName, validName, normalizeEntry, normalizePublication, compare, rank, parse, createStore, createOnline };
 });

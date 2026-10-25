@@ -1,0 +1,36 @@
+name: Publish shared balloon Top 10
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: sync-armory-scores
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Validate publication and browser fallback
+        run: node --test stats/armory-score-publication.test.cjs stats/site-armory.test.cjs
+      - name: Download public scores
+        run: node stats/sync-armory-scores.cjs
+      - name: Check public data
+        run: node stats/check-public-release.cjs
+      - name: Publish changed table
+        run: |
+          if git diff --quiet -- stats/published/armory-scores.json; then
+            echo 'Shared Top 10 unchanged.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add stats/published/armory-scores.json
+          git commit -m 'Update shared balloon Top 10'
+          git pull --rebase origin main
+          git push

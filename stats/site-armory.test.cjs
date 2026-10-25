@@ -157,6 +157,66 @@ test('shared reads reject malformed responses, retain the last good table and sh
   assert.equal(f.online.entries()[0].score, 12);
 });
 
+test('published shared scores remain readable when the live API is blocked; local bests are never merged', async () => {
+  const f = onlineFixture(async url => {
+    if (url.startsWith(scores.ENDPOINT)) throw Error('Failed to fetch');
+    return scoreResponse([scoreEntry('Shared pilot', 12, {token: 'not public'})], {publishedAt: 1000});
+  });
+  await f.online.refresh();
+  assert.equal(f.online.entries()[0].name, 'Shared pilot');
+  assert.equal(f.online.entries()[0].token, undefined);
+  assert.equal(f.online.status().source, 'published');
+  assert.equal(f.online.status().publishedAt, 1000);
+  assert.equal(f.online.status().phase, 'error');
+  await f.online.begin('Local pilot');
+  f.online.save(scoreEntry('Local pilot', 99));
+  assert.equal(f.online.status().pending, true);
+  assert.equal(f.online.entries()[0].score, 12);
+});
+
+test('publication appears while live fetch is pending, but late snapshots cannot overwrite live scores', async () => {
+  let finishLive, finishPublished;
+  const f = onlineFixture(async url => url.startsWith(scores.ENDPOINT)
+    ? new Promise(resolve => {finishLive = resolve;}) : scoreResponse([scoreEntry('Published', 5)], {publishedAt: 1000}));
+  const loading = f.online.refresh(); await settleScores();
+  assert.equal(f.online.entries()[0].score, 5);
+  finishLive(scoreResponse([scoreEntry('Live', 12)])); await loading;
+  assert.equal(f.online.status().source, 'live');
+  assert.equal(f.online.entries()[0].score, 12);
+  const late = onlineFixture(async url => url.startsWith(scores.ENDPOINT) ? scoreResponse([scoreEntry('Live', 20)])
+    : new Promise(resolve => {finishPublished = resolve;}));
+  await late.online.refresh();
+  finishPublished(scoreResponse([scoreEntry('Old publication', 1)], {publishedAt: 1000})); await settleScores();
+  assert.equal(late.online.entries()[0].score, 20);
+  assert.equal(late.online.status().source, 'live');
+});
+
+test('unavailable GitHub publication falls back to site copy, and invalid snapshots never erase good scores', async () => {
+  let valid = true;
+  const f = onlineFixture(async url => {
+    if (url !== scores.PUBLICATION) throw Error('offline');
+    return valid ? scoreResponse([scoreEntry('Published', 8)], {publishedAt: 1000})
+      : scoreResponse([scoreEntry('Invalid', 99)], {publishedAt: 'not a date'});
+  });
+  await f.online.refresh(); assert.equal(f.online.entries()[0].score, 8);
+  assert.ok(f.requests.some(request => request.url === scores.PUBLICATION));
+  valid = false; await f.online.refresh(); assert.equal(f.online.entries()[0].score, 8);
+});
+
+test('a newer publication replaces a previously live table after the API goes offline', async () => {
+  let live = true;
+  const f = onlineFixture(async url => {
+    if (url.startsWith(scores.ENDPOINT)) {
+      if (!live) throw Error('offline');
+      return scoreResponse([scoreEntry('Pilot', 2)]);
+    }
+    return scoreResponse([scoreEntry('Pilot', 9)], {publishedAt: live ? 1000 : Date.now() + 1000});
+  });
+  await f.online.refresh(); assert.equal(f.online.entries()[0].score, 2);
+  live = false; await f.online.refresh();
+  assert.equal(f.online.entries()[0].score, 9); assert.equal(f.online.status().source, 'published');
+});
+
 test('balloon hit testing excludes transparent corners, ropes, destroyed and invalid bounds', () => {
   const box = { left: 100, top: 50, width: 132, height: 184 };
   assert.equal(hitBalloon(166, 122, box), true);

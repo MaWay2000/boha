@@ -32,6 +32,13 @@ for (const file of files) {
   if (/^stats\/published\/(?:leaderboards|matches|beta1|beta3)\.json$/.test(file)) {
     try { assertNoPrivateFields(JSON.parse(text)); } catch { failures.push(`Private or invalid data in ${file}; details suppressed.`); }
   }
+  if (file === 'stats/published/armory-scores.json') {
+    try {
+      const value = JSON.parse(text);
+      const {normalizePublication} = require('./../balloon/site-armory-scores.js');
+      if (JSON.stringify(value) !== JSON.stringify(normalizePublication(value))) throw Error('Unexpected score fields');
+    } catch { failures.push(`Private or invalid score publication in ${file}; details suppressed.`); }
+  }
 }
 try {
   const manifest = JSON.parse(read('stats/published/manifest.json'));

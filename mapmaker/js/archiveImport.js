@@ -1,3 +1,5 @@
+import {readMapVersion} from './mapVersion.js';
+
 // Shared, DOM-free readers for classic Warzone map archives.
 export function metadataText(...values) {
   for (const value of values) {
@@ -83,6 +85,8 @@ export async function readMapArchiveMetadata(zip) {
     const generator = metadataText(json.generator, json.madeWith, json['made-with']);
     if (generator) data.generator = generator;
   }
+  const savedVersion = await readMapVersion(zip);
+  if (savedVersion) data.versionName = savedVersion;
   return { name: jsonName || null, data: Object.keys(data).length ? data : null };
 }
 

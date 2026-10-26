@@ -21,6 +21,7 @@ const vm = require('node:vm');
     scheduleLocalAutosave:() => {scheduled++;},
     currentMapExportInfo:null, currentMapArchive:null, tilesetIndex:0, mapW:128, mapH:128,
     getSaveMapName:() => 'Scavenger test', getOfficialTilesetName:() => 'arizona',
+    getSaveMapVersion:() => '1.0',
     buildDefaultLevelJson:() => '{"author":{"name":"Original author"},"license":"CC0","scavs":1}',
     buildDefaultGamJson:() => '{}'
   });
@@ -40,6 +41,19 @@ const vm = require('node:vm');
       'Detection never freezes Auto into an override');
   }
   expectAuto('0', 'Missing objects are No, regardless of stale metadata');
+  vm.runInContext(extract('getDefaultMapInfoOverrides'), ctx);
+  const restoreSource = extract('loadLocalSaveSnapshot');
+  const restoreStart = restoreSource.indexOf('  currentMapInfoOverrides =');
+  const restoreEnd = restoreSource.indexOf('  updateMapInfoInputs();', restoreStart);
+  assert(restoreStart >= 0 && restoreEnd > restoreStart);
+  for (const previous of ['0','1','']) {
+    ctx.snapshot = {mapInfo:{name:'Saved map',author:'Original author',license:'MIT',scavengers:previous}};
+    vm.runInContext(restoreSource.slice(restoreStart, restoreEnd), ctx);
+    expectAuto('0', 'Settings defaults to Auto when restoring a saved or generated map');
+    assert.equal(ctx.currentMapInfoOverrides.name, 'Saved map');
+    assert.equal(ctx.currentMapInfoOverrides.author, 'Original author');
+    assert.equal(ctx.currentMapInfoOverrides.license, 'MIT');
+  }
   ctx.objectsGroup = null;
   expectAuto('0', 'No scene objects before loading is safe');
   ctx.objectsGroup = {children:[

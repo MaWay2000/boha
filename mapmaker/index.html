@@ -541,6 +541,20 @@
       outline: none;
       border-color: #6CF527;
     }
+    .save-info-dialog {
+      left: 50%; top: 50%; right: auto; bottom: auto; margin: 0;
+      width: min(560px, calc(100vw - 24px));
+      max-height: calc(100dvh - 24px); overflow-y: auto; color: var(--fg);
+    }
+    .save-info-dialog::backdrop { background: rgba(0,0,0,0.45); }
+    .save-license-help-dialog { width: min(680px, calc(100vw - 24px)); }
+    .save-info-dialog select,
+    .save-info-dialog textarea {
+      width: 100%; box-sizing: border-box; background: #283445;
+      border: 1px solid #435066; color: var(--fg); padding: 5px 7px; font: inherit;
+    }
+    .save-info-dialog select:focus,
+    .save-info-dialog textarea:focus { outline: none; border-color: #6CF527; }
     .app-dialog-hint {
       color: var(--muted);
       font-size: 0.75rem;
@@ -1061,10 +1075,13 @@
             <input type="text" id="settingsMapVersionInput" autocomplete="off" spellcheck="false">
             <label for="settingsMapTagsInput" style="margin:0; font-size:0.85rem;">Tags:</label>
             <input type="text" id="settingsMapTagsInput" autocomplete="off" spellcheck="false">
-            <label for="settingsMapLicenseInput" style="margin:0; font-size:0.85rem;">License:</label>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label for="settingsMapLicenseInput" style="margin:0; font-size:0.85rem;">License:</label>
+              <button type="button" id="mapLicenseHelpBtn" class="action-btn" title="License help" style="width:28px; min-width:28px; height:24px; padding:0; line-height:1;">?</button>
+            </div>
             <select id="settingsMapLicenseInput">
-              <option value="">Unknown</option>
-              <option value="CC0-1.0">CC0-1.0</option>
+              <option value="Unknown">Unknown</option>
+              <option value="CC0-1.0" selected>CC0-1.0</option>
               <option value="CC-BY-4.0">CC-BY-4.0</option>
               <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
               <option value="GPL-2.0-or-later">GPL-2.0-or-later</option>
@@ -1084,15 +1101,15 @@
               <button type="button" id="licenseHelpBtn" class="action-btn" title="License help" style="width:28px; min-width:28px; height:24px; padding:0; line-height:1;">?</button>
             </div>
             <select id="settingsMyLicenseInput">
-              <option value="">Unknown</option>
-              <option value="CC0-1.0">CC0-1.0</option>
+              <option value="Unknown">Unknown</option>
+              <option value="CC0-1.0" selected>CC0-1.0</option>
               <option value="CC-BY-4.0">CC-BY-4.0</option>
               <option value="CC-BY-SA-4.0">CC-BY-SA-4.0</option>
               <option value="GPL-2.0-or-later">GPL-2.0-or-later</option>
               <option value="GPL-3.0-or-later">GPL-3.0-or-later</option>
               <option value="MIT">MIT</option>
             </select>
-            <label for="settingsMySourceInput" style="margin:0; font-size:0.85rem;">My source / page:</label>
+            <label for="settingsMySourceInput" style="margin:0; font-size:0.85rem;">My website:</label>
             <input type="text" id="settingsMySourceInput" autocomplete="off" spellcheck="false">
           </div>
         </div>

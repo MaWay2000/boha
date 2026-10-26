@@ -41,7 +41,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
     mapW:149,mapH:171,tilesetIndex:2,TILESETS:[{},{},{name:'rocky mountains'}],
     getCurrentMapFilename:()=>metadata.name,getOfficialTilesetName:()=>'rockies',getSaveObjectSummary:()=>'',getMetadataText:h.metadataText,
     console,loadedDroids:null});
-  for(const n of ['getStructurePlayer','getObjectEntryPlayer','getSaveAuthor','getSaveLicense','getSaveMapName','getSaveSourceName',
+  for(const n of ['getStructurePlayer','getObjectEntryPlayer','getSaveAuthor','getSaveLicense','getSaveMapName','getSaveMapVersion','getSaveSourceName',
     'getStructureSaveCategory','getSavePlayerStats','formatSavePlayerStats','formatOilByPlayer','formatHqPositions','getSaveBalanceSummary',
     'getDeclaredPlayerCount','getReadableFileSize','getDetectedMapScavengers','getSaveScavengers','buildSaveResultDetails','readArchiveJson','syncMapScriptEditor','loadArchiveMetadata','loadDroidsFromZip','buildDefaultLevelJson'])
     vm.runInContext(extract(n),ctx);

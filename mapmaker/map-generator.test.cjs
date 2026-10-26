@@ -12,6 +12,8 @@ const vm=require('node:vm');
   const catalog={tileTypes,tileCounts:[78,81,80],structures:Object.entries(structureData).map(([id,d])=>({id,sizeX:d.width||2,sizeY:d.breadth||2})),
     features:Object.entries(featureData).map(([id,d])=>({id,sizeX:d.width||1,sizeY:d.breadth||1}))};
   const a=generateMap({},catalog),b=generateMap({},catalog);
+  assert.equal(a.snapshot.mapInfo.license,'CC0-1.0','generated maps default to CC0');
+  assert.equal(a.snapshot.mapInfo.version,'1.0','generated maps default to version 1.0');
   assert.deepEqual(a,b,'same settings and seed reproduce exactly');
   assert.deepEqual(a.report.errors,[],'defaults are valid');
   const metadata={name:'My map',author:'Map creator',license:'MIT',description:'Keep this',version:'3',tags:'custom',created:'2026-10-15',source:'local',slots:'2',scavengers:'1'};

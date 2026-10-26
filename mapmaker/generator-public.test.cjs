@@ -7,6 +7,7 @@ const vm = require('node:vm');
   const {generateMap} = await import('./js/mapGenerator.js');
   const {mountMapGenerator} = await import('./js/mapGeneratorUI.js');
   const {loadMapUnified} = await import('./js/maploader.js');
+  const {metadataText} = await import('./js/archiveImport.js');
   const source = fs.readFileSync(path.join(__dirname, 'js/game.js'), 'utf8');
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   function extract(name) {
@@ -132,16 +133,19 @@ const vm = require('node:vm');
   generated.mapRotations[20][20] = 2; generated.mapXFlip[20][20] = true;
   const exportContext = vm.createContext({...generated,Uint8Array,DataView,
     currentMapExportInfo:{gamma:false,version:40,width:generated.mapW,height:generated.mapH,tail:null},
-    currentMapArchive:null,currentLevelJson:null,currentMapInfoOverrides:generated.mapInfo,
-    getSaveMapName:() => generated.name,getOfficialTilesetName:() => 'arizona',getSaveScavengers:() => '0'});
+    currentMapArchive:null,currentLevelJson:null,currentServerMapMetadata:null,currentMapInfoOverrides:generated.mapInfo,
+    getSaveMapName:() => generated.name,getOfficialTilesetName:() => 'arizona',getSaveScavengers:() => '0',
+    getMetadataText:metadataText,readUserMapInfo:() => ({license:'CC0-1.0'})});
   for (const name of ['buildTileNumber','getReusableMapTail','buildClassicMapFileBytes',
-    'buildDefaultLevelJson','buildDefaultGamJson','updateGammaMetadata','isBuilderDroid']) {
+    'getSaveLicense','getSaveMapVersion','buildDefaultLevelJson','buildDefaultGamJson','updateGammaMetadata','isBuilderDroid']) {
     vm.runInContext(extract(name),exportContext);
   }
   const zip = new mod.exports();
   await exportContext.updateGammaMetadata(zip,'Generated map');
   const level = JSON.parse(await zip.file('level.json').async('string'));
   assert.equal(level.mapmakerFormat,'classic40'); assert.equal(level.players,4);
+  assert.equal(level.license,generated.mapInfo.license,'Generated archive retains its selected license');
+  assert.equal(level.versionName,'1.0','Generated archive starts at version 1.0');
   const bytes = exportContext.buildClassicMapFileBytes();
   const loadSource = extract('loadMapFile');
   const decodeStart = loadSource.indexOf('const generatedClassic40 =');

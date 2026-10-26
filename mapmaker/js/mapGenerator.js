@@ -14,7 +14,7 @@ export const generatorDefaults = {
   baseOil:4, oilDistance:10, expansions:2, expansionOil:2, neutralOil:8, oilSpacing:3,
   derricks:false, drums:0, artifacts:0, scenery:1, sceneryStyle:'rocks', symmetricScenery:true,
   scavengers:false, scavCamps:2, scavUnits:2,
-  author:'', license:'CC0-1.0', description:'', version:'1', tags:'generated',
+  author:'', license:'CC0-1.0', description:'', version:'1.0', tags:'generated',
   regenerate:'all', lockTerrain:false, lockBases:false, lockResources:false, lockScenery:false
 };
 export function seededRandom(seed) {

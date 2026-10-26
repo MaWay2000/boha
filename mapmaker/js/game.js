@@ -5,6 +5,8 @@ import { materializeScriptMap, normalizeMapScriptSource, readMapScriptSource, wr
 import { mountScriptEditor } from './scriptEditor.js';
 import { mountScriptPanelResize } from './scriptPanelResize.js';
 import { mountMapGenerator } from './mapGeneratorUI.js';
+import { showSaveInfoDialog, showSaveLicenseHelp } from './saveInfoDialogs.js';
+import { getNextMapVersion, writeMapVersion } from './mapVersion.js';
 
 function normalizeTexPath(name){
   let n = String(name || '').replace(/\\/g,'/').toLowerCase();
@@ -137,6 +139,7 @@ const serverMapLicenseDialog = document.getElementById('serverMapLicenseDialog')
 const serverMapLicenseBody = document.getElementById('serverMapLicenseBody');
 const serverMapLicenseOkBtn = document.getElementById('serverMapLicenseOkBtn');
 const licenseHelpBtn = document.getElementById('licenseHelpBtn');
+const mapLicenseHelpBtn = document.getElementById('mapLicenseHelpBtn');
 const licenseHelpBackdrop = document.getElementById('licenseHelpBackdrop');
 const licenseHelpDialog = document.getElementById('licenseHelpDialog');
 const licenseHelpBody = document.getElementById('licenseHelpBody');
@@ -5911,7 +5914,7 @@ function getLicenseUseText(license) {
   ];
 }
 
-function showLicenseHelpDialog() {
+function showLicenseHelpDialog(modal = false) {
   if (!licenseHelpDialog || !licenseHelpBody) return;
   const licenses = [
     ['CC0-1.0', 'Public domain style license. Best when you allow anyone to edit, remix, and share without required credit.'],
@@ -5947,6 +5950,10 @@ function showLicenseHelpDialog() {
   note.className = 'app-dialog-hint';
   note.textContent = 'This is not legal advice. For maps you publish, keep the original author, source, and license information whenever possible.';
   licenseHelpBody.appendChild(note);
+  if (modal === true) {
+    showSaveLicenseHelp(licenseHelpBody);
+    return;
+  }
   if (licenseHelpBackdrop) licenseHelpBackdrop.classList.remove('hidden');
   licenseHelpDialog.classList.remove('hidden');
 }
@@ -6751,6 +6758,7 @@ let redoBtn;
 const undoStack = [];
 const redoStack = [];
 let mapDirty = false;
+let savedMapVersion = '';
 const LOCAL_AUTOSAVE_ENABLED_KEY = 'warzone2100MapMaker.localAutosave.enabled';
 const LOCAL_SAVE_INDEX_KEY = 'warzone2100MapMaker.localSaves.index';
 const LOCAL_SAVE_KEY_PREFIX = 'warzone2100MapMaker.localSaves.';
@@ -6819,6 +6827,7 @@ function markMapDirty() {
 
 function markMapClean() {
   setMapDirty(false);
+  savedMapVersion = String(currentLevelJson?.versionName || currentLevelJson?.mapVersion || '').trim();
 }
 
 function confirmUnsavedChanges(message = 'You have unsaved map changes. Continue and lose them?') {
@@ -6859,13 +6868,15 @@ function safeLocalStorageRemove(key) {
 }
 
 function getDefaultUserMapInfo() {
-  return { author: '', license: '', source: '' };
+  return { author: '', license: 'CC0-1.0', source: '' };
 }
 
 function readUserMapInfo() {
   try {
     const parsed = JSON.parse(safeLocalStorageGet(USER_MAP_INFO_KEY) || '{}');
-    return { ...getDefaultUserMapInfo(), ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+    const info = { ...getDefaultUserMapInfo(), ...(parsed && typeof parsed === 'object' ? parsed : {}) };
+    info.license = String(info.license || '').trim() || getDefaultUserMapInfo().license;
+    return info;
   } catch (e) {
     return getDefaultUserMapInfo();
   }
@@ -7664,7 +7675,7 @@ function syncMyInfoInputs(info = readUserMapInfo()) {
   if (settingsMyAuthorInput) settingsMyAuthorInput.value = info.author || '';
   if (settingsMyLicenseInput) {
     ensureLicenseOption(settingsMyLicenseInput, info.license);
-    settingsMyLicenseInput.value = info.license || '';
+    settingsMyLicenseInput.value = info.license || getDefaultUserMapInfo().license;
   }
   if (settingsMySourceInput) settingsMySourceInput.value = info.source || '';
 }
@@ -7679,7 +7690,7 @@ function applyUserMapInfoToMapInfo(info = readUserMapInfo(), previous = getDefau
   if (info.author && shouldCopy('author', currentMapInfoOverrides.author, getMetadataText(currentServerMapMetadata?.author, currentLevelJson?.author, currentLevelJson?.authors, currentLevelJson?.creator))) {
     currentMapInfoOverrides.author = info.author;
   }
-  if (info.license && shouldCopy('license', currentMapInfoOverrides.license, getMetadataText(currentServerMapMetadata?.license, currentLevelJson?.license, currentLevelJson?.licence))) {
+  if (info.license && shouldCopy('license', currentMapInfoOverrides.license, getMetadataText(currentServerMapMetadata?.license, currentLevelJson?.license, currentLevelJson?.licence, currentLevelJson?.['spdx-license-id']))) {
     currentMapInfoOverrides.license = info.license;
   }
   if (info.source && shouldCopy('source', currentMapInfoOverrides.source, getSaveSourceName())) {
@@ -7727,10 +7738,10 @@ function updateMapInfoInputs() {
   updateScavengerInfoInput();
   if (settingsMapSlotsInput) settingsMapSlotsInput.value = getMetadataText(currentMapInfoOverrides.slots, currentServerMapMetadata?.slots, currentLevelJson?.players);
   if (settingsMapUploadedInput) settingsMapUploadedInput.value = getMetadataText(currentMapInfoOverrides.uploaded, currentServerMapMetadata?.download?.uploaded, currentLevelJson?.uploaded).slice(0, 10);
-  if (settingsMapVersionInput) settingsMapVersionInput.value = getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion);
+  if (settingsMapVersionInput) settingsMapVersionInput.value = getSaveMapVersion();
   if (settingsMapTagsInput) settingsMapTagsInput.value = getMetadataText(currentMapInfoOverrides.tags, currentLevelJson?.tags);
   if (settingsMapLicenseInput) {
-    const license = getMetadataText(currentMapInfoOverrides.license, currentLevelJson?.license, currentLevelJson?.licence, currentLevelJson?.['spdx-license-id'], currentServerMapMetadata?.license);
+    const license = getSaveLicense();
     ensureLicenseOption(settingsMapLicenseInput, license);
     settingsMapLicenseInput.value = license;
   }
@@ -7763,7 +7774,11 @@ function getSaveLicense() {
     currentLevelJson?.licence,
     currentLevelJson?.['spdx-license-id'],
     currentServerMapMetadata?.license
-  ) || 'Unknown';
+  ) || readUserMapInfo().license;
+}
+
+function getSaveMapVersion() {
+  return getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion, '1.0');
 }
 
 function getSaveSourceName() {
@@ -7928,7 +7943,7 @@ function buildSaveResultDetails(blob = null, sha256 = '', timeLabel = 'Saved') {
     source: getSaveSourceName(),
     created: getMetadataText(currentMapInfoOverrides.created, currentLevelJson?.created, currentServerMapMetadata?.created),
     uploaded: getMetadataText(currentMapInfoOverrides.uploaded, currentServerMapMetadata?.download?.uploaded, currentLevelJson?.uploaded),
-    version: getMetadataText(currentMapInfoOverrides.version, currentLevelJson?.versionName, currentLevelJson?.mapVersion),
+    version: getSaveMapVersion(),
     mapType: getMetadataText(currentMapInfoOverrides.mapType, currentServerMapMetadata?.type, currentLevelJson?.mapType),
     description: getMetadataText(currentMapInfoOverrides.description, currentLevelJson?.description, currentLevelJson?.readme),
     scavengers: getSaveScavengers(),
@@ -8125,7 +8140,9 @@ function buildDefaultLevelJson(base) {
     type: 'skirmish',
     players: 4,
     tileset: getOfficialTilesetName(tilesetIndex),
+    license: getSaveLicense(),
     ...(currentLevelJson || {}),
+    versionName: getSaveMapVersion(),
     // Preserve recorded provenance; exporting an imported map does not make us its original creator.
     ...(currentMapArchive ? {} : { generator: currentLevelJson?.generator || 'warzone2100-mapmaker' })
   }, null, 2);
@@ -8483,7 +8500,7 @@ async function updateGammaMetadata(zip, base) {
     if (currentMapInfoOverrides.description) level.description = currentMapInfoOverrides.description;
     level.scavs = Number(getSaveScavengers());
     if (currentMapInfoOverrides.uploaded) level.uploaded = currentMapInfoOverrides.uploaded;
-    if (currentMapInfoOverrides.version) level.versionName = currentMapInfoOverrides.version;
+    level.versionName = getSaveMapVersion();
     if (currentMapInfoOverrides.tags) level.tags = currentMapInfoOverrides.tags;
     if (currentMapInfoOverrides.license) level.license = currentMapInfoOverrides.license;
     if (currentMapInfoOverrides.source) level.source = currentMapInfoOverrides.source;
@@ -9097,14 +9114,29 @@ async function buildWzFileBlob() {
   updateFeatureJson(zip);
   updateDroidJson(zip);
   writeMapScriptSource(zip, currentMapScript);
+  writeMapVersion(zip, getSaveMapVersion());
   zip.file(mapPath, buildMapFileBytes());
   zip.file(getTileTypesArchivePath(mapPath), buildTileTypesFileBytes());
   return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
 
+let mapSaveInProgress = false;
+
+async function confirmMapSaveInfo() {
+  const suggestedVersion = mapDirty && savedMapVersion && getSaveMapVersion() === savedMapVersion
+    ? getNextMapVersion(savedMapVersion) : '';
+  syncMyInfoInputs();
+  if (!await showSaveInfoDialog(document.getElementById('settingsMyInfoPanel'), 'My info', 'Next: Map info', () => showLicenseHelpDialog(true))) return false;
+  updateMapInfoInputs();
+  return showSaveInfoDialog(document.getElementById('settingsMapInfoPanel'), 'Map info', 'Save map', null, [
+    'settingsMapAuthorInput', 'settingsMapLicenseInput', 'settingsMapSourceInput', 'settingsMapUploadedInput'
+  ], suggestedVersion);
+}
+
 async function saveCurrentMap() {
+  if (mapSaveInProgress) return;
+  mapSaveInProgress = true;
   let fileHandle = null;
-  const savedName = makeSaveFilename();
   try {
     hideSaveResult();
     const validation = validateMapForExport();
@@ -9120,6 +9152,11 @@ async function saveCurrentMap() {
         return;
       }
     }
+    if (!await confirmMapSaveInfo()) {
+      setFileStatus('Save cancelled.');
+      return;
+    }
+    const savedName = makeSaveFilename();
     if (typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function') {
       try {
         setFileStatus('Choose save location...');
@@ -9161,7 +9198,9 @@ async function saveCurrentMap() {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
     setLoadingProgress('WZ saved', 100);
+    currentLevelJson = { ...(currentLevelJson || {}), versionName: getSaveMapVersion() };
     markMapClean();
+    savedMapVersion = getSaveMapVersion();
     setTimeout(() => {
       hideLoadingProgress();
       const baseTip = savedMapNeedsAdvancedBases() ? ' Use Advanced Bases in Warzone to keep defenses/sensors.' : '';
@@ -9176,6 +9215,8 @@ async function saveCurrentMap() {
     console.error('Failed to save WZ map:', err);
     setFileStatus('Failed to save .wz map.');
     setLoadingProgress('Failed to save WZ archive', 100);
+  } finally {
+    mapSaveInProgress = false;
   }
 }
 window.saveCurrentMap = saveCurrentMap;
@@ -9267,6 +9308,7 @@ const initDom = () => {
   if (serverMapLicenseOkBtn) serverMapLicenseOkBtn.addEventListener('click', closeServerMapLicenseDialog);
   if (serverMapLicenseBackdrop) serverMapLicenseBackdrop.addEventListener('click', closeServerMapLicenseDialog);
   if (licenseHelpBtn) licenseHelpBtn.addEventListener('click', showLicenseHelpDialog);
+  if (mapLicenseHelpBtn) mapLicenseHelpBtn.addEventListener('click', showLicenseHelpDialog);
   if (licenseHelpOkBtn) licenseHelpOkBtn.addEventListener('click', closeLicenseHelpDialog);
   if (licenseHelpBackdrop) licenseHelpBackdrop.addEventListener('click', closeLicenseHelpDialog);
   if (templateNameInput) {
@@ -12673,7 +12715,7 @@ async function loadLocalSaveSnapshot(snapshot) {
   currentServerMapSourceName = String(snapshot.serverSourceName || '');
   currentMapScript = normalizeMapScriptSource(snapshot.mapScript);
   syncMapScriptEditor();
-  currentMapInfoOverrides = { ...getDefaultMapInfoOverrides(), ...(snapshot.mapInfo || {}) };
+  currentMapInfoOverrides = { ...getDefaultMapInfoOverrides(), ...(snapshot.mapInfo || {}), scavengers: '' };
   if (!currentMapInfoOverrides.name) currentMapInfoOverrides.name = String(name || '').trim();
   updateMapInfoInputs();
   applyUserMapInfoToMapInfo();

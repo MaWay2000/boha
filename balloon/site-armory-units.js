@@ -2,6 +2,7 @@ import { TextureLoader, NearestFilter } from '../mapmaker/js/three.module.js';
 import { parsePie } from '../mapmaker/js/pie.js';
 import { drawSoftwareUnit } from '../mapmaker/js/softwareUnitPreview.js?v=20261010-software-3d-1';
 import { buildUnit, cachedLoad, retryLoad, validateUnitGeometry } from './site-armory-unit-model-utils.mjs?v=20261025-recovery-1';
+import { createModelPreloader, publishModelState, createRenderCheck, boundedAsset } from './site-armory-preload.mjs?v=20261027-models-1';
 
 const layer = document.getElementById('armoryTargets');
 if (layer && window.SiteArmoryBattle) mountUnits();
@@ -9,7 +10,7 @@ if (layer && window.SiteArmoryBattle) mountUnits();
 function mountUnits() {
   const geometries = new Map(), textures = new Map(), templates = new Map(), items = new Map();
   const waits = new Map(), requests = new Set();
-  const catalog = window.SiteArmoryBattle.loadCatalog(window);
+  const catalog = () => window.SiteArmoryBattle.loadCatalog(window);
   let frame = null, last = -Infinity, disposed = false;
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const stop = () => { if (frame != null) cancelAnimationFrame(frame); frame = null; };
@@ -47,19 +48,18 @@ function mountUnits() {
     });
   }
   function texture(name) {
-    if (!/^[a-z0-9_-]+\.png$/i.test(name || '')) return Promise.resolve(null);
-    return cachedLoad(textures, name, () => retry(() => new TextureLoader().loadAsync(new URL('../mapmaker/classic/texpages/texpages/' + name, import.meta.url).href)
+    if (!/^[a-z0-9_-]+\.png$/i.test(name || '')) return Promise.reject(Error('Invalid unit texture.'));
+    return cachedLoad(textures, name, () => retry(() => boundedAsset(new TextureLoader().loadAsync(new URL('../mapmaker/classic/texpages/texpages/' + name, import.meta.url).href))
       .then(value => { value.magFilter = NearestFilter; return value; })));
   }
   function template(key) {
     return cachedLoad(templates, key, () => retry(async () => {
-      const type = (await catalog).find(type => type.key === key);
+      const type = (await catalog()).find(type => type.key === key);
       if (!type) throw Error('Unknown unit design.');
       const parts = await Promise.all(type.parts.map(async part => {
         const geo = await geometry(part.path);
-        // Even an unavailable texture must not replace valid 3D geometry with
-        // the flat silhouette. Failures never poison the texture asset cache.
-        return { role: part.role, geometry: geo, texture: await texture(geo.userData.textureName).catch(() => null) };
+        // A template is ready only when every part and its texture are ready.
+        return { role: part.role, geometry: geo, texture: await texture(geo.userData.textureName) };
       }));
       return buildUnit(parts);
     }));
@@ -74,7 +74,7 @@ function mountUnits() {
     }).catch(error => {
       if (disposed || !node.isConnected || items.get(node) !== item) return;
       node.dataset.modelState = 'fallback';
-      console.warn('Unit target preview unavailable; using its silhouette.', node.dataset.unitKey, error);
+      console.warn('Unit target model unavailable; keeping it hidden.', node.dataset.unitKey, error);
     });
   }
   function recoverFailed() {
@@ -111,4 +111,12 @@ function mountUnits() {
     for (const pending of templates.values()) pending.then(value => value.traverse(mesh => { if (mesh.isMesh) mesh.material.dispose(); })).catch(() => {});
   });
   reconcile();
+  const rack = document.getElementById('siteArmory');
+  if (rack) {
+    const prepare = createModelPreloader({items: catalog, load: type => template(type.key),
+      validate: createRenderCheck(drawSoftwareUnit), active: () => !disposed,
+      onState: state => publishModelState(rack, 'Units', state)});
+    const warm = () => prepare().catch(error => console.warn('Unit models could not be prepared.', error));
+    rack.addEventListener('boha:armory-preload-retry', warm); warm();
+  }
 }

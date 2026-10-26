@@ -96,10 +96,11 @@
   function loadCatalog(win) {
     if (CATALOG.length) return Promise.resolve(CATALOG);
     if (!catalogPromise) catalogPromise = Promise.all(['bodies/body.json', 'prop/propulsion.json', 'weapons/weapons.json', 'templates.json'].map(async path => {
-      const response = await win.fetch(new URL('mapmaker/pies/components/' + path, win.document.baseURI));
+      const response = await win.fetch(new URL('mapmaker/pies/components/' + path, win.document.baseURI), {signal: win.AbortSignal?.timeout?.(8000)});
       if (!response.ok) throw Error('Unit catalog unavailable.');
       return response.json();
-    })).then(([bodies, propulsions, weapons, templates]) => makeCatalog({ bodies, propulsions, weapons, templates }));
+    })).then(([bodies, propulsions, weapons, templates]) => makeCatalog({ bodies, propulsions, weapons, templates }))
+      .catch(error => { catalogPromise = null; throw error; });
     return catalogPromise;
   }
   function rollBossDrop(random = Math.random) {

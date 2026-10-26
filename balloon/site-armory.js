@@ -184,6 +184,8 @@
     const scoreStore = scoresModule.createStore(win);
     const onlineScores = options.onlineScores || scoresModule.createOnline(win, () => { if (lobby?.open) renderScores(); });
     let playerName = '', pendingWeapon = 'machinegun', savedScoreKey = '', lobbyReturn = null;
+    let modelWaitTimer = null, modelsTimedOut = false;
+    const modelsReady = () => rack.dataset.modelsWeapons === 'ready' && rack.dataset.modelsUnits === 'ready';
     let lootPoint = null, lootNotice = '';
     let effectTimer = null, effectPrevious = null;
     let rouletteTimer = null, rouletteQueue = [];
@@ -714,7 +716,26 @@
     function syncNameEntry(showError = false) {
       if (!nameInput) return;
       const valid = scoresModule.validName(nameInput.value);
-      const submit = doc.getElementById('armoryStartSubmit'); if (submit) submit.disabled = !valid;
+      const loaded = modelsReady();
+      const failed = modelsTimedOut || rack.dataset.modelsWeapons === 'error' || rack.dataset.modelsUnits === 'error';
+      const submit = doc.getElementById('armoryStartSubmit'); if (submit) submit.disabled = !valid || !loaded;
+      const modelStatus = doc.getElementById('armoryModelStatus'), retry = doc.getElementById('armoryModelRetry');
+      if (loaded || failed) { if (modelWaitTimer != null) win.clearTimeout(modelWaitTimer); modelWaitTimer = null; }
+      if (loaded) modelsTimedOut = false;
+      if (modelStatus) {
+        modelStatus.hidden = loaded;
+        const count = Number(rack.dataset.modelsWeaponsReady || 0) + Number(rack.dataset.modelsUnitsReady || 0);
+        const total = Number(rack.dataset.modelsWeaponsTotal || 0) + Number(rack.dataset.modelsUnitsTotal || 0);
+        modelStatus.textContent = failed ? 'Some 3D models could not load. Retry before starting.'
+          : `Loading complete 3D models${total ? ` (${count}/${total})` : ''}…`;
+      }
+      if (retry) {
+        retry.hidden = loaded || !failed;
+        retry.textContent = !rack.dataset.modelsWeapons || !rack.dataset.modelsUnits ? 'Reload 3D models' : 'Retry 3D models';
+      }
+      if (!loaded && !failed && lobby?.open && modelWaitTimer == null) modelWaitTimer = win.setTimeout(() => {
+        modelWaitTimer = null; modelsTimedOut = true; syncNameEntry();
+      }, 30000);
       const error = doc.getElementById('armoryNameError');
       if (error) { error.hidden = valid || (!showError && !nameInput.value); error.textContent = 'Enter a nickname of 1–24 characters, without control characters.'; }
       nameInput.setAttribute('aria-invalid', String(!valid && (showError || !!nameInput.value)));
@@ -726,16 +747,17 @@
       nameInput.value = playerName || scoreStore.lastName(); nameInput.readOnly = !!playerName;
       const submit = doc.getElementById('armoryStartSubmit'); if (submit) submit.textContent = playerName ? 'Resume game' : 'Start game';
       const change = doc.getElementById('armoryNewPlayer'); if (change) change.hidden = !playerName;
-      renderScores(); syncNameEntry(); lobby.showModal(); onlineScores.refresh();
+      renderScores(); lobby.showModal(); syncNameEntry(); onlineScores.refresh();
       if (playerName) submit?.focus?.(); else nameInput.focus?.();
     }
     function closeLobby() {
+      if (modelWaitTimer != null) win.clearTimeout(modelWaitTimer); modelWaitTimer = null;
       lobby?.close();
       if (!state.weapon) (lobbyReturn || startButton)?.focus?.({ preventScroll: true });
     }
     function startPlayer(e) {
       e?.preventDefault();
-      if (!lobby?.open || !scoresModule.validName(nameInput.value)) { syncNameEntry(true); return; }
+      if (!lobby?.open || !scoresModule.validName(nameInput.value) || !modelsReady()) { syncNameEntry(true); return; }
       if (!playerName) {
         playerName = scoresModule.normalizeName(nameInput.value); scoreStore.remember(playerName); onlineScores.begin(playerName);
         savedScoreKey = '';
@@ -1032,6 +1054,16 @@
     topsButton?.addEventListener('click', () => openLobby());
     doc.getElementById('armoryHudTops')?.addEventListener('click', () => openLobby());
     doc.getElementById('armoryStartForm')?.addEventListener('submit', startPlayer);
+    rack.addEventListener('boha:armory-models', () => { if (lobby?.open) syncNameEntry(); });
+    doc.getElementById('armoryModelRetry')?.addEventListener('click', () => {
+      if (!rack.dataset.modelsWeapons || !rack.dataset.modelsUnits) {
+        if (scoresModule.validName(nameInput.value)) scoreStore.remember(nameInput.value);
+        win.location.reload?.(); return;
+      }
+      modelsTimedOut = false;
+      rack.dispatchEvent(new win.CustomEvent('boha:armory-preload-retry'));
+      refreshCatalog(); syncNameEntry();
+    });
     nameInput?.addEventListener('input', () => syncNameEntry());
     doc.getElementById('armoryStartClose')?.addEventListener('click', closeLobby);
     lobby?.addEventListener('cancel', e => { e.preventDefault(); closeLobby(); });
@@ -1125,11 +1157,13 @@
     win.addEventListener('resize', syncBattleView);
     win.addEventListener('pageshow', syncDamageScroll);
     win.addEventListener('pagehide', () => { select(null); reset(false); sound?.dispose(); });
-    const ready = battleModule.loadCatalog(win).then(next => {
+    function refreshCatalog() { return battleModule.loadCatalog(win).then(next => {
       catalog = next;
+      catalogError = false;
       if (battle.active) battle = battleModule.spawnAffordable(battle, catalog);
       sync();
-    }).catch(() => { catalogError = true; sync(); });
+    }).catch(() => { catalogError = true; sync(); }); }
+    const ready = refreshCatalog();
     const guide = doc.getElementById('armoryLootGuide');
     if (guide) for (const item of lootModule.CATALOG) {
       const row = doc.createElement('li'), label = doc.createElement('b'), detail = doc.createElement('span');

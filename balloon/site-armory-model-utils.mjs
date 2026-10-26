@@ -22,7 +22,7 @@ export function createTierLoader(loadModel, onState) {
         const model = await loadModel(files);
         if (!disposed && token === generation) onState({ status: 'ready', definition: files.definition, model });
       } catch {
-        if (!disposed && token === generation) onState({ status: 'fallback', definition: files.definition });
+        if (!disposed && token === generation) { requested = ''; onState({ status: 'fallback', definition: files.definition }); }
       }
     },
     dispose() { disposed = true; generation++; }

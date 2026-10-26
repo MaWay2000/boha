@@ -1,12 +1,12 @@
 # Balloon news and mini-game
 
-This folder contains all 15 JavaScript/module and CSS files for the flying news
+This folder contains the JavaScript modules and CSS files for the flying news
 balloon and its optional target-practice game. The root `index.html` loads them
 from here; no compatibility copies are kept in the repository root.
 
 - `site-news*`: flight, news dialog, and 3D balloon rendering.
 - `site-armory*`: weapons, sound, combat, drops, scores, research tiers, and unit
-  previews.
+  previews, including complete-model preparation before play.
 
 The permanent news records stay in `../news/`. Balloon artwork stays in
 `../assets/`; shared Warzone components, textures and renderers stay in

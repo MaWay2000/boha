@@ -6,7 +6,7 @@ const { NEWS, normalizeArchive, bounds, createFlight, advanceFlight, mount } = r
 test('all balloon/game source files live in balloon with no root compatibility copies', () => {
   const path = require('node:path'), root = path.resolve(__dirname, '..');
   const files = fs.readdirSync(path.join(root, 'balloon')).filter(name => /^site-(armory|news).*\.(js|mjs|css)$/.test(name));
-  assert.equal(files.length, 15);
+  assert.equal(files.length, 16);
   for (const file of files) assert.equal(fs.existsSync(path.join(root, file)), false, `Root copy remains: ${file}`);
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const entrypoints = [...html.matchAll(/(?:src|href)="((?:balloon\/)?site-(?:armory|news)[^"?]+)(?:\?[^" ]*)?"/g)].map(match => match[1]);

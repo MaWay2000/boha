@@ -289,12 +289,14 @@ function fixture({ reduced = false, hostname = '', signedIn = true, storage, fir
   ids.push('armoryLootGuide', 'armoryEffects', 'armoryRouletteStatus');
   ids.push('armoryStartDialog', 'armoryPlayerName', 'armoryStart', 'armoryTops', 'armoryHudTops', 'armoryStartForm', 'armoryStartSubmit',
     'armoryStartClose', 'armoryNewPlayer', 'armoryPlayerLabel', 'armoryTopRows', 'armoryTopEmpty', 'armoryScoreStorage', 'armoryNameError');
+  ids.push('armoryModelStatus', 'armoryModelRetry');
   ids.push('armoryWave', 'armoryWaveTitle', 'armoryWaveDetail', 'armoryWaveProgress');
   ids.push('armoryAlliesStats', 'armoryAllyCount', 'armoryAllyReserves', 'armoryAllyKills', 'armoryAllyDamage');
   ids.push('armoryUpgradeNote', 'armoryUpgradeProgress', 'armoryUpgradeStatus');
   ids.push('armoryTech', 'armoryTechName', 'armoryTechNext', 'armoryTechPath');
   for (const weapon of Object.keys(WEAPONS)) ids.push('armoryReload-' + weapon, 'armoryReloadLabel-' + weapon, 'armoryDamage-' + weapon, 'armoryKills-' + weapon, 'armoryLevel-' + weapon, 'armoryLabel-' + weapon, 'armoryTier-' + weapon);
   const nodes = Object.fromEntries(ids.map(id => [id, new Element(id)]));
+  nodes.siteArmory.dataset.modelsWeapons = 'ready'; nodes.siteArmory.dataset.modelsUnits = 'ready';
   if (!fireControl) delete nodes.armoryFire;
   const buttons = Object.keys(WEAPONS).map(weapon => { const button = new Element(weapon); button.dataset.weapon = weapon; return button; });
   const doc = new Element('document'); doc.body = new Element('body'); doc.hidden = false;
@@ -337,6 +339,41 @@ function fixture({ reduced = false, hostname = '', signedIn = true, storage, fir
       throw Error('Timer loop did not settle');
     } };
 }
+
+test('Start waits for complete weapon and unit models, exposes failures and supports retry', async () => {
+  const f=fixture({signedIn:false}); await f.ready;
+  f.nodes.siteArmory.dataset.modelsWeapons='loading'; f.nodes.siteArmory.dataset.modelsUnits='loading';
+  f.nodes.armoryStart.emit('click'); f.nodes.armoryPlayerName.value='Model pilot'; f.nodes.armoryPlayerName.emit('input');
+  assert.equal(f.nodes.armoryStartSubmit.disabled,true); assert.equal(f.nodes.armoryModelStatus.hidden,false);
+  f.nodes.armoryStartForm.emit('submit'); assert.equal(f.getPlayer(),''); assert.equal(f.getState().weapon,null);
+  f.nodes.siteArmory.dataset.modelsWeapons='ready'; f.nodes.siteArmory.emit('boha:armory-models');
+  assert.equal(f.nodes.armoryStartSubmit.disabled,true);
+  f.nodes.siteArmory.dataset.modelsUnits='error'; f.nodes.siteArmory.emit('boha:armory-models');
+  assert.equal(f.nodes.armoryModelRetry.hidden,false); assert.match(f.nodes.armoryModelStatus.textContent,/could not load/);
+  f.nodes.siteArmory.addEventListener('boha:armory-preload-retry',()=>{f.nodes.siteArmory.dataset.modelsUnits='ready';});
+  f.nodes.armoryModelRetry.emit('click'); assert.equal(f.nodes.armoryStartSubmit.disabled,false);
+  assert.equal(f.nodes.armoryModelStatus.hidden,true);
+  f.nodes.armoryStartForm.emit('submit'); assert.equal(f.getPlayer(),'Model pilot'); assert.equal(f.nodes.siteArmory.dataset.started,'true');
+});
+
+test('missing renderer preparation times out without starting and can recover after late readiness', async () => {
+  const f=fixture({signedIn:false}); await f.ready;
+  delete f.nodes.siteArmory.dataset.modelsWeapons;
+  f.nodes.armoryStart.emit('click'); f.nodes.armoryPlayerName.value='Waiting'; f.nodes.armoryPlayerName.emit('input');
+  f.advance(30000); assert.equal(f.nodes.armoryStartSubmit.disabled,true); assert.equal(f.nodes.armoryModelRetry.hidden,false);
+  assert.equal(f.getPlayer(),'');
+  f.nodes.siteArmory.dataset.modelsWeapons='ready'; f.nodes.siteArmory.emit('boha:armory-models');
+  assert.equal(f.nodes.armoryStartSubmit.disabled,false); assert.equal(f.nodes.armoryModelRetry.hidden,true);
+});
+
+test('a missing renderer offers a reload and preserves the chosen nickname without starting', async () => {
+  const f=fixture({signedIn:false}); await f.ready; let reloaded=false;
+  f.win.location.reload=()=>{reloaded=true;}; delete f.nodes.siteArmory.dataset.modelsUnits;
+  f.nodes.armoryStart.emit('click'); f.nodes.armoryPlayerName.value='Patient pilot'; f.nodes.armoryPlayerName.emit('input');
+  f.advance(30000); assert.equal(f.nodes.armoryModelRetry.textContent,'Reload 3D models');
+  f.nodes.armoryModelRetry.emit('click'); assert.equal(reloaded,true); assert.equal(f.getPlayer(),'');
+  assert.equal(scores.createStore(f.win).lastName(),'Patient pilot');
+});
 
 test('every gun and hotkey requires a nickname plus explicit Start before any game activity', async () => {
   for (const weapon of Object.keys(WEAPONS)) {
@@ -1067,6 +1104,9 @@ test('each accepted cannon shot recruits exactly one ally, including before the 
 });
 
 test('friendly fighters attack automatically, take return fire, and credit rewards only once', async () => {
+  const savedRandom = Math.random; let seed = 42;
+  Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  try {
   const f = fixture({ reduced: true }); await f.ready; popBalloon(f); f.select('cannon');
   for (let i = 0; i < 5; i++) { f.next(3000); f.shoot(900, 700); }
   assert.equal(f.getAllies().units.length, 4); assert.equal(f.getAllies().reserves, 1);
@@ -1079,6 +1119,7 @@ test('friendly fighters attack automatically, take return fire, and credit rewar
   assert.equal(Object.values(state.weaponStats).reduce((sum, gun) => sum + gun.damage + gun.kills, 0), 0);
   assert.equal(round.bank + round.spent, 500 + round.earned);
   assert.equal(state.powerEarned, round.earned);
+  } finally { Math.random = savedRandom; }
 });
 
 test('cannon recruits close a distant gap before attacking, including reduced-motion combat', async () => {

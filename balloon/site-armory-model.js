@@ -1,7 +1,9 @@
 import { TextureLoader, NearestFilter } from '../mapmaker/js/three.module.js';
 import { parsePie } from '../mapmaker/js/pie.js';
 import { drawSoftwareUnit } from '../mapmaker/js/softwareUnitPreview.js?v=20261010-software-3d-1';
-import { TECH_PATHS, turretFor, createTierLoader, buildTurret, disposeTurret } from './site-armory-model-utils.mjs?v=20261024-tech-tiers-1';
+import { TECH_PATHS, turretFor, createTierLoader, buildTurret, disposeTurret } from './site-armory-model-utils.mjs?v=20261027-models-1';
+import { cachedLoad, retryLoad, validateUnitGeometry } from './site-armory-unit-model-utils.mjs?v=20261025-recovery-1';
+import { createModelPreloader, publishModelState, createRenderCheck, boundedAsset } from './site-armory-preload.mjs?v=20261027-models-1';
 
 const rack = document.getElementById('siteArmory');
 if (rack) mountTurrets();
@@ -60,30 +62,25 @@ function mountTurrets() {
     for (const pending of textures.values()) pending.then(texture => texture?.dispose());
   });
   const loadGeometry = async name => {
-    if (!geometries.has(name)) geometries.set(name, (async () => {
-      const response = await fetch(new URL('../mapmaker/pies/components/weapons/' + name, import.meta.url));
+    return cachedLoad(geometries, name, () => retryLoad(async () => {
+      const response = await fetch(new URL('../mapmaker/pies/components/weapons/' + name, import.meta.url), {signal: AbortSignal.timeout(8000)});
       if (!response.ok) throw new Error('Turret model unavailable.');
-      return parsePie(await response.text());
-    })());
-    return geometries.get(name);
+      return validateUnitGeometry(parsePie(await response.text()));
+    }, {active: () => !disposed}));
   };
   const loadTexture = name => {
-    if (!/^[a-z0-9_-]+\.png$/i.test(name || '')) return Promise.resolve(null);
-    if (!textures.has(name)) {
-      textures.set(name, new TextureLoader().loadAsync(new URL('../mapmaker/classic/texpages/texpages/' + name, import.meta.url).href)
-        .then(texture => { texture.magFilter = NearestFilter; return texture; }).catch(() => null));
-    }
-    return textures.get(name);
+    if (!/^[a-z0-9_-]+\.png$/i.test(name || '')) return Promise.reject(Error('Invalid turret texture.'));
+    return cachedLoad(textures, name, () => retryLoad(() => boundedAsset(new TextureLoader().loadAsync(new URL('../mapmaker/classic/texpages/texpages/' + name, import.meta.url).href))
+      .then(texture => { texture.magFilter = NearestFilter; return texture; }), {active: () => !disposed}));
   };
   const loadModel = files => {
-    if (!models.has(files.definition)) models.set(files.definition, (async () => {
+    return cachedLoad(models, files.definition, async () => {
       const [mount, barrel] = await Promise.all([loadGeometry(files.mount), loadGeometry(files.barrel)]);
       const texture = await loadTexture(mount.userData.textureName);
       // Each cached model owns its geometry clones; shared texture ownership is
       // retained by the texture cache until page exit.
       return buildTurret(mount.clone(), barrel.clone(), texture);
-    })());
-    return models.get(files.definition);
+    });
   };
   for (const weapon of Object.keys(TECH_PATHS)) {
     const button = rack.querySelector(`[data-weapon="${weapon}"]`), stage = button?.querySelector('.armory-gun-preview');
@@ -101,4 +98,13 @@ function mountTurrets() {
     });
     item.loader.select(turretFor(weapon, Number(button.dataset.level) || 1));
   }
+  const prepare = createModelPreloader({items: async () => Object.values(TECH_PATHS).flat(), load: loadModel,
+    validate: createRenderCheck(drawSoftwareUnit), active: () => !disposed,
+    onState: state => publishModelState(rack, 'Weapons', state)});
+  const warm = () => prepare().then(() => {
+    for (const item of items) item.loader.select(turretFor(item.weapon, Number(item.button.dataset.level) || 1));
+    draw(); sync();
+  }).catch(error => console.warn('Weapon models could not be prepared.', error));
+  rack.addEventListener('boha:armory-preload-retry', warm);
+  warm();
 }

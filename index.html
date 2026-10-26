@@ -21,15 +21,15 @@
   <link rel="stylesheet" href="balloon/site-news.css?v=20261023-news-cleanup-1">
   <script src="balloon/site-news.js?v=20261023-news-cleanup-1" defer></script>
   <script src="balloon/site-news-model.js?v=20261023-balloon-3d-1" type="module"></script>
-  <link rel="stylesheet" href="balloon/site-armory.css?v=20261027-start-icons-1">
+  <link rel="stylesheet" href="balloon/site-armory.css?v=20261027-models-1">
   <script src="balloon/site-armory-loot.js?v=20261024-roulette-1" defer></script>
   <script src="balloon/site-armory-tech.js?v=20261024-tech-tiers-1" defer></script>
   <script src="balloon/site-armory-audio.js?v=20261024-flamer-1" defer></script>
-  <script src="balloon/site-armory-battle.js?v=20261024-loot30-1" defer></script>
+  <script src="balloon/site-armory-battle.js?v=20261027-models-1" defer></script>
   <script src="balloon/site-armory-scores.js?v=20261025-public-tops-1" defer></script>
-  <script src="balloon/site-armory.js?v=20261027-start-icons-1" defer></script>
-  <script src="balloon/site-armory-model.js?v=20261027-start-icons-1" type="module"></script>
-  <script src="balloon/site-armory-units.js?v=20261025-model-recovery-1" type="module"></script>
+  <script src="balloon/site-armory.js?v=20261027-models-1" defer></script>
+  <script src="balloon/site-armory-model.js?v=20261027-models-1" type="module"></script>
+  <script src="balloon/site-armory-units.js?v=20261027-models-1" type="module"></script>
   <style>
     body.radio-playlist-open {
       overflow: hidden;
@@ -352,6 +352,8 @@
       <div class="armory-name-entry"><input id="armoryPlayerName" name="nickname" type="text" required maxlength="48" autocomplete="nickname" autocapitalize="off" spellcheck="false" aria-describedby="armoryNameHint armoryNameError"><button type="submit" id="armoryStartSubmit" disabled>Start game</button></div>
       <p id="armoryNameHint">Enter 1–24 characters before starting. Nickname only — no account needed.</p>
       <p id="armoryNameError" class="armory-name-error" role="alert" hidden></p>
+      <p id="armoryModelStatus" role="status" aria-live="polite">Loading complete 3D models…</p>
+      <button type="button" id="armoryModelRetry" hidden>Retry 3D models</button>
     </form>
     <section class="armory-tops" aria-labelledby="armoryTopsTitle">
       <h3 id="armoryTopsTitle">Top scores <span>SHARED TOP 10</span></h3>

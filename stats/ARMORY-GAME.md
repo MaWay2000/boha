@@ -16,6 +16,14 @@ remain available before play; a remembered nickname or opening the lobby does
 not reveal weapons. Pausing retains the rack for switching/resuming, while
 New player / reset round hides it again. Hidden previews do not animate.
 
+Start game also waits for all 21 weapon-tier models and all nine unit designs.
+Both renderers prepare every part and texture, then validate a rendered frame
+with visible triangles. The lobby reports loading progress and offers Retry 3D
+models on failure; missing renderer scripts time out instead of enabling play.
+Downloads run in bounded batches, stalled requests time out, and successful
+assets remain cached across retries. Units stay hidden until their first full
+render, and weapon upgrades retain the previous complete model while swapping.
+
 Start and Top scores buttons sit below the disarmed gun rack; Top scores is
 also available in the game HUD. Opening the lobby disarms/pauses the game,
 retains the selected gun and offers Resume game for the same player. The name
@@ -226,8 +234,8 @@ reusing already-loaded parts. A still-failed visible unit can retry on reconnect
 game resume or returning to the page. Empty/non-finite geometry and zero-triangle
 canvas draws cannot be reported as ready. Page teardown aborts geometry requests
 and clears pending waits; late results never attach to removed/replaced units.
-After texture retries are exhausted, valid geometry remains visible untextured
-instead of being replaced by a flat silhouette.
+Texture failure now blocks preparation instead of exposing an untextured model
+or a flat silhouette. Retry preserves good assets and fetches failed ones again.
 
 The nine designs use the site's existing Warzone templates and component data.
 Their cost is `floor(body power * (100 + propulsion power %) / 100) + weapon power`,
@@ -358,7 +366,7 @@ remain grouped by slot, while hit messages retain the variant that fired.
 
 The HUD shows current tier, next variant, required level/power and an expandable
 research path. Disarm/weapon switching preserves tiers; Restart game resets to basic
-models. Preview models/geometries/textures are cached, with five canvases and
+models. Preview models/geometries/textures are cached, with five visible canvases and
 at most five rendered models. Async model swaps discard stale completions so
 an old request cannot override an upgrade or reset. All 21 models are checked
 against the bundled component definitions, textures and compact preview bounds.

@@ -14,15 +14,15 @@
   touch-action: manipulation;
   will-change: transform;
   -webkit-tap-highlight-color: transparent;
+  visibility: hidden;
 }
 
 .news-balloon[hidden] { display: none; }
-.news-balloon img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.news-balloon.has-3d[data-model-state="ready"] { visibility: visible; }
+.news-balloon img { display: none; }
 .news-balloon-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.news-balloon.has-3d img { visibility: hidden; }
 .news-balloon:hover .news-balloon-canvas, .news-balloon:focus-visible .news-balloon-canvas { filter: brightness(1.12); }
 .news-balloon-label, .news-balloon-unread { z-index: 1; }
-.news-balloon:hover img, .news-balloon:focus-visible img { filter: brightness(1.15) drop-shadow(0 0 8px #68daff66); }
 .news-balloon:focus-visible { outline: 2px solid #79e8ff; outline-offset: 3px; }
 .news-balloon-label {
   position: absolute;

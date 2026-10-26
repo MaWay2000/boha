@@ -5,9 +5,9 @@ import { batchStaticRig, cameraFrame } from './site-news-model-utils.mjs';
 
 const button = document.getElementById('siteNewsBalloon');
 if (button) mountModel().catch(error => {
-  button.dataset.modelState = 'fallback';
+  button.dataset.modelState = 'error';
   button.classList.remove('has-3d');
-  console.warn('News balloon 3D preview unavailable; using its image.', error);
+  console.warn('News balloon 3D model unavailable; keeping the balloon hidden.', error);
 });
 
 async function mountModel() {
@@ -71,6 +71,10 @@ async function mountModel() {
       facing.rotation.y = -0.13 + Math.sin(phase * 0.25) * 0.14;
       renderer.render(scene, camera);
       button.dataset.modelDrawCalls = String(renderer.info.render.calls);
+      if (!(renderer.info.render.calls > 0)) throw new Error('The balloon has not rendered a visible frame.');
+      if (button.dataset.modelState !== 'ready') {
+        button.classList.add('has-3d'); button.dataset.modelState = 'ready';
+      }
     };
     const resize = () => {
       const width = button.clientWidth, height = button.clientHeight;
@@ -94,10 +98,9 @@ async function mountModel() {
     };
     const sync = () => { stop(); if (canAnimate()) frame = requestAnimationFrame(tick); };
     canvas.addEventListener('webglcontextlost', event => {
-      event.preventDefault(); button.dataset.modelState = 'fallback'; dispose();
+      event.preventDefault(); button.dataset.modelState = 'error'; dispose();
     });
     button.append(canvas); resize();
-    button.classList.add('has-3d'); button.dataset.modelState = 'ready';
     button.dataset.modelAnimationClips = String(gltf.animations.length);
     resizeObserver = new ResizeObserver(resize); resizeObserver.observe(button);
     observer = new MutationObserver(sync); observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });

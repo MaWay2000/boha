@@ -69,7 +69,7 @@ test('camera fitting keeps the complete balloon visible at both button sizes', (
   }
 });
 
-test('renderer keeps the poster fallback and pauses 3D rendering when flight pauses', async () => {
+test('renderer reveals only a rendered 3D balloon and pauses when flight pauses', async () => {
   const source = await readFile(new URL('../balloon/site-news-model.js', import.meta.url), 'utf8');
   assert.match(source, /alpha: true, antialias: true/);
   assert.match(source, /setClearColor\(0x000000, 0\)/);
@@ -78,5 +78,10 @@ test('renderer keeps the poster fallback and pauses 3D rendering when flight pau
   assert.match(source, /1 \/ 30/);
   assert.match(source, /webglcontextlost/);
   assert.match(source, /classList\.remove\('has-3d'\)/);
+  assert.match(source, /renderer\.info\.render\.calls > 0/);
+  const css = await readFile(new URL('../balloon/site-news.css', import.meta.url), 'utf8');
+  assert.match(css, /\.news-balloon \{[^}]*visibility: hidden;/);
+  assert.match(css, /\.news-balloon\.has-3d\[data-model-state="ready"\] \{ visibility: visible; \}/);
+  assert.match(css, /\.news-balloon img \{ display: none; \}/);
   assert.doesNotMatch(source, /https:\/\/|unpkg|jsdelivr/);
 });

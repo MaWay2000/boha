@@ -401,6 +401,17 @@ test('every gun and hotkey requires a nickname plus explicit Start before any ga
   assert.equal(f.getState().weapon, null);
 });
 
+test('the entry menu pauses immediately and resumes the last weapon without resetting progress', async () => {
+  const f=fixture(); await f.ready; popBalloon(f); f.select('laser');
+  const before=f.getBattle(); assert.equal(f.nodes.armoryStart.textContent,'Pause');
+  f.nodes.armoryStart.emit('click'); assert.equal(f.getState().weapon,null);
+  assert.equal(f.nodes.armoryStart.textContent,'Resume'); assert.equal(f.nodes.armoryStartDialog.open,false);
+  f.fly(2000); assert.deepEqual(f.getBattle(),before);
+  f.nodes.armoryStart.emit('click'); assert.equal(f.getState().weapon,'laser'); assert.equal(f.nodes.armoryStart.textContent,'Pause');
+  f.doc.emit('keydown',{key:'Escape'}); assert.equal(f.nodes.armoryStart.textContent,'Resume');
+  f.nodes.armoryStart.emit('click'); assert.equal(f.getState().weapon,'laser');
+});
+
 test('Top scores pauses and resumes the same player/weapon; reset and new players preserve personal bests', async () => {
   const f = fixture({ reduced: true }); await f.ready; popBalloon(f);
   const before = f.getBattle(); assert.equal(f.getScores()[0].score, before.score);

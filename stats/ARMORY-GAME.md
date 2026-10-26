@@ -24,7 +24,10 @@ Downloads run in bounded batches, stalled requests time out, and successful
 assets remain cached across retries. Units stay hidden until their first full
 render, and weapon upgrades retain the previous complete model while swapping.
 
-Start and Top scores buttons sit below the disarmed gun rack; Top scores is
+The player menu remains visible below the gun rack during play. Its Start button
+becomes Pause while armed and Resume while paused. Pause stops play immediately;
+Resume restores the last selected weapon without opening the lobby or resetting
+progress. Top scores is
 also available in the game HUD. Opening the lobby disarms/pauses the game,
 retains the selected gun and offers Resume game for the same player. The name
 is locked during an existing round. New player / reset round saves the previous

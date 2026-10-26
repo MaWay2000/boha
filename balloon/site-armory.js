@@ -596,6 +596,7 @@
     }
     function sync() {
       rack.dataset.started = String(!!playerName);
+      if (startButton) startButton.textContent = state.weapon ? 'Pause' : playerName ? 'Resume' : 'Start';
       syncScrollLock();
       shield.hidden = !state.weapon;
       hud.hidden = !state.weapon;
@@ -676,6 +677,7 @@
     function select(weapon) {
       if (weapon !== null && !Object.hasOwn(WEAPONS, weapon)) return;
       if (weapon && !playerName) { openLobby(weapon); return; }
+      if (weapon) pendingWeapon = weapon;
       stopHolding();
       state = { ...state, weapon: weapon === state.weapon ? null : weapon };
       if (!state.weapon) onlineScores.flush();
@@ -740,7 +742,7 @@
       if (error) { error.hidden = valid || (!showError && !nameInput.value); error.textContent = 'Enter a nickname of 1–24 characters, without control characters.'; }
       nameInput.setAttribute('aria-invalid', String(!valid && (showError || !!nameInput.value)));
     }
-    function openLobby(weapon = state.weapon || 'machinegun') {
+    function openLobby(weapon = state.weapon || pendingWeapon) {
       if (!lobby || blocked()) return;
       pendingWeapon = weapon; lobbyReturn = doc.activeElement;
       if (state.weapon) select(null);
@@ -765,7 +767,6 @@
       const weapon = pendingWeapon;
       lobby.close();
       const label = doc.getElementById('armoryPlayerLabel'); if (label) label.textContent = playerName;
-      if (startButton) startButton.textContent = 'Resume';
       select(weapon); weaponButtons.find(button => button.dataset.weapon === weapon)?.focus?.({ preventScroll: true });
     }
     const ephemeral = (node, duration) => {
@@ -1050,7 +1051,10 @@
       if (playerName && restartOnline !== false) onlineScores.begin(playerName);
     }
     for (const button of weaponButtons) button.addEventListener('click', () => select(button.dataset.weapon));
-    startButton?.addEventListener('click', () => openLobby());
+    startButton?.addEventListener('click', () => {
+      if (!playerName) { openLobby(); return; }
+      select(state.weapon ? null : pendingWeapon);
+    });
     topsButton?.addEventListener('click', () => openLobby());
     doc.getElementById('armoryHudTops')?.addEventListener('click', () => openLobby());
     doc.getElementById('armoryStartForm')?.addEventListener('submit', startPlayer);

@@ -343,6 +343,7 @@ test('every gun and hotkey requires a nickname plus explicit Start before any ga
     const f = fixture({ signedIn: false }); await f.ready;
     f.select(weapon);
     assert.equal(f.nodes.armoryStartDialog.open, true); assert.equal(f.getPlayer(), '');
+    assert.equal(f.nodes.siteArmory.dataset.started, 'false');
     assert.equal(f.getState().weapon, null); assert.equal(f.frame.inert, false);
     f.shoot(166, 122); assert.equal(f.getState().shots, 0); assert.equal(f.getBattle().active, false);
     for (const invalid of ['', ' ', 'x'.repeat(25)]) {
@@ -355,6 +356,7 @@ test('every gun and hotkey requires a nickname plus explicit Start before any ga
     f.nodes.armoryStartForm.emit('submit');
     assert.equal(f.getPlayer(), 'Žaibas'); assert.equal(f.getState().weapon, weapon);
     assert.equal(f.nodes.armoryStartDialog.open, false); assert.equal(f.getState().shots, 0);
+    assert.equal(f.nodes.siteArmory.dataset.started, 'true');
   }
   const f = fixture({ signedIn: false });
   f.doc.emit('keydown', { key: '2' }); assert.equal(f.nodes.armoryStartDialog.open, true);
@@ -373,8 +375,10 @@ test('Top scores pauses and resumes the same player/weapon; reset and new player
   f.advance(10000); assert.deepEqual(f.getBattle(), before);
   f.nodes.armoryStartForm.emit('submit'); assert.equal(f.getState().weapon, 'laser'); assert.equal(f.getPlayer(), 'Test pilot');
   f.reset(); assert.equal(f.getScores()[0].score, before.score); assert.equal(f.getBattle().score, 0);
+  assert.equal(f.nodes.siteArmory.dataset.started, 'true');
   f.nodes.armoryHudTops.emit('click'); f.nodes.armoryNewPlayer.emit('click');
   assert.equal(f.getPlayer(), ''); assert.equal(f.getState().weapon, null); assert.equal(f.nodes.armoryPlayerName.readOnly, false);
+  assert.equal(f.nodes.siteArmory.dataset.started, 'false');
   assert.equal(f.nodes.armoryStartSubmit.disabled, true); assert.equal(f.getScores().length, 1);
   f.nodes.armoryPlayerName.value = 'Second pilot'; f.nodes.armoryStartForm.emit('submit');
   assert.equal(f.getPlayer(), 'Second pilot'); assert.equal(f.getState().weapon, 'machinegun');

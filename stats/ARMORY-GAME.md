@@ -11,6 +11,11 @@ whitespace normalization; blank names, control characters and directional
 override characters are rejected. A remembered name is prefilled but never
 auto-starts a new page session. Names are rendered only as text, not HTML.
 
+The weapon rack stays hidden until Start game is submitted. Start and Top scores
+remain available before play; a remembered nickname or opening the lobby does
+not reveal weapons. Pausing retains the rack for switching/resuming, while
+New player / reset round hides it again. Hidden previews do not animate.
+
 Start and Top scores buttons sit below the disarmed gun rack; Top scores is
 also available in the game HUD. Opening the lobby disarms/pauses the game,
 retains the selected gun and offers Resume game for the same player. The name

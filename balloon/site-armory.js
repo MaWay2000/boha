@@ -593,6 +593,7 @@
       if (loading && !doc.hidden) reloadTimer = win.setTimeout(updateReload, 50);
     }
     function sync() {
+      rack.dataset.started = String(!!playerName);
       syncScrollLock();
       shield.hidden = !state.weapon;
       hud.hidden = !state.weapon;
@@ -1036,6 +1037,7 @@
     lobby?.addEventListener('cancel', e => { e.preventDefault(); closeLobby(); });
     doc.getElementById('armoryNewPlayer')?.addEventListener('click', () => {
       reset(false); onlineScores.clear(); scoreStore.forgetName(); playerName = ''; savedScoreKey = ''; pendingWeapon = 'machinegun';
+      rack.dataset.started = 'false';
       nameInput.value = ''; nameInput.readOnly = false;
       const label = doc.getElementById('armoryPlayerLabel'); if (label) label.textContent = '';
       if (startButton) startButton.textContent = 'Start';

@@ -1,4 +1,5 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
+import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261026-1";
 
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 100;
@@ -101,6 +102,7 @@ const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data
 
 let selectedLeaderboard = "Global";
 let leaderboardData = null;
+let personalRatings = null;
 let leaderboardDataSignature = "";
 let bannedAccountIds = new Set();
 let liveFeedState = "idle";
@@ -443,6 +445,10 @@ function hydratePublishedBoard(name) {
   // Preserve historical slots without republishing omitted player profiles.
   for (const id of accounts.keys()) if (!listedAccountIds.has(id)) accounts.delete(id);
   return { accounts, games };
+}
+
+function getRatingBoard(name) {
+  return personalRatings ? personalRatings.getBoard(name, leaderboardData, hydratePublishedBoard) : hydratePublishedBoard(name);
 }
 
 function getFavoriteUnitNameCandidates() {
@@ -2323,7 +2329,7 @@ function getPlayerLeaderboardRanks(account) {
     : Object.keys(leaderboardData.leaderboards);
 
   return leaderboards.flatMap((leaderboard) => {
-    const { accounts } = hydratePublishedBoard(leaderboard);
+    const { accounts } = getRatingBoard(leaderboard);
     const rankedAccounts = filterRankedAccounts(sortAccounts(accounts.values()));
     const rankIndex = rankedAccounts.findIndex((candidate) => getAccountExpandKey(candidate) === accountKey);
     return rankIndex >= 0 ? [{ leaderboard, rank: rankIndex + 1 }] : [];
@@ -3636,7 +3642,7 @@ function render() {
     return;
   }
 
-  const { accounts: globalAccounts, games: globalGames } = hydratePublishedBoard("Global");
+  const { accounts: globalAccounts, games: globalGames } = getRatingBoard("Global");
 
   const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !account.banned);
   resolveActivePlayerShareKey(globalAccountList);
@@ -3645,7 +3651,7 @@ function render() {
   leaderboardGameCounts = new Map(Object.entries(leaderboardData.leaderboards)
     .map(([leaderboard, board]) => [leaderboard, Number(board.matches || 0)]));
 
-  const { accounts, games } = hydratePublishedBoard(selectedLeaderboard);
+  const { accounts, games } = getRatingBoard(selectedLeaderboard);
 
   const accountList = sortAccounts(accounts.values()).filter((account) => !account.banned);
   renderedAccountList = accountList;
@@ -3885,6 +3891,12 @@ document.addEventListener("click", (event) => {
 async function init() {
   applyStateFromUrl();
   setupSortHeaders();
+  const ratingsHost = document.querySelector(".stats-shell");
+  if (ratingsHost) {
+    let storage;
+    try { storage = window.localStorage; } catch {}
+    personalRatings = mountPersonalRatings(ratingsHost, render, storage);
+  }
 
   try {
     await refreshFromMirror(true);

@@ -32,6 +32,21 @@ const vm=require('node:vm');
   assert.deepEqual(locked.snapshot.mapTiles,a.snapshot.mapTiles);assert.deepEqual(locked.snapshot.droids.map(d=>d.position),a.snapshot.droids.map(d=>d.position));
   assert(generateMap({lockTerrain:true,width:200},catalog,a.snapshot).report.errors.length>0);
   assert.equal(normalizeGeneratorOptions({width:999,players:100}).width,255);
+  for(let tileset=0;tileset<catalog.tileCounts.length;tileset++){
+    const count=catalog.tileCounts[tileset];
+    assert.equal(normalizeGeneratorOptions({tileset,textureVariety:999}).textureVariety,count,'variety follows the selected tileset');
+    assert.equal(normalizeGeneratorOptions({tileset,textureVariety:10}).textureVariety,10,'values above six remain available');
+    assert.equal(normalizeGeneratorOptions({tileset,textureVariety:0}).textureVariety,1,'minimum stays one');
+  }
+  assert.equal(normalizeGeneratorOptions({textureVariety:999},{tileCounts:[12]}).textureVariety,12,'custom catalog count is respected');
+  const varied=generateMap({tileset:1,textureVariety:999,water:0,roads:false,border:0,cliffs:false,terrain:'flat'},catalog);
+  assert.equal(varied.options.textureVariety,catalog.tileCounts[1],'engine no longer clamps variety to six');
+  const usedTiles=new Set(varied.snapshot.mapTiles.flat());
+  assert(usedTiles.size>6,'generation actually uses more than six ground textures');
+  for(const tile of usedTiles){
+    assert(tile>=0&&tile<catalog.tileCounts[1],'generated tile exists');
+    assert.equal(tileTypes[1][tile],tileTypes[1][0],'existing ground-type filtering is unchanged');
+  }
   for(const style of ['lakes','river','coast','islands']) {
     const r=generateMap({water:20,waterStyle:style},catalog);assert(r.report.connected,style+' routes');
   }

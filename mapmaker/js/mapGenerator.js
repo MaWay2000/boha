@@ -1,4 +1,5 @@
 // Pure, deterministic generation: no DOM, renderer, network or editor mutations.
+import {getTileCount} from './tileset.js';
 export const generatorDefaults = {
   name:'Generated battlefield', width:128, height:128, players:4, tileset:0, seed:'map-1',
   preset:'arena', symmetry:'both', layout:'corners', teams:2, edge:16, baseRadius:12,
@@ -25,15 +26,16 @@ const clone=x=>JSON.parse(JSON.stringify(x));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const grid=(w,h,value)=>Array.from({length:h},()=>Array(w).fill(value));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
-export function normalizeGeneratorOptions(input={}) {
+export function normalizeGeneratorOptions(input={},catalog={}) {
   const o={...generatorDefaults,...input};
   const ranges={width:[48,255],height:[48,255],players:[2,10],teams:[1,5],edge:[8,64],baseRadius:[7,24],
     minHeight:[0,255],maxHeight:[0,255],frequency:[1,12],smoothness:[0,8],border:[0,8],centreRadius:[0,30],
     routes:[1,4],routeWidth:[3,14],water:[0,60],riverWidth:[2,16],crossings:[1,6],roadWidth:[1,5],
-    groundTile:[0,77],textureVariety:[1,6],trucks:[1,8],tanks:[0,12],support:[0,4],cyborgs:[0,8],modules:[0,2],
+    groundTile:[0,77],trucks:[1,8],tanks:[0,12],support:[0,4],cyborgs:[0,8],modules:[0,2],
     defenses:[0,12],baseOil:[0,16],oilDistance:[6,24],expansions:[0,6],expansionOil:[1,8],neutralOil:[0,40],
     oilSpacing:[2,8],drums:[0,20],artifacts:[0,12],scenery:[0,5],scavCamps:[1,6],scavUnits:[0,10],tileset:[0,2]};
   for(const [k,[lo,hi]] of Object.entries(ranges)) o[k]=clamp(Math.round(Number(o[k])||0),lo,hi);
+  o.textureVariety=clamp(Math.round(Number(o.textureVariety)||0),1,catalog.tileCounts?.[o.tileset]||getTileCount(o.tileset));
   if(o.minHeight>o.maxHeight) [o.minHeight,o.maxHeight]=[o.maxHeight,o.minHeight];
   o.seed=String(o.seed||'map-1').slice(0,100);
   o.edge=Math.min(o.edge,Math.floor(Math.min(o.width,o.height)/3));
@@ -55,7 +57,7 @@ function canonical(x,y,o) {
   return {x,y};
 }
 export function generateMap(input={},catalog={},previous=null) {
-  const o=normalizeGeneratorOptions(input),w=o.width,h=o.height;
+  const o=normalizeGeneratorOptions(input,catalog),w=o.width,h=o.height;
   const random=seededRandom(o.seed), warnings=[], errors=[];
   // A narrow map must spread corner starts out, not keep the old inset and
   // reject every subsequent edit because the bases overlap in the middle.
@@ -65,7 +67,7 @@ export function generateMap(input={},catalog={},previous=null) {
   }
   const centre={x:(w-1)/2,y:(h-1)/2};
   const types=catalog.tileTypes?.[o.tileset]||Array(96).fill(0);
-  const tileCount=catalog.tileCounts?.[o.tileset]||[78,81,80][o.tileset];
+  const tileCount=catalog.tileCounts?.[o.tileset]||getTileCount(o.tileset);
   const waterTile=types[17]===7?17:types.slice(0,tileCount).findIndex(t=>t===7);
   const landTiles=types.map((t,i)=>i<tileCount&&t===types[o.groundTile]&&t!==7&&t!==8?i:-1).filter(i=>i>=0);
   const land=types[o.groundTile]===7||types[o.groundTile]===8?landTiles[0]??0:Math.min(o.groundTile,tileCount-1);

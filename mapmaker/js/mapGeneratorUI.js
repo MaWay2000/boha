@@ -1,12 +1,13 @@
 import {generatorDefaults,generateMap} from './mapGenerator.js';
 import {createLiveMapGeneration} from './liveMapGeneration.js';
+import {getTileCount} from './tileset.js';
 
 // Every field is read by the pure generation engine; presets are editable starting points.
 const groups=[
  ['Map',['width|Width (tiles)|number|48|255','height|Height (tiles)|number|48|255','players|Players|number|2|10','tileset|Tileset|select|0:Arizona,1:Urban,2:Rockies','seed|Seed|text','preset|Preset|select|arena:Open arena,ntw:NTW-style,hills:Hills,canyon:Canyon,islands:Islands,city:City']],
  ['Layout',['symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','layout|Starting layout|select|corners:Corners (4 players),circle:Circle,edges:Edges,opposite:Opposite edges,teams:Team groups','teams|Team groups (layout only)|number|1|5','edge|Base edge distance|number|8|64','baseRadius|Flat base radius|number|7|24','centreRadius|Central arena radius|number|0|30','routes|Routes per player|number|1|4','routeWidth|Route / ramp width|number|3|14','connected|Require land routes|checkbox']],
  ['Terrain',['terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','border|Mountain border width|number|0|8']],
- ['Water and textures',['water|Water amount (%) target|number|0|60','waterStyle|Water shape|select|lakes:Lakes,river:River,coast:Coast,islands:Islands','riverWidth|River width|number|2|16','crossings|River crossings|number|1|6','roads|Connect bases with roads|checkbox','roadWidth|Road width|number|1|5','groundTile|Ground tile ID|number|0|77','textureVariety|Ground texture variety|number|1|6','transitions|Blend terrain edges|checkbox']],
+ ['Water and textures',['water|Water amount (%) target|number|0|60','waterStyle|Water shape|select|lakes:Lakes,river:River,coast:Coast,islands:Islands','riverWidth|River width|number|2|16','crossings|River crossings|number|1|6','roads|Connect bases with roads|checkbox','roadWidth|Road width|number|1|5','groundTile|Ground tile ID|number|0|77','textureVariety|Ground texture variety|number|1|'+getTileCount(generatorDefaults.tileset),'transitions|Blend terrain edges|checkbox']],
  ['Starting bases',['base|Starting base|select|trucks:Trucks only,small:Small base,advanced:Advanced base,custom:Custom building list','trucks|Trucks per player|number|1|8','baseBuildings|Custom building IDs (comma separated)|text','modules|Factory modules (other buildings max 1)|number|0|2','orientation|Building / unit facing|select|centre:Face centre,north:North','defenses|Defenses per player|number|0|12','defenseType|Defense building ID|text']],
  ['Starting units',['truckBody|Truck body ID|text','truckPropulsion|Truck propulsion ID|text','tanks|Tanks per player|number|0|12','tankWeapon|Tank weapon ID|text','support|Sensor units per player|number|0|4','cyborgs|Cyborgs per player|number|0|8']],
  ['Oil and resources',['baseOil|Base oil per player|number|0|16','oilDistance|Base oil distance|number|6|24','expansions|Expansion clusters per player|number|0|6','expansionOil|Oil per expansion cluster|number|1|8','neutralOil|Contested centre oil|number|0|40','oilSpacing|Minimum oil spacing|number|2|8','derricks|Prebuild owned oil derricks|checkbox','drums|Neutral oil drums|number|0|20','artifacts|Neutral artifacts|number|0|12']],
@@ -27,7 +28,7 @@ export function mountMapGenerator(host,bridge) {
   const box=document.createElement('div');box.className='panel-box generator-box';host.append(box);
   const heading=document.createElement('div');heading.className='show-hide-title';heading.textContent='Generate map';box.append(heading);
   const form=document.createElement('form');form.className='generator-form';box.append(form);
-  const inputs=new Map(),values=new Map();
+  const inputs=new Map(),values=new Map(),maxLabels=new Map();
   for(const [title,fields] of groups){
     const details=document.createElement('details');details.open=title==='Map';
     const summary=document.createElement('summary');summary.textContent=title;details.append(summary);
@@ -45,13 +46,19 @@ export function mountMapGenerator(host,bridge) {
         const track=document.createElement('span');track.className='generator-range-track';
         const low=document.createElement('span');low.textContent=min;low.setAttribute('aria-hidden','true');
         const high=document.createElement('span');high.textContent=max;high.setAttribute('aria-hidden','true');
+        maxLabels.set(key,high);
         track.append(low,control,high);wrapper.append(title,track,value);
       }else wrapper.append(text,control);
       details.append(wrapper);inputs.set(key,control);
     }form.append(details);
   }
   const report=document.createElement('div');report.className='generator-report';report.setAttribute('aria-live','polite');host.append(report);
-  const syncValues=()=>{for(const [key,value] of values)value.textContent=inputs.get(key).value;};
+  const syncValues=()=>{
+    const variety=inputs.get('textureVariety'),max=getTileCount(inputs.get('tileset').value);
+    variety.max=String(max);variety.value=String(Math.max(1,Math.min(max,Number(variety.value)||1)));
+    maxLabels.get('textureVariety').textContent=String(max);
+    for(const [key,value] of values)value.textContent=inputs.get(key).value;
+  };
   const setOptions=o=>{for(const [key,input] of inputs)if(key in o){if(input.type==='checkbox')input.checked=!!o[key];else input.value=o[key];}syncValues();};
   const options=()=>Object.fromEntries([...inputs].map(([k,input])=>[k,input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value]));
   const signature=()=>JSON.stringify(options());

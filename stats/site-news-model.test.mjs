@@ -81,7 +81,7 @@ test('renderer reveals only a rendered 3D balloon and pauses when flight pauses'
   assert.match(source, /renderer\.info\.render\.calls > 0/);
   const css = await readFile(new URL('../balloon/site-news.css', import.meta.url), 'utf8');
   assert.match(css, /\.news-balloon \{[^}]*visibility: hidden;/);
-  assert.match(css, /\.news-balloon\.has-3d\[data-model-state="ready"\] \{ visibility: visible; \}/);
+  assert.match(css, /\.news-balloon:where\(\.has-3d\[data-model-state="ready"\]\) \{ visibility: visible; \}/);
   assert.match(css, /\.news-balloon img \{ display: none; \}/);
   assert.doesNotMatch(source, /https:\/\/|unpkg|jsdelivr/);
 });

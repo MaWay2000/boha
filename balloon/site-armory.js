@@ -806,6 +806,13 @@
       // Explosive/heat damage leaves soot and a burnt hole, not glass spokes.
       if (weapon !== 'rockets' && weapon !== 'flamer') node.append(svg);
       node.append(hole); damage.append(node); marks.push(node);
+      const timer = win.setTimeout(() => {
+        node.remove();
+        const index = marks.indexOf(node);
+        if (index !== -1) marks.splice(index, 1);
+        timers.delete(timer);
+      }, 10000);
+      timers.add(timer);
       if (marks.length > MAX_MARKS) marks.shift().remove();
     }
     function burst(x, y, destroyed) {

@@ -517,6 +517,18 @@ test('misses leave bounded visual-only damage; repair clears all marks and anima
   assert.equal(f.nodes.armoryHud.hidden, true); assert.equal(f.getState().shots, 0);
 });
 
+test('impact marks expire individually after ten seconds, even while paused', () => {
+  const f = fixture({ reduced: true }); f.select('cannon');
+  const marks = () => f.nodes.armoryDamage.children.filter(node => node.className === 'armory-mark');
+  f.shoot(900, 700); const first = marks()[0];
+  f.advance(3000); f.shoot(900, 700); const second = marks()[1];
+  f.select(null); f.advance(6999);
+  assert.deepEqual(marks(), [first, second]);
+  f.advance(1); assert.deepEqual(marks(), [second]);
+  f.advance(3000); assert.deepEqual(marks(), []);
+  f.reset(); assert.equal(f.timers.size, 0);
+});
+
 test('boss requires sustained cannon fire; disarming restores news without silently clearing damage', () => {
   const f = fixture(); f.select('cannon'); f.shoot(400, 450); f.next(3000);
   f.nodes.armoryFire.emit('click'); assert.equal(f.getState().health, BALLOON_MAX_HEALTH - 55);
@@ -554,8 +566,8 @@ test('modal opening disarms, hidden tabs and invalid coordinates cannot fire, an
 
 test('reduced motion omits explosion animations while keeping weapon and repair actions usable', () => {
   const f = fixture({ reduced: true }); f.select('cannon'); f.shoot(400, 450);
-  assert.equal(f.nodes.armoryDamage.children.length, 1); assert.equal(f.timers.size, 1); // Only the reload display timer.
-  f.advance(3000); assert.equal(f.timers.size, 0);
+  assert.equal(f.nodes.armoryDamage.children.length, 1); assert.equal(f.timers.size, 2); // Reload display and impact expiry.
+  f.advance(3000); assert.equal(f.timers.size, 1);
   f.reset(); assert.equal(f.nodes.armoryDamage.children.length, 0); assert.equal(f.getState().weapon, 'cannon');
 });
 
@@ -665,14 +677,14 @@ test('reload bars fill, show the countdown, keep updating after disarm, and stop
   assert.equal(f.buttons[1].dataset.loading, 'true');
   f.select(null); f.advance(1500);
   assert.equal(bar.value, 1); assert.equal(label.textContent, 'Ready');
-  assert.equal(f.buttons[1].dataset.loading, 'false'); assert.equal(f.timers.size, 0);
+  assert.equal(f.buttons[1].dataset.loading, 'false'); assert.equal(f.timers.size, 1);
 });
 
 test('repair resets reload bars and hidden pages reconcile elapsed cooldown without background polling', () => {
   const f = fixture({ reduced: true }); f.select('cannon'); f.shoot(400, 450);
-  f.doc.hidden = true; f.doc.emit('visibilitychange'); assert.equal(f.timers.size, 0);
+  f.doc.hidden = true; f.doc.emit('visibilitychange'); assert.equal(f.timers.size, 1);
   f.advance(4000); f.doc.hidden = false; f.doc.emit('visibilitychange');
-  assert.equal(f.nodes['armoryReload-cannon'].value, 1); assert.equal(f.timers.size, 0);
+  assert.equal(f.nodes['armoryReload-cannon'].value, 1); assert.equal(f.timers.size, 1);
   f.shoot(400, 450); assert.equal(f.nodes['armoryReload-cannon'].value, 0);
   f.reset(); assert.equal(f.nodes['armoryReload-cannon'].value, 1); assert.equal(f.timers.size, 0);
 });

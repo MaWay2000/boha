@@ -470,6 +470,20 @@ test('remembered nicknames still require Start on reload, and names render as te
   assert.equal(reload.nodes.armoryTopRows.children[0].children[1].textContent, 'Other tab');
 });
 
+test('returning nickname continues its saved score without carrying combat progress into a new run', async () => {
+  const f = fixture({ signedIn: false }); await f.ready;
+  scores.createStore(f.win).record(scoreEntry('Returning Pilot', 327));
+  f.nodes.armoryStart.emit('click'); f.nodes.armoryPlayerName.value = 'returning pilot'; f.nodes.armoryStartForm.emit('submit');
+  assert.equal(Number(f.nodes.armoryScore.textContent), 327);
+  assert.equal(f.getBattle().score, 0);
+  f.select(null); popBalloon(f); f.select(null);
+  const saved = scores.createStore(f.win).entries()[0];
+  assert.equal(saved.score, 328); assert.equal(saved.kills + saved.bosses, 328);
+  f.reset();
+  assert.equal(Number(f.nodes.armoryScore.textContent), 328);
+  assert.equal(f.getBattle().score, 0);
+});
+
 test('storage-denied lobby remains playable; shared scoreboard identity does not depend on local storage', async () => {
   const storage = { getItem() { throw Error('denied'); }, setItem() { throw Error('denied'); } };
   const f = fixture({ signedIn: false, storage }); await f.ready;

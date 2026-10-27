@@ -185,6 +185,7 @@
     const scoreStore = scoresModule.createStore(win);
     const onlineScores = options.onlineScores || scoresModule.createOnline(win, () => { if (lobby?.open) renderScores(); });
     let playerName = '', pendingWeapon = 'machinegun', savedScoreKey = '', lobbyReturn = null;
+    let scoreBaseline = null, scoreGeneration = 0;
     let modelWaitTimer = null, modelsTimedOut = false;
     const modelsReady = () => rack.dataset.modelsWeapons === 'ready' && rack.dataset.modelsUnits === 'ready';
     let lootPoint = null, lootNotice = '';
@@ -293,7 +294,7 @@
       if (battleStats) battleStats.hidden = !battle.active;
       if (targetLayer) { targetLayer.hidden = (!battle.active && !allies.units.length) || !state.weapon || doc.hidden || blocked(); targetLayer.dataset.armed = String(!!state.weapon); }
       const text = (id, value) => { const node = doc.getElementById(id); if (node) node.textContent = String(value); };
-      text('armoryScore', battle.score); text('armoryBank', battle.bank); text('armoryTargetCount', `${battle.units.length} / ${battleModule.MAX_UNITS}`);
+      text('armoryScore', battle.score + (scoreBaseline?.score || 0)); text('armoryBank', battle.bank); text('armoryTargetCount', `${battle.units.length} / ${battleModule.MAX_UNITS}`);
       text('armoryUnitDamage', state.unitDamage);
       syncLoot();
       const waveView = doc.getElementById('armoryWave');
@@ -688,6 +689,18 @@
       if (!state.weapon && !state.health) restoreBalloon();
       sync();
     }
+    function beginScores() {
+      const generation = ++scoreGeneration, name = playerName;
+      const matches = [...scoreStore.entries(), ...onlineScores.entries()].filter(row => row.name.toLowerCase() === name.toLowerCase());
+      scoreBaseline = matches.sort(scoresModule.compare)[0] || null;
+      sync();
+      Promise.resolve(onlineScores.begin(name)).then(previous => {
+        if (generation !== scoreGeneration || name !== playerName || !previous) return;
+        if (!scoreBaseline || previous.score > scoreBaseline.score) {
+          scoreBaseline = previous; savedScoreKey = ''; sync();
+        }
+      });
+    }
     function saveScore() {
       if (!playerName || !battle.score) return;
       const key = [playerName, battle.score, battle.waves?.number, battle.earned].join('|');
@@ -695,7 +708,9 @@
       savedScoreKey = key;
       const entry = { name: playerName, score: battle.score, wave: battle.waves?.number || 1,
         kills: battle.unitKills, bosses: state.bossKills, power: battle.earned, savedAt: Date.now() };
-      scoreStore.record(entry); onlineScores.save(entry);
+      const total = { ...entry, wave: Math.max(entry.wave, scoreBaseline?.wave || 1) };
+      for (const field of ['score', 'kills', 'bosses', 'power']) total[field] += scoreBaseline?.[field] || 0;
+      scoreStore.record(total); onlineScores.save(entry);
     }
     function renderScores() {
       const rows = doc.getElementById('armoryTopRows');
@@ -763,7 +778,7 @@
       e?.preventDefault();
       if (!lobby?.open || !scoresModule.validName(nameInput.value) || !modelsReady()) { syncNameEntry(true); return; }
       if (!playerName) {
-        playerName = scoresModule.normalizeName(nameInput.value); scoreStore.remember(playerName); onlineScores.begin(playerName);
+        playerName = scoresModule.normalizeName(nameInput.value); scoreStore.remember(playerName); beginScores();
         savedScoreKey = '';
       }
       const weapon = pendingWeapon;
@@ -1057,7 +1072,7 @@
       lootPoint = null; lootNotice = '';
       allies = battleModule.createAllies();
       const weapon = state.weapon; state = { ...createState(), weapon }; restoreBalloon(); sync();
-      if (playerName && restartOnline !== false) onlineScores.begin(playerName);
+      if (playerName && restartOnline !== false) beginScores();
     }
     for (const button of weaponButtons) button.addEventListener('click', () => select(button.dataset.weapon));
     startButton?.addEventListener('click', () => {
@@ -1082,7 +1097,7 @@
     lobby?.addEventListener('cancel', e => { e.preventDefault(); closeLobby(); });
     function endRound() {
       select(null);
-      reset(false); onlineScores.clear(); scoreStore.forgetName(); playerName = ''; savedScoreKey = ''; pendingWeapon = 'machinegun';
+      reset(false); onlineScores.clear(); scoreStore.forgetName(); playerName = ''; scoreBaseline = null; scoreGeneration++; savedScoreKey = ''; pendingWeapon = 'machinegun';
       rack.dataset.started = 'false';
       nameInput.value = ''; nameInput.readOnly = false;
       const label = doc.getElementById('armoryPlayerLabel'); if (label) label.textContent = '';

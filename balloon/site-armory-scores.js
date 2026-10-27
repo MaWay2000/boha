@@ -125,6 +125,7 @@
         if (current !== generation) return;
         if (!/^[a-f0-9]{64}$/.test(result.token)) throw Error('Invalid game session.');
         token = result.token; accept(result, order); retries = 0; report('ready');
+        return normalizeEntry(result.playerScore);
       }).catch(failure => { if (current === generation) { retryFloor = failure.status === 429 ? 60000 : 5000; report('error', failure.message || 'Score service unavailable.'); } })
         .finally(() => { if (current === generation) { connecting = null; if (token && pending) pump(); else retry(); } });
       return connecting;

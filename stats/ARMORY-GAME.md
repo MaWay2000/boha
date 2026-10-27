@@ -59,8 +59,10 @@ API; pending uploads are explicitly shown and are never inserted into the
 published table as if accepted. The snapshot contains only already-public
 nicknames and run statistics; no session tokens, IPs or private server state.
 
-One best run per case-insensitive nickname is retained, ordered by score, wave,
-earned power and first-achieved time. Score is existing unit kills plus balloon
+One cumulative total per case-insensitive nickname is retained, ordered by score, best wave,
+earned power and first-achieved time. New sessions add only their incremental counters;
+repeated submissions do not count twice. Session creation returns the nickname's
+saved total even outside the Top 10. Combat progress starts fresh. Score is unit kills plus balloon
 defeats, including friendly kills; earned power is total gained, not the bank.
 The client batches updates over two seconds and flushes on disarm/reset/exit,
 using credential-free keepalive requests. Temporary failures retain the latest

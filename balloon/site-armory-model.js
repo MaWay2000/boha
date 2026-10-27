@@ -14,7 +14,7 @@ function mountTurrets() {
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   const localPreview = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   // Local rotation is explicitly requested; public visitors retain reduced motion.
-  const canRotate = () => !disposed && rack.dataset.started === 'true' && !document.hidden && visible && (localPreview || !motion.matches)
+  const canRotate = () => !disposed && rack.dataset.started === 'true' && !!rack.dataset.armed && !document.hidden && visible && (localPreview || !motion.matches)
     && !document.body.classList.contains('site-news-open')
     && !document.body.classList.contains('radio-playlist-open')
     && !document.body.classList.contains('replay-analyzer-modal-open');
@@ -46,7 +46,7 @@ function mountTurrets() {
   observer.observe(rack);
   const overlays = new MutationObserver(sync);
   overlays.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-  overlays.observe(rack, { attributes: true, attributeFilter: ['data-started'] });
+  overlays.observe(rack, { attributes: true, attributeFilter: ['data-started', 'data-armed'] });
   const tiers = new MutationObserver(() => { for (const item of items) item.loader.select(turretFor(item.weapon, Number(item.button.dataset.level) || 1)); });
   tiers.observe(rack, { attributes: true, subtree: true, attributeFilter: ['data-definition'] });
   const resize = new ResizeObserver(draw); resize.observe(rack);

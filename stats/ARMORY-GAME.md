@@ -13,8 +13,8 @@ auto-starts a new page session. Names are rendered only as text, not HTML.
 
 The weapon rack stays hidden until Start game is submitted. Start and Top scores
 remain available before play; a remembered nickname or opening the lobby does
-not reveal weapons. Pausing retains the rack for switching/resuming, while
-New player / reset round hides it again. Hidden previews do not animate.
+not reveal weapons. Pausing hides the rack; Resume restores it with the last
+selected weapon. Hidden previews do not animate.
 
 Start game also waits for all 21 weapon-tier models and all nine unit designs.
 Both renderers prepare every part and texture, then validate a rendered frame
@@ -27,7 +27,9 @@ render, and weapon upgrades retain the previous complete model while swapping.
 The player menu remains visible below the gun rack during play. Its Start button
 becomes Pause while armed and Resume while paused. Pause stops play immediately;
 Resume restores the last selected weapon without opening the lobby or resetting
-progress. Top scores is
+progress.
+Stop is available in both states: it saves the best score, ends the round,
+clears its units and effects, and returns to Start for a new player. Top scores is
 also available in the game HUD. Opening the lobby disarms/pauses the game,
 retains the selected gun and offers Resume game for the same player. The name
 is locked during an existing round. New player / reset round saves the previous

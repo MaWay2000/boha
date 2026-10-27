@@ -7,7 +7,9 @@
   font-family: "Oxanium", sans-serif;
 }
 .armory-rack { display: flex; gap: 6px; max-width: 100%; }
-.site-armory:not([data-started="true"]) .armory-rack { display: none; }
+.site-armory:not([data-armed]) .armory-rack,
+.site-armory[data-armed=""] .armory-rack { display: none; }
+.armory-entry-controls button[hidden] { display: none; }
 .armory-gun-preview:not(.has-model) { visibility: hidden; }
 .armory-unit:not([data-model-state="ready"]) { visibility: hidden; }
 #armoryModelStatus { color: #e8c481; }

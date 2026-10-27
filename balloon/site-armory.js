@@ -181,6 +181,7 @@
     const lootButton = doc.getElementById('armoryLoot');
     const lobby = doc.getElementById('armoryStartDialog'), nameInput = doc.getElementById('armoryPlayerName');
     const startButton = doc.getElementById('armoryStart'), topsButton = doc.getElementById('armoryTops');
+    const stopButton = doc.getElementById('armoryStop');
     const scoreStore = scoresModule.createStore(win);
     const onlineScores = options.onlineScores || scoresModule.createOnline(win, () => { if (lobby?.open) renderScores(); });
     let playerName = '', pendingWeapon = 'machinegun', savedScoreKey = '', lobbyReturn = null;
@@ -597,6 +598,7 @@
     function sync() {
       rack.dataset.started = String(!!playerName);
       if (startButton) startButton.textContent = state.weapon ? 'Pause' : playerName ? 'Resume' : 'Start';
+      if (stopButton) stopButton.hidden = !playerName;
       syncScrollLock();
       shield.hidden = !state.weapon;
       hud.hidden = !state.weapon;
@@ -1071,7 +1073,8 @@
     nameInput?.addEventListener('input', () => syncNameEntry());
     doc.getElementById('armoryStartClose')?.addEventListener('click', closeLobby);
     lobby?.addEventListener('cancel', e => { e.preventDefault(); closeLobby(); });
-    doc.getElementById('armoryNewPlayer')?.addEventListener('click', () => {
+    function endRound() {
+      select(null);
       reset(false); onlineScores.clear(); scoreStore.forgetName(); playerName = ''; savedScoreKey = ''; pendingWeapon = 'machinegun';
       rack.dataset.started = 'false';
       nameInput.value = ''; nameInput.readOnly = false;
@@ -1079,7 +1082,11 @@
       if (startButton) startButton.textContent = 'Start';
       doc.getElementById('armoryNewPlayer').hidden = true;
       doc.getElementById('armoryStartSubmit').textContent = 'Start game';
-      renderScores(); syncNameEntry(); nameInput.focus?.();
+      sync(); renderScores(); syncNameEntry();
+    }
+    doc.getElementById('armoryNewPlayer')?.addEventListener('click', () => { endRound(); nameInput.focus?.(); });
+    stopButton?.addEventListener('click', () => {
+      endRound(); closeLobby(); startButton?.focus?.({preventScroll:true});
     });
     win.addEventListener('storage', e => { if (e.key === scoresModule.STORAGE_KEY && lobby?.open) onlineScores.refresh(); });
     off.addEventListener('click', () => select(null)); repair.addEventListener('click', reset);

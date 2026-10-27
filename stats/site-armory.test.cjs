@@ -290,6 +290,7 @@ function fixture({ reduced = false, hostname = '', signedIn = true, storage, fir
   ids.push('armoryStartDialog', 'armoryPlayerName', 'armoryStart', 'armoryTops', 'armoryHudTops', 'armoryStartForm', 'armoryStartSubmit',
     'armoryStartClose', 'armoryNewPlayer', 'armoryPlayerLabel', 'armoryTopRows', 'armoryTopEmpty', 'armoryScoreStorage', 'armoryNameError');
   ids.push('armoryModelStatus', 'armoryModelRetry');
+  ids.push('armoryStop');
   ids.push('armoryWave', 'armoryWaveTitle', 'armoryWaveDetail', 'armoryWaveProgress');
   ids.push('armoryAlliesStats', 'armoryAllyCount', 'armoryAllyReserves', 'armoryAllyKills', 'armoryAllyDamage');
   ids.push('armoryUpgradeNote', 'armoryUpgradeProgress', 'armoryUpgradeStatus');
@@ -399,6 +400,24 @@ test('every gun and hotkey requires a nickname plus explicit Start before any ga
   f.doc.emit('keydown', { key: '2' }); assert.equal(f.nodes.armoryStartDialog.open, true);
   f.nodes.armoryStartDialog.emit('cancel'); assert.equal(f.nodes.armoryStartDialog.open, false);
   assert.equal(f.getState().weapon, null);
+});
+
+test('Stop ends active or paused rounds, preserves saved scores and returns the menu to Start', async () => {
+  for(const paused of [false,true]) {
+    const f=fixture(); await f.ready; popBalloon(f); f.select('cannon'); f.shoot(1100,700);
+    const best=f.getScores()[0].score;
+    if(paused)f.nodes.armoryStart.emit('click');
+    assert.equal(f.nodes.armoryStop.hidden,false);
+    f.nodes.armoryStop.emit('click');
+    assert.equal(f.getPlayer(),''); assert.equal(f.getState().weapon,null); assert.equal(f.getBattle().active,false);
+    assert.equal(f.getAllies().units.length,0); assert.equal(f.nodes.armoryTargets.children.length,0);
+    assert.equal(f.nodes.armoryStart.textContent,'Start'); assert.equal(f.nodes.armoryStop.hidden,true);
+    assert.equal(f.nodes.siteArmory.dataset.armed,''); assert.equal(f.nodes.siteArmory.dataset.started,'false');
+    assert.equal(f.getScores()[0].score,best); assert.equal(f.nodes.armoryPlayerLabel.textContent,'');
+    assert.equal(f.nodes.armoryStartDialog.open,false);
+    f.nodes.armoryStart.emit('click'); assert.equal(f.nodes.armoryStartDialog.open,true);
+    assert.equal(f.nodes.armoryStartSubmit.disabled,true);
+  }
 });
 
 test('the entry menu pauses immediately and resumes the last weapon without resetting progress', async () => {

@@ -106,9 +106,44 @@ test("conflicting player identities in one game are skipped", () => {
 });
 
 test("invalid, nonfinite and out-of-range settings are rejected", () => {
-  for (const change of [{ k: NaN }, { k: Infinity }, { k: -1 }, { k: "20" }, { multiplierGames: 0.5 }, { minimumMinutes: 181 }, { equalTeams: 1 }]) {
+  for (const change of [{ k: NaN }, { k: Infinity }, { k: -1 }, { k: "20" }, { multiplierGames: 0.5 }, { minimumMinutes: 181 }, { equalTeams: 1 }, { ratingScale: 0 }, { ratingScale: Infinity }, { ratingScale: 2001 }, { minimumTeamSize: 0 }, { minimumTeamSize: 1.5 }, { minimumTeamSize: 21 }]) {
     assert.throws(() => normalizeSettings({ ...CURRENT_SETTINGS, ...change }));
   }
+});
+
+test("Elo scale changes the expected-score curve while preserving original defaults", () => {
+  const { board, game } = fixture();
+  board.games.push(game("second", 20));
+  const original = calculatePersonalRatings(board, options());
+  const softer = calculatePersonalRatings(board, options({ ratingScale: 800 }));
+  assert.ok(Math.abs(original.accounts.get("a").elo - (1510 + 20 / (1 + 10 ** (20 / 400)))) < 1e-9);
+  assert.ok(Math.abs(softer.accounts.get("a").elo - (1510 + 20 / (1 + 10 ** (20 / 800)))) < 1e-9);
+  assert.ok(softer.accounts.get("a").elo > original.accounts.get("a").elo);
+  assert.equal(softer.games[0].slots[0].eloDelta, 10);
+});
+
+test("minimum team size filters games, including FFA, without changing recorded facts", () => {
+  const { board, a, b } = fixture();
+  const skipped = calculatePersonalRatings(board, options({ minimumTeamSize: 2 }));
+  assert.equal(skipped.ratedGames, 0);
+  assert.equal(skipped.accounts.get("a").winCount, a.winCount);
+  for (const [index, account] of [a, b].entries()) {
+    const teammate = { ...account, mainPublicKey: `extra-${index}`, games: [...account.games] };
+    board.accounts.set(`extra-${index}`, teammate);
+    board.games[0].slots.push({ account: teammate, position: index + 2, team: index, userType: index === 0 ? "winner" : "loser" });
+  }
+  assert.equal(calculatePersonalRatings(board, options({ minimumTeamSize: 2 })).ratedGames, 1);
+  assert.equal(calculatePersonalRatings(board, options({ minimumTeamSize: 3 })).ratedGames, 0);
+  board.games[0].alliancesType = 0;
+  assert.equal(calculatePersonalRatings(board, options({ minimumTeamSize: 2 })).ratedGames, 0);
+});
+
+test("older saved settings adopt the original scale and team-size defaults", () => {
+  const legacy = { ...CURRENT_SETTINGS, k: 37, base: 1200 };
+  delete legacy.ratingScale;
+  delete legacy.minimumTeamSize;
+  const storage = { getItem: () => JSON.stringify({ version: 1, settings: legacy }) };
+  assert.deepEqual(readSettings(storage), { ...legacy, ratingScale: 400, minimumTeamSize: 1 });
 });
 
 test("only the personal storage key changes; bad or unavailable storage is tolerated", () => {

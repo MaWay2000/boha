@@ -1,16 +1,17 @@
 export const STORAGE_KEY = "boha.personalRatingSettings.v1";
-export const CURRENT_SETTINGS = Object.freeze({ base: 1500, k: 20, minimumGames: 5, multiplier: 1, multiplierGames: 50, minimumMinutes: 3, equalTeams: true });
+export const CURRENT_SETTINGS = Object.freeze({ base: 1500, k: 20, ratingScale: 400, minimumGames: 5, multiplier: 1, multiplierGames: 50, minimumMinutes: 3, minimumTeamSize: 1, equalTeams: true });
 export const BOHAN_SETTINGS = Object.freeze({ ...CURRENT_SETTINGS, k: 40, multiplier: 2 });
 
-const limits = { base: [0, 10000], k: [0, 200], minimumGames: [0, 10000], multiplier: [1, 10], multiplierGames: [0, 10000], minimumMinutes: [0, 180] };
+const limits = { base: [0, 10000], k: [0, 200], ratingScale: [100, 2000], minimumGames: [0, 10000], multiplier: [1, 10], multiplierGames: [0, 10000], minimumMinutes: [0, 180], minimumTeamSize: [1, 20] };
 
 export function normalizeSettings(input) {
   if (!input || typeof input !== "object") throw new Error("Invalid rating settings.");
   const settings = {};
   for (const [key, [min, max]] of Object.entries(limits)) {
-    const value = input[key];
+    // Older saved preferences predate these two controls; retain their original behavior.
+    const value = input[key] === undefined && ["ratingScale", "minimumTeamSize"].includes(key) ? CURRENT_SETTINGS[key] : input[key];
     if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max
-      || (["minimumGames", "multiplierGames"].includes(key) && !Number.isInteger(value))) {
+      || (["minimumGames", "multiplierGames", "minimumTeamSize"].includes(key) && !Number.isInteger(value))) {
       throw new Error(`Invalid ${key} setting.`);
     }
     settings[key] = value;
@@ -73,6 +74,7 @@ export function calculatePersonalRatings(board, input) {
     for (const slot of game.slots) slot.elo = slot.account.elo;
     const sizes = game.teams.map(team => team.players.length).filter(Boolean);
     if (game.cheated || game.crashed || game.duration < settings.minimumMinutes * 60000 || !sizes.length
+      || Math.min(...sizes) < settings.minimumTeamSize
       || game.teams.every(team => team.userType === "loser")
       || (settings.equalTeams && Math.min(...sizes) !== Math.max(...sizes))) continue;
     const teams = game.teams.map(team => {
@@ -85,7 +87,7 @@ export function calculatePersonalRatings(board, input) {
     const winners = teams.filter(team => team.userType === "winner");
     const contenders = teams.filter(team => team.userType === "contender");
     const survivors = winners.length ? winners : contenders;
-    const delta = (actual, a, b) => settings.k * (actual - 1 / (1 + 10 ** ((b - a) / 400)));
+    const delta = (actual, a, b) => settings.k * (actual - 1 / (1 + 10 ** ((b - a) / settings.ratingScale)));
     let hasResult = false;
     for (const loser of teams.filter(team => team.userType === "loser")) {
       const best = teams.filter(team => team !== loser).reduce((best, team) => !best || team.elo > best.elo ? team : best, null);
@@ -125,42 +127,70 @@ export function mountPersonalRatings(host, onChange, storage) {
   const cache = new Map();
   const style = document.createElement("style");
   style.textContent = `
-    .personal-ratings { margin: 0 0 16px; padding: 12px 16px; border: 1px solid #285365; background: #091922; color: #c1dae2; }
-    .personal-ratings summary { cursor: pointer; display: list-item; font-weight: 600; }
-    .personal-ratings .rating-status { color: #6de8ff; margin-left: 12px; font-size: .85rem; overflow-wrap: anywhere; }
-    .personal-ratings form { margin-top: 16px; }
-    .personal-ratings .rating-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 12px; }
-    .personal-ratings label { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; }
-    .personal-ratings input, .personal-ratings select, .personal-ratings button { font: inherit; color: #dceff5; background: #102b39; border: 1px solid #386579; padding: 8px; min-width: 0; border-radius: 3px; }
-    .personal-ratings input[type=checkbox] { align-self: start; }
-    .personal-ratings .rating-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
-    .personal-ratings button { cursor: pointer; }
+    .personal-ratings { margin: 0 0 20px; border: 1px solid #315668; border-radius: 12px; background: linear-gradient(130deg, #102b38, #091922 75%); color: #c1dae2; overflow: hidden; }
+    .personal-ratings summary { cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 17px 20px; list-style: none; font-weight: 650; }
+    .personal-ratings summary::-webkit-details-marker { display: none; }
+    .personal-ratings .rating-title::before { content: '▸'; margin-right: 10px; color: #6de8ff; }
+    .personal-ratings[open] .rating-title::before { content: '▾'; }
+    .personal-ratings[open] summary { border-bottom: 1px solid #2b4958; }
+    .personal-ratings .rating-status { border: 1px solid #315b69; border-radius: 20px; padding: 4px 10px; background: #0c2430; color: #91e9ef; font-size: 11px; font-weight: 500; overflow-wrap: anywhere; }
+    .personal-ratings form { padding: 20px; }
+    .personal-ratings .rating-toolbar { display: flex; align-items: end; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+    .personal-ratings .rating-toolbar label { flex: 1 1 260px; max-width: 460px; }
+    .personal-ratings .rating-toolbar p { flex: 1 1 240px; margin: 0; padding-bottom: 7px; color: #98b7c6; }
+    .personal-ratings .rating-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .personal-ratings .rating-section { min-width: 0; margin: 0; padding: 16px; border: 1px solid #2c5262; border-radius: 8px; background: #081c27a6; }
+    .personal-ratings .rating-section legend { padding: 0 7px; color: #ddf2fa; font-size: 13px; font-weight: 650; }
+    .personal-ratings .rating-section label + label { margin-top: 14px; }
+    .personal-ratings label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; }
+    .personal-ratings label small { color: #8faeba; line-height: 1.5; font-size: 11px; }
+    .personal-ratings input, .personal-ratings select, .personal-ratings button { font: inherit; color: #e1f2f9; background: #0b2330; border: 1px solid #3c6272; padding: 10px 12px; min-width: 0; border-radius: 6px; }
+    .personal-ratings input, .personal-ratings select { width: 100%; min-height: 42px; }
+    .personal-ratings .rating-switch { flex-direction: row; align-items: center; gap: 10px; }
+    .personal-ratings .rating-switch input { width: 17px; min-height: 17px; height: 17px; accent-color: #72dce9; flex-shrink: 0; }
+    .personal-ratings .rating-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    .personal-ratings button { cursor: pointer; font-size: 13px; font-weight: 600; }
+    .personal-ratings button[type=submit] { border-color: #65d8ed; background: #17637b; color: white; }
+    .personal-ratings button:hover { border-color: #80cadd; }
     .personal-ratings :focus-visible { outline: 2px solid #6de8ff; outline-offset: 2px; }
     .personal-ratings :disabled { opacity: .55; cursor: not-allowed; }
-    .personal-ratings p { font-size: .85rem; line-height: 1.5; margin: 12px 0 0; }
-    .personal-ratings .rating-feedback { color: #ffcf7a; min-height: 1.5em; }
+    .personal-ratings p { font-size: 12px; line-height: 1.7; margin: 14px 0 0; }
+    .personal-ratings .rating-help { margin-top: 18px; padding-top: 14px; border-top: 1px solid #294b5b; color: #91b1bf; }
+    .personal-ratings .rating-feedback { color: #ffcf7a; margin-top: 10px; }
+    .personal-ratings .rating-feedback:empty { display: none; }
+    @media (max-width: 900px) { .personal-ratings .rating-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .personal-ratings .rating-section:last-child { grid-column: 1 / -1; } }
+    @media (max-width: 560px) { .personal-ratings form { padding: 14px; } .personal-ratings summary { padding: 15px 14px; } .personal-ratings .rating-fields { grid-template-columns: 1fr; } .personal-ratings .rating-section:last-child { grid-column: auto; } .personal-ratings .rating-actions button { flex: 1 1 100%; } }
   `;
   document.head.append(style);
   const panel = document.createElement("details");
   panel.className = "personal-ratings";
   panel.innerHTML = `
-    <summary>Personal rating settings <span class="rating-status" aria-live="polite"></span></summary>
+    <summary><span class="rating-title">Personal rating settings</span><span class="rating-status" aria-live="polite"></span></summary>
     <form>
-      <div class="rating-fields">
-        <label>Preset<select name="preset"><option value="published">Official published ratings</option><option value="current">Current formula · K=20 preview</option><option value="bohan">Bohan-style · K=40 preview</option><option value="custom">Custom preview</option></select></label>
-        <label>Starting Elo<input name="base" type="number" min="0" max="10000" step="any" required></label>
-        <label>K factor<input name="k" type="number" min="0" max="200" step="any" required></label>
-        <label>Minimum games to rate<input name="minimumGames" type="number" min="0" max="10000" step="1" required></label>
-        <label>New-player multiplier<input name="multiplier" type="number" min="1" max="10" step="any" required></label>
-        <label>Multiplier decreases over games<input name="multiplierGames" type="number" min="0" max="10000" step="1" required></label>
-        <label>Minimum match minutes<input name="minimumMinutes" type="number" min="0" max="180" step="any" required></label>
-        <label>Require equal team sizes<input name="equalTeams" type="checkbox"></label>
-        <label>Quit-time weighting<input type="checkbox" disabled title="Quit-time data is not included in the public snapshot."></label>
-        <label>Power-based distribution<input type="checkbox" disabled title="Power-won data is not included in the public snapshot."></label>
+      <div class="rating-toolbar">
+        <label>Preset<select name="preset"><option value="published">Official published ratings</option><option value="current">Site defaults · K=20 preview</option><option value="bohan">Bohan-style · K=40 preview</option><option value="custom">Custom preview</option></select></label>
+        <p>Start with the site defaults, adjust any value, then recalculate your personal leaderboard.</p>
       </div>
-      <div class="rating-actions"><button type="submit">Recalculate</button><button type="button" class="rating-reset">Reset to published</button></div>
-      <p>Your preview changes Elo and rankings only in this browser. Recorded wins, losses and draws stay published. Settings are remembered on this device.</p>
-      <p>Previews use the selected category's published matches and visible player identities. Hidden players, quit times and power-won data are unavailable, so neither preset guarantees an exact match to official ratings or Bohan's website. Crashed and cheated matches are always excluded. Set multiplier games to 0 to disable the boost.</p>
+      <div class="rating-fields">
+        <fieldset class="rating-section"><legend>Rating formula</legend>
+          <label>Starting Elo<input name="base" type="number" min="0" max="10000" step="any" required></label>
+          <label>K factor<input name="k" type="number" min="0" max="200" step="any" required><small>How strongly each match changes the rating.</small></label>
+          <label>Elo scale<input name="ratingScale" type="number" min="100" max="2000" step="any" required><small>Default 400. Higher values soften the effect of rating gaps.</small></label>
+        </fieldset>
+        <fieldset class="rating-section"><legend>Match eligibility</legend>
+          <label>Minimum games to rate<input name="minimumGames" type="number" min="0" max="10000" step="1" required></label>
+          <label>Minimum match minutes<input name="minimumMinutes" type="number" min="0" max="180" step="any" required></label>
+          <label>Minimum players per team<input name="minimumTeamSize" type="number" min="1" max="20" step="1" required><small>1 includes duels and FFA. 3 requires teams of at least three.</small></label>
+          <label class="rating-switch"><input name="equalTeams" type="checkbox">Require equal team sizes</label>
+        </fieldset>
+        <fieldset class="rating-section"><legend>New-player boost</legend>
+          <label>New-player multiplier<input name="multiplier" type="number" min="1" max="10" step="any" required><small>Default ×1 leaves rating changes unboosted.</small></label>
+          <label>Multiplier decreases over games<input name="multiplierGames" type="number" min="0" max="10000" step="1" required><small>The boost fades over rated games. Set 0 to disable it.</small></label>
+          <p>These values affect only your browser's preview. Published wins, losses and draws stay unchanged.</p>
+        </fieldset>
+      </div>
+      <div class="rating-actions"><button type="submit">Recalculate</button><button type="button" class="rating-defaults">Load site defaults</button><button type="button" class="rating-reset">Reset to published</button></div>
+      <p class="rating-help">Settings are remembered on this device. Previews use the selected category's published matches and visible player identities. Hidden players, quit-time and power-won data are unavailable, so neither preset guarantees an exact match to official ratings or Bohan's website. Crashed and cheated matches are always excluded.</p>
       <p class="rating-feedback" role="status" aria-live="polite"></p>
     </form>`;
   host.prepend(panel);
@@ -174,7 +204,7 @@ export function mountPersonalRatings(host, onChange, storage) {
       const field = form.elements.namedItem(key);
       if (key === "equalTeams") field.checked = value[key];
       else field.value = value[key];
-      field.disabled = selected === "published";
+      field.disabled = false;
     }
   }
   function showStatus() {
@@ -219,6 +249,10 @@ export function mountPersonalRatings(host, onChange, storage) {
       next.equalTeams = form.elements.namedItem("equalTeams").checked;
       apply(preset.value === "published" ? null : normalizeSettings(next));
     } catch (error) { feedback.textContent = error.message; }
+  });
+  panel.querySelector(".rating-defaults").addEventListener("click", () => {
+    showSettings(CURRENT_SETTINGS, "current");
+    feedback.textContent = "Site defaults loaded. You can edit any value, then press Recalculate.";
   });
   panel.querySelector(".rating-reset").addEventListener("click", () => {
     showSettings(CURRENT_SETTINGS, "published");

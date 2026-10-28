@@ -1,5 +1,5 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
-import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261026-1";
+import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261028-controls-1";
 
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 100;

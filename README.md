@@ -66,6 +66,22 @@ That script refreshes mirrored leaderboard logic, player-key mappings, snapshot 
 
 Running the static site locally does not start these backend or synchronization services. Features that use external APIs still depend on those services being available and allowing the request.
 
+## Personal rating previews
+
+Leaderboards, player comparison, and recent matches share a browser-local rating
+panel. Published ratings remain the initial view. The displayed site defaults
+are editable: starting Elo 1500, K 20, Elo scale 400, minimum 5 games, minimum
+3 match minutes, minimum 1 player per team, equal teams required, and no
+new-player boost (multiplier 1). Users can load these defaults, customize them,
+then select Recalculate. Reset to published restores the published leaderboard.
+
+The Elo scale controls how rating gaps affect expected results. Minimum players
+per team can restrict previews to larger team games. Saved preferences from older
+versions adopt the original defaults for these new controls. Preferences remain
+in the user's browser; match outcomes and server-published statistics are unchanged.
+The preview uses published match data and is not an exact reproduction of
+Bohan's leaderboard when required private identities or telemetry are missing.
+
 ## Hosting and contributions
 
 GitHub Pages publishes this repository from the main branch. Keep asset paths relative where possible and preserve filename casing.

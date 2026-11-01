@@ -382,3 +382,9 @@ test('news links render as accessible internal anchors and reject unsafe URLs',(
  assert.equal(link.id,'a');assert.equal(link.textContent,'Open Mapmaker');assert.equal(link.attributes.href,'mapmaker/');
  for(const href of ['javascript:alert(1)','https://other.test/','//other.test/','../private/','mapmaker/\" onclick=bad'])assert.throws(()=>normalizeArchive({schemaVersion:1,entries:[{...NEWS[0],link:{label:'Open',href}}]}));
 });
+
+test('Mapmaker news keeps its original post and link, with a responsive image',()=>{
+ const post=NEWS.find(entry=>entry.id==='2026-11-01-mapmaker-performance');assert.equal(NEWS.filter(entry=>entry.id===post.id).length,1);assert.equal(post.date,'2026-11-01');assert.equal(post.link.href,'mapmaker/');
+ const f=browserFixture();const image=f.elements.siteNewsList.children[0].children.find(node=>node.id==='img');assert.equal(image.attributes.src,post.image.src);assert.equal(image.attributes.alt,post.image.alt);assert.equal(image.attributes.width,'421');assert.equal(image.attributes.height,'234');assert.ok(fs.existsSync(require('node:path').resolve(__dirname,'..',post.image.src)));
+ for(const src of ['https://other.test/image.png','../private.png','news/images/../secret.png','javascript:alert(1)'])assert.throws(()=>normalizeArchive({schemaVersion:1,entries:[{...post,image:{...post.image,src}}]}));
+});

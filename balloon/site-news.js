@@ -23,7 +23,16 @@
           || !/^(?:[a-z0-9_-]+\/)+(?:[a-z0-9_-]+\.html)?$/i.test(entry.link.href)) throw new Error('Invalid news link.');
         link = { label: entry.link.label, href: entry.link.href };
       }
-      return { id: entry.id, date: entry.date, category: entry.category, title: entry.title, text: entry.text, ...(link ? {link} : {}) };
+      let image;
+      if (entry.image != null) {
+        const value = entry.image;
+        if (typeof value.src !== 'string' || !/^news\/images\/[a-z0-9_-]+\.(?:png|jpg|webp)$/i.test(value.src)
+          || typeof value.alt !== 'string' || !value.alt.trim()
+          || !Number.isInteger(value.width) || value.width < 1 || value.width > 4096
+          || !Number.isInteger(value.height) || value.height < 1 || value.height > 4096) throw new Error('Invalid news image.');
+        image = { src: value.src, alt: value.alt, width: value.width, height: value.height };
+      }
+      return { id: entry.id, date: entry.date, category: entry.category, title: entry.title, text: entry.text, ...(link ? {link} : {}), ...(image ? {image} : {}) };
     }).sort((a, b) => b.date.localeCompare(a.date));
   }
   const NEWS = initialArchive ? normalizeArchive(initialArchive) : [];
@@ -90,6 +99,12 @@
       }
       heading.tabIndex = -1;
       meta.append(date, category); item.append(meta, heading, text);
+      if (entry.image) {
+        const image = doc.createElement('img'); image.className = 'site-news-image';
+        for (const [key, value] of Object.entries(entry.image)) image.setAttribute(key, String(value));
+        image.setAttribute('loading', 'lazy'); image.setAttribute('decoding', 'async');
+        item.append(image);
+      }
       return { item, heading };
     };
     const renderOlder = () => {

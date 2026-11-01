@@ -10,6 +10,12 @@
       "link": {
         "label": "Open Mapmaker",
         "href": "mapmaker/"
+      },
+      "image": {
+        "src": "news/images/mapmaker-quality-menu.png",
+        "alt": "Mapmaker toolbar showing FPS, High, Medium and Low quality options, and the Auto checkbox.",
+        "width": 421,
+        "height": 234
       }
     },
     {

@@ -121,3 +121,6 @@ body.site-news-open { overflow: hidden; }
   .site-news-settings { margin: 0 20px; }
 }
 @media (prefers-reduced-motion: reduce) { .news-balloon { will-change: auto; } }
+
+.site-news-entry .site-news-link { margin-left: .35em; color: #72e4ff; text-decoration: underline; text-underline-offset: 3px; }
+.site-news-entry .site-news-link:focus-visible { outline: 2px solid #72e4ff; outline-offset: 3px; }

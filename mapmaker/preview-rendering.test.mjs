@@ -1,0 +1,9 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {previewPixelRatio,replacePreviewRenderer,wantsAntialias} from './js/previewRendering.mjs';
+test('Low reduces pixel workload and antialiasing without altering other presets',()=>{assert.equal(previewPixelRatio('low',2),.5);assert.equal(previewPixelRatio('normal',2),1);assert.equal(previewPixelRatio('high',3),2);assert.equal(wantsAntialias('low'),false);assert.equal(wantsAntialias('high'),true);});
+test('quality transitions replace only renderer resources and reuse unchanged contexts',()=>{
+ const events=[];class Renderer{constructor(options){this.options=options;this.domElement={remove:()=>events.push('remove')};}setClearColor(){}getContext(){return {getContextAttributes:()=>({antialias:this.options.antialias})};}dispose(){events.push('dispose');}forceContextLoss(){events.push('release');}}
+ const container={appendChild:()=>events.push('append')},THREE={WebGLRenderer:Renderer};const high=replacePreviewRenderer(null,THREE,'high',container);assert.equal(replacePreviewRenderer(high,THREE,'normal',container),high);
+ const low=replacePreviewRenderer(high,THREE,'low',container);assert.notEqual(low,high);assert.equal(low.options.antialias,false);assert.deepEqual(events,['append','append','remove','dispose','release']);assert.equal(replacePreviewRenderer(low,THREE,'low',container),low);
+ const restored=replacePreviewRenderer(low,THREE,'high',container);assert.equal(restored.options.antialias,true);
+});
+test('failed context creation retains the existing working preview',()=>{const previous={getContext:()=>({getContextAttributes:()=>({antialias:true})})};const THREE={WebGLRenderer:class{constructor(){throw Error('Unavailable');}}};assert.equal(replacePreviewRenderer(previous,THREE,'low',{}),previous);});

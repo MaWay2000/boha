@@ -1,4 +1,6 @@
 import * as THREE from './three.module.js';
+import { previewPixelRatio, replacePreviewRenderer } from './previewRendering.mjs?v=20261101-light-low-4';
+import { mountPerformanceQuality, allowsModelAnimation, clampPreviewZoom } from './performanceQuality.mjs?v=20261101-static-models-3';
 import { drawLocalSavePreview } from './localSavePreview.js';
 import { metadataText, mapPlayerIndex, parseLegacyIni, readMapArchiveMetadata, readMapArchiveEntities } from './archiveImport.js';
 import { materializeScriptMap, normalizeMapScriptSource, readMapScriptSource, writeMapScriptSource, runMapScript, buildScriptMapFiles } from './scriptMapImport.js';
@@ -6778,6 +6780,7 @@ const MAX_LOCAL_SAVES = 8;
 let localAutosaveEnabled = true;
 let buildPreviewVisible = true;
 let tileGridVisible = false;
+let performanceQuality = null;
 let previewQuality = 'normal';
 let tileQuality = 'normal';
 let mapBrightness = 100;
@@ -6919,14 +6922,15 @@ function setTileGridVisible(visible, persist = true) {
 }
 
 function getPreviewQualityPixelRatio() {
-  if (previewQuality === 'low') return 0.75;
-  if (previewQuality === 'high') return Math.min(window.devicePixelRatio || 1, 2);
-  return 1;
+  return previewPixelRatio(previewQuality, window.devicePixelRatio);
 }
 
 function applyPreviewQuality() {
   if (!renderer || !threeContainer) return;
+  renderer = replacePreviewRenderer(renderer, THREE, previewQuality, threeContainer);
   renderer.setPixelRatio(getPreviewQualityPixelRatio());
+  renderer.domElement.dataset.renderScale = String(getPreviewQualityPixelRatio());
+  renderer.domElement.dataset.antialias = String(renderer.getContext().getContextAttributes()?.antialias);
   renderer.setSize(threeContainer.offsetWidth, threeContainer.offsetHeight);
 }
 
@@ -6935,6 +6939,7 @@ function setPreviewQuality(value, persist = true) {
   if (previewQualitySelect) previewQualitySelect.value = previewQuality;
   if (persist) safeLocalStorageSet(UI_PREVIEW_QUALITY_KEY, previewQuality);
   applyPreviewQuality();
+  performanceQuality?.sync();
 }
 
 const TERRAIN_TILE_QUALITY = {
@@ -6952,6 +6957,7 @@ function setTileQuality(value, persist = true) {
   if (tileQualitySelect) tileQualitySelect.value = tileQuality;
   if (persist) safeLocalStorageSet(UI_TILE_QUALITY_KEY, tileQuality);
   if (persist) requestTerrainRedraw();
+  performanceQuality?.sync();
 }
 
 function clampMapBrightness(value) {
@@ -7012,6 +7018,10 @@ function resetSettingsToDefaults() {
 }
 
 function initOverlayVisibilitySettings() {
+  if (!performanceQuality && threeContainer) performanceQuality = mountPerformanceQuality(window, threeContainer, {
+    getQuality: () => previewQuality === tileQuality ? previewQuality : 'custom',
+    setQuality: value => { setPreviewQuality(value); setTileQuality(value); }
+  });
   setMinimapVisible(safeLocalStorageGet(UI_MINIMAP_VISIBLE_KEY) !== '0', false);
   setCompassVisible(safeLocalStorageGet(UI_COMPASS_VISIBLE_KEY) !== '0', false);
   setBuildPreviewVisible(safeLocalStorageGet(UI_BUILD_PREVIEW_VISIBLE_KEY) !== '0', false);
@@ -10695,7 +10705,7 @@ const initDom = () => {
     droidPreviewCamera.lookAt(0, 0, 0);
     const renderDroidPreview = () => {
       if (droidPreviewRenderer && droidPreviewScene && droidPreviewCamera) {
-        updateDroidAnimations(droidPreviewScene, performance.now());
+        if (allowsModelAnimation(previewQuality)) updateDroidAnimations(droidPreviewScene, performance.now());
         droidPreviewRenderer.render(droidPreviewScene, droidPreviewCamera);
       }
       requestAnimationFrame(renderDroidPreview);
@@ -13140,7 +13150,7 @@ function drawMap3D() {
       }
     }
   } else {
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = replacePreviewRenderer(null, THREE, previewQuality, threeContainer);
     renderer.setClearColor(0x151e28);
     threeContainer.appendChild(renderer.domElement);
     scene = new THREE.Scene();
@@ -13184,7 +13194,7 @@ function drawMap3D() {
     });
     threeContainer.addEventListener('wheel', e => {
       cameraState.zoom *= (1 + e.deltaY * 0.0015 * zoomSpeedMultiplier);
-      cameraState.zoom = Math.max(0.01, Math.min(cameraState.zoom, 6));
+      cameraState.zoom = clampPreviewZoom(cameraState.zoom, previewQuality);
     });
   }
   applyPreviewQuality();
@@ -13330,7 +13340,9 @@ function updateCulling() {
     obj.visible = visible;
   });
 }
+  performanceQuality?.reset();
   function animate() {
+    cameraState.zoom = clampPreviewZoom(cameraState.zoom, previewQuality);
     let moveX = 0, moveZ = 0;
     const cameraMoveStep = cameraState.camMoveSpeed * cameraState.zoom * cameraSpeedMultiplier;
     if (cameraState.keys['w']) moveZ -= cameraMoveStep;
@@ -13367,8 +13379,9 @@ function updateCulling() {
       compassNeedle.setAttribute('transform', `rotate(${deg} 50 50)`);
     }
     updateCulling();
-    updateDroidAnimations(objectsGroup, performance.now());
+    if (allowsModelAnimation(previewQuality)) updateDroidAnimations(objectsGroup, performance.now());
     renderer.render(scene, camera);
+    performanceQuality?.frame(performance.now());
     animationId = requestAnimationFrame(animate);
   }
   animate();

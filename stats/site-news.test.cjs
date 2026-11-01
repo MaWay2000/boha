@@ -376,3 +376,9 @@ test('balloon is anchored to the top of the document and pauses while scrolled o
   assert.equal(f.frames.size, 1); assert.equal(button.dataset.flying, 'true');
   f.step(); f.step(); assert.notEqual(button.style.transform, original);
 });
+
+test('news links render as accessible internal anchors and reject unsafe URLs',()=>{
+ const f=browserFixture();const paragraph=f.elements.siteNewsList.children[0].children[2];const link=paragraph.children[0];
+ assert.equal(link.id,'a');assert.equal(link.textContent,'Open Mapmaker');assert.equal(link.attributes.href,'mapmaker/');
+ for(const href of ['javascript:alert(1)','https://other.test/','//other.test/','../private/','mapmaker/\" onclick=bad'])assert.throws(()=>normalizeArchive({schemaVersion:1,entries:[{...NEWS[0],link:{label:'Open',href}}]}));
+});

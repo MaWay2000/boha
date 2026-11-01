@@ -17,7 +17,13 @@
         || new Date(entry.date + "T12:00:00Z").toISOString().slice(0, 10) !== entry.date || ids.has(entry.id))
         throw new Error("Invalid news date or duplicate record ID.");
       ids.add(entry.id);
-      return { id: entry.id, date: entry.date, category: entry.category, title: entry.title, text: entry.text };
+      let link;
+      if (entry.link != null) {
+        if (typeof entry.link.label !== 'string' || !entry.link.label.trim() || typeof entry.link.href !== 'string'
+          || !/^(?:[a-z0-9_-]+\/)+(?:[a-z0-9_-]+\.html)?$/i.test(entry.link.href)) throw new Error('Invalid news link.');
+        link = { label: entry.link.label, href: entry.link.href };
+      }
+      return { id: entry.id, date: entry.date, category: entry.category, title: entry.title, text: entry.text, ...(link ? {link} : {}) };
     }).sort((a, b) => b.date.localeCompare(a.date));
   }
   const NEWS = initialArchive ? normalizeArchive(initialArchive) : [];
@@ -77,6 +83,11 @@
       const category = doc.createElement("span"); category.className = "site-news-category"; category.textContent = entry.category;
       const heading = doc.createElement("h3"); heading.textContent = entry.title;
       const text = doc.createElement("p"); text.textContent = entry.text;
+      if (entry.link) {
+        const link = doc.createElement('a'); link.className = 'site-news-link';
+        link.textContent = entry.link.label; link.setAttribute('href', entry.link.href);
+        text.append(link);
+      }
       heading.tabIndex = -1;
       meta.append(date, category); item.append(meta, heading, text);
       return { item, heading };

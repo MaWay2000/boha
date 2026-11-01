@@ -2,6 +2,17 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "2026-11-01-mapmaker-performance",
+      "date": "2026-11-01",
+      "category": "Mapmaker",
+      "title": "Lighter mapmaking for older PCs",
+      "text": "Mapmaker now shows FPS and graphics quality in the top-right toolbar. Auto can lower quality when FPS stays low. Low uses 50% rendering resolution, turns off anti-aliasing and limits zoom-out. Low and Medium keep full 3D models still; High enables model animations. These settings affect the preview only—your map objects and exports stay unchanged.",
+      "link": {
+        "label": "Open Mapmaker",
+        "href": "mapmaker/"
+      }
+    },
+    {
       "id": "2026-10-24-target-practice",
       "date": "2026-10-24",
       "category": "Mini-game",

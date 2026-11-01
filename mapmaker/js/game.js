@@ -1,12 +1,13 @@
 import * as THREE from './three.module.js';
+import { mapExportOwner } from './mapOwnership.mjs?v=20261101-scav-owner-1';
 import { previewPixelRatio, replacePreviewRenderer } from './previewRendering.mjs?v=20261101-light-low-4';
 import { mountPerformanceQuality, allowsModelAnimation, clampPreviewZoom } from './performanceQuality.mjs?v=20261101-static-models-3';
 import { drawLocalSavePreview } from './localSavePreview.js';
 import { metadataText, mapPlayerIndex, parseLegacyIni, readMapArchiveMetadata, readMapArchiveEntities } from './archiveImport.js';
-import { materializeScriptMap, normalizeMapScriptSource, readMapScriptSource, writeMapScriptSource, runMapScript, buildScriptMapFiles } from './scriptMapImport.js';
+import { materializeScriptMap, normalizeMapScriptSource, readMapScriptSource, writeMapScriptSource, runMapScript, buildScriptMapFiles } from './scriptMapImport.js?v=20261101-scav-owner-1';
 import { mountScriptEditor } from './scriptEditor.js';
 import { mountScriptPanelResize } from './scriptPanelResize.js';
-import { mountMapGenerator } from './mapGeneratorUI.js';
+import { mountMapGenerator } from './mapGeneratorUI.js?v=20261101-scav-owner-1';
 import { showSaveInfoDialog, showSaveLicenseHelp } from './saveInfoDialogs.js';
 import { getNextMapVersion, writeMapVersion } from './mapVersion.js';
 
@@ -8458,7 +8459,7 @@ function getDroidExportEntry(group) {
   out.rotation = [0, degreesToWzAngle(getDroidRotationDegrees(group)), 0];
   out.startpos = getDroidPlayer(group);
   delete out.rotDeg;
-  return out;
+  return mapExportOwner(out, getDroidPlayer(group));
 }
 
 function ensureUniqueEntryIds(entries, assignMissing = false) {
@@ -8601,12 +8602,11 @@ function getStructureExportEntry(group, style, id) {
     base.rotation = degreesToWzAngle(getStructureRotationDegrees(group));
   }
   const player = getStructurePlayer(group);
-  if (base.player !== undefined) base.player = player === 10 ? 'scavenger' : player;
-  else base.startpos = player;
+
   const moduleCount = getStructureModuleCount(group);
   if (moduleCount > 0) base.modules = moduleCount;
   else delete base.modules;
-  return base;
+  return mapExportOwner(base, player);
 }
 
 function getFeatureExportEntry(group, id) {

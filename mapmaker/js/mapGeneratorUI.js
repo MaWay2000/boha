@@ -1,4 +1,4 @@
-import {generatorDefaults,generateMap} from './mapGenerator.js';
+import {generatorDefaults,generateMap} from './mapGenerator.js?v=20261101-scav-owner-1';
 import {createLiveMapGeneration} from './liveMapGeneration.js';
 import {getTileCount} from './tileset.js';
 

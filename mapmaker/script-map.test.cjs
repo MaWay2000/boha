@@ -84,7 +84,7 @@ const vm = require('node:vm');
     '[{name:"OilResource",position:[64,64],direction:8192}]);');
   const files = scripts.buildScriptMapFiles(fixture,'game.js').files;
   assert.equal(JSON.parse(files.find(([n])=>n==='struct.json')[1])[0].rotation,90);
-  assert.equal(JSON.parse(files.find(([n])=>n==='struct.json')[1])[0].player,10);
+  assert.equal(JSON.parse(files.find(([n])=>n==='struct.json')[1])[0].player,'scavenger');
   const droid = JSON.parse(files.find(([n])=>n==='droid.json')[1])[0];
   assert.equal(droid.template,'ConstructionDroid');assert.equal(droid.rotation[1],32768);
   const decoded = await loadMapUnified(new File([files[0][1]],'game.map'));

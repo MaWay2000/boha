@@ -1,3 +1,4 @@
+import {mapExportOwner} from './mapOwnership.mjs?v=20261101-scav-owner-1';
 // Script-generated WZ maps use gameRand / setMapData instead of game.map.
 export function validateScriptMapData(data) {
   const {width, height, textures, heights} = data || {};
@@ -210,7 +211,7 @@ export function buildScriptMapFiles(data, scriptName) {
     result.rotation = kind === 'droid' ? [0, entry.direction, 0] : entry.direction * 360 / 65536;
     if (kind === 'droid') result.template = entry.name;
     delete result.direction;
-    return result;
+    return kind === 'feature' ? result : mapExportOwner(result, entry.player);
   };
   return {
     mapName:base + 'game.map',

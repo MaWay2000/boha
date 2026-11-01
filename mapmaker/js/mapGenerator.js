@@ -1,3 +1,4 @@
+import {mapExportOwner} from './mapOwnership.mjs?v=20261101-scav-owner-1';
 // Pure, deterministic generation: no DOM, renderer, network or editor mutations.
 import {getTileCount} from './tileset.js';
 export const generatorDefaults = {
@@ -157,7 +158,7 @@ export function generateMap(input={},catalog={},previous=null) {
       clearDisk({x:x+sx/2,y:y+sy/2},Math.max(sx,sy)); occupy(x,y,sx,sy);
       const entry={id:nextId++,name:id,position:[(x+sx/2)*128,(y+sy/2)*128,o.minHeight*2],rotation:[facing(p),0,0],startpos:owner};
       if(o.modules&&['A0LightFactory','A0VTolFactory1','A0ResearchFacility','A0PowerGenerator'].includes(id))entry.modules=['A0LightFactory','A0VTolFactory1'].includes(id)?o.modules:1;
-      snapshot.structures.push(entry);return true;
+      snapshot.structures.push(mapExportOwner(entry, owner));return true;
     } warnings.push(`No room for ${id} at player ${owner}.`);return false;
   };
   const putDroid=(p,owner,role,index)=>{
@@ -170,7 +171,8 @@ export function generateMap(input={},catalog={},previous=null) {
       if(truck){if(o.truckBody==='Body1REC'&&o.truckPropulsion==='wheeled01')d.template='ConstructionDroid';d.construct='Spade1Mk1';}
       else d.weapons=[role==='support'?'SensorTurret1Mk1':cyborg?'CyborgChaingun':o.tankWeapon];
       if(role==='support'){delete d.weapons;d.sensor='SensorTurret1Mk1';}
-      snapshot.droids.push(d);return true;
+      if(owner===10)Object.assign(d,{name:'Scavenger',template:'BaBaPeople',body:'B1BaBaPerson01',propulsion:'BaBaLegs',weapons:['BaBaMG']});
+      snapshot.droids.push(mapExportOwner(d, owner));return true;
     }warnings.push(`No room for ${role} at player ${owner}.`);return false;
   };
   const baseLists={trucks:[],small:['A0CommandCentre','A0LightFactory','A0ResearchFacility','A0PowerGenerator'],

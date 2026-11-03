@@ -4,12 +4,13 @@ export function getScriptLineNumbers(source) {
   return Array.from({length:String(source).split('\n').length}, (_, index) => index + 1).join('\n');
 }
 
-export function mountScriptEditor(panel, {onChange, onRun}) {
+export function mountScriptEditor(panel, {onChange, onRun, onEnable}) {
   if (!panel) return null;
   panel.innerHTML = '<div class="panel-box">' +
     '<div class="script-header"><span class="script-title">Map script:</span>' +
     '<span data-script-filename class="script-filename"></span>' +
-    '<button type="button" class="action-btn" data-script-find-open title="Find (Ctrl+F) / Replace (Ctrl+H)">Find / replace</button></div>' +
+    '<button type="button" class="action-btn" data-script-find-open title="Find (Ctrl+F) / Replace (Ctrl+H)">Find / replace</button>' +
+    '<label class="script-enable"><input type="checkbox" data-script-enable>Enable Script</label></div>' +
     '<div class="script-search" data-script-search hidden role="search" aria-label="Find in map script">' +
     '<div class="script-search-row">' +
     '<label for="mapScriptFind">Find</label><input id="mapScriptFind" type="text" spellcheck="false" autocomplete="off" aria-label="Find in script">' +
@@ -53,6 +54,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
   const toggleReplace = panel.querySelector('[data-script-replace-toggle]');
   const open = panel.querySelector('[data-script-find-open]');
   const close = panel.querySelector('[data-script-find-close]');
+  const enable = panel.querySelector('[data-script-enable]');
   let script = null, busy = false, matches = [], activeMatch = -1;
   search.hidden = true;
   replaceRow.hidden = true;
@@ -74,8 +76,13 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     lineNumbers.textContent = getScriptLineNumbers(editor.value);
     syncScroll();
   }
+  function isEnabled() {
+    return !!script && script.enabled !== false;
+  }
   function updateControls() {
-    const disabled = busy || !script;
+    const disabled = busy || !isEnabled();
+    enable.checked = isEnabled();
+    enable.disabled = busy;
     editor.disabled = disabled;
     run.disabled = disabled;
     run.textContent = busy ? 'Running…' : 'Run script';
@@ -114,7 +121,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     selectActiveMatch();
   }
   function openSearch(withReplace) {
-    if (!script || busy) return;
+    if (!isEnabled() || busy) return;
     const selected = editor.value.slice(editor.selectionStart, editor.selectionEnd);
     if (selected && !/[\r\n]/.test(selected)) find.value = selected;
     search.hidden = false;
@@ -135,7 +142,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     status.classList.toggle('script-error', error);
   }
   function commitSourceChange() {
-    if (!script || busy) return;
+    if (!isEnabled() || busy) return;
     if (script.source !== editor.value) {
       script = {...script, source:editor.value, pendingChanges:true};
       onChange(script.source);
@@ -155,7 +162,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     if (script.source !== editor.value) commitSourceChange();
   }
   function replaceCurrent() {
-    if (busy || !script || !matches.length) return;
+    if (busy || !isEnabled() || !matches.length) return;
     const match = matches[activeMatch];
     const text = replacement.value;
     insertReplacement(match.start, match.end, text);
@@ -165,7 +172,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     showStatus('Replaced 1 match. Run script to update the map.');
   }
   function replaceEveryMatch() {
-    if (busy || !script || !matches.length) return;
+    if (busy || !isEnabled() || !matches.length) return;
     const total = matches.length;
     const text = replaceScriptMatches(editor.value, matches, replacement.value);
     insertReplacement(0, editor.value.length, text);
@@ -177,12 +184,20 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
 
   editor.addEventListener('scroll', syncScroll);
   editor.addEventListener('input', commitSourceChange);
+  enable.addEventListener('change', () => {
+    if (busy) return;
+    onEnable?.(enable.checked);
+  });
   if (typeof ResizeObserver !== 'undefined') {
     const observer = new ResizeObserver(syncScroll);
     observer.observe(search);
     observer.observe(editor);
   }
-  open.addEventListener('click', () => openSearch(true));
+  open.addEventListener('click', () => {
+    if (!isEnabled() || busy) return;
+    if (search.hidden) openSearch(true);
+    else closeSearch();
+  });
   close.addEventListener('click', closeSearch);
   previous.addEventListener('click', () => navigate(-1));
   next.addEventListener('click', () => navigate(1));
@@ -199,7 +214,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
   // Scope shortcuts to this editor panel, never the browser/map/other tabs.
   panel.addEventListener('keydown', event => {
     const key = event.key.toLowerCase();
-    if (!busy && script && !event.altKey && (event.ctrlKey || event.metaKey) && (key === 'f' || key === 'h')) {
+    if (!busy && isEnabled() && !event.altKey && (event.ctrlKey || event.metaKey) && (key === 'f' || key === 'h')) {
       event.preventDefault();
       event.stopPropagation();
       openSearch(key === 'h');
@@ -218,7 +233,7 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     }
   });
   run.addEventListener('click', async () => {
-    if (!script || busy) return;
+    if (!isEnabled() || busy) return;
     busy = true;
     updateControls();
     showStatus('Generating map…');
@@ -236,11 +251,12 @@ export function mountScriptEditor(panel, {onChange, onRun}) {
     setScript(value) {
       script = value ? {...value} : null;
       editor.value = script?.source || '';
-      if (!script) search.hidden = true;
+      if (!isEnabled()) search.hidden = true;
       refreshSearch(0);
       filename.textContent = script?.filename || 'No script in this map.';
-      editor.placeholder = script ? '' : 'Load a script-generated map to view and edit its game.js.';
-      showStatus(script?.pendingChanges ? 'Script edited — Run script to update the map.' : '');
+      editor.placeholder = script ? '' : 'Enable Script to create a game.js, or load a script-generated map.';
+      showStatus(script?.enabled === false ? 'Script disabled. Your source is kept.' :
+        script?.pendingChanges ? 'Script edited — Run script to update the map.' : '');
       updateControls();
     }
   };

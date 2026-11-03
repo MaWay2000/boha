@@ -1,16 +1,93 @@
-import {generatorDefaults,generateMap} from './mapGenerator.js?v=20261101-scav-owner-1';
+import {generatorDefaults,generateMap,startingBuildingOptions,getStartingBuildingCounts} from './mapGenerator.js?v=20261101-scav-owner-1';
 import {createLiveMapGeneration} from './liveMapGeneration.js';
 import {getTileCount} from './tileset.js';
 
+const fieldHelp={
+  "width": "Map width in terrain tiles, from left to right. More tiles give players more space.",
+  "height": "Map height in terrain tiles, from top to bottom.",
+  "players": "Number of player starting positions to create. Each player receives the same requested starting buildings, units and base oil.",
+  "tileset": "Visual terrain set: Arizona desert, Urban city terrain or snowy Rockies. Available ground textures follow this choice.",
+  "preset": "A starting point for generator settings. Selecting a preset changes some options; you can adjust them before clicking Generate or Update map.",
+  "layout": "Arrangement of player starts. Team groups puts teammates together; two groups use the top and bottom edges. Corners is intended for four players.",
+  "teams": "Number of groups for starting positions. With 4 players and 2 teams, two players start at the top and two at the bottom. This only groups bases; choose alliances separately in Warzone before the game.",
+  "edge": "Distance in tiles between starting positions and map edges. Larger values move bases farther into the map.",
+  "baseRadius": "Radius in tiles of the flattened area around each starting position. Larger bases need more space between players.",
+  "centreRadius": "Radius in tiles of the flattened central arena. Set to 0 to disable this central clearing.",
+  "routes": "Requested connections from each base. Extra routes connect bases to other starting positions when land routes are enabled.",
+  "routeWidth": "Width in tiles of the land corridors and ramps connecting bases. Wider routes leave more room for units to pass.",
+  "connected": "Carve land routes from starting positions and check that every player can reach the others by land.",
+  "symmetry": "Mirror the generated terrain vertically, horizontally, on both axes, or by a 180-degree rotation. Starting positions are controlled separately by Starting layout.",
+  "terrain": "Overall terrain shape: flat land, rolling hills, mountains, stepped plateaus or a canyon.",
+  "minHeight": "Lower height used to generate the terrain and flatten base areas. If it exceeds Maximum height, the two values are swapped.",
+  "maxHeight": "Upper height used for terrain generation. Larger differences from Minimum height create stronger elevation changes.",
+  "frequency": "Frequency of terrain waves. Higher values create more closely spaced hills and valleys.",
+  "smoothness": "Number of smoothing passes over the height map. More passes soften abrupt changes in elevation.",
+  "cliffs": "Allow high, steep terrain and cliff textures where supported. These areas can restrict movement.",
+  "border": "Width in tiles of the raised mountain border around the map. Set to 0 to disable it.",
+  "water": "Approximate target amount of water. The final coverage depends on water shape, terrain and the land routes cleared for players.",
+  "waterStyle": "Pattern used to place water: scattered lakes, a river, a coast or water surrounding islands.",
+  "riverWidth": "Width in tiles of the generated river. Used when Water shape is River.",
+  "crossings": "Requested crossings through the river so units can move between its sides.",
+  "roads": "Draw road textures along base connections. Requires land routes and a road texture in the selected tileset.",
+  "roadWidth": "Width in tiles of road textures along the connecting routes.",
+  "groundTile": "Terrain texture ID used as the reference for ground generation. IDs and available textures depend on the tileset.",
+  "textureVariety": "Number of compatible ground textures to choose from. More variety adds visual detail; incompatible terrain types are filtered out.",
+  "transitions": "Use supported coast-transition textures to blend water edges. Results depend on the tileset transition profiles.",
+  "base": "Starting-building preset for each player. Trucks only includes HQ. Small uses 33%, Medium 66%, and Full 100% of standard counts, rounded to whole buildings. Presets exclude satellite uplink and laser satellite buildings. Counts below remain editable.",
+  "trucks": "Starting construction trucks for each player, from 1 to 15. The default is 2. Placement still needs enough room around the base.",
+  "modules": "Starting upgrade modules: up to two for vehicle and VTOL factories, and at most one for research labs and power generators.",
+  "orientation": "Initial facing of generated buildings and units: North or toward the map centre.",
+  "defenses": "Number of extra defensive structures requested for each player. Choose their building ID below.",
+  "defenseType": "Internal Warzone structure ID to use for the extra defenses, such as GuardTower1. It must exist in the structure catalog.",
+  "truckBody": "Internal vehicle body ID for starting trucks. The selected body must exist in the component catalog.",
+  "truckPropulsion": "Internal propulsion ID for starting trucks, such as wheeled01. It must exist in the component catalog.",
+  "tanks": "Number of starting weapon vehicles requested for each player. Their weapon is selected by Tank weapon ID.",
+  "tankWeapon": "Internal weapon ID for starting tanks, such as MG1Mk1. It must exist in the weapon catalog.",
+  "support": "Number of starting sensor vehicles requested for each player. These use a sensor turret instead of a weapon.",
+  "cyborgs": "Number of starting armed cyborgs requested for each player.",
+  "baseOil": "Oil wells requested in the oil cluster near each player base, up to 40. Dense clusters may not fit; check placement warnings.",
+  "oilDistance": "Distance in tiles from each base toward the map centre to its base oil cluster.",
+  "expansions": "Number of additional oil clusters requested along each player’s route toward the centre.",
+  "expansionOil": "Number of oil wells requested in each expansion cluster.",
+  "neutralOil": "Number of contested oil wells requested around the map centre, shared between all players.",
+  "oilSpacing": "Minimum spacing in tiles between generated oil wells. Larger spacing spreads clusters out and may reduce how many wells fit.",
+  "derricks": "Place player-owned oil derricks on their generated oil wells, so those resources start with extractors already built.",
+  "drums": "Number of neutral oil drums requested around the map. Collecting them provides a one-time power bonus in the game.",
+  "artifacts": "Number of neutral collectible artifacts requested. Placement requires a supported artifact model in the catalog.",
+  "scenery": "Amount of decorative scenery requested. Higher values place more objects; bases and routes are kept clear where possible.",
+  "sceneryStyle": "Type of scenery to choose from: rocks, trees, ruins or city buildings. Available models depend on the catalog.",
+  "symmetricScenery": "Mirror decorative scenery using the Terrain symmetry setting.",
+  "scavengers": "Add scavenger camps and units, owned by the scavenger player. Camps too close to player bases can be skipped.",
+  "scavCamps": "Number of scavenger camps requested when Scavenger camps is enabled.",
+  "scavUnits": "Number of units requested at each scavenger camp.",
+  "regenerate": "Choose which generated layers to replace: the whole map, terrain, bases and units, resources, or scenery. Other layers are retained.",
+  "lockTerrain": "Keep the current terrain instead of regenerating it. Retained layers require matching map dimensions and tileset.",
+  "lockBases": "Keep existing player buildings and units instead of replacing them.",
+  "lockResources": "Keep existing resource objects instead of replacing them.",
+  "lockScenery": "Keep existing decorative scenery instead of replacing it."
+};
+for(const [key,label] of startingBuildingOptions) fieldHelp[key]='Number of '+label.toLowerCase()+' requested for each player. Set to 0 to omit this building. This controls initial placement, not how many can be built during the game. If there is not enough room, the generator reports a warning.';
+const sectionHelp={
+  "Map": "Choose map dimensions, player count, tileset and a preset. Settings are applied only when you click Generate or Update map.",
+  "Layout": "Arrange player starts, group them into teams, and control the space and routes between bases.",
+  "Terrain": "Control terrain symmetry, height, hills, smoothing and the mountain border.",
+  "Water and textures": "Choose water patterns, roads, ground textures and coastline blending.",
+  "Starting bases": "Choose a building preset and adjust the starting buildings and construction trucks for each player. These are placement counts, not game build limits.",
+  "Starting units": "Configure additional starting tanks, sensor vehicles and cyborgs, plus truck components.",
+  "Oil and resources": "Control base oil, expansion clusters, contested resources and collectible objects.",
+  "Scenery and scavengers": "Add decorative objects and optional scavenger camps.",
+  "Keep / regenerate": "Choose which parts of the current map to replace and which layers to preserve."
+};
+
 // Every field is read by the pure generation engine; presets are editable starting points.
 const groups=[
- ['Map',['width|Width (tiles)|number|48|255','height|Height (tiles)|number|48|255','players|Players|number|2|10','tileset|Tileset|select|0:Arizona,1:Urban,2:Rockies','seed|Seed|text','preset|Preset|select|arena:Open arena,ntw:NTW-style,hills:Hills,canyon:Canyon,islands:Islands,city:City']],
- ['Layout',['symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','layout|Starting layout|select|corners:Corners (4 players),circle:Circle,edges:Edges,opposite:Opposite edges,teams:Team groups','teams|Team groups (layout only)|number|1|5','edge|Base edge distance|number|8|64','baseRadius|Flat base radius|number|7|24','centreRadius|Central arena radius|number|0|30','routes|Routes per player|number|1|4','routeWidth|Route / ramp width|number|3|14','connected|Require land routes|checkbox']],
- ['Terrain',['terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','border|Mountain border width|number|0|8']],
+ ['Map',['width|Width (tiles)|number|48|255','height|Height (tiles)|number|48|255','players|Players|number|2|10','tileset|Tileset|select|0:Arizona,1:Urban,2:Rockies','preset|Preset|select|arena:Open arena,ntw:NTW-style,hills:Hills,canyon:Canyon,islands:Islands,city:City']],
+ ['Layout',['layout|Starting layout|select|corners:Corners (4 players),circle:Circle,edges:Edges,opposite:Opposite edges,teams:Team groups','teams|Total teams|number|1|5','edge|Base edge distance|number|8|64','baseRadius|Flat base radius|number|7|24','centreRadius|Central arena radius|number|0|30','routes|Routes|number|1|4','routeWidth|Route / ramp width|number|3|14','connected|Require land routes|checkbox']],
+ ['Terrain',['symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','border|Mountain border width|number|0|8']],
  ['Water and textures',['water|Water amount (%) target|number|0|60','waterStyle|Water shape|select|lakes:Lakes,river:River,coast:Coast,islands:Islands','riverWidth|River width|number|2|16','crossings|River crossings|number|1|6','roads|Connect bases with roads|checkbox','roadWidth|Road width|number|1|5','groundTile|Ground tile ID|number|0|77','textureVariety|Ground texture variety|number|1|'+getTileCount(generatorDefaults.tileset),'transitions|Blend terrain edges|checkbox']],
- ['Starting bases',['base|Starting base|select|trucks:Trucks only,small:Small base,advanced:Advanced base,custom:Custom building list','trucks|Trucks per player|number|1|8','baseBuildings|Custom building IDs (comma separated)|text','modules|Factory modules (other buildings max 1)|number|0|2','orientation|Building / unit facing|select|centre:Face centre,north:North','defenses|Defenses per player|number|0|12','defenseType|Defense building ID|text']],
- ['Starting units',['truckBody|Truck body ID|text','truckPropulsion|Truck propulsion ID|text','tanks|Tanks per player|number|0|12','tankWeapon|Tank weapon ID|text','support|Sensor units per player|number|0|4','cyborgs|Cyborgs per player|number|0|8']],
- ['Oil and resources',['baseOil|Base oil per player|number|0|16','oilDistance|Base oil distance|number|6|24','expansions|Expansion clusters per player|number|0|6','expansionOil|Oil per expansion cluster|number|1|8','neutralOil|Contested centre oil|number|0|40','oilSpacing|Minimum oil spacing|number|2|8','derricks|Prebuild owned oil derricks|checkbox','drums|Neutral oil drums|number|0|20','artifacts|Neutral artifacts|number|0|12']],
+ ['Starting bases',['base|Starting base|select|trucks:Trucks only,small:Small base (33%),medium:Medium base (66%),full:Full base (100%)','trucks|Trucks|number|1|15',...startingBuildingOptions.map(([key,label,,max])=>`${key}|${label}|number|0|${max}`),'modules|Factory modules (other buildings max 1)|number|0|2','orientation|Building / unit facing|select|centre:Face centre,north:North','defenses|Defenses|number|0|12','defenseType|Defense building ID|text']],
+ ['Starting units',['truckBody|Truck body ID|text','truckPropulsion|Truck propulsion ID|text','tanks|Tanks|number|0|12','tankWeapon|Tank weapon ID|text','support|Sensor units|number|0|4','cyborgs|Cyborgs|number|0|8']],
+ ['Oil and resources',['baseOil|Base oil|number|0|40','oilDistance|Base oil distance|number|6|24','expansions|Expansion clusters|number|0|6','expansionOil|Oil per expansion cluster|number|1|8','neutralOil|Contested centre oil|number|0|40','oilSpacing|Minimum oil spacing|number|2|8','derricks|Prebuild owned oil derricks|checkbox','drums|Neutral oil drums|number|0|20','artifacts|Neutral artifacts|number|0|12']],
  ['Scenery and scavengers',['scenery|Scenery density|number|0|5','sceneryStyle|Scenery|select|rocks:Rocks,trees:Trees,ruins:Ruins / wrecks,city:City buildings','symmetricScenery|Mirror scenery|checkbox','scavengers|Scavenger camps|checkbox','scavCamps|Camp count|number|1|6','scavUnits|Units per camp|number|0|10']],
  ['Keep / regenerate',['regenerate|Regenerate|select|all:Whole map,terrain:Terrain only,bases:Bases and units only,resources:Resources only,scenery:Scenery only','lockTerrain|Lock terrain|checkbox','lockBases|Lock bases and units|checkbox','lockResources|Lock resources|checkbox','lockScenery|Lock scenery|checkbox']]
 ];
@@ -28,13 +105,13 @@ export function mountMapGenerator(host,bridge) {
   const box=document.createElement('div');box.className='panel-box generator-box';host.append(box);
   const heading=document.createElement('div');heading.className='show-hide-title';heading.textContent='Generate map';box.append(heading);
   const form=document.createElement('form');form.className='generator-form';box.append(form);
-  const inputs=new Map(),values=new Map(),maxLabels=new Map();
+  const inputs=new Map(),values=new Map(),maxLabels=new Map(),fieldLabels=new Map(),sectionLabels=new Map();
   for(const [title,fields] of groups){
     const details=document.createElement('details');details.open=title==='Map';
-    const summary=document.createElement('summary');summary.textContent=title;details.append(summary);
+    const summary=document.createElement('summary');summary.textContent=title;sectionLabels.set(title,summary);details.append(summary);
     for(const field of fields){const [key,label,type,min,max]=field.split('|');
       const wrapper=document.createElement('label');wrapper.className='generator-field';
-      const text=document.createElement('span');text.textContent=label;
+      const text=document.createElement('span');text.textContent=label;fieldLabels.set(key,text);
       const control=document.createElement(type==='select'?'select':'input');control.name=key;control.id='gen-'+key;
       if(type==='select')for(const choice of min.split(',')){const [value,name]=choice.split(':');const opt=document.createElement('option');opt.value=value;opt.textContent=name;control.append(opt);}
       else {control.type=type==='number'?'range':type;if(type==='number'){control.min=min;control.max=max;control.step='1';control.setAttribute('aria-label',label);}}
@@ -42,7 +119,7 @@ export function mountMapGenerator(host,bridge) {
       if(type==='number'){
         wrapper.classList.add('generator-range-field');
         const value=document.createElement('output');value.htmlFor=control.id;value.textContent=control.value;values.set(key,value);
-        const title=document.createElement('span');title.className='generator-range-title';title.title=label;title.append(text);
+        const title=document.createElement('span');title.className='generator-range-title';title.title='';title.append(text);
         const track=document.createElement('span');track.className='generator-range-track';
         const low=document.createElement('span');low.textContent=min;low.setAttribute('aria-hidden','true');
         const high=document.createElement('span');high.textContent=max;high.setAttribute('aria-hidden','true');
@@ -52,6 +129,29 @@ export function mountMapGenerator(host,bridge) {
       details.append(wrapper);inputs.set(key,control);
     }form.append(details);
   }
+  const attachHelp=(label,message,id,keyboardLabel=true)=>{
+    if(!message)throw new Error('Missing generator help: '+id);
+    label.classList.add('generator-help-label');if(keyboardLabel)label.tabIndex=0;
+    label.setAttribute('aria-describedby',id);
+    const popup=document.createElement('div');popup.id=id;popup.className='generator-tooltip';popup.hidden=true;popup.setAttribute('role','tooltip');popup.textContent=message;host.append(popup);
+    const hide=()=>{popup.hidden=true;};
+    const show=()=>{
+      const rect=label.getBoundingClientRect();
+      popup.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-336))+'px';popup.hidden=false;
+      popup.style.top=Math.max(8,Math.min(rect.bottom+10,window.innerHeight-popup.offsetHeight-8))+'px';
+    };
+    label.addEventListener('mouseenter',show);label.addEventListener('mouseleave',hide);
+    label.addEventListener('focus',show);label.addEventListener('blur',hide);
+    label.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});
+    host.addEventListener('scroll',hide,true);
+    return {show,hide};
+  };
+  for(const [key,label] of fieldLabels){
+    const help=attachHelp(label,fieldHelp[key],'generator-help-'+key);
+    inputs.get(key).setAttribute('aria-describedby','generator-help-'+key);
+    inputs.get(key).addEventListener('focus',help.show);inputs.get(key).addEventListener('blur',help.hide);
+  }
+  for(const [title,label] of sectionLabels)attachHelp(label,sectionHelp[title],'generator-help-section-'+title.toLowerCase().replace(/[^a-z]+/g,'-'),false);
   const report=document.createElement('div');report.className='generator-report';report.setAttribute('aria-live','polite');host.append(report);
   const syncValues=()=>{
     const variety=inputs.get('textureVariety'),max=getTileCount(inputs.get('tileset').value);
@@ -62,20 +162,35 @@ export function mountMapGenerator(host,bridge) {
   const setOptions=o=>{for(const [key,input] of inputs)if(key in o){if(input.type==='checkbox')input.checked=!!o[key];else input.value=o[key];}syncValues();};
   const options=()=>Object.fromEntries([...inputs].map(([k,input])=>[k,input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value]));
   const signature=()=>JSON.stringify(options());
-  let appliedOptions=options(),appliedSignature=signature(),submittedOptions=null,submittedSignature=null,updating=false;
-  const actions=document.createElement('div');actions.className='generator-update-actions';actions.hidden=true;host.append(actions);
-  const update=document.createElement('button');update.type='button';update.className='action-btn generator-update';update.id='generateUpdateMap';update.textContent='Update map';
-  const cancel=document.createElement('button');cancel.type='button';cancel.className='action-btn generator-cancel';cancel.textContent='×';cancel.setAttribute('aria-label','Cancel changes');cancel.title='Discard pending changes; keep current map';actions.append(update,cancel);
-  const syncButton=()=>{actions.hidden=signature()===appliedSignature&&!updating;update.disabled=updating;cancel.disabled=updating;update.textContent=updating?'Updating map…':'Update map';};
-  const status=message=>{report.textContent=message;report.classList.remove('generator-error');};
+  let appliedOptions=options(),appliedSignature=signature(),submittedOptions=null,submittedSignature=null,updating=false,hasGenerated=false;
+  const actions=document.createElement('div');actions.className='generator-update-actions';actions.hidden=false;host.append(actions);
+  const update=document.createElement('button');update.type='button';update.className='action-btn generator-update';update.id='generateUpdateMap';update.textContent='Generate map';
+  const cancel=document.createElement('button');cancel.hidden=true;cancel.type='button';cancel.className='action-btn generator-cancel';cancel.textContent='×';cancel.setAttribute('aria-label','Cancel changes');cancel.title='Discard pending changes; keep current map';actions.append(update,cancel);
+  const syncButton=()=>{actions.hidden=hasGenerated&&signature()===appliedSignature&&!updating;update.disabled=updating;cancel.disabled=updating;cancel.hidden=signature()===appliedSignature;update.textContent=updating?(hasGenerated?'Updating map…':'Generating map…'):(hasGenerated?'Update map':'Generate map');};
+  const markErrorFields=errors=>{
+    const keys=new Set();
+    const rules=[
+      [/bases are too close/,['width','height','players','baseRadius']],
+      [/current map dimensions and tileset|outside the map boundary/,['width','height','tileset']],
+      [/Unknown truck body/,['truckBody']],
+      [/Unknown truck propulsion/,['truckPropulsion']],
+      [/Unknown tank weapon/,['tankWeapon']],
+      [/traversable land route/,['minHeight','maxHeight','water','routeWidth']],
+      [/at least one starting truck/,['trucks','baseRadius']],
+      [/Building .* unavailable in catalog/,['base','defenseType']]
+    ];
+    for(const message of errors)for(const [pattern,fields] of rules)if(pattern.test(message))for(const key of fields)keys.add(key);
+    for(const [key,label] of fieldLabels){label.classList.toggle('generator-field-error',keys.has(key));inputs.get(key).setAttribute('aria-invalid',String(keys.has(key)));}
+  };
+  const status=message=>{report.textContent=message;report.classList.remove('generator-error');markErrorFields([]);};
   const fail=e=>{report.textContent=e.message||String(e);report.classList.add('generator-error');};
   const live=createLiveMapGeneration({bridge,generate:generateEditorMap,automatic:false,onStatus:status,onError:fail,onUndo:()=>{},onResult:(result,applied)=>{
-    if(applied){appliedSignature=submittedSignature;appliedOptions=submittedOptions;}
+    if(applied){hasGenerated=true;appliedSignature=submittedSignature;appliedOptions=submittedOptions;}
     const r=result.report;status(applied?`${r.structures} buildings · ${r.droids} units · ${r.totalOil} oil · updated on map`:`Map unchanged: ${r.errors[0]}`);
     if(applied&&r.warnings.length){const p=document.createElement('p');p.textContent=r.warnings[0];report.append(p);}
     if(r.errors.length||r.warnings.length){const details=document.createElement('details');const summary=document.createElement('summary');summary.textContent=`${r.errors.length} errors · ${r.warnings.length} warnings`;details.append(summary);
       for(const [prefix,items] of [['Error',r.errors],['Warning',r.warnings]])for(const message of items){const p=document.createElement('p');p.textContent=`${prefix}: ${message}`;details.append(p);}report.append(details);}
-    report.classList.toggle('generator-error',!!r.errors.length);
+    report.classList.toggle('generator-error',!!r.errors.length);markErrorFields(r.errors);
   }});
   const invalidate=()=>{
     syncValues();live.request(options());syncButton();
@@ -91,13 +206,15 @@ export function mountMapGenerator(host,bridge) {
     if(updating)return;
     live.cancel();setOptions(appliedOptions);syncButton();status('Changes cancelled. Current map unchanged.');
   });
+  inputs.get('base').addEventListener('change',()=>{setOptions(getStartingBuildingCounts(inputs.get('base').value));invalidate();});
   form.addEventListener('input',invalidate);form.addEventListener('change',invalidate);form.addEventListener('submit',e=>e.preventDefault());
   inputs.get('preset').addEventListener('change',()=>{
     const selected=inputs.get('preset').value;
-    const presets={arena:{terrain:'flat',water:0,roads:false},ntw:{terrain:'flat',water:0,baseOil:12,base:'advanced'},
+    const presets={arena:{terrain:'flat',water:0,roads:false},ntw:{terrain:'flat',water:0,baseOil:12,base:'full'},
       hills:{terrain:'hills',water:8},canyon:{terrain:'canyon',water:0,cliffs:true},
       islands:{terrain:'hills',water:45,waterStyle:'islands',connected:false},city:{terrain:'flat',water:0,tileset:1,sceneryStyle:'city',scenery:4}};
-    setOptions(presets[selected]||{});invalidate();
+    const settings=presets[selected]||{};
+    setOptions({...settings,...(settings.base?getStartingBuildingCounts(settings.base):{})});invalidate();
   });
-  status('Change options to enable Update map.');
+  status('Click Generate map to use these settings.');
 }

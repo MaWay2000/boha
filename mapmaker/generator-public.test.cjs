@@ -34,7 +34,7 @@ const vm = require('node:vm');
       this.tagName = tag; this.children = []; this.listeners = {}; this.attributes = {};
       this.value = ''; this.hidden = false; this.disabled = false; this.text = '';
       const names = new Set();
-      this.classList = {add:name => names.add(name), remove:name => names.delete(name),
+      this.classList = {contains:name => names.has(name), add:name => names.add(name), remove:name => names.delete(name),
         toggle:(name,on) => on ? names.add(name) : names.delete(name)};
     }
     append(...children) { this.children.push(...children); }
@@ -49,6 +49,53 @@ const vm = require('node:vm');
   const oldDocument = globalThis.document;
   globalThis.document = {createElement:tag => new Element(tag)};
   try {
+    const initialHost=new Element('div');
+    let initialCurrent=generateMap({},catalog).snapshot,initialApplies=0;
+    mountMapGenerator(initialHost,{snapshot:()=>initialCurrent,catalog:async()=>catalog,apply:async snapshot=>{initialCurrent=snapshot;initialApplies++;return 'initial-generated';}});
+    const walk=node=>[node,...node.children.flatMap(walk)];
+    const controls=walk(initialHost).filter(node=>node.id?.startsWith('gen-'));
+    assert(controls.length>60);
+    for(const control of controls){
+      const helpId=control.attributes['aria-describedby'];
+      assert(helpId,control.id+' has linked help');
+      const popup=find(initialHost,node=>node.id===helpId);
+      assert(popup&&popup.textContent.length>35,control.id+' has a full explanation');
+      assert.equal(popup.attributes.role,'tooltip');assert.equal(popup.hidden,true);
+    }
+    const helpLabel=find(initialHost,node=>node.attributes['aria-describedby']==='generator-help-width'&&node.tagName==='span');
+    const popup=find(initialHost,node=>node.id==='generator-help-width');
+    helpLabel.getBoundingClientRect=()=>({left:20,bottom:100});popup.style={};popup.offsetHeight=80;
+    const savedWindow=globalThis.window;globalThis.window={innerWidth:900,innerHeight:700};
+    try{
+      await helpLabel.emit('mouseenter');assert.equal(popup.hidden,false);assert.equal(popup.style.top,'110px');
+      await helpLabel.emit('mouseleave');assert.equal(popup.hidden,true);
+      await controls[0].emit('focus');assert.equal(popup.hidden,false);
+      await controls[0].emit('blur');assert.equal(popup.hidden,true);
+      await helpLabel.emit('focus');
+      for(const handler of helpLabel.listeners.keydown)handler({key:'Escape'});
+      assert.equal(popup.hidden,true);
+    }finally{if(savedWindow===undefined)delete globalThis.window;else globalThis.window=savedWindow;}
+    for(const summary of walk(initialHost).filter(node=>node.tagName==='summary'))assert(summary.attributes['aria-describedby'],'section heading has help');
+    const initialActions=find(initialHost,node=>node.className==='generator-update-actions');
+    const initialButton=find(initialHost,node=>node.id==='generateUpdateMap');
+    assert.equal(initialActions.hidden,false,'Generate is available immediately');
+    assert.equal(initialButton.textContent,'Generate map');
+    assert.equal(initialButton.disabled,false);
+    assert.equal(initialApplies,0,'Opening still does not generate automatically');
+    await initialButton.emit('click');
+    assert.equal(initialApplies,1,'Unchanged default settings can generate');
+    assert.equal(initialActions.hidden,true,'Successful generation keeps existing no-pending-change behavior');
+    const initialWidth=find(initialHost,node=>node.id==='gen-width');initialWidth.value='160';
+    await find(initialHost,node=>node.tagName==='form').emit('input');
+    assert.equal(initialActions.hidden,false);assert.equal(initialButton.textContent,'Update map');
+    initialWidth.value='109';find(initialHost,node=>node.id==='gen-height').value='97';find(initialHost,node=>node.id==='gen-players').value='10';
+    await find(initialHost,node=>node.tagName==='form').emit('input');await initialButton.emit('click');
+    assert.equal(initialApplies,1,'invalid spacing does not replace the map');
+    for(const key of ['width','height','players','baseRadius'])assert.equal(find(initialHost,node=>node.id==='gen-'+key).attributes['aria-invalid'],'true');
+    assert(find(initialHost,node=>node.classList.contains('generator-field-error')),'related labels have error styling');
+    initialWidth.value='255';await find(initialHost,node=>node.tagName==='form').emit('input');
+    assert.equal(initialWidth.attributes['aria-invalid'],'false','editing clears stale validation');
+    assert.equal(find(initialHost,node=>node.classList.contains('generator-field-error')),undefined);
     const host = new Element('div');
     let current = generateMap({},catalog).snapshot;
     current.name = 'Keep this name'; current.mapInfo.author = 'Keep this author';
@@ -66,7 +113,8 @@ const vm = require('node:vm');
     const actions = find(host,node => node.className === 'generator-update-actions');
     const update = find(host,node => node.id === 'generateUpdateMap');
     assert.equal(applied.length,0,'Opening Generate does not change the current map');
-    assert.equal(actions.hidden,true);
+    assert.equal(actions.hidden,false);
+    assert.equal(update.textContent,'Generate map');
     assert.equal(Number(variety.max),78); assert.equal(varietyMax.textContent,'78');
     variety.value = '70'; await form.emit('input');
     assert.equal(variety.value,'70'); assert.equal(varietyValue.textContent,'70');
@@ -86,11 +134,25 @@ const vm = require('node:vm');
     assert.equal(Number(variety.max),81); assert.equal(varietyMax.textContent,'81','Presets refresh the limit too');
     await actions.children[1].emit('click');
     assert.equal(Number(variety.max),78); assert.equal(Number(variety.value),3);
+    const factories=find(host,node=>node.id==='gen-factoryCount');
+    const base=find(host,node=>node.id==='gen-base');
+    assert.equal(Number(factories.max),5);
+    assert.equal(Number(find(host,node=>node.id==='gen-researchCount').max),20);
+    assert.equal(Number(find(host,node=>node.id==='gen-rearmCount').max),99);
+    factories.value='3'; await factories.emit('input'); await form.emit('input');
+    assert.equal(base.value,'small','counts remain editable without a custom preset');
+    assert.equal(applied.length,0,'building count changes wait for Update map');
+    await actions.children[1].emit('click');
+    assert.equal(base.value,'small'); assert.equal(Number(factories.value),2,'Cancel restores building counts');
+    assert.deepEqual(base.children.map(o=>o.value),['trucks','small','medium','full']);
+    assert.equal(find(host,node=>node.id==='gen-baseBuildings'),undefined);
+    for(const [mode,count] of [['trucks',0],['medium',3],['full',5]]){base.value=mode;await base.emit('change');assert.equal(Number(factories.value),count);assert.equal(Number(find(host,node=>node.id==='gen-uplinkCount').value),0);assert.equal(Number(find(host,node=>node.id==='gen-lassatCount').value),0);}
+    await actions.children[1].emit('click');
     width.value = '160'; await form.emit('input');
     assert.equal(applied.length,0,'Changing controls waits for Update map');
     assert.equal(actions.hidden,false);
     await actions.children[1].emit('click');
-    assert.equal(Number(width.value),128); assert.equal(applied.length,0,'Cancel leaves the map untouched');
+    assert.equal(Number(width.value),65); assert.equal(applied.length,0,'Cancel leaves the map untouched');
     width.value = '160'; await form.emit('input'); await update.emit('click');
     assert.equal(applied.length,1); assert.equal(current.mapW,160);
     assert.equal(current.name,'Keep this name'); assert.equal(current.mapInfo.author,'Keep this author');

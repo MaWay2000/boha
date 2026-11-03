@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 (async()=>{
-  const {generateMap,normalizeGeneratorOptions}=await import('./js/mapGenerator.js');
+  const {generateMap,normalizeGeneratorOptions,startingBuildingOptions,getStartingBuildingCounts}=await import('./js/mapGenerator.js');
   const {generateEditorMap}=await import('./js/mapGeneratorUI.js');
   const source=fs.readFileSync(`${__dirname}/js/game.js`,'utf8');
   const arrays=source.slice(source.indexOf('const DEFAULT_TILE_TYPES_BY_TILESET ='),source.indexOf('let selectedTileId'));
@@ -11,6 +11,46 @@ const vm=require('node:vm');
   const featureData=JSON.parse(fs.readFileSync(`${__dirname}/features.json`,'utf8'));
   const catalog={tileTypes,tileCounts:[78,81,80],structures:Object.entries(structureData).map(([id,d])=>({id,sizeX:d.width||2,sizeY:d.breadth||2})),
     features:Object.entries(featureData).map(([id,d])=>({id,sizeX:d.width||1,sizeY:d.breadth||1}))};
+  assert.deepEqual(getStartingBuildingCounts('trucks'),{hqCount:1,factoryCount:0,cyborgFactoryCount:0,vtolFactoryCount:0,researchCount:0,powerCount:0,repairCount:0,rearmCount:0,relayCount:0,uplinkCount:0,lassatCount:0});
+  for(const [base,factories,power,pads] of [['small',2,3,17],['medium',3,7,33],['full',5,10,50]]){
+    const o=normalizeGeneratorOptions({base});
+    assert.equal(o.factoryCount,factories);assert.equal(o.cyborgFactoryCount,factories);assert.equal(o.researchCount,factories);
+    assert.equal(o.powerCount,power);assert.equal(o.rearmCount,pads);assert.equal(o.hqCount,1);
+    assert.equal(o.uplinkCount,0);assert.equal(o.lassatCount,0);
+  }
+  const trucks=generateMap({base:'trucks'},catalog);
+  assert.equal(trucks.snapshot.structures.length,4);
+  assert(trucks.snapshot.structures.every(s=>s.name==='A0CommandCentre'));
+  assert.equal(trucks.snapshot.droids.length,8);
+  const emptyCounts=Object.fromEntries(startingBuildingOptions.map(([key])=>[key,0]));
+  for(const [key,,id,max] of startingBuildingOptions){
+    assert.equal(normalizeGeneratorOptions({[key]:999})[key],max);
+    assert.equal(normalizeGeneratorOptions({[key]:-1})[key],0);
+    const counted=generateMap({...emptyCounts,base:'counts',[key]:Math.min(2,max),width:192,height:192,players:2,layout:'opposite',symmetry:'none',baseRadius:24,baseOil:0,expansions:0,neutralOil:0,scenery:0},catalog);
+    assert.deepEqual(counted.report.errors,[]);
+    for(let player=0;player<2;player++) assert.equal(counted.snapshot.structures.filter(s=>s.startpos===player&&s.name===id).length,Math.min(2,max),id+' count per player');
+    assert.equal(counted.snapshot.structures.length,2*Math.min(2,max),'zero counts place nothing');
+  }
+  const packed=generateMap({...emptyCounts,base:'counts',rearmCount:99,baseRadius:7},catalog);
+  assert(packed.report.warnings.some(w=>w.includes('No room')),'crowded counts report placement failures');
+  for(const [width,height] of [[255,255],[192,128]]){
+    const teamMap=generateMap({width,height,players:4,layout:'teams',teams:2,base:'trucks',baseRadius:7},catalog);
+    assert.deepEqual(teamMap.report.errors,[]);
+    for(const player of [0,2])assert(teamMap.starts[player].y<height/2,'first team starts at top');
+    for(const player of [1,3])assert(teamMap.starts[player].y>height/2,'second team starts at bottom');
+    assert(teamMap.starts[0].x!==teamMap.starts[2].x,'teammates spread across the top');
+    assert(teamMap.starts[1].x!==teamMap.starts[3].x,'teammates spread across the bottom');
+  }
+  for(const [width,height,players] of [[190,255,4],[128,128,4],[96,128,4],[255,255,10],[190,255,5]]) {
+    const grouped=generateMap({width,height,players,layout:'teams',teams:2,base:'trucks',baseRadius:12},catalog);
+    assert.deepEqual(grouped.report.errors,[],'two rows fit '+width+'x'+height+'/'+players);
+    const top=grouped.starts.filter((_,i)=>i%2===0),bottom=grouped.starts.filter((_,i)=>i%2===1);
+    for(const row of [top,bottom]) {
+      assert.equal(row[0].x,grouped.options.edge);
+      assert.equal(row.at(-1).x,width-1-grouped.options.edge,'use the whole available row width');
+      assert(row.every(p=>p.y===row[0].y),'teammates share an edge');
+    }
+  }
   const a=generateMap({},catalog),b=generateMap({},catalog);
   assert.equal(a.snapshot.mapInfo.license,'CC0-1.0','generated maps default to CC0');
   assert.equal(a.snapshot.mapInfo.version,'1.0','generated maps default to version 1.0');

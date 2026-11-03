@@ -6760,6 +6760,7 @@ let undoBtn;
 let redoBtn;
 const undoStack = [];
 const redoStack = [];
+let mapHistoryBusy = false;
 let mapDirty = false;
 let savedMapVersion = '';
 const LOCAL_AUTOSAVE_ENABLED_KEY = 'warzone2100MapMaker.localAutosave.enabled';
@@ -7287,8 +7288,8 @@ function readLocalSaveSnapshot(id) {
 }
 
 function updateUndoRedoButtons() {
-  if (undoBtn) undoBtn.disabled = undoStack.length === 0;
-  if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+  if (undoBtn) undoBtn.disabled = mapHistoryBusy || undoStack.length === 0;
+  if (redoBtn) redoBtn.disabled = mapHistoryBusy || redoStack.length === 0;
 }
 
 function pushUndo(action) {
@@ -7463,6 +7464,8 @@ function applyAction(action, mode) {
 }
 
 function undo() {
+  if (mapHistoryBusy) return;
+  if (undoStack[undoStack.length - 1]?.type === 'script-map') return restoreScriptHistory('undo');
   const action = undoStack.pop();
   if (!action) return;
   applyAction(action, 'undo');
@@ -7472,6 +7475,8 @@ function undo() {
 }
 
 function redo() {
+  if (mapHistoryBusy) return;
+  if (redoStack[redoStack.length - 1]?.type === 'script-map') return restoreScriptHistory('redo');
   const action = redoStack.pop();
   if (!action) return;
   applyAction(action, 'redo');
@@ -8224,15 +8229,112 @@ function syncMapScriptEditor() {
   mapScriptEditor?.setScript(currentMapScript);
 }
 
+function setMapScriptEnabled(enabled) {
+  if (!currentMapScript) {
+    if (!enabled) return;
+    const mapPath = String(currentMapArchivePath || 'game.map').replace(/\\/g, '/');
+    currentMapScript = {
+      filename: mapPath.replace(/[^/]*$/, 'game.js'),
+      enabled: true,
+      pendingChanges: true,
+      source: '// Example: a flat map. Run script replaces the current terrain and objects.\n' +
+        'const width = ' + mapW + ';\nconst height = ' + mapH + ';\n' +
+        'const textures = new Array(width * height).fill(0);\n' +
+        'const heights = new Array(width * height).fill(0);\n' +
+        'const structures = [];\nconst droids = [];\nconst features = [];\n\n' +
+        'setMapData(width, height, textures, heights, structures, droids, features);\n'
+    };
+  } else {
+    if ((currentMapScript.enabled !== false) === enabled) return;
+    currentMapScript = {...currentMapScript, enabled};
+  }
+  syncMapScriptEditor();
+  markMapDirty();
+}
+
 function updateMapScriptDraft(source) {
   if (!currentMapScript) return;
   currentMapScript = {...currentMapScript, source, pendingChanges:true};
   markMapDirty();
 }
 
+function captureScriptMapState() {
+  return {
+    snapshot: JSON.parse(JSON.stringify(makeLocalSaveSnapshot())),
+    archive: [currentMapArchive, currentMapArchivePath, currentMapExportInfo, currentStructArchivePath,
+      currentStructJsonStyle, currentDroidArchivePath, currentFeatureArchivePath,
+      currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath],
+    gam: currentGamJson ? JSON.parse(JSON.stringify(currentGamJson)) : null,
+    savedVersion: savedMapVersion
+  };
+}
+
+async function restoreScriptMapState(state) {
+  await loadLocalSaveSnapshot(state.snapshot);
+  [currentMapArchive, currentMapArchivePath, currentMapExportInfo, currentStructArchivePath,
+    currentStructJsonStyle, currentDroidArchivePath, currentFeatureArchivePath,
+    currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath] = state.archive;
+  currentGamJson = state.gam;
+  savedMapVersion = state.savedVersion;
+  currentMapInfoOverrides = { ...getDefaultMapInfoOverrides(), ...(state.snapshot.mapInfo || {}) };
+  updateMapInfoInputs();
+}
+
+async function restoreScriptHistory(mode) {
+  if (mapHistoryBusy) return;
+  const action = (mode === 'undo' ? undoStack : redoStack).at(-1);
+  if (!action || action.type !== 'script-map') return;
+  const current = captureScriptMapState();
+  const history = {undo:undoStack.slice(), redo:redoStack.slice(), dirty:mapDirty};
+  mapHistoryBusy = true;
+  updateUndoRedoButtons();
+  if (localAutosaveTimer) { clearTimeout(localAutosaveTimer); localAutosaveTimer = null; }
+  try {
+    await restoreScriptMapState(action.state);
+    // Object actions reference the old scene. Only map checkpoints survive a rebuild.
+    undoStack.length = 0; redoStack.length = 0;
+    undoStack.push(...history.undo.filter(item => item.type === 'script-map'));
+    redoStack.push(...history.redo.filter(item => item.type === 'script-map'));
+    (mode === 'undo' ? undoStack : redoStack).pop();
+    action.state = current;
+    (mode === 'undo' ? redoStack : undoStack).push(action);
+    markMapDirty();
+    setFileStatus(mode === 'undo' ? 'Script run undone.' : 'Script run redone.');
+  } catch (error) {
+    try {
+      await restoreScriptMapState(current);
+    } catch (rollbackError) {
+      console.error('Could not restore the current map:', rollbackError);
+    }
+    undoStack.length = 0; redoStack.length = 0;
+    undoStack.push(...history.undo); redoStack.push(...history.redo);
+    setMapDirty(history.dirty);
+    if (history.dirty) scheduleLocalAutosave();
+    console.error('Could not restore script history:', error);
+    setFileStatus('Could not ' + mode + ' the script run.');
+  } finally {
+    mapHistoryBusy = false;
+    hideLoadingProgress();
+    updateUndoRedoButtons();
+  }
+}
+
 async function runEditedMapScript(value) {
+  if (mapHistoryBusy) throw new Error('Wait for the current map operation to finish.');
+  mapHistoryBusy = true;
+  updateUndoRedoButtons();
+  try {
+    return await applyEditedMapScript(value);
+  } finally {
+    mapHistoryBusy = false;
+    updateUndoRedoButtons();
+  }
+}
+
+async function applyEditedMapScript(value) {
   const script = normalizeMapScriptSource(value);
   if (!script) throw new Error('No valid map script is loaded.');
+  if (!script.enabled) throw new Error('Enable Script before running it.');
   const sourceContext = currentMapScript;
   // Compile, execute and validate before touching the current map.
   const data = await runMapScript(script.source);
@@ -8250,15 +8352,11 @@ async function runEditedMapScript(value) {
     // JSZip.clone shares its file dictionary; own it before replacing entries.
     nextArchive.files = {...nextArchive.files};
     nextArchive.remove(script.filename);
+    if (currentMapArchivePath && currentMapArchivePath !== generated.mapName) nextArchive.remove(currentMapArchivePath);
     for (const [name, contents] of generated.files) nextArchive.file(name, contents);
     writeMapScriptSource(nextArchive, appliedScript);
   }
-  const previous = makeLocalSaveSnapshot();
-  const archiveState = [
-    currentMapArchive, currentMapArchivePath, currentMapExportInfo, currentStructArchivePath,
-    currentStructJsonStyle, currentDroidArchivePath, currentFeatureArchivePath,
-    currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath
-  ];
+  const previousState = captureScriptMapState();
   const history = {undo:undoStack.slice(), redo:redoStack.slice(), dirty:mapDirty};
   if (localAutosaveTimer) {
     clearTimeout(localAutosaveTimer);
@@ -8288,16 +8386,14 @@ async function runEditedMapScript(value) {
     syncMapScriptEditor();
     undoStack.length = 0;
     redoStack.length = 0;
+    undoStack.push(...history.undo.filter(action => action.type === 'script-map'), {type:'script-map', state:previousState});
     updateUndoRedoButtons();
     markMapDirty();
     return 'Map updated: ' + data.width + ' × ' + data.height + '.';
   } catch (error) {
     try {
-      await loadLocalSaveSnapshot(previous);
+      await restoreScriptMapState(previousState);
     } finally {
-      [currentMapArchive, currentMapArchivePath, currentMapExportInfo, currentStructArchivePath,
-        currentStructJsonStyle, currentDroidArchivePath, currentFeatureArchivePath,
-        currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath] = archiveState;
       undoStack.length = 0;
       redoStack.length = 0;
       undoStack.push(...history.undo);
@@ -14020,6 +14116,7 @@ if (document.readyState === 'loading') {
 
 mapScriptEditor = mountScriptEditor(document.getElementById('scriptPanel'), {
   onChange: updateMapScriptDraft,
+  onEnable: setMapScriptEnabled,
   onRun: runEditedMapScript
 });
 syncMapScriptEditor();

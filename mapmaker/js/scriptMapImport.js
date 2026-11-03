@@ -231,10 +231,17 @@ export function normalizeMapScriptSource(value) {
   const parts = filename.split('/');
   if (parts.some(part => !part || part === '.' || part === '..' || part.includes('\0')) ||
       parts[parts.length - 1].toLowerCase() !== 'game.js') return null;
-  return {filename, source:value.source, pendingChanges:!!value.pendingChanges};
+  return {filename, source:value.source, pendingChanges:!!value.pendingChanges, enabled:value.enabled !== false};
 }
 
 export async function readMapScriptSource(zip) {
+  const saved = zip.file('mapmaker-script.json');
+  if (saved) {
+    try {
+      const script = normalizeMapScriptSource(JSON.parse(await saved.async('string')));
+      if (script) return script;
+    } catch {}
+  }
   const names = Object.keys(zip.files).filter(name => !zip.files[name].dir);
   const original = names.find(name => /(^|[\\/])game\.js$/i.test(name));
   if (original) {
@@ -243,10 +250,7 @@ export async function readMapScriptSource(zip) {
       source:(await zip.files[original].async('string')).replace(/\0+$/, '')
     });
   }
-  const saved = zip.file('mapmaker-script.json');
-  if (!saved) return null;
-  try { return normalizeMapScriptSource(JSON.parse(await saved.async('string'))); }
-  catch { return null; }
+  return null;
 }
 
 export function writeMapScriptSource(zip, value) {

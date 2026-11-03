@@ -104,6 +104,16 @@ const assert = require('node:assert/strict');
   h.ui.setScript(null);
   assert.equal(h.key('f',h.area,{ctrlKey:true}).prevented,false,'Empty editor leaves browser shortcut alone');
   h.setSource('Cat cat CAT');
+  for(let cycle=0;cycle<2;cycle++) {
+    h.c('[data-script-find-open]').listeners.click();
+    assert.equal(h.c('[data-script-search]').hidden,false,'Click opens Find / replace');
+    assert.equal(h.c('[data-script-replace-row]').hidden,false);
+    h.c('[data-script-find-open]').listeners.click();
+    assert.equal(h.c('[data-script-search]').hidden,true,'Clicking the same button again closes it');
+    assert.equal(h.css['--script-search-height'],'0px');
+    assert.equal(h.doc.activeElement,h.area);
+  }
+  assert.equal(h.area.value,'Cat cat CAT'); assert.equal(h.changes.length,0); assert.equal(h.runs.length,0);
   const opened=h.key('f',h.area,{ctrlKey:true});
   assert(opened.prevented&&opened.stopped);
   assert.equal(h.c('[data-script-search]').hidden,false);

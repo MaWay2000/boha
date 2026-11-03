@@ -1,16 +1,35 @@
 import {mapExportOwner} from './mapOwnership.mjs?v=20261101-scav-owner-1';
 // Pure, deterministic generation: no DOM, renderer, network or editor mutations.
 import {getTileCount} from './tileset.js';
+// Starting-building counts use the lobby slider ranges, not runtime build caps.
+export const startingBuildingOptions = [
+  ['hqCount','HQ','A0CommandCentre',1,1],
+  ['factoryCount','Factories','A0LightFactory',5,1],
+  ['cyborgFactoryCount','Cyborg factories','A0CyborgFactory',5,0],
+  ['vtolFactoryCount','VTOL factories','A0VTolFactory1',5,0],
+  ['researchCount','Research labs','A0ResearchFacility',20,1],
+  ['powerCount','Power generators','A0PowerGenerator',10,1],
+  ['repairCount','Repair facilities','A0RepairCentre3',5,0],
+  ['rearmCount','VTOL rearming pads','A0VtolPad',99,0],
+  ['relayCount','Command relay centers','A0ComDroidControl',1,0],
+  ['uplinkCount','Satellite uplink centers','A0Sat-linkCentre',1,0],
+  ['lassatCount','Laser satellite','A0LasSatCommand',1,0]
+];
+export function getStartingBuildingCounts(base='small') {
+  const standard={hqCount:1,factoryCount:5,cyborgFactoryCount:5,vtolFactoryCount:5,researchCount:5,powerCount:10,repairCount:5,rearmCount:50,relayCount:1,uplinkCount:0,lassatCount:0};
+  const fraction=base==='trucks'?0:base==='medium'?0.66:base==='full'||base==='advanced'?1:0.33;
+  return Object.fromEntries(startingBuildingOptions.map(([key])=>[key,key==='hqCount'?1:standard[key]?Math.max(fraction?1:0,Math.round(standard[key]*fraction)):0]));
+}
 export const generatorDefaults = {
-  name:'Generated battlefield', width:128, height:128, players:4, tileset:0, seed:'map-1',
-  preset:'arena', symmetry:'both', layout:'corners', teams:2, edge:16, baseRadius:12,
-  terrain:'hills', minHeight:20, maxHeight:65, frequency:4, smoothness:3, cliffs:false,
+  ...getStartingBuildingCounts(),
+  name:'Generated battlefield', width:65, height:128, players:4, tileset:0, seed:'map-1',
+  preset:'hills', symmetry:'both', layout:'teams', teams:2, edge:16, baseRadius:12,
+  terrain:'hills', minHeight:0, maxHeight:175, frequency:4, smoothness:3, cliffs:false,
   border:3, centreRadius:10, routes:2, routeWidth:5, connected:true,
   water:0, waterStyle:'lakes', riverWidth:5, crossings:2, roads:true, roadWidth:2,
   groundTile:0, textureVariety:3, transitions:true,
   base:'small', trucks:2, tanks:0, support:0, cyborgs:0, truckBody:'Body1REC',
-  truckPropulsion:'wheeled01', tankWeapon:'MG1Mk1', orientation:'centre', modules:0,
-  baseBuildings:'A0CommandCentre,A0LightFactory,A0ResearchFacility,A0PowerGenerator',
+  truckPropulsion:'wheeled01', tankWeapon:'MG1Mk1', orientation:'north', modules:0,
   defenses:0, defenseType:'GuardTower1',
   baseOil:4, oilDistance:10, expansions:2, expansionOil:2, neutralOil:8, oilSpacing:3,
   derricks:false, drums:0, artifacts:0, scenery:1, sceneryStyle:'rocks', symmetricScenery:true,
@@ -28,14 +47,15 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const grid=(w,h,value)=>Array.from({length:h},()=>Array(w).fill(value));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 export function normalizeGeneratorOptions(input={},catalog={}) {
-  const o={...generatorDefaults,...input};
+  const o={...generatorDefaults,...getStartingBuildingCounts(input.base||generatorDefaults.base),...input};
   const ranges={width:[48,255],height:[48,255],players:[2,10],teams:[1,5],edge:[8,64],baseRadius:[7,24],
     minHeight:[0,255],maxHeight:[0,255],frequency:[1,12],smoothness:[0,8],border:[0,8],centreRadius:[0,30],
     routes:[1,4],routeWidth:[3,14],water:[0,60],riverWidth:[2,16],crossings:[1,6],roadWidth:[1,5],
-    groundTile:[0,77],trucks:[1,8],tanks:[0,12],support:[0,4],cyborgs:[0,8],modules:[0,2],
-    defenses:[0,12],baseOil:[0,16],oilDistance:[6,24],expansions:[0,6],expansionOil:[1,8],neutralOil:[0,40],
+    groundTile:[0,77],trucks:[1,15],tanks:[0,12],support:[0,4],cyborgs:[0,8],modules:[0,2],
+    defenses:[0,12],baseOil:[0,40],oilDistance:[6,24],expansions:[0,6],expansionOil:[1,8],neutralOil:[0,40],
     oilSpacing:[2,8],drums:[0,20],artifacts:[0,12],scenery:[0,5],scavCamps:[1,6],scavUnits:[0,10],tileset:[0,2]};
   for(const [k,[lo,hi]] of Object.entries(ranges)) o[k]=clamp(Math.round(Number(o[k])||0),lo,hi);
+  for(const [key,,,max] of startingBuildingOptions) o[key]=clamp(Math.round(Number(o[key])||0),0,max);
   o.textureVariety=clamp(Math.round(Number(o.textureVariety)||0),1,catalog.tileCounts?.[o.tileset]||getTileCount(o.tileset));
   if(o.minHeight>o.maxHeight) [o.minHeight,o.maxHeight]=[o.maxHeight,o.minHeight];
   o.seed=String(o.seed||'map-1').slice(0,100);
@@ -83,8 +103,13 @@ export function generateMap(input={},catalog={},previous=null) {
   const starts=[];
   if(o.layout==='corners' && o.players===4) starts.push({x:o.edge,y:o.edge},{x:w-1-o.edge,y:o.edge},{x:o.edge,y:h-1-o.edge},{x:w-1-o.edge,y:h-1-o.edge});
   else for(let i=0;i<o.players;i++) {
+    if(o.layout==='teams'&&o.teams===2) {
+      const team=i%2,slot=Math.floor(i/2),count=Math.ceil((o.players-team)/2);
+      starts.push({x:Math.round(count===1?centre.x:o.edge+slot*(w-1-2*o.edge)/(count-1)),y:team===0?o.edge:h-1-o.edge});
+      continue;
+    }
     let angle=-Math.PI/2+i*2*Math.PI/o.players;
-    if(o.layout==='teams') {const team=i%o.teams,slot=Math.floor(i/o.teams),n=Math.ceil(o.players/o.teams);angle=team*2*Math.PI/o.teams+(slot-(n-1)/2)*0.28;}
+    if(o.layout==='teams') {const team=i%o.teams,slot=Math.floor(i/o.teams),n=Math.ceil(o.players/o.teams);angle=-Math.PI/2+team*2*Math.PI/o.teams+(slot-(n-1)/2)*0.28;}
     let rx=(w-1)/2-o.edge,ry=(h-1)/2-o.edge;
     let sx=Math.cos(angle),sy=Math.sin(angle);
     if(o.layout==='edges'||o.layout==='opposite') {const scale=1/Math.max(Math.abs(sx),Math.abs(sy));sx*=scale;sy*=scale;}
@@ -175,10 +200,8 @@ export function generateMap(input={},catalog={},previous=null) {
       snapshot.droids.push(mapExportOwner(d, owner));return true;
     }warnings.push(`No room for ${role} at player ${owner}.`);return false;
   };
-  const baseLists={trucks:[],small:['A0CommandCentre','A0LightFactory','A0ResearchFacility','A0PowerGenerator'],
-    advanced:['A0CommandCentre','A0LightFactory','A0ResearchFacility','A0PowerGenerator','A0RepairCentre3','A0CyborgFactory','A0VTolFactory1']};
   starts.forEach((p,i)=>{
-    const list=o.base==='custom'?o.baseBuildings.split(',').map(x=>x.trim()).filter(Boolean):baseLists[o.base]||baseLists.small;
+    const list=startingBuildingOptions.flatMap(([key,,id])=>Array(o[key]).fill(id));
     list.forEach(id=>putStructure(id,p,i));
     for(let n=0;n<o.defenses;n++)putStructure(o.defenseType,p,i,20+n*3);
     for(const [role,count] of [['truck',o.trucks],['tank',o.tanks],['support',o.support],['cyborg',o.cyborgs]])for(let n=0;n<count;n++)putDroid(p,i,role,n);

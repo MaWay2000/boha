@@ -27,7 +27,7 @@ export function createLiveMapGeneration({bridge, generate, onStatus, onResult, o
         onUndo(true);
         if(request.revision===revision){valid=true;onResult(result,true);}
       } catch(error) {
-        if(applying){try{await bridge.apply(original);}catch(rollback){error=new Error(`${error.message}. Restore failed: ${rollback.message}`);}}
+        if(applying&&!bridge.applyHandlesRollback){try{await bridge.apply(original);}catch(rollback){error=new Error(`${error.message}. Restore failed: ${rollback.message}`);}}
         if(request.revision===revision){valid=false;onError(error);}
       }
     });

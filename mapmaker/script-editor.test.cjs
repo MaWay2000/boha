@@ -147,7 +147,7 @@ const vm = require('node:vm');
     currentTileTypesArchivePath:'ttypes.ttp',currentGamArchivePath:null,currentLevelArchivePath:null,
     currentMapScript:{...info,source:'// changed',pendingChanges:true},
     currentLevelJson:{author:'arc',license:'CC0'},currentFeatureEntries:[],
-    mapDirty:false,mapHistoryBusy:false,savedMapVersion:'1.0',currentGamJson:{version:7},
+    currentLocalSaveId:'original-save',mapDirty:false,mapHistoryBusy:false,savedMapVersion:'1.0',currentGamJson:{version:7},
     currentMapInfoOverrides:{name:'Original map',scavengers:'1'},undoBtn:{},redoBtn:{},
     undoStack:[{old:true}],redoStack:[],localAutosaveTimer:null,
     mapScriptEditor:{setScript:value=>{shownScript=value;}},
@@ -181,7 +181,7 @@ const vm = require('node:vm');
   });
   for(const name of ['syncMapScriptEditor','getMapExportInfo','getDefaultMapInfoOverrides',
     'captureScriptMapState','restoreScriptMapState','restoreScriptHistory','updateUndoRedoButtons',
-    'undo','redo','runEditedMapScript','applyEditedMapScript'])
+    'undo','redo','runEditedMapScript','applyEditedMapScript','applyGeneratedMapSnapshot'])
     vm.runInContext(extract(name),ctx);
   const initialGrid=ctx.mapTiles;
   await assert.rejects(()=>ctx.runEditedMapScript({...ctx.currentMapScript,enabled:false}),/Enable Script/);
@@ -241,6 +241,32 @@ const vm = require('node:vm');
   mode='switch';rendered=0;
   await assert.rejects(()=>ctx.runEditedMapScript(ctx.currentMapScript),/map changed/i);
   assert.equal(rendered,0,'Changing maps while generation runs cancels stale results');
+
+  // Generate/Update use the same full-map history as script execution.
+  let autosaves=0;
+  Object.assign(ctx,{makeLocalSaveId:()=> 'generated-save',saveLocalAutosaveNow:()=>{autosaves++;},setActiveTab(){}});
+  const originalState=ctx.captureScriptMapState(),oldHistory=ctx.undoStack.length;
+  const generated={...ctx.makeLocalSaveSnapshot(),mapW:3,mapH:1,mapTiles:[[7,8,9]],mapHeights:[[10,11,12]],structures:[{name:'Generated HQ'}],droids:[],features:[],mapScript:null};
+  assert.equal(await ctx.applyGeneratedMapSnapshot(generated),'generated-save');
+  assert.equal(ctx.mapW,3);assert.equal(ctx.undoStack.length,oldHistory);
+  assert.equal(ctx.undoStack.at(-1).source,'generator');assert.equal(ctx.redoStack.length,0);
+  assert.equal(ctx.currentMapArchive,null);assert.equal(ctx.undoBtn.disabled,false);
+  await ctx.undo();
+  assert.equal(JSON.stringify(ctx.makeLocalSaveSnapshot()),JSON.stringify(originalState.snapshot));
+  assert.equal(ctx.currentMapArchive,originalState.archive[0]);assert.equal(ctx.currentLocalSaveId,originalState.localSaveId);
+  await ctx.redo();assert.equal(ctx.mapW,3);assert.equal(ctx.structures[0].name,'Generated HQ');
+  await ctx.applyGeneratedMapSnapshot({...generated,mapTiles:[[20,21,22]]});
+  await ctx.undo();assert.equal(ctx.mapTiles[0][0],7);
+  await ctx.undo();assert.equal(JSON.stringify(ctx.makeLocalSaveSnapshot()),JSON.stringify(originalState.snapshot));
+  await ctx.redo();await ctx.redo();assert.equal(ctx.mapTiles[0][0],20);
+  await ctx.undo();await ctx.applyGeneratedMapSnapshot({...generated,mapTiles:[[30,31,32]]});
+  assert.equal(ctx.redoStack.length,0,'A new generation clears the abandoned redo branch');
+  const beforeFailure=JSON.stringify(ctx.makeLocalSaveSnapshot()),checkpointCount=ctx.undoStack.length,saveCount=autosaves;
+  failRestore=true;await assert.rejects(()=>ctx.applyGeneratedMapSnapshot(generated),/Restore asset failure/);
+  assert.equal(JSON.stringify(ctx.makeLocalSaveSnapshot()),beforeFailure,'Failed generation restores the map');
+  assert.equal(ctx.undoStack.length,checkpointCount);assert.equal(ctx.redoStack.length,0);assert.equal(autosaves,saveCount);assert.equal(ctx.mapHistoryBusy,false);
+  ctx.mapHistoryBusy=true;await assert.rejects(()=>ctx.applyGeneratedMapSnapshot(generated),/Wait for/);ctx.mapHistoryBusy=false;
+  await ctx.restoreScriptMapState(originalState);
 
   // Production snapshot includes a copy of the editable source for local saves.
   Object.assign(ctx,{

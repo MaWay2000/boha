@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 (async () => {
   const {generateMap} = await import('./js/mapGenerator.js');
-  const {mountMapGenerator} = await import('./js/mapGeneratorUI.js');
+  const {mountMapGenerator} = await import(process.env.MAPMAKER_UI_UNDER_TEST||'./js/mapGeneratorUI.js');
   const {loadMapUnified} = await import('./js/maploader.js');
   const {metadataText} = await import('./js/archiveImport.js');
   const source = fs.readFileSync(path.join(__dirname, 'js/game.js'), 'utf8');
@@ -50,8 +50,8 @@ const vm = require('node:vm');
   globalThis.document = {createElement:tag => new Element(tag)};
   try {
     const initialHost=new Element('div');
-    let initialCurrent=generateMap({},catalog).snapshot,initialApplies=0;
-    mountMapGenerator(initialHost,{snapshot:()=>initialCurrent,catalog:async()=>catalog,apply:async snapshot=>{initialCurrent=snapshot;initialApplies++;return 'initial-generated';}});
+    let initialCurrent=generateMap({},catalog).snapshot,initialApplies=0;const overlayStates=[];
+    mountMapGenerator(initialHost,{showCliffs:value=>overlayStates.push(value),snapshot:()=>initialCurrent,catalog:async()=>catalog,apply:async snapshot=>{initialCurrent=snapshot;initialApplies++;return 'initial-generated';}});
     const walk=node=>[node,...node.children.flatMap(walk)];
     const controls=walk(initialHost).filter(node=>node.id?.startsWith('gen-'));
     assert(controls.length>60);
@@ -64,10 +64,13 @@ const vm = require('node:vm');
     }
     const helpLabel=find(initialHost,node=>node.attributes['aria-describedby']==='generator-help-width'&&node.tagName==='span');
     const popup=find(initialHost,node=>node.id==='generator-help-width');
-    helpLabel.getBoundingClientRect=()=>({left:20,bottom:100});popup.style={};popup.offsetHeight=80;
+    helpLabel.getBoundingClientRect=()=>({left:20,right:430,top:80,bottom:100});popup.style={};popup.offsetHeight=80;
     const savedWindow=globalThis.window;globalThis.window={innerWidth:900,innerHeight:700};
     try{
-      await helpLabel.emit('mouseenter');assert.equal(popup.hidden,false);assert.equal(popup.style.top,'110px');
+      await helpLabel.emit('mouseenter');assert.equal(popup.hidden,false);assert.equal(popup.style.left,'20px');assert.equal(popup.style.top,'110px','label tooltip keeps its original position');
+      await controls[0].emit('mouseenter');assert.equal(popup.style.left,'442px');assert.equal(popup.style.top,'80px','control hover places tooltip on the right without clicking');
+      helpLabel.getBoundingClientRect=()=>({left:500,right:650,top:80,bottom:100});await controls[0].emit('mouseenter');assert.equal(popup.style.left,'158px','use left side if the right side has no room');
+      helpLabel.getBoundingClientRect=()=>({left:20,right:430,top:80,bottom:100});
       await helpLabel.emit('mouseleave');assert.equal(popup.hidden,true);
       await controls[0].emit('focus');assert.equal(popup.hidden,false);
       await controls[0].emit('blur');assert.equal(popup.hidden,true);
@@ -76,6 +79,56 @@ const vm = require('node:vm');
       assert.equal(popup.hidden,true);
     }finally{if(savedWindow===undefined)delete globalThis.window;else globalThis.window=savedWindow;}
     for(const summary of walk(initialHost).filter(node=>node.tagName==='summary'))assert(summary.attributes['aria-describedby'],'section heading has help');
+    const initialEdge=find(initialHost,node=>node.id==='gen-edge');
+    assert.equal(Number(initialEdge.max),17,'edge cap follows current dimensions and layout');
+    const edgeLabel=find(initialHost,node=>node.tagName==='span'&&node.attributes['aria-describedby']==='generator-help-edge');
+    const edgeHelp=find(initialHost,node=>node.id==='generator-help-edge');
+    edgeLabel.getBoundingClientRect=()=>({left:20,bottom:100});edgeHelp.style={};edgeHelp.offsetHeight=80;
+    const limitWindow=globalThis.window;globalThis.window={innerWidth:900,innerHeight:700};
+    try{
+      initialEdge.value='17';let blocked=false;
+      for(const handler of initialEdge.listeners.keydown)handler({key:'ArrowRight',preventDefault(){blocked=true;}});
+      assert(blocked);assert.equal(initialEdge.value,'17');assert.equal(edgeHelp.hidden,false);assert.match(edgeHelp.textContent,/width.*too small/);
+      initialEdge.value='99';await initialEdge.emit('input');await find(initialHost,node=>node.tagName==='form').emit('input');assert.equal(initialEdge.value,'17','cannot exceed the current cap');
+      find(initialHost,node=>node.id==='gen-width').value='96';await find(initialHost,node=>node.tagName==='form').emit('input');assert.equal(Number(initialEdge.max),32,'larger map increases the cap');
+      find(initialHost,node=>node.id==='gen-width').value='65';initialEdge.value='16';await find(initialHost,node=>node.tagName==='form').emit('input');
+    }finally{if(limitWindow===undefined)delete globalThis.window;else globalThis.window=limitWindow;}
+    const boundsWindow=globalThis.window;globalThis.window={innerWidth:900,innerHeight:700};
+    try{
+      for(const control of controls.filter(control=>control.type==='range')){
+        const label=find(initialHost,node=>node.tagName==='span'&&node.attributes['aria-describedby']===control.attributes['aria-describedby']);
+        const hint=find(initialHost,node=>node.id===control.attributes['aria-describedby']);
+        label.getBoundingClientRect=()=>({left:20,bottom:100});hint.style={};hint.offsetHeight=80;
+        const oldValue=control.value;
+        for(const [bound,key] of [['max','ArrowRight'],['min','ArrowLeft']]){
+          control.value=control[bound];let prevented=false;
+          for(const handler of control.listeners.keydown)handler({key,preventDefault(){prevented=true;}});
+          assert(prevented,control.id+' enforces '+bound);assert.equal(hint.hidden,false);assert(hint.textContent.length>20);
+          assert.equal(control.value,control[bound]);
+        }
+        control.value=oldValue;await control.emit('blur');
+      }
+      const camps=find(initialHost,node=>node.id==='gen-scavCamps');assert.equal(camps.disabled,true);
+      const campLabel=find(initialHost,node=>node.tagName==='span'&&node.attributes['aria-describedby']===camps.attributes['aria-describedby']);
+      await campLabel.emit('mouseenter');
+      assert.match(find(initialHost,node=>node.id===camps.attributes['aria-describedby']).textContent,/Enable Scavenger camps first/);
+      await campLabel.emit('mouseleave');
+    }finally{if(boundsWindow===undefined)delete globalThis.window;else globalThis.window=boundsWindow;}
+    const cliffCheckbox=find(initialHost,node=>node.id==='gen-showCliffs');
+    assert.equal(cliffCheckbox.tagName,'button');assert.equal(cliffCheckbox.type,'button');assert.equal(cliffCheckbox.attributes['aria-pressed'],'false','cliff overlay starts off');
+    await cliffCheckbox.emit('click');assert.equal(cliffCheckbox.attributes['aria-pressed'],'true');assert.deepEqual(overlayStates,[true]);
+    assert.equal(initialApplies,0,'preview does not generate a map');
+    const hoverWindow=globalThis.window;globalThis.window={innerWidth:900,innerHeight:700};
+    try{
+      for(const key of ['waterStyle','cliffs','showCliffs']){
+        const control=find(initialHost,node=>node.id==='gen-'+key),label=find(initialHost,node=>node.tagName==='span'&&node.attributes['aria-describedby']===control.attributes['aria-describedby']),hint=find(initialHost,node=>node.id===control.attributes['aria-describedby']);
+        label.getBoundingClientRect=()=>({left:20,right:430,top:80,bottom:100});hint.style={};hint.offsetHeight=80;
+        const beforeState=control.attributes['aria-checked']||control.attributes['aria-pressed']||control.value;
+        await control.emit('mouseenter');assert.equal(hint.hidden,false);assert.equal(hint.style.left,'442px');
+        assert.equal(control.attributes['aria-checked']||control.attributes['aria-pressed']||control.value,beforeState,'hover never activates the control');
+        await control.emit('mouseleave');assert.equal(hint.hidden,true);
+      }
+    }finally{if(hoverWindow===undefined)delete globalThis.window;else globalThis.window=hoverWindow;}
     const initialActions=find(initialHost,node=>node.className==='generator-update-actions');
     const initialButton=find(initialHost,node=>node.id==='generateUpdateMap');
     assert.equal(initialActions.hidden,false,'Generate is available immediately');
@@ -84,14 +137,23 @@ const vm = require('node:vm');
     assert.equal(initialApplies,0,'Opening still does not generate automatically');
     await initialButton.emit('click');
     assert.equal(initialApplies,1,'Unchanged default settings can generate');
+    assert.equal('showCliffs' in initialCurrent,false,'overlay is never saved as map data');
+    await cliffCheckbox.emit('click');assert.equal(cliffCheckbox.attributes['aria-pressed'],'false');
+    for(const eventName of ['input','change'])for(const listener of find(initialHost,node=>node.tagName==='form').listeners[eventName])listener({target:cliffCheckbox});
+    assert.deepEqual(overlayStates,[true,false]);assert.equal(initialApplies,1,'preview toggle does not regenerate');
+    assert.equal(initialActions.hidden,true,'preview toggle does not create pending generator changes');
     assert.equal(initialActions.hidden,true,'Successful generation keeps existing no-pending-change behavior');
     const initialWidth=find(initialHost,node=>node.id==='gen-width');initialWidth.value='160';
     await find(initialHost,node=>node.tagName==='form').emit('input');
     assert.equal(initialActions.hidden,false);assert.equal(initialButton.textContent,'Update map');
     initialWidth.value='109';find(initialHost,node=>node.id==='gen-height').value='97';find(initialHost,node=>node.id==='gen-players').value='10';
     await find(initialHost,node=>node.tagName==='form').emit('input');await initialButton.emit('click');
-    assert.equal(initialApplies,1,'invalid spacing does not replace the map');
-    for(const key of ['width','height','players','baseRadius'])assert.equal(find(initialHost,node=>node.id==='gen-'+key).attributes['aria-invalid'],'true');
+    assert.equal(initialApplies,2,'bounded settings can generate without a spacing error');
+    assert(Number(find(initialHost,node=>node.id==='gen-players').value)<10,'player count fits current dimensions');
+    find(initialHost,node=>node.id==='gen-defenses').value='1';find(initialHost,node=>node.id==='gen-defenseType').value='InvalidBuilding';
+    await find(initialHost,node=>node.tagName==='form').emit('input');await initialButton.emit('click');
+    assert.equal(initialApplies,2,'invalid catalog IDs do not replace the map');
+    for(const key of ['base','defenseType'])assert.equal(find(initialHost,node=>node.id==='gen-'+key).attributes['aria-invalid'],'true');
     assert(find(initialHost,node=>node.classList.contains('generator-field-error')),'related labels have error styling');
     initialWidth.value='255';await find(initialHost,node=>node.tagName==='form').emit('input');
     assert.equal(initialWidth.attributes['aria-invalid'],'false','editing clears stale validation');
@@ -159,10 +221,21 @@ const vm = require('node:vm');
     assert.equal(current.mapInfo.license,'MIT'); assert.equal(actions.hidden,true);
     width.value = '192'; await form.emit('input'); await update.emit('click');
     assert.equal(applied.length,2); assert.equal(current.id,'generated-save','Updates reuse the generated local save');
+    const cliffsSwitch=find(host,node=>node.id==='gen-cliffs');
+    assert.equal(cliffsSwitch.tagName,'button');assert.equal(cliffsSwitch.type,'button');assert.equal(cliffsSwitch.attributes.role,'switch');
+    assert.equal(cliffsSwitch.textContent,'OFF');assert.equal(cliffsSwitch.attributes['aria-checked'],'false');
+    await cliffsSwitch.emit('click');
+    assert.equal(cliffsSwitch.textContent,'ON');assert.equal(cliffsSwitch.attributes['aria-checked'],'true');
+    assert.equal(actions.hidden,false);assert.equal(applied.length,2,'switch waits for Update map');
+    await actions.children[1].emit('click');
+    assert.equal(cliffsSwitch.textContent,'OFF');assert.equal(cliffsSwitch.attributes['aria-checked'],'false','Cancel restores switch state');
+    assert.equal(actions.hidden,true);
   } finally {
     if (oldDocument === undefined) delete globalThis.document;
     else globalThis.document = oldDocument;
   }
+
+  if(process.env.MAPMAKER_UI_ONLY==='1'){console.log('PASS: actual local generator UI, label/control hover, positioning, switches and Update/cancel.');return;}
 
   // Check the production bridge connects generation to the existing editor path.
   let mounted, restored, dirty = 0, saved = 0, tab = null;
@@ -174,12 +247,14 @@ const vm = require('node:vm');
     DEFAULT_TILE_TYPES_BY_TILESET:tileTypes, TILESETS:catalog.tileCounts.map(count => ({count})),
     SMART_WATER_TILE_HINTS:{}, bodyDefs:{Body1REC:{}}, propDefs:{wheeled01:{}}, weaponDefs:{MG1Mk1:{}},
     makeLocalSaveId:() => 'new-save', loadLocalSaveSnapshot:async snapshot => {restored = snapshot;},
+    applyGeneratedMapSnapshot:async snapshot=>{const copy=JSON.parse(JSON.stringify(snapshot));copy.id=snapshot.id||'new-save';restored=copy;dirty++;saved++;tab='generate';return copy.id;},
     markMapDirty:() => {dirty++;}, saveLocalAutosaveNow:() => {saved++;}, setActiveTab:value => {tab = value;}
   });
   const mountStart = source.lastIndexOf("mountMapGenerator(document.getElementById('generatePanel'),");
   assert(mountStart >= 0);
   vm.runInContext(source.slice(mountStart),bridgeContext);
   assert.equal(mounted.snapshot().id,'current-save');
+  assert.equal(mounted.applyHandlesRollback,true,'Production generation handles full map/history rollback');
   assert.deepEqual(Array.from((await mounted.catalog()).bodyIds),['Body1REC']);
   const generated = generateMap({water:20,waterStyle:'river'},catalog).snapshot;
   const requested = {...generated,id:'reuse-save'};

@@ -2,7 +2,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const vm=require('node:vm');
 (async()=>{
-  const {generateMap,normalizeGeneratorOptions,startingBuildingOptions,getStartingBuildingCounts}=await import('./js/mapGenerator.js');
+  const {generateMap,normalizeGeneratorOptions,startingBuildingOptions,getStartingBuildingCounts,getBaseEdgeLimit,getGeneratorStarts}=await import('./js/mapGenerator.js');
   const {generateEditorMap}=await import('./js/mapGeneratorUI.js');
   const source=fs.readFileSync(`${__dirname}/js/game.js`,'utf8');
   const arrays=source.slice(source.indexOf('const DEFAULT_TILE_TYPES_BY_TILESET ='),source.indexOf('let selectedTileId'));
@@ -22,6 +22,18 @@ const vm=require('node:vm');
   assert.equal(trucks.snapshot.structures.length,4);
   assert(trucks.snapshot.structures.every(s=>s.name==='A0CommandCentre'));
   assert.equal(trucks.snapshot.droids.length,8);
+  assert.equal(getBaseEdgeLimit({width:65,height:128,players:4,layout:'teams',teams:2,baseRadius:12}).max,17);
+  assert.equal(getBaseEdgeLimit({width:96,height:128,players:4,layout:'teams',teams:2,baseRadius:12}).max,32);
+  assert.equal(getBaseEdgeLimit({width:48,height:48,players:10,layout:'teams',teams:2,baseRadius:12}).max,null);
+  for(const layout of ['teams','corners','circle','edges','opposite'])for(const players of [2,4,6,10]){
+    const input={width:128,height:192,players,layout,teams:2,baseRadius:12},limit=getBaseEdgeLimit(input);
+    if(limit.max===null)continue;
+    for(let edge=8;edge<=limit.max;edge++){
+      const starts=getGeneratorStarts(normalizeGeneratorOptions({...input,edge}));
+      for(let i=0;i<starts.length;i++)for(let j=0;j<i;j++)assert(Math.hypot(starts[i].x-starts[j].x,starts[i].y-starts[j].y)>=30,'allowed edge keeps bases apart');
+    }
+    assert.match(limit.reason,/width|height|64/);
+  }
   const emptyCounts=Object.fromEntries(startingBuildingOptions.map(([key])=>[key,0]));
   for(const [key,,id,max] of startingBuildingOptions){
     assert.equal(normalizeGeneratorOptions({[key]:999})[key],max);

@@ -56,6 +56,7 @@ export function normalizeGeneratorOptions(input={},catalog={}) {
     oilSpacing:[2,8],drums:[0,20],artifacts:[0,12],scenery:[0,5],scavCamps:[1,6],scavUnits:[0,10],tileset:[0,2]};
   for(const [k,[lo,hi]] of Object.entries(ranges)) o[k]=clamp(Math.round(Number(o[k])||0),lo,hi);
   for(const [key,,,max] of startingBuildingOptions) o[key]=clamp(Math.round(Number(o[key])||0),0,max);
+  o.groundTile=clamp(Math.round(Number(input.groundTile??generatorDefaults.groundTile)||0),0,(catalog.tileCounts?.[o.tileset]||getTileCount(o.tileset))-1);
   o.textureVariety=clamp(Math.round(Number(o.textureVariety)||0),1,catalog.tileCounts?.[o.tileset]||getTileCount(o.tileset));
   if(o.minHeight>o.maxHeight) [o.minHeight,o.maxHeight]=[o.maxHeight,o.minHeight];
   o.seed=String(o.seed||'map-1').slice(0,100);
@@ -76,6 +77,47 @@ function canonical(x,y,o) {
   if(o.symmetry==='horizontal'||o.symmetry==='both') y=Math.min(y,o.height-1-y);
   if(o.symmetry==='rotation' && y>=(o.height/2)) {x=o.width-1-x;y=o.height-1-y;}
   return {x,y};
+}
+export function getGeneratorStarts(o) {
+  const w=o.width,h=o.height,centre={x:(w-1)/2,y:(h-1)/2};
+  const starts=[];
+  if(o.layout==='corners' && o.players===4) starts.push({x:o.edge,y:o.edge},{x:w-1-o.edge,y:o.edge},{x:o.edge,y:h-1-o.edge},{x:w-1-o.edge,y:h-1-o.edge});
+  else for(let i=0;i<o.players;i++) {
+    if(o.layout==='teams'&&o.teams===2) {
+      const team=i%2,slot=Math.floor(i/2),count=Math.ceil((o.players-team)/2);
+      starts.push({x:Math.round(count===1?centre.x:o.edge+slot*(w-1-2*o.edge)/(count-1)),y:team===0?o.edge:h-1-o.edge});
+      continue;
+    }
+    let angle=-Math.PI/2+i*2*Math.PI/o.players;
+    if(o.layout==='teams') {const team=i%o.teams,slot=Math.floor(i/o.teams),n=Math.ceil(o.players/o.teams);angle=-Math.PI/2+team*2*Math.PI/o.teams+(slot-(n-1)/2)*0.28;}
+    let rx=(w-1)/2-o.edge,ry=(h-1)/2-o.edge;
+    let sx=Math.cos(angle),sy=Math.sin(angle);
+    if(o.layout==='edges'||o.layout==='opposite') {const scale=1/Math.max(Math.abs(sx),Math.abs(sy));sx*=scale;sy*=scale;}
+    starts.push({x:Math.round(centre.x+rx*sx),y:Math.round(centre.y+ry*sy)});
+  }
+  return starts;
+}
+export function getBaseEdgeLimit(input={}) {
+  const o=normalizeGeneratorOptions(input),ceiling=Math.min(64,Math.floor(Math.min(o.width,o.height)/3));
+  const fits=edge=>{
+    const starts=getGeneratorStarts({...o,edge});
+    for(let i=0;i<starts.length;i++)for(let j=0;j<i;j++)if(dist(starts[i],starts[j])<2*o.baseRadius+6)return false;
+    return true;
+  };
+  let max=null;
+  for(let edge=8;edge<=ceiling;edge++){if(!fits(edge))break;max=edge;}
+  let dimension=o.width<=o.height?'width':'height';
+  if(max!==null&&max<ceiling){
+    const starts=getGeneratorStarts({...o,edge:max+1});let closest=Infinity;
+    for(let i=0;i<starts.length;i++)for(let j=0;j<i;j++){
+      const a=starts[i],b=starts[j],distance=dist(a,b);
+      if(distance<closest){closest=distance;dimension=Math.abs(a.x-b.x)>=Math.abs(a.y-b.y)?'width':'height';}
+    }
+  }
+  const reason=max===64?'Maximum supported base edge distance is 64 tiles.':max===null?
+    'Map '+dimension+' is too small for these player positions and base radius. Increase map size, reduce players or reduce the base radius.':
+    'Map '+dimension+' is too small for a larger base edge distance with this layout. Maximum now: '+max+' tiles. Increase map size, reduce players or reduce the base radius.';
+  return {max,reason};
 }
 export function generateMap(input={},catalog={},previous=null) {
   const o=normalizeGeneratorOptions(input,catalog),w=o.width,h=o.height;
@@ -100,21 +142,7 @@ export function generateMap(input={},catalog={},previous=null) {
     structureStyle:'array',mapInfo:{name:o.name,slots:String(o.players),author:o.author,license:o.license,
       description:o.description,version:o.version,tags:o.tags,scavengers:o.scavengers?'1':'0'},structures:[],droids:[],features:[]};
   const blocked=grid(w,h,false), reserved=grid(w,h,false), routeMask=grid(w,h,false);
-  const starts=[];
-  if(o.layout==='corners' && o.players===4) starts.push({x:o.edge,y:o.edge},{x:w-1-o.edge,y:o.edge},{x:o.edge,y:h-1-o.edge},{x:w-1-o.edge,y:h-1-o.edge});
-  else for(let i=0;i<o.players;i++) {
-    if(o.layout==='teams'&&o.teams===2) {
-      const team=i%2,slot=Math.floor(i/2),count=Math.ceil((o.players-team)/2);
-      starts.push({x:Math.round(count===1?centre.x:o.edge+slot*(w-1-2*o.edge)/(count-1)),y:team===0?o.edge:h-1-o.edge});
-      continue;
-    }
-    let angle=-Math.PI/2+i*2*Math.PI/o.players;
-    if(o.layout==='teams') {const team=i%o.teams,slot=Math.floor(i/o.teams),n=Math.ceil(o.players/o.teams);angle=-Math.PI/2+team*2*Math.PI/o.teams+(slot-(n-1)/2)*0.28;}
-    let rx=(w-1)/2-o.edge,ry=(h-1)/2-o.edge;
-    let sx=Math.cos(angle),sy=Math.sin(angle);
-    if(o.layout==='edges'||o.layout==='opposite') {const scale=1/Math.max(Math.abs(sx),Math.abs(sy));sx*=scale;sy*=scale;}
-    starts.push({x:Math.round(centre.x+rx*sx),y:Math.round(centre.y+ry*sy)});
-  }
+  const starts=getGeneratorStarts(o);
   for(let i=0;i<starts.length;i++) for(let j=0;j<i;j++) if(dist(starts[i],starts[j])<2*o.baseRadius+6) errors.push(`Player ${i+1} and ${j+1} bases are too close. Increase size or reduce base radius.`);
   const waves=Array.from({length:5},()=>({x:random()*6+1,y:random()*6+1,p:random()*Math.PI*2}));
   const field=(x,y)=>waves.reduce((s,a)=>s+Math.sin(x/w*a.x*o.frequency+y/h*a.y*o.frequency+a.p),0)/waves.length;

@@ -1,3 +1,4 @@
+import {createCliffOverlay,disposeCliffOverlay} from './cliffOverlay.js';
 import * as THREE from './three.module.js';
 import { mapExportOwner } from './mapOwnership.mjs?v=20261101-scav-owner-1';
 import { previewPixelRatio, replacePreviewRenderer } from './previewRendering.mjs?v=20261101-light-low-4';
@@ -8276,6 +8277,7 @@ async function restoreScriptMapState(state) {
     currentTileTypesArchivePath, currentGamArchivePath, currentLevelArchivePath] = state.archive;
   currentGamJson = state.gam;
   savedMapVersion = state.savedVersion;
+  currentLocalSaveId = state.localSaveId;
   currentMapInfoOverrides = { ...getDefaultMapInfoOverrides(), ...(state.snapshot.mapInfo || {}) };
   updateMapInfoInputs();
 }
@@ -8299,7 +8301,7 @@ async function restoreScriptHistory(mode) {
     action.state = current;
     (mode === 'undo' ? redoStack : undoStack).push(action);
     markMapDirty();
-    setFileStatus(mode === 'undo' ? 'Script run undone.' : 'Script run redone.');
+    setFileStatus(action.source === 'generator' ? (mode === 'undo' ? 'Map generation undone.' : 'Map generation redone.') : (mode === 'undo' ? 'Script run undone.' : 'Script run redone.'));
   } catch (error) {
     try {
       await restoreScriptMapState(current);
@@ -8311,7 +8313,40 @@ async function restoreScriptHistory(mode) {
     setMapDirty(history.dirty);
     if (history.dirty) scheduleLocalAutosave();
     console.error('Could not restore script history:', error);
-    setFileStatus('Could not ' + mode + ' the script run.');
+    setFileStatus('Could not ' + mode + (action.source === 'generator' ? ' map generation.' : ' the script run.'));
+  } finally {
+    mapHistoryBusy = false;
+    hideLoadingProgress();
+    updateUndoRedoButtons();
+  }
+}
+
+async function applyGeneratedMapSnapshot(snapshot) {
+  if (mapHistoryBusy) throw new Error('Wait for the current map operation to finish.');
+  const previousState = captureScriptMapState();
+  const history = {undo:undoStack.slice(), redo:redoStack.slice(), dirty:mapDirty};
+  const copy = JSON.parse(JSON.stringify(snapshot));
+  copy.id = snapshot.id || makeLocalSaveId();
+  mapHistoryBusy = true;
+  updateUndoRedoButtons();
+  if (localAutosaveTimer) { clearTimeout(localAutosaveTimer); localAutosaveTimer = null; }
+  try {
+    await loadLocalSaveSnapshot(copy);
+    undoStack.length = 0; redoStack.length = 0;
+    undoStack.push(...history.undo.filter(action => action.type === 'script-map'), {type:'script-map', source:'generator', state:previousState});
+    markMapDirty();
+    saveLocalAutosaveNow();
+    setActiveTab('generate');
+    return copy.id;
+  } catch (error) {
+    try { await restoreScriptMapState(previousState); }
+    finally {
+      undoStack.length = 0; redoStack.length = 0;
+      undoStack.push(...history.undo); redoStack.push(...history.redo);
+      setMapDirty(history.dirty);
+      if (history.dirty) scheduleLocalAutosave();
+    }
+    throw error;
   } finally {
     mapHistoryBusy = false;
     hideLoadingProgress();
@@ -12285,7 +12320,20 @@ function createTerrainTileGrid() {
   return grid;
 }
 
+let generatorCliffOverlayVisible = false;
+let generatorCliffOverlay = null;
+function refreshGeneratorCliffOverlay() {
+  if(generatorCliffOverlay){if(scene)scene.remove(generatorCliffOverlay);disposeCliffOverlay(generatorCliffOverlay);generatorCliffOverlay=null;}
+  if(!generatorCliffOverlayVisible||!scene)return;
+  generatorCliffOverlay=createCliffOverlay(THREE,mapTiles,tileTypesById,getTerrainCornerHeight);
+  scene.add(generatorCliffOverlay);
+}
+function setGeneratorCliffOverlayVisible(enabled) {
+  generatorCliffOverlayVisible=!!enabled;
+  refreshGeneratorCliffOverlay();
+}
 function refreshTileGrid() {
+  refreshGeneratorCliffOverlay();
   removeTileGrid();
   if (!tileGridVisible || !scene || !mapW || !mapH) return;
   tileGridGroup = createTerrainTileGrid();
@@ -14124,6 +14172,7 @@ syncMapScriptEditor();
 mountScriptPanelResize(document.getElementById('scriptWidthHandle'), document.getElementById('editPanel'), resizeScriptViewport);
 
 mountMapGenerator(document.getElementById('generatePanel'), {
+  showCliffs: enabled => setGeneratorCliffOverlayVisible(enabled),
   snapshot: () => ({...makeLocalSaveSnapshot(), id: currentLocalSaveId}),
   catalog: async () => {
     await Promise.all([loadStructureDefs(), loadFeatureDefs(), loadComponentDefs()]);
@@ -14131,15 +14180,8 @@ mountMapGenerator(document.getElementById('generatePanel'), {
       tileTypes: DEFAULT_TILE_TYPES_BY_TILESET, tileCounts: TILESETS.map(set => set.count), waterHints: SMART_WATER_TILE_HINTS,
       bodyIds:Object.keys(bodyDefs||{}), propulsionIds:Object.keys(propDefs||{}), weaponIds:Object.keys(weaponDefs||{})};
   },
-  apply: async snapshot => {
-    const copy = JSON.parse(JSON.stringify(snapshot));
-    copy.id = snapshot.id || makeLocalSaveId();
-    await loadLocalSaveSnapshot(copy);
-    markMapDirty();
-    saveLocalAutosaveNow();
-    setActiveTab('generate');
-    return copy.id;
-  },
+  apply: applyGeneratedMapSnapshot,
+  applyHandlesRollback: true,
   validate: () => validateMapFromFileTab(),
   save: () => saveCurrentMap()
 });

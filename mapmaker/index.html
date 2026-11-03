@@ -898,6 +898,19 @@
     .generator-field { display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:8px; font-size:11px; }
     .generator-field input:not([type=checkbox]):not([type=range]), .generator-field select { width:128px; min-width:0; background:#26384d; color:#eef5fc; border:1px solid #526780; padding:4px; }
     .generator-field input[type=checkbox] { width:16px; height:16px; }
+    .generator-cliff-row { display:flex; gap:24px; margin-top:8px; }
+    .generator-on-off { position:relative; flex:none; box-sizing:border-box; width:70px; height:25px; padding:2px 5px 2px 22px; background:#252525; color:#dddcc6; border:1px solid #85877d; border-radius:3px; font:inherit; font-weight:700; cursor:pointer; }
+    .generator-on-off::before { content:''; position:absolute; top:4px; bottom:4px; left:4px; width:13px; background:#a4a79b; }
+    .generator-on-off[aria-checked=true] { background:#393e20; border-color:#b6bd71; color:#e3e6b4; padding-left:5px; padding-right:22px; }
+    .generator-on-off[aria-checked=true]::before { left:auto; right:4px; background:#d3d995; }
+    .generator-on-off:hover { border-color:#d3d995; }
+    .generator-on-off:focus-visible { outline:2px solid #d3d995; outline-offset:2px; }
+    .generator-cliff-row .generator-field { flex:1; margin-top:0; white-space:nowrap; }
+    .generator-preview-toggle { background:#263344; color:#d6d8e5; border:1px solid #415269; padding:3px 12px; font:inherit; cursor:pointer; }
+    .generator-preview-toggle[aria-pressed=true], .generator-preview-toggle:hover { background:#6cf527; color:#000; }
+    .generator-preview-toggle:focus-visible { outline:2px solid #6cf527; outline-offset:2px; }
+    .generator-preview-toggle .generator-help-label { color:inherit; text-decoration:none; cursor:pointer; }
+    #generatePanel .generator-preview-toggle:hover .generator-help-label, #generatePanel .generator-preview-toggle[aria-pressed=true] .generator-help-label { color:#000; font-weight:700; }
     .generator-range-field { display:grid; grid-template-columns:minmax(0,1fr) minmax(80px,1.4fr) 40px; align-items:center; gap:7px; margin-top:10px; }
     .generator-range-title { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .generator-range-field output { color:#a8edff; background:#26384d; border:1px solid #526780; border-radius:3px; padding:2px 4px; text-align:center; font-variant-numeric:tabular-nums; }

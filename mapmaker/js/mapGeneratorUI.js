@@ -1,8 +1,10 @@
-import {generatorDefaults,generateMap,startingBuildingOptions,getStartingBuildingCounts} from './mapGenerator.js?v=20261101-scav-owner-1';
+import {generatorDefaults,generateMap,startingBuildingOptions,getStartingBuildingCounts,getBaseEdgeLimit} from './mapGenerator.js?v=20261101-scav-owner-1';
 import {createLiveMapGeneration} from './liveMapGeneration.js';
 import {getTileCount} from './tileset.js';
+import {getGeneratorLimits,getGeneratorDependencies} from './generatorLimits.js';
 
 const fieldHelp={
+  "showCliffs":"Preview cliff tiles with a red tint and X markers. This only changes the editor display; it does not alter terrain or the saved map.",
   "width": "Map width in terrain tiles, from left to right. More tiles give players more space.",
   "height": "Map height in terrain tiles, from top to bottom.",
   "players": "Number of player starting positions to create. Each player receives the same requested starting buildings, units and base oil.",
@@ -22,7 +24,7 @@ const fieldHelp={
   "maxHeight": "Upper height used for terrain generation. Larger differences from Minimum height create stronger elevation changes.",
   "frequency": "Frequency of terrain waves. Higher values create more closely spaced hills and valleys.",
   "smoothness": "Number of smoothing passes over the height map. More passes soften abrupt changes in elevation.",
-  "cliffs": "Allow high, steep terrain and cliff textures where supported. These areas can restrict movement.",
+  "cliffs": "All units cant access highest terrain areas (vtols also cant land)",
   "border": "Width in tiles of the raised mountain border around the map. Set to 0 to disable it.",
   "water": "Approximate target amount of water. The final coverage depends on water shape, terrain and the land routes cleared for players.",
   "waterStyle": "Pattern used to place water: scattered lakes, a river, a coast or water surrounding islands.",
@@ -83,7 +85,7 @@ const sectionHelp={
 const groups=[
  ['Map',['width|Width (tiles)|number|48|255','height|Height (tiles)|number|48|255','players|Players|number|2|10','tileset|Tileset|select|0:Arizona,1:Urban,2:Rockies','preset|Preset|select|arena:Open arena,ntw:NTW-style,hills:Hills,canyon:Canyon,islands:Islands,city:City']],
  ['Layout',['layout|Starting layout|select|corners:Corners (4 players),circle:Circle,edges:Edges,opposite:Opposite edges,teams:Team groups','teams|Total teams|number|1|5','edge|Base edge distance|number|8|64','baseRadius|Flat base radius|number|7|24','centreRadius|Central arena radius|number|0|30','routes|Routes|number|1|4','routeWidth|Route / ramp width|number|3|14','connected|Require land routes|checkbox']],
- ['Terrain',['symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','border|Mountain border width|number|0|8']],
+ ['Terrain',['symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','showCliffs|Show on map|checkbox','border|Mountain border width|number|0|8']],
  ['Water and textures',['water|Water amount (%) target|number|0|60','waterStyle|Water shape|select|lakes:Lakes,river:River,coast:Coast,islands:Islands','riverWidth|River width|number|2|16','crossings|River crossings|number|1|6','roads|Connect bases with roads|checkbox','roadWidth|Road width|number|1|5','groundTile|Ground tile ID|number|0|77','textureVariety|Ground texture variety|number|1|'+getTileCount(generatorDefaults.tileset),'transitions|Blend terrain edges|checkbox']],
  ['Starting bases',['base|Starting base|select|trucks:Trucks only,small:Small base (33%),medium:Medium base (66%),full:Full base (100%)','trucks|Trucks|number|1|15',...startingBuildingOptions.map(([key,label,,max])=>`${key}|${label}|number|0|${max}`),'modules|Factory modules (other buildings max 1)|number|0|2','orientation|Building / unit facing|select|centre:Face centre,north:North','defenses|Defenses|number|0|12','defenseType|Defense building ID|text']],
  ['Starting units',['truckBody|Truck body ID|text','truckPropulsion|Truck propulsion ID|text','tanks|Tanks|number|0|12','tankWeapon|Tank weapon ID|text','support|Sensor units|number|0|4','cyborgs|Cyborgs|number|0|8']],
@@ -105,17 +107,18 @@ export function mountMapGenerator(host,bridge) {
   const box=document.createElement('div');box.className='panel-box generator-box';host.append(box);
   const heading=document.createElement('div');heading.className='show-hide-title';heading.textContent='Generate map';box.append(heading);
   const form=document.createElement('form');form.className='generator-form';box.append(form);
-  const inputs=new Map(),values=new Map(),maxLabels=new Map(),fieldLabels=new Map(),sectionLabels=new Map();
+  const inputs=new Map(),values=new Map(),maxLabels=new Map(),minLabels=new Map(),supportedRanges=new Map(),fieldLabels=new Map(),sectionLabels=new Map();
   for(const [title,fields] of groups){
     const details=document.createElement('details');details.open=title==='Map';
     const summary=document.createElement('summary');summary.textContent=title;sectionLabels.set(title,summary);details.append(summary);
+    let cliffRow=null;
     for(const field of fields){const [key,label,type,min,max]=field.split('|');
-      const wrapper=document.createElement('label');wrapper.className='generator-field';
+      const wrapper=document.createElement(['cliffs','showCliffs'].includes(key)?'div':'label');wrapper.className='generator-field';
       const text=document.createElement('span');text.textContent=label;fieldLabels.set(key,text);
-      const control=document.createElement(type==='select'?'select':'input');control.name=key;control.id='gen-'+key;
+      const control=document.createElement(type==='select'?'select':['cliffs','showCliffs'].includes(key)?'button':'input');control.name=key;control.id='gen-'+key;
       if(type==='select')for(const choice of min.split(',')){const [value,name]=choice.split(':');const opt=document.createElement('option');opt.value=value;opt.textContent=name;control.append(opt);}
-      else {control.type=type==='number'?'range':type;if(type==='number'){control.min=min;control.max=max;control.step='1';control.setAttribute('aria-label',label);}}
-      if(type==='checkbox')control.checked=generatorDefaults[key];else control.value=generatorDefaults[key];
+      else {control.type=['cliffs','showCliffs'].includes(key)?'button':type==='number'?'range':type;if(type==='number'){control.min=min;control.max=max;control.step='1';supportedRanges.set(key,[Number(min),Number(max)]);control.setAttribute('aria-label',label);}}
+      if(type==='checkbox')control.checked=generatorDefaults[key]??false;else control.value=generatorDefaults[key];
       if(type==='number'){
         wrapper.classList.add('generator-range-field');
         const value=document.createElement('output');value.htmlFor=control.id;value.textContent=control.value;values.set(key,value);
@@ -123,44 +126,121 @@ export function mountMapGenerator(host,bridge) {
         const track=document.createElement('span');track.className='generator-range-track';
         const low=document.createElement('span');low.textContent=min;low.setAttribute('aria-hidden','true');
         const high=document.createElement('span');high.textContent=max;high.setAttribute('aria-hidden','true');
-        maxLabels.set(key,high);
+        maxLabels.set(key,high);minLabels.set(key,low);
         track.append(low,control,high);wrapper.append(title,track,value);
-      }else wrapper.append(text,control);
-      details.append(wrapper);inputs.set(key,control);
+      }else if(key==='showCliffs'){control.className='generator-preview-toggle';control.setAttribute('aria-pressed','false');control.append(text);wrapper.append(control);}
+      else if(key==='cliffs'){control.className='generator-on-off';control.setAttribute('role','switch');control.setAttribute('aria-label',label);wrapper.append(text,control);}
+      else wrapper.append(text,control);
+      if(key==='cliffs'){cliffRow=document.createElement('div');cliffRow.className='generator-cliff-row';details.append(cliffRow);cliffRow.append(wrapper);}
+      else if(key==='showCliffs')cliffRow.append(wrapper);
+      else details.append(wrapper);
+      inputs.set(key,control);
     }form.append(details);
   }
+  const fieldPopups=new Map();
+  let controlLimits={},dependencyReasons={},pendingKey=null;
   const attachHelp=(label,message,id,keyboardLabel=true)=>{
     if(!message)throw new Error('Missing generator help: '+id);
     label.classList.add('generator-help-label');if(keyboardLabel)label.tabIndex=0;
     label.setAttribute('aria-describedby',id);
     const popup=document.createElement('div');popup.id=id;popup.className='generator-tooltip';popup.hidden=true;popup.setAttribute('role','tooltip');popup.textContent=message;host.append(popup);
+    const messageText=message;
+    const helpKey=id.startsWith('generator-help-section-')?null:id.slice(15);
     const hide=()=>{popup.hidden=true;};
-    const show=()=>{
-      const rect=label.getBoundingClientRect();
-      popup.style.left=Math.max(8,Math.min(rect.left,window.innerWidth-336))+'px';popup.hidden=false;
-      popup.style.top=Math.max(8,Math.min(rect.bottom+10,window.innerHeight-popup.offsetHeight-8))+'px';
+    const show=(override,besideControl=false)=>{
+      popup.textContent=typeof override==='string'?override:((dependencyReasons[helpKey]||'')+' '+messageText).trim();
+      const anchor=besideControl?(label.closest?.('.generator-field')||inputs.get(helpKey)||label):label;
+      const rect=(anchor.getBoundingClientRect?anchor:label).getBoundingClientRect();
+      popup.hidden=false;
+      const width=popup.offsetWidth||330,gap=12;
+      let left=besideControl?(rect.right??rect.left)+gap:Math.max(8,Math.min(rect.left,window.innerWidth-width-8));
+      let top=besideControl?(rect.top??rect.bottom):rect.bottom+10;
+      if(besideControl&&left+width>window.innerWidth-8){
+        if(rect.left-width-gap>=8)left=rect.left-width-gap;
+        else{left=Math.max(8,Math.min(rect.left,window.innerWidth-width-8));top=rect.bottom+10;}
+      }
+      popup.style.left=left+'px';
+      popup.style.top=Math.max(8,Math.min(top,window.innerHeight-popup.offsetHeight-8))+'px';
     };
-    label.addEventListener('mouseenter',show);label.addEventListener('mouseleave',hide);
-    label.addEventListener('focus',show);label.addEventListener('blur',hide);
+    const showLabel=()=>show(undefined,helpKey==='showCliffs');
+    const showControl=override=>show(override,true);
+    label.addEventListener('mouseenter',showLabel);label.addEventListener('mouseleave',hide);
+    label.addEventListener('focus',showLabel);label.addEventListener('blur',hide);
     label.addEventListener('keydown',event=>{if(event.key==='Escape')hide();});
     host.addEventListener('scroll',hide,true);
-    return {show,hide};
+    return {show,showControl,hide};
   };
   for(const [key,label] of fieldLabels){
-    const help=attachHelp(label,fieldHelp[key],'generator-help-'+key);
+    const help=attachHelp(label,fieldHelp[key],'generator-help-'+key,key!=='showCliffs');
+    fieldPopups.set(key,help);
     inputs.get(key).setAttribute('aria-describedby','generator-help-'+key);
-    inputs.get(key).addEventListener('focus',help.show);inputs.get(key).addEventListener('blur',help.hide);
+    inputs.get(key).addEventListener('mouseenter',()=>help.showControl());
+    inputs.get(key).addEventListener('mouseleave',help.hide);
+    inputs.get(key).addEventListener('keydown',event=>{if(event.key==='Escape')help.hide();});
+    inputs.get(key).addEventListener('focus',()=>{
+      const input=inputs.get(key),limit=controlLimits[key],value=Number(input.value);
+      if(input.type==='range'&&limit&&(value<=limit.min||value>=limit.max))help.showControl(rangeMessage(key,value<=limit.min));
+      else help.showControl();
+    });inputs.get(key).addEventListener('blur',help.hide);
   }
   for(const [title,label] of sectionLabels)attachHelp(label,sectionHelp[title],'generator-help-section-'+title.toLowerCase().replace(/[^a-z]+/g,'-'),false);
   const report=document.createElement('div');report.className='generator-report';report.setAttribute('aria-live','polite');host.append(report);
-  const syncValues=()=>{
-    const variety=inputs.get('textureVariety'),max=getTileCount(inputs.get('tileset').value);
-    variety.max=String(max);variety.value=String(Math.max(1,Math.min(max,Number(variety.value)||1)));
-    maxLabels.get('textureVariety').textContent=String(max);
-    for(const [key,value] of values)value.textContent=inputs.get(key).value;
+  const readOptions=()=>Object.fromEntries([...inputs].filter(([key])=>key!=='showCliffs').map(([key,input])=>[key,(key==='cliffs'||input.type==='checkbox')?input.checked:input.type==='range'?Number(input.value):input.value]));
+  const rangeMessage=(key,lower=false)=>{
+    const limit=controlLimits[key],label=fieldLabels.get(key).textContent;
+    return (lower?limit?.minReason:limit?.maxReason)||limit?.reason||(label+': '+(lower?'Minimum':'Maximum')+' supported value is '+(lower?limit.min:limit.max)+'.'+(/Count$|^(trucks|tanks|support|cyborgs|baseOil|expansions|expansionOil|neutralOil|drums|artifacts|defenses)$/.test(key)?' Actual placement also depends on available space; check generation warnings.':''));
   };
-  const setOptions=o=>{for(const [key,input] of inputs)if(key in o){if(input.type==='checkbox')input.checked=!!o[key];else input.value=o[key];}syncValues();};
-  const options=()=>Object.fromEntries([...inputs].map(([k,input])=>[k,input.type==='checkbox'?input.checked:input.type==='range'?Number(input.value):input.value]));
+  const syncValues=(changedKey=null)=>{
+    let blocked=null;
+    // Existing bounds stop a single edit from silently changing other settings.
+    if(changedKey&&controlLimits[changedKey]&&inputs.get(changedKey).type==='range'){
+      const input=inputs.get(changedKey),limit=controlLimits[changedKey],requested=Number(input.value);
+      let value=Math.max(limit.min,Math.min(limit.max,requested));
+      if(limit.allowed&&!limit.allowed.includes(value))value=limit.allowed.reduce((best,n)=>Math.abs(n-value)<Math.abs(best-value)?n:best,limit.allowed[0]);
+      if(value!==requested){blocked={key:changedKey,lower:requested<limit.min};input.value=String(value);}
+    }
+    for(let pass=0;pass<6;pass++){
+      const raw=readOptions();
+      controlLimits=getGeneratorLimits(raw,Object.fromEntries(supportedRanges));
+      dependencyReasons=getGeneratorDependencies(raw);
+      let adjusted=false;
+      for(const key of ['players','teams','edge','baseRadius','width','height',...supportedRanges.keys()]){
+        const input=inputs.get(key),limit=controlLimits[key];if(!limit)continue;
+        const requested=Number(input.value);
+        let value=Math.max(limit.min,Math.min(limit.max,requested));
+        if(limit.allowed&&!limit.allowed.includes(value))value=limit.allowed.reduce((best,n)=>Math.abs(n-value)<Math.abs(best-value)?n:best,limit.allowed[0]);
+        input.min=String(limit.min);input.max=String(limit.max);input.value=String(value);
+        input.setAttribute('aria-valuemin',input.min);input.setAttribute('aria-valuemax',input.max);
+        minLabels.get(key).textContent=input.min;maxLabels.get(key).textContent=input.max;
+        if(requested!==value){adjusted=true;if(['players','teams','edge','baseRadius','width','height'].includes(key))break;}
+      }
+      for(const [key,input] of inputs)input.disabled=!!dependencyReasons[key];
+      if(!adjusted)break;
+    }
+    const cliffs=inputs.get('cliffs');cliffs.textContent=cliffs.checked?'ON':'OFF';cliffs.setAttribute('aria-checked',String(cliffs.checked));
+    for(const [key,value] of values)value.textContent=inputs.get(key).value;
+    if(blocked)fieldPopups.get(blocked.key).showControl(rangeMessage(blocked.key,blocked.lower));
+  };
+  for(const [key,input] of inputs){
+    if(input.type!=='range')continue;
+    const atLower=()=>Number(input.value)<=Number(input.min),atUpper=()=>Number(input.value)>=Number(input.max);
+    const explain=lower=>fieldPopups.get(key).showControl(rangeMessage(key,lower));
+    input.addEventListener('input',()=>{pendingKey=key;if(atUpper())explain(false);else if(atLower())explain(true);else fieldPopups.get(key).hide();});
+    input.addEventListener('pointerdown',()=>{if(atUpper())explain(false);else if(atLower())explain(true);});
+    input.addEventListener('keydown',event=>{
+      const up=['ArrowRight','ArrowUp','PageUp','End'].includes(event.key),down=['ArrowLeft','ArrowDown','PageDown','Home'].includes(event.key);
+      if((up&&atUpper())||(down&&atLower())){event.preventDefault();explain(down);return;}
+      const allowed=controlLimits[key]?.allowed,current=Number(input.value);
+      if(allowed&&(up||down)&&!['Home','End'].includes(event.key)){
+        const next=up?allowed.find(n=>n>current):allowed.slice().reverse().find(n=>n<current);
+        if(next!==undefined&&Math.abs(next-current)>1){event.preventDefault();input.value=String(next);input.dispatchEvent(new Event('input',{bubbles:true}));}
+      }
+    });
+    input.addEventListener('wheel',event=>{if((event.deltaY<0&&atUpper())||(event.deltaY>0&&atLower())){event.preventDefault();explain(event.deltaY>0);}},{passive:false});
+  }
+  syncValues();
+  const setOptions=o=>{for(const [key,input] of inputs)if(key in o){if(key==='cliffs'||input.type==='checkbox')input.checked=!!o[key];else input.value=o[key];}syncValues();};
+  const options=readOptions;
   const signature=()=>JSON.stringify(options());
   let appliedOptions=options(),appliedSignature=signature(),submittedOptions=null,submittedSignature=null,updating=false,hasGenerated=false;
   const actions=document.createElement('div');actions.className='generator-update-actions';actions.hidden=false;host.append(actions);
@@ -193,7 +273,7 @@ export function mountMapGenerator(host,bridge) {
     report.classList.toggle('generator-error',!!r.errors.length);markErrorFields(r.errors);
   }});
   const invalidate=()=>{
-    syncValues();live.request(options());syncButton();
+    const key=pendingKey;pendingKey=null;syncValues(key);live.request(options());syncButton();
     if(signature()===appliedSignature&&!updating)status('No unapplied changes.');
   };
   update.addEventListener('click',async()=>{
@@ -207,7 +287,12 @@ export function mountMapGenerator(host,bridge) {
     live.cancel();setOptions(appliedOptions);syncButton();status('Changes cancelled. Current map unchanged.');
   });
   inputs.get('base').addEventListener('change',()=>{setOptions(getStartingBuildingCounts(inputs.get('base').value));invalidate();});
-  form.addEventListener('input',invalidate);form.addEventListener('change',invalidate);form.addEventListener('submit',e=>e.preventDefault());
+  inputs.get('cliffs').addEventListener('click',()=>{const cliffs=inputs.get('cliffs');cliffs.checked=!cliffs.checked;invalidate();});
+  const showCliffs=inputs.get('showCliffs');
+  let showCliffsEnabled=false;
+  showCliffs.addEventListener('click',()=>{showCliffsEnabled=!showCliffsEnabled;showCliffs.setAttribute('aria-pressed',String(showCliffsEnabled));bridge.showCliffs?.(showCliffsEnabled);});
+  const onSettingChange=event=>{if(event.target!==showCliffs)invalidate();};
+  form.addEventListener('input',onSettingChange);form.addEventListener('change',onSettingChange);form.addEventListener('submit',e=>e.preventDefault());
   inputs.get('preset').addEventListener('change',()=>{
     const selected=inputs.get('preset').value;
     const presets={arena:{terrain:'flat',water:0,roads:false},ntw:{terrain:'flat',water:0,baseOil:12,base:'full'},

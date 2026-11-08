@@ -1,5 +1,5 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
-import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261028-controls-1";
+import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261108-popup-1";
 
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const INITIAL_PLAYER_LIMIT = 100;
@@ -3096,7 +3096,7 @@ function renderSummary(accountList, gameList) {
       <span class="stats-card-label">Matches</span>
       <strong class="stats-card-value">${gameList.length}</strong>
     </article>
-    <article class="stats-card">
+    <article class="stats-card stats-latest-card">
       <span class="stats-card-label">Latest Match</span>
       <strong class="stats-card-value">${latestMatch ? formatShortDate(latestMatch.endDate) : "--"}</strong>
       ${latestReplayUrl
@@ -3118,6 +3118,7 @@ function renderSummary(accountList, gameList) {
     summaryElement.append(statusElement);
     renderStatusText();
   }
+  personalRatings?.placeButton(summaryElement, statusElement);
   renderTrendingPlayers(accountList, gameList);
 }
 

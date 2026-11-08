@@ -194,8 +194,25 @@
 
     .stats-summary {
       position: relative;
-      grid-template-columns: minmax(280px, 420px) max-content max-content max-content max-content max-content minmax(0, 1fr);
+      grid-template-columns: minmax(220px, 420px) max-content max-content max-content max-content minmax(260px, 1fr) 36px max-content;
       overflow: visible;
+    }
+
+    .stats-summary .stats-latest-card {
+      min-width: 0;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .stats-summary .stats-latest-card .stats-card-label,
+    .stats-summary .stats-latest-card .stats-card-value {
+      flex-shrink: 0;
+    }
+
+    .stats-summary .stats-latest-card .stats-player-note {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .stats-summary .stats-games-filter-menu {
@@ -719,6 +736,6 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20261028-rating-controls-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20261108-rating-popup-1"></script>
 </body>
 </html>

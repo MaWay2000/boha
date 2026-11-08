@@ -16,9 +16,12 @@
 .site-chat-button:hover { background: #19526a; }
 .site-chat-button:focus-visible, .site-chat-dialog :focus-visible { outline: 2px solid #81eaff; outline-offset: 3px; }
 .site-chat-dialog {
-  width: min(760px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: 90vw;
+  height: 90dvh;
+  margin: auto;
   max-width: none;
-  max-height: calc(100dvh - 32px);
+  max-height: 90dvh;
   padding: 0;
   border: 1px solid #397489;
   border-radius: 14px;
@@ -28,14 +31,13 @@
   box-shadow: 0 24px 90px #000b;
 }
 .site-chat-dialog::backdrop { background: #02090fd9; }
-.site-chat-layout { display: flex; flex-direction: column; height: min(650px, calc(100dvh - 36px)); }
+.site-chat-layout { display: flex; flex-direction: column; height: 100%; }
 .site-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid #244552; background: #102734; }
 .site-chat-header h2 { margin: 4px 0 0; color: #83e6ff; font: 700 26px 'Oxanium', sans-serif; }
 .site-chat-eyebrow { color: #8ab0c0; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; }
 .site-chat-dialog button { border: 1px solid #3e7487; border-radius: 5px; padding: 9px 14px; color: #d6f5ff; background: #163a4b; cursor: pointer; font: inherit; font-weight: 700; }
 .site-chat-dialog button:disabled { opacity: .55; cursor: wait; }
 .site-chat-dialog .site-chat-close { font-size: 22px; line-height: 1; padding: 8px 12px; }
-.site-chat-note { margin: 14px 24px 4px; color: #9cb8c6; font-size: 12px; }
 .site-chat-messages { flex: 1; min-height: 100px; overflow-y: auto; overscroll-behavior: contain; margin: 0; padding: 16px 24px; list-style: none; scrollbar-color: #53cbe8 #0a1b26; }
 .site-chat-message { padding: 12px 0; border-bottom: 1px solid #1b3744; overflow-wrap: anywhere; }
 .site-chat-message header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 5px; }
@@ -59,7 +61,7 @@ body.site-chat-open { overflow: hidden; }
 }
 @media (max-width: 500px) {
   .site-chat-header { padding: 14px 16px; }
-  .site-chat-note, .site-chat-empty { margin-inline: 16px; }
+  .site-chat-empty { margin-inline: 16px; }
   .site-chat-messages { padding-inline: 16px; }
   .site-chat-form { padding: 10px 16px 14px; }
   .site-chat-status { padding-inline: 16px; }

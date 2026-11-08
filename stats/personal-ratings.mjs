@@ -127,12 +127,16 @@ export function mountPersonalRatings(host, onChange, storage) {
   const cache = new Map();
   const style = document.createElement("style");
   style.textContent = `
-    .personal-ratings { margin: 0 0 20px; border: 1px solid #315668; border-radius: 12px; background: linear-gradient(130deg, #102b38, #091922 75%); color: #c1dae2; overflow: hidden; }
-    .personal-ratings summary { cursor: pointer; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 17px 20px; list-style: none; font-weight: 650; }
-    .personal-ratings summary::-webkit-details-marker { display: none; }
-    .personal-ratings .rating-title::before { content: '▸'; margin-right: 10px; color: #6de8ff; }
-    .personal-ratings[open] .rating-title::before { content: '▾'; }
-    .personal-ratings[open] summary { border-bottom: 1px solid #2b4958; }
+    .personal-ratings { box-sizing: border-box; width: min(1100px, 90vw); max-width: none; max-height: 90dvh; padding: 0; margin: auto; border: 1px solid #315668; border-radius: 12px; background: linear-gradient(130deg, #102b38, #091922 75%); color: #c1dae2; overflow: auto; font: 14px 'Space Grotesk', sans-serif; }
+    .personal-ratings::backdrop { background: #020a10d9; }
+    .personal-ratings .rating-header { position: sticky; top: 0; z-index: 1; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px; border-bottom: 1px solid #2b4958; background: #102b38; }
+    .personal-ratings .rating-header h2 { margin: 0 0 8px; font: 700 24px 'Oxanium', sans-serif; color: #8ae9ff; }
+    .personal-ratings .rating-close { padding: 8px 12px; font-size: 24px; line-height: 1; }
+    .stats-summary > .rating-settings-button { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; justify-self: end; width: 36px; min-width: 36px; max-width: 36px; align-self: stretch; min-height: 40px; padding: 7px; border: 0; border-left: 1px solid rgba(179,125,255,.18); border-radius: 0; background: transparent; color: #8ae9ff; cursor: pointer; }
+    .rating-settings-button svg { width: 20px; height: 20px; }
+    .rating-settings-button:hover { color: white; background: #9360cd22; }
+    .rating-settings-button:focus-visible { outline: 2px solid #6de8ff; outline-offset: -3px; }
+    body.personal-ratings-open { overflow: hidden; }
     .personal-ratings .rating-status { border: 1px solid #315b69; border-radius: 20px; padding: 4px 10px; background: #0c2430; color: #91e9ef; font-size: 11px; font-weight: 500; overflow-wrap: anywhere; }
     .personal-ratings form { padding: 20px; }
     .personal-ratings .rating-toolbar { display: flex; align-items: end; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -159,13 +163,18 @@ export function mountPersonalRatings(host, onChange, storage) {
     .personal-ratings .rating-feedback { color: #ffcf7a; margin-top: 10px; }
     .personal-ratings .rating-feedback:empty { display: none; }
     @media (max-width: 900px) { .personal-ratings .rating-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } .personal-ratings .rating-section:last-child { grid-column: 1 / -1; } }
-    @media (max-width: 560px) { .personal-ratings form { padding: 14px; } .personal-ratings summary { padding: 15px 14px; } .personal-ratings .rating-fields { grid-template-columns: 1fr; } .personal-ratings .rating-section:last-child { grid-column: auto; } .personal-ratings .rating-actions button { flex: 1 1 100%; } }
+    @media (max-width: 560px) { .personal-ratings form { padding: 14px; } .personal-ratings .rating-header { padding: 15px 14px; } .personal-ratings .rating-fields { grid-template-columns: 1fr; } .personal-ratings .rating-section:last-child { grid-column: auto; } .personal-ratings .rating-actions button { flex: 1 1 100%; } }
   `;
   document.head.append(style);
-  const panel = document.createElement("details");
+  style.dataset.ratingPopup = "";
+  let modalDocument = document;
+  try { if (window.parent !== window && window.parent.location.origin === window.location.origin) modalDocument = window.parent.document; } catch {}
+  if (modalDocument !== document) modalDocument.head.append(style.cloneNode(true));
+  const panel = modalDocument.createElement("dialog");
   panel.className = "personal-ratings";
+  panel.setAttribute("aria-labelledby", "personalRatingTitle");
   panel.innerHTML = `
-    <summary><span class="rating-title">Personal rating settings</span><span class="rating-status" aria-live="polite"></span></summary>
+    <header class="rating-header"><div><h2 id="personalRatingTitle">Personal rating settings</h2><span class="rating-status" aria-live="polite"></span></div><button class="rating-close" type="button" aria-label="Close rating settings" autofocus>×</button></header>
     <form>
       <div class="rating-toolbar">
         <label>Preset<select name="preset"><option value="published">Official published ratings</option><option value="current">Site defaults · K=20 preview</option><option value="bohan">Bohan-style · K=40 preview</option><option value="custom">Custom preview</option></select></label>
@@ -193,7 +202,26 @@ export function mountPersonalRatings(host, onChange, storage) {
       <p class="rating-help">Settings are remembered on this device. Previews use the selected category's published matches and visible player identities. Hidden players, quit-time and power-won data are unavailable, so neither preset guarantees an exact match to official ratings or Bohan's website. Crashed and cheated matches are always excluded.</p>
       <p class="rating-feedback" role="status" aria-live="polite"></p>
     </form>`;
-  host.prepend(panel);
+  modalDocument.body.append(panel);
+  const settingsButton = document.createElement("button");
+  settingsButton.type = "button";
+  settingsButton.className = "rating-settings-button";
+  settingsButton.setAttribute("aria-label", "Personal rating settings");
+  settingsButton.setAttribute("aria-haspopup", "dialog");
+  settingsButton.title = "Personal rating settings";
+  settingsButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m9 3-.6 2.2-2 .9L4.3 5.5 2.5 8.6 4 10.3v2.3l-1.5 1.8 1.8 3.1 2.1-.6 2 .9L9 20h3.6l.6-2.2 2-.9 2.1.6 1.8-3.1-1.5-1.8v-2.3l1.5-1.7-1.8-3.1-2.1.6-2-.9L12.6 3Z" transform="translate(1.2 .5)"/><circle cx="12" cy="12" r="3"/></svg>';
+  function placeButton(summary = host.querySelector(".stats-summary"), status = host.querySelector("#resultsStatus")) {
+    if (status?.parentNode === summary) summary.insertBefore(settingsButton, status);
+    else summary?.append(settingsButton);
+  }
+  placeButton();
+  settingsButton.addEventListener("click", () => { panel.showModal(); panel.scrollTop = 0; modalDocument.body.classList.add("personal-ratings-open"); });
+  panel.querySelector(".rating-close").addEventListener("click", () => panel.close());
+  panel.addEventListener("close", () => { modalDocument.body.classList.remove("personal-ratings-open"); settingsButton.focus(); });
+  window.addEventListener("pagehide", () => {
+    panel.close(); panel.remove(); modalDocument.body.classList.remove("personal-ratings-open");
+    if (modalDocument !== document) modalDocument.head.querySelectorAll('style[data-rating-popup]').forEach(node => node.remove());
+  }, { once: true });
   const form = panel.querySelector("form");
   const preset = form.elements.namedItem("preset");
   const badge = panel.querySelector(".rating-status");
@@ -265,6 +293,7 @@ export function mountPersonalRatings(host, onChange, storage) {
     apply(next, false);
   });
   return {
+    placeButton,
     getBoard(name, data, hydrate) {
       if (!settings) return hydrate(name);
       if (payload !== data) { payload = data; cache.clear(); }

@@ -1,7 +1,8 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
-import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261108-bohan-default-1";
+import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261108-maway-fields-1";
 
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
+const RATING_PERFORMANCE_URL = new URL('./published/rating-performance.json', import.meta.url);
 const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
@@ -358,6 +359,10 @@ async function ensureLeaderboardData(force = false) {
   if (!payload.leaderboards || !Array.isArray(payload.games)) {
     throw new Error("Published leaderboard data is incomplete.");
   }
+  try {
+    const performance = await readJson(RATING_PERFORMANCE_URL, payload.generatedAt || 'performance', force);
+    payload.ratingPerformance = performance.format === 2 && performance.games && typeof performance.games === 'object' ? performance.games : {};
+  } catch { payload.ratingPerformance = {}; }
   leaderboardData = payload;
   leaderboardDataSignature = signature;
   bannedAccountIds = new Set((payload.leaderboards.Global?.players || [])
@@ -1060,6 +1065,7 @@ function getPlayerPowerLabel(account) {
 }
 
 function getTeamStrengthPercent(team) {
+  if (Number.isFinite(team.ratingExpected)) return Math.round(team.ratingExpected * 100);
   const totalRankedPlayers = globalRankMap.size;
   if (!totalRankedPlayers || !team.players.length) {
     return null;
@@ -1487,6 +1493,17 @@ function bindCopyButtons(scope) {
 }
 
 function renderPlayerGameDetails(game, activeAccount) {
+  const slot = getAccountGameSlot(game, activeAccount);
+  const detail = slot?.ratingBreakdown;
+  const number = value => Number(value).toFixed(2);
+  const explanation = detail ? `<section class="stats-maway-breakdown" style="margin-top:14px;padding:12px;border:1px solid #315668;border-radius:6px;color:#c1dae2;font-size:12px;line-height:1.7">
+    <strong>Maway v1 · Beta 3 breakdown</strong><br>
+    Before match: your team ${number(detail.teamAverage)} Elo · opponents ${number(detail.opponentAverage)} Elo · expected result ${number(detail.expected * 100)}%.<br>
+    Result change ${number(detail.base)} · personal adjustment ${number(detail.adjustment)} · final ${number(slot.eloDelta ?? 0)}${detail.capped ? ` (limited by ±${number(detail.matchCap)} cap)` : ''}.<br>
+    ${detail.performanceAvailable ? `Match performance ${number(detail.performanceScore * 100)}% · expected performance ${number(detail.expectedPerformance * 100)}% · rank ${detail.performanceRank}/${detail.fieldSize}. Weights: ${Object.entries(detail.metrics).map(([key,value])=>`${escapeHtml(key)} ${number(value*100)}%`).join(', ')}.` : 'Verified six-stat coverage is incomplete for this match; result-only scoring.'}
+    ${detail.provisional ? `Provisional K bonus: fades over ${detail.provisionalGames} rated matches.` : ''}
+    ${!detail.rated ? 'This identity is not rated; its share is not transferred to teammates.' : ''}
+    </section>` : '';
   return `
     <div class="stats-player-game-detail-panel">
       <div class="stats-matchup stats-matchup-tiles">
@@ -1499,6 +1516,7 @@ function renderPlayerGameDetails(game, activeAccount) {
           currentGameKey: getPlayerGameKey(game)
         })}
       </div>
+      ${explanation}
     </div>
   `;
 }
@@ -2854,7 +2872,7 @@ function renderMatchup(game, options = {}) {
                 .join("")}
             </div>
             ${showTeamStrength ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
-              Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
+              ${game.ratingMethod === 'maway-v1' ? 'Pre-match chance' : 'Team power'}: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
             ${renderUpsetBadge(team, strengthPercent)}
           </div>
@@ -2878,7 +2896,7 @@ function renderMatchup(game, options = {}) {
             </span>
             ${renderUpsetBadge(team, strengthPercent)}
             ${showTeamStrength ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
-              Team power: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
+              ${game.ratingMethod === 'maway-v1' ? 'Pre-match chance' : 'Team power'}: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
           </div>
           ${vsLabel}

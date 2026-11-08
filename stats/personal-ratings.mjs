@@ -24,14 +24,15 @@ export function normalizeSettings(input) {
 export function readSettings(storage) {
   try {
     const saved = JSON.parse(storage.getItem(STORAGE_KEY));
-    return saved?.version === 1 ? normalizeSettings(saved.settings) : null;
-  } catch { return null; }
+    if (saved?.version === 1 && saved.mode === "published") return null;
+    return saved?.version === 1 ? normalizeSettings(saved.settings) : { ...BOHAN_SETTINGS };
+  } catch { return { ...BOHAN_SETTINGS }; }
 }
 
 export function saveSettings(storage, settings) {
   try {
     if (settings) storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, settings: normalizeSettings(settings) }));
-    else storage.removeItem(STORAGE_KEY);
+    else storage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, mode: "published" }));
     return true;
   } catch { return false; }
 }
@@ -177,8 +178,8 @@ export function mountPersonalRatings(host, onChange, storage) {
     <header class="rating-header"><div><h2 id="personalRatingTitle">Personal rating settings</h2><span class="rating-status" aria-live="polite"></span></div><button class="rating-close" type="button" aria-label="Close rating settings" autofocus>×</button></header>
     <form>
       <div class="rating-toolbar">
-        <label>Preset<select name="preset"><option value="published">Official published ratings</option><option value="current">Site defaults · K=20 preview</option><option value="bohan">Bohan-style · K=40 preview</option><option value="custom">Custom preview</option></select></label>
-        <p>Start with the site defaults, adjust any value, then recalculate your personal leaderboard.</p>
+        <label>Preset<select name="preset"><option value="published">Official published ratings</option><option value="current">Classic · K=20 preview</option><option value="bohan">Bohan-style · K=40 · default</option><option value="custom">Custom preview</option></select></label>
+        <p>Bohan-style is the default. Adjust any value, then recalculate your personal leaderboard.</p>
       </div>
       <div class="rating-fields">
         <fieldset class="rating-section"><legend>Rating formula</legend>
@@ -193,12 +194,12 @@ export function mountPersonalRatings(host, onChange, storage) {
           <label class="rating-switch"><input name="equalTeams" type="checkbox">Require equal team sizes</label>
         </fieldset>
         <fieldset class="rating-section"><legend>New-player boost</legend>
-          <label>New-player multiplier<input name="multiplier" type="number" min="1" max="10" step="any" required><small>Default ×1 leaves rating changes unboosted.</small></label>
+          <label>New-player multiplier<input name="multiplier" type="number" min="1" max="10" step="any" required><small>Bohan-style uses ×2. Set ×1 for no boost.</small></label>
           <label>Multiplier decreases over games<input name="multiplierGames" type="number" min="0" max="10000" step="1" required><small>The boost fades over rated games. Set 0 to disable it.</small></label>
           <p>These values affect only your browser's preview. Published wins, losses and draws stay unchanged.</p>
         </fieldset>
       </div>
-      <div class="rating-actions"><button type="submit">Recalculate</button><button type="button" class="rating-defaults">Load site defaults</button><button type="button" class="rating-reset">Reset to published</button></div>
+      <div class="rating-actions"><button type="submit">Recalculate</button><button type="button" class="rating-defaults">Load Bohan defaults</button><button type="button" class="rating-reset">Reset to published</button></div>
       <p class="rating-help">Settings are remembered on this device. Previews use the selected category's published matches and visible player identities. Hidden players, quit-time and power-won data are unavailable, so neither preset guarantees an exact match to official ratings or Bohan's website. Crashed and cheated matches are always excluded.</p>
       <p class="rating-feedback" role="status" aria-live="polite"></p>
     </form>`;
@@ -256,7 +257,13 @@ export function mountPersonalRatings(host, onChange, storage) {
       ? "Applied for this page. Browser storage is unavailable; settings could not be saved."
       : settings ? "Personal preview applied. Official published ratings are unchanged." : "Showing official published ratings.";
   }
-  showSettings(settings || CURRENT_SETTINGS, settings ? "custom" : "published");
+  function selectedPreset(value) {
+    if (!value) return "published";
+    if (Object.keys(BOHAN_SETTINGS).every(key => value[key] === BOHAN_SETTINGS[key])) return "bohan";
+    if (Object.keys(CURRENT_SETTINGS).every(key => value[key] === CURRENT_SETTINGS[key])) return "current";
+    return "custom";
+  }
+  showSettings(settings || BOHAN_SETTINGS, selectedPreset(settings));
   showStatus();
   preset.addEventListener("change", () => {
     if (preset.value === "custom") {
@@ -279,8 +286,8 @@ export function mountPersonalRatings(host, onChange, storage) {
     } catch (error) { feedback.textContent = error.message; }
   });
   panel.querySelector(".rating-defaults").addEventListener("click", () => {
-    showSettings(CURRENT_SETTINGS, "current");
-    feedback.textContent = "Site defaults loaded. You can edit any value, then press Recalculate.";
+    showSettings(BOHAN_SETTINGS, "bohan");
+    feedback.textContent = "Bohan defaults loaded. You can edit any value, then press Recalculate.";
   });
   panel.querySelector(".rating-reset").addEventListener("click", () => {
     showSettings(CURRENT_SETTINGS, "published");
@@ -289,7 +296,7 @@ export function mountPersonalRatings(host, onChange, storage) {
   window.addEventListener("storage", event => {
     if (event.key !== STORAGE_KEY && event.key !== null) return;
     const next = readSettings(storage);
-    showSettings(next || CURRENT_SETTINGS, next ? "custom" : "published");
+    showSettings(next || BOHAN_SETTINGS, selectedPreset(next));
     apply(next, false);
   });
   return {

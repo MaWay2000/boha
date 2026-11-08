@@ -149,14 +149,14 @@ test("older saved settings adopt the original scale and team-size defaults", () 
 test("only the personal storage key changes; bad or unavailable storage is tolerated", () => {
   const values = new Map([["existing-progress", "keep"]]);
   const storage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value), removeItem: key => values.delete(key) };
-  assert.equal(readSettings(storage), null);
+  assert.deepEqual(readSettings(storage), BOHAN_SETTINGS);
   assert.equal(saveSettings(storage, CURRENT_SETTINGS), true);
   assert.deepEqual(readSettings(storage), CURRENT_SETTINGS);
   values.set(STORAGE_KEY, '{"version":1,"settings":{"k":"bad"}}');
-  assert.equal(readSettings(storage), null);
+  assert.deepEqual(readSettings(storage), BOHAN_SETTINGS);
   saveSettings(storage, null);
   assert.equal(values.get("existing-progress"), "keep");
-  assert.equal(values.has(STORAGE_KEY), false);
-  assert.equal(readSettings(undefined), null);
+  assert.equal(readSettings(storage), null);
+  assert.deepEqual(readSettings(undefined), BOHAN_SETTINGS);
   assert.equal(saveSettings(undefined, CURRENT_SETTINGS), false);
 });

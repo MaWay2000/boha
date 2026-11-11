@@ -1,15 +1,14 @@
-import {combineRulesets} from './wavehoster-data.mjs';
+import {combineRulesets, replaySource, matchResults} from './wavehoster-data.mjs?v=20261111-results-1';
 
 let data = null;
 const rulesetNames = new Map();
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
-const expandedPlayers = new Set(selectedPlayer ? [selectedPlayer] : []);
 let limit = 25;
 
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
-const rulesetLabel = group => `${rulesetNames.get(group.id) || 'Custom mod'} · ${group.version}`;
+const rulesetLabel = group => rulesetNames.get(group.id) || 'Custom mod';
 
 function profileUrl(playerId) {
   const url = new URL('index.html', window.location.href);
@@ -29,10 +28,7 @@ function syncSelection() {
 }
 
 function selectPlayer(id) {
-  selectedPlayer = id;
-  if (!id) expandedPlayers.clear();
-  else if (expandedPlayers.has(id)) expandedPlayers.delete(id);
-  else expandedPlayers.add(id);
+  selectedPlayer = selectedPlayer === id ? null : id;
   limit = 25;
   syncSelection();
   render();
@@ -115,21 +111,6 @@ function cell(row, value, className = '') {
   return td;
 }
 
-function badge(status, modsVerified) {
-  const span = document.createElement('span');
-  span.className = 'wave-status ' + status;
-  span.textContent = ({
-    confirmed: 'Verified',
-    pending: 'Awaiting analysis',
-    incomplete: 'Incomplete · unrated',
-    unknown: modsVerified ? 'Mods verified · no winner' : 'Result unknown',
-    unverified: 'Unverified · unrated',
-    error: 'Needs analysis',
-    ignored: 'Excluded'
-  })[status] || 'Awaiting analysis';
-  return span;
-}
-
 function updatedLabel(timestamp) {
   const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(timestamp)) / 60000));
   if (minutes < 1) return 'Just now';
@@ -154,12 +135,12 @@ function render() {
   $('waveConfirmed').textContent = number(data.games.filter(game => game.status === 'confirmed').length);
   $('waveWaiting').textContent = number(data.games.filter(game => game.status === 'pending').length);
   $('waveRuleSummary').textContent = all
-    ? `All ${number(data.groups.length)} rulesets · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
+    ? `All ${number(data.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
     : `${rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
   $('waveRankingNote').textContent = all
-    ? 'Combined totals across all rulesets. Only verified outcomes add wins and scores.'
+    ? 'Combined totals across all mods. Only verified outcomes add wins and scores.'
     : 'Each game version and mod pack has its own rankings. Only verified outcomes add wins and scores.';
-  $('waveProfileNote').textContent = all ? 'Stats and match history across all rulesets.' : 'Stats and match history for this ruleset.';
+  $('waveProfileNote').textContent = all ? 'Stats and match history across all mods.' : 'Stats and match history for this mod.';
 
   const query = $('wavePlayerSearch').value.trim().toLocaleLowerCase();
   const players = group.players
@@ -176,33 +157,24 @@ function render() {
   players.forEach(({player, rank}) => {
     const row = document.createElement('tr');
     row.classList.toggle('wave-selected', player.id === selectedPlayer);
-    const expanded = expandedPlayers.has(player.id);
+    const expanded = player.id === selectedPlayer;
     row.classList.toggle('is-expanded', expanded);
     cell(row, rank);
-    const name = cell(row, '');
+    const name = cell(row, '', 'wave-player-cell');
     const link = document.createElement('a');
     link.className = 'wave-player-link';
     link.textContent = player.name;
-    link.href = profileUrl(player.id).href;
+    link.href = profileUrl(expanded ? null : player.id).href;
     link.target = '_top';
     link.setAttribute('aria-expanded', String(expanded));
     link.setAttribute('aria-controls', 'waveIdentity-' + player.id);
     if (player.id === selectedPlayer) link.setAttribute('aria-current', 'true');
-    link.addEventListener('click', event => {
+    name.addEventListener('click', event => {
       if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       selectPlayer(player.id);
     });
     name.append(link);
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'stats-expand-toggle';
-    toggle.textContent = expanded ? '−' : '+';
-    toggle.setAttribute('aria-label', `${expanded ? 'Collapse' : 'Expand'} nicknames and keys for ${player.name}`);
-    toggle.setAttribute('aria-expanded', String(expanded));
-    toggle.setAttribute('aria-controls', 'waveIdentity-' + player.id);
-    toggle.addEventListener('click', () => selectPlayer(player.id));
-    name.append(toggle);
     if (!player.identityVerified) {
       const note = document.createElement('span');
       note.className = 'wave-name-note';
@@ -238,10 +210,10 @@ function render() {
       $('waveProfileMetrics').append(card);
     }
   }
-  $('waveMatchesLabel').textContent = profile ? 'Player match history' : 'Recent matches';
   const header = document.createElement('tr');
-  const headings = profile ? ['Date ↓', 'Map', 'Result', 'Score', 'Time', 'Kills'] : ['Date ↓', 'Map', 'Players', 'Time', 'Status'];
-  if (all) headings.splice(2, 0, 'Ruleset');
+  const headings = profile ? ['Date ↓', 'Map', 'Result', 'Score', 'Time', 'Kills'] : ['Date ↓', 'Map', 'Players', 'Time', 'Results'];
+  if (all) headings.splice(2, 0, 'Mod');
+  headings.push('Statistics');
   for (const label of headings) {
     const th = document.createElement('th');
     th.scope = 'col';
@@ -250,7 +222,6 @@ function render() {
   }
   $('waveMatchesHead').replaceChildren(header);
   const games = data.games.filter(game => (all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
-  $('waveMatchCount').textContent = `(${number(games.length)})`;
   $('waveMatches').replaceChildren();
   games.slice(0, limit).forEach(game => {
     const row = document.createElement('tr');
@@ -258,7 +229,7 @@ function render() {
     cell(row, game.map);
     if (all) {
       const ruleset = data.groups.find(group => group.id === game.group);
-      cell(row, ruleset ? rulesetLabel(ruleset) : 'Unknown');
+      cell(row, ruleset ? rulesetLabel(ruleset) : 'Unknown', 'wave-mod-cell');
     }
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
     if (participant) {
@@ -269,7 +240,36 @@ function render() {
     const seconds = Math.floor(game.durationMilliseconds / 1000);
     cell(row, `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`);
     if (participant) cell(row, participant.kills === null ? '—' : number(participant.kills));
-    else cell(row, '').append(badge(game.status, game.modsVerified));
+    else {
+      const results = cell(row, '');
+      for (const result of matchResults(game)) {
+        const label = document.createElement('span');
+        label.className = 'wave-match-result wave-result-' + result.result;
+        label.textContent = result.label;
+        results.append(label);
+      }
+    }
+    const source = replaySource(game);
+    const action = cell(row, source ? '' : '—');
+    if (source) {
+      const link = document.createElement('a');
+      const url = profileUrl(selectedPlayer);
+      url.searchParams.set('replay', source.replayUrl);
+      link.href = url.href;
+      link.target = '_top';
+      link.className = 'stats-replay-link';
+      link.textContent = 'Analyze';
+      link.setAttribute('aria-label', 'Analyze match on ' + game.map);
+      link.dataset.replayAnalyzerUrl = source.replayUrl;
+      link.dataset.replaySourceLabel = source.sourceLabel;
+      link.dataset.replaySourceUrl = source.sourceUrl;
+      link.addEventListener('click', event => {
+        if (window.parent === window || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        window.parent.postMessage({type: 'boha:open-replay-analyzer', ...source}, window.location.origin);
+      });
+      action.append(link);
+    }
     $('waveMatches').append(row);
   });
   $('waveMore').hidden = games.length <= limit;
@@ -315,7 +315,6 @@ async function load() {
 $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;
   selectedPlayer = null;
-  expandedPlayers.clear();
   limit = 25;
   syncSelection();
   render();
@@ -323,7 +322,6 @@ $('waveRuleset').addEventListener('change', () => {
 $('waveClearPlayer').addEventListener('click', () => selectPlayer(null));
 $('wavePlayerSearch').addEventListener('input', render);
 $('waveMore').addEventListener('click', () => { limit += 25; render(); });
-$('waveRefresh').addEventListener('click', load);
 
 load();
 setInterval(() => { if (!document.hidden) load(); }, 30000);

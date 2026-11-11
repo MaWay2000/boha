@@ -5,12 +5,14 @@ const fixture = () => ({format: 1, source: 'WaveHoster', ranking: 'wins-then-bes
  groups: [{id: 'group', version: '4.7.0', mods: ['hash'], label: 'Mod', matches: 1, confirmed: 1,
  players: [{id: 'player', name: 'Nickname', identityVerified: true, games: 1, wins: 0, losses: 1, draws: 0, bestScore: -20, kills: 2,
  names: [{name: 'Nickname', games: 1}], publicKeys: ['public-key']}]}],
- games: [{id: 'replay', group: 'group', map: 'TD', status: 'confirmed', players: ['Nickname'], modsVerified: true,
+ games: [{id: 'replay', matchId: 42, replaySha256: 'a'.repeat(64), group: 'group', map: 'TD', status: 'confirmed', players: ['Nickname'], modsVerified: true,
  participants: [{id: 'player', name: 'Nickname', result: 'loser', score: -20, kills: 2}]}], queue: {privateWorkerDetails: 'omit'}});
 test('WaveHoster publication retains public identities and results and drops unknown fields', () => {
  const input = fixture(); input.groups[0].players[0].internalDetail = 'omit'; input.games[0].internalDetail = 'omit';
  const output = sanitizeWaveHoster(input);
  assert.equal(output.games[0].participants[0].score, -20);
+ assert.equal(output.games[0].matchId, 42);
+ assert.equal(output.games[0].replaySha256, 'a'.repeat(64));
  assert.deepEqual(output.groups[0].players[0].publicKeys, ['public-key']);
  assert.ok(!JSON.stringify(output).includes('omit'));
  assert.ok(Object.hasOwn(input, 'queue'));

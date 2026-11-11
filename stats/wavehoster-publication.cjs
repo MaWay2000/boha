@@ -21,7 +21,7 @@ function sanitizeWaveHoster(input) {
   result.groups = list(input.groups).map(group => ({...scalars(group, 'id version label matches confirmed'), mods: strings(group.mods),
     players: list(group.players).map(player => ({...scalars(player, 'id name identityVerified games wins losses draws bestScore kills'),
       names: list(player.names || []).map(alias => scalars(alias, 'name games')), publicKeys: strings(player.publicKeys || [])}))}));
-  result.games = list(input.games).map(game => ({...scalars(game, 'id group map startedAt durationMilliseconds status modsVerified'),
+  result.games = list(input.games).map(game => ({...scalars(game, 'id matchId replaySha256 group map startedAt durationMilliseconds status modsVerified'),
     players: strings(game.players), participants: list(game.participants || []).map(player => scalars(player, 'id name result score kills'))}));
   assertNoPrivateFields(result);
   return result;

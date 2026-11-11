@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png">
   <link rel="stylesheet" href="styles.css?v=20261022-match-ui-1">
-  <link rel="stylesheet" href="stats/wavehoster.css?v=20261111-identities-1">
+  <link rel="stylesheet" href="stats/wavehoster.css?v=20261111-player-cell-1">
 </head>
 <body class="embedded-page wave-embedded">
   <div class="page-shell wave-page">
@@ -28,21 +28,15 @@
             <span class="stats-search-label">Player search:</span>
             <input id="wavePlayerSearch" class="stats-search-input" type="search" placeholder="Nickname / key" aria-label="Search WaveHoster players" autocomplete="off">
           </label>
+          <label class="wave-ruleset" for="waveRuleset"><span>Mod</span><select id="waveRuleset" aria-label="Mod"></select></label>
           <article class="stats-card"><span class="stats-card-label">Replays</span><strong id="waveTotal" class="stats-card-value">—</strong></article>
           <article class="stats-card"><span class="stats-card-label">Verified</span><strong id="waveConfirmed" class="stats-card-value">—</strong></article>
-          <article class="stats-card"><span class="stats-card-label">Rulesets</span><strong id="waveGroups" class="stats-card-value">—</strong></article>
+          <article class="stats-card"><span class="stats-card-label">Mods</span><strong id="waveGroups" class="stats-card-value">—</strong></article>
           <article class="stats-card"><span class="stats-card-label">Pending</span><strong id="waveWaiting" class="stats-card-value">—</strong></article>
           <article class="stats-card stats-update-card"><span class="stats-card-label">Last updated</span><strong id="waveUpdated" class="stats-card-value">Loading…</strong></article>
         </div>
-        <div class="wave-heading-row">
-          <div class="wave-heading"><h1>WaveHoster</h1><span class="wave-source-tag">Modded leaderboards</span></div>
-          <div class="wave-controls">
-            <label class="wave-ruleset" for="waveRuleset"><span>Ruleset</span><select id="waveRuleset" aria-label="Ruleset"></select></label>
-          </div>
-        </div>
         <div class="wave-grid">
-          <section class="stats-panel wave-panel wave-rank-panel" aria-labelledby="waveRankingTitle">
-            <div class="wave-panel-head"><h2 id="waveRankingTitle">Top players</h2><span id="waveRanking">Wins, then best game score</span></div>
+          <section class="stats-panel wave-panel wave-rank-panel" aria-label="Top players">
             <div class="stats-table-wrap wave-table-wrap">
               <table class="stats-table wave-ranking-table">
                 <thead><tr><th scope="col">#</th><th scope="col">Top players</th><th scope="col">Best score</th><th scope="col">Games</th><th scope="col" aria-sort="descending">Win ↓</th><th scope="col">Lost</th><th scope="col">Kills</th></tr></thead>
@@ -52,27 +46,26 @@
             </div>
             <p id="waveRankingNote" class="wave-footnote">Each game version and mod pack has its own rankings. Only verified outcomes add wins and scores.</p>
           </section>
-          <section class="stats-panel wave-panel wave-match-panel" aria-labelledby="waveMatchesTitle">
-            <div class="wave-panel-head wave-matches-head"><h2 id="waveMatchesTitle"><span id="waveMatchesLabel">Recent matches</span> <span id="waveMatchCount" class="wave-count"></span></h2><button id="waveRefresh" class="stats-filter-button" type="button">Refresh</button></div>
+          <section class="stats-panel wave-panel wave-match-panel" aria-label="Matches">
             <section id="waveProfile" class="wave-profile" aria-label="Player profile" hidden>
               <div class="wave-profile-heading"><div><span class="wave-profile-kicker">Player profile</span><h3 id="waveProfileName"></h3></div><button id="waveClearPlayer" class="stats-filter-button" type="button">All matches</button></div>
               <div id="waveProfileMetrics" class="wave-profile-metrics"></div>
-              <p id="waveProfileNote" class="wave-footnote">Stats and match history for this ruleset.</p>
+              <p id="waveProfileNote" class="wave-footnote">Stats and match history for this mod.</p>
             </section>
             <div class="stats-table-wrap wave-table-wrap">
               <table class="stats-table wave-matches-table">
-                <thead id="waveMatchesHead"><tr><th scope="col">Date ↓</th><th scope="col">Map</th><th scope="col">Players</th><th scope="col">Time</th><th scope="col">Status</th></tr></thead>
+                <thead id="waveMatchesHead"><tr><th scope="col">Date ↓</th><th scope="col">Map</th><th scope="col">Players</th><th scope="col">Time</th><th scope="col">Results</th><th scope="col">Statistics</th></tr></thead>
                 <tbody id="waveMatches"></tbody>
               </table>
             </div>
             <button id="waveMore" class="stats-filter-button wave-more" type="button" hidden>Show more matches</button>
           </section>
         </div>
-        <footer class="wave-footer"><span id="waveRuleSummary">Loading rulesets…</span><span id="waveError" role="status"></span></footer>
+        <footer class="wave-footer"><span id="waveRuleSummary">Loading mods…</span><span id="waveError" role="status"></span></footer>
       </section>
     </main>
   </div>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/wavehoster.mjs?v=20261111-ruleset-names-1"></script>
+  <script type="module" src="stats/wavehoster.mjs?v=20261111-player-cell-1"></script>
 </body>
 </html>

@@ -1,6 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {combineRulesets} from '../stats/wavehoster-data.mjs';
+import {combineRulesets, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+
+test('recent match results distinguish co-op outcomes, opposing players and unconfirmed results', () => {
+  const player = (name, result) => ({name, result});
+  assert.deepEqual(matchResults({status: 'confirmed', participants: [player('A', 'loser'), player('B', 'loser')]}), [{label: 'Lost', result: 'loser'}]);
+  assert.deepEqual(matchResults({status: 'confirmed', participants: [player('A', 'winner'), player('B', 'loser')]}).map(row => row.label), ['A: Win', 'B: Lost']);
+  assert.equal(matchResults({status: 'confirmed', participants: [player('A', 'contender')]})[0].label, 'Draw');
+  for (const status of ['pending', 'unknown', 'incomplete', 'unverified', 'error']) {
+    assert.equal(matchResults({status, participants: [player('A', 'winner')]})[0].label, 'Unknown');
+  }
+  assert.equal(matchResults({status: 'confirmed', participants: []})[0].label, 'Unknown');
+});
 
 test('ALL combines the same identity across rulesets without merging equal nicknames', () => {
   const player = {id: 'one', name: 'Current', identityVerified: true, games: 2, wins: 1, losses: 1, draws: 0,
@@ -30,4 +41,12 @@ test('ALL keeps missing scores distinct from zero and ranks tied wins by best sc
   assert.deepEqual(all.players.map(row => row.id), ['zero', 'negative', 'missing']);
   assert.equal(all.players[2].bestScore, null);
   assert.deepEqual(combineRulesets({groups: [], games: []}).players, []);
+});
+
+test('Analyze uses the archived replay and older snapshots retain a safe WaveHoster fallback', () => {
+  const hash = 'a'.repeat(64);
+  assert.equal(replaySource({replaySha256: hash}).replayUrl, 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/' + hash);
+  assert.equal(replaySource({id: '20261109_083951_7715'}).replayUrl, 'https://api.wavehoster.net/v1/replays/20261109_083951_7715');
+  assert.equal(replaySource({id: '../private', replaySha256: 'https://other.invalid/'}), null);
+  assert.equal(replaySource({id: 'https://other.invalid/'}), null);
 });

@@ -29,3 +29,24 @@ export function combineRulesets(snapshot) {
 }
 
 function compareNames(a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; }
+
+export function matchResults(game) {
+  const labels = {winner: 'Win', loser: 'Lost', contender: 'Draw'};
+  const players = game.status === 'confirmed' ? game.participants || [] : [];
+  if (!players.length) return [{label: 'Unknown', result: 'unknown'}];
+  const results = players.map(player => ({name: player.name, result: labels[player.result] ? player.result : 'unknown',
+    label: labels[player.result] || 'Unknown'}));
+  if (results.every(player => player.result === results[0].result)) {
+    return [{label: results[0].label, result: results[0].result}];
+  }
+  return results.map(player => ({...player, label: `${player.name}: ${player.label}`}));
+}
+
+export function replaySource(game) {
+  const hash = String(game.replaySha256 || '');
+  const id = String(game.id || '');
+  const replayUrl = /^[a-f0-9]{64}$/.test(hash)
+    ? 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/' + hash
+    : /^\d{8}_\d{6}_\d+$/.test(id) ? 'https://api.wavehoster.net/v1/replays/' + id : null;
+  return replayUrl ? {replayUrl, sourceLabel: 'WaveHoster', sourceUrl: 'https://api.wavehoster.net/v1/replays'} : null;
+}

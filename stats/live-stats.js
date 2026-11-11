@@ -82,6 +82,7 @@ const playerProfileElement = document.getElementById("statsPlayerProfile");
 const playerComparisonElement = document.getElementById("statsPlayerComparison");
 const playerGamesElement = document.getElementById("statsPlayerGames");
 const playerGamesActionsElement = document.getElementById("statsPlayerGamesActions");
+const leaderboardRecentMatchesElement = document.getElementById("statsLeaderboardRecentMatches");
 const playerSearchElement = document.getElementById("statsPlayerSearch");
 const playerSearchClearElement = document.getElementById("statsPlayerSearchClear");
 const playerSearchFieldElement = playerSearchElement?.closest(".stats-search-field");
@@ -2465,6 +2466,9 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
   const selectedAccount = globalAccounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
   const hasSelectedPlayer = Boolean(activeAccount || selectedAccount);
+  if (leaderboardRecentMatchesElement) {
+    leaderboardRecentMatchesElement.hidden = hasSelectedPlayer;
+  }
   if (playerRecentLabelElement) {
     playerRecentLabelElement.hidden = !hasSelectedPlayer;
   }
@@ -2501,10 +2505,14 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     resetPlayerGamesView();
     expandedAccounts.clear();
     if (profileHeadingLabel) {
-      profileHeadingLabel.textContent = "Player Profile";
+      profileHeadingLabel.textContent = leaderboardRecentMatchesElement ? "Recent matches" : "Player Profile";
     }
-    playerGamesTitleElement.innerHTML = '<span class="stats-player-profile-empty-title">Select a player to open their profile</span>';
-    playerGamesMetaElement.textContent = "The selected player's latest matches will appear here.";
+    playerGamesTitleElement.innerHTML = leaderboardRecentMatchesElement
+      ? `<span class="stats-player-profile-leaderboard">${escapeHtml(selectedLeaderboard)}</span>`
+      : '<span class="stats-player-profile-empty-title">Select a player to open their profile</span>';
+    playerGamesMetaElement.textContent = leaderboardRecentMatchesElement
+      ? `Latest matches in the ${selectedLeaderboard} leaderboard.`
+      : "The selected player's latest matches will appear here.";
     if (playerGamesActionsElement) {
       playerGamesActionsElement.innerHTML = "";
     }
@@ -2807,6 +2815,8 @@ function renderMatchup(game, options = {}) {
     showTeamStrength = true
   } = options;
   const teams = game.teams.filter((team) => team.players.length);
+  const showTeamStrengthLabel = showTeamStrength
+    && !(teams.length === 2 && teams.every((team) => team.players.length === 1));
   if (!teams.length) {
     return `<span class="stats-note">Player list unavailable.</span>`;
   }
@@ -2871,7 +2881,7 @@ function renderMatchup(game, options = {}) {
                 })
                 .join("")}
             </div>
-            ${showTeamStrength ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
+            ${showTeamStrengthLabel ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               ${game.ratingMethod === 'maway-v1' ? 'Pre-match chance' : 'Team power'}: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
             ${renderUpsetBadge(team, strengthPercent)}
@@ -2895,7 +2905,7 @@ function renderMatchup(game, options = {}) {
                 .join("")}
             </span>
             ${renderUpsetBadge(team, strengthPercent)}
-            ${showTeamStrength ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
+            ${showTeamStrengthLabel ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               ${game.ratingMethod === 'maway-v1' ? 'Pre-match chance' : 'Team power'}: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
           </div>
@@ -3447,22 +3457,22 @@ function renderRankActions(totalPlayers, matchingPlayers = totalPlayers, searchQ
 }
 
 function renderMatches(gameList) {
-  if (!matchesElement) {
+  if (!matchesElement || leaderboardRecentMatchesElement?.hidden) {
     return;
   }
 
   renderMatchMapOptions(gameList);
-  const activeFilterCount = getActiveMatchFilterCount();
+  const activeFilterCount = leaderboardRecentMatchesElement ? 0 : getActiveMatchFilterCount();
   if (matchFilterCountElement) {
     matchFilterCountElement.textContent = activeFilterCount
       ? `${activeFilterCount} active ${activeFilterCount === 1 ? "filter" : "filters"}`
       : "No advanced filters";
   }
 
-  const searchQuery = normalizeSearchQuery(matchesSearchQuery);
+  const searchQuery = leaderboardRecentMatchesElement ? "" : normalizeSearchQuery(matchesSearchQuery);
   const filteredGames = gameList
     .filter((game) => matchesRecentGameSearch(game, searchQuery))
-    .filter(matchesAdvancedFilters)
+    .filter((game) => leaderboardRecentMatchesElement || matchesAdvancedFilters(game))
     .sort(compareMatches);
   const rows = filteredGames.slice(0, visibleMatchCount);
 
@@ -3472,7 +3482,7 @@ function renderMatches(gameList) {
   if (!rows.length) {
     matchesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="6">${searchQuery || activeFilterCount ? "No matches matched the current filters." : "No matches found for this slice."}</td>
+        <td colspan="${leaderboardRecentMatchesElement ? 4 : 6}">${searchQuery || activeFilterCount ? "No matches matched the current filters." : "No matches found for this slice."}</td>
       </tr>
     `;
     return;
@@ -3490,6 +3500,7 @@ function renderMatches(gameList) {
           <td>
             ${renderMapFilterLink(game.mapName)}
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
+            ${leaderboardRecentMatchesElement ? `<span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>` : ""}
           </td>
           <td class="stats-matchup">${renderMatchup(game, {
             includePlayerPower: true,
@@ -3497,8 +3508,10 @@ function renderMatches(gameList) {
             showTeamStrength: true,
             showVersus: false
           })}</td>
-          <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
-          <td><span class="stats-note">${escapeHtml(game.sourceLabel || "Legacy")}</span></td>
+          ${leaderboardRecentMatchesElement ? "" : `
+            <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
+            <td><span class="stats-note">${escapeHtml(game.sourceLabel || "Legacy")}</span></td>
+          `}
           <td><a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replaySource.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replaySource.replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a></td>
         </tr>
       `;

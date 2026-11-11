@@ -544,18 +544,37 @@
       return null;
     }
 
-    const matchesResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
-    if (!matchesResponse.ok) {
-      throw new Error(`Unable to load the published match index (${matchesResponse.status}).`);
+    let match = null;
+    try {
+      const response = await fetch(new URL("stats/published/wavehoster.json", document.baseURI), {cache: "no-store"});
+      if (response.ok) {
+        const payload = await response.json();
+        const game = payload.format === 1 && payload.source === "WaveHoster" && (payload.games || []).find(item => (
+          replaySha256 ? item.replaySha256 === replaySha256 : replayId && item.id === String(replayId)
+        ));
+        if (game && Number.isSafeInteger(game.matchId) && game.matchId > 0 && /^[a-f0-9]{64}$/.test(game.replaySha256 || "")) {
+          match = {id: game.matchId, replay_sha256: game.replaySha256,
+            replay_url: `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`, players: []};
+        }
+      }
+    } catch (_) {
+      // The independent modded index must never block main-leaderboard analysis.
     }
 
-    const matchesPayload = await matchesResponse.json();
-    const match = (matchesPayload.matches || []).find((item) => (
-      (replaySha256 && item.replay_sha256 === replaySha256)
-      || (replayId && String(item.source_match_id) === String(replayId))
-    ));
     if (!match) {
-      return null;
+      const matchesResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
+      if (!matchesResponse.ok) {
+        throw new Error(`Unable to load the published match index (${matchesResponse.status}).`);
+      }
+
+      const matchesPayload = await matchesResponse.json();
+      match = (matchesPayload.matches || []).find((item) => (
+        (replaySha256 && item.replay_sha256 === replaySha256)
+        || (replayId && String(item.source_match_id) === String(replayId))
+      ));
+      if (!match) {
+        return null;
+      }
     }
 
     let detailMatch = null;
@@ -578,6 +597,10 @@
       if (detailResponse.ok) {
         const detailPayload = await detailResponse.json();
         detailMatch = detailPayload.match || null;
+        if (detailMatch && match.replay_sha256 && detailMatch.replay_sha256 !== match.replay_sha256) {
+          detailMatch = null;
+          throw new Error("Replay analysis identity mismatch.");
+        }
         await expandCompressedEngineAnalysis(detailMatch?.telemetry?.engineAnalysis);
         normalizeTacticalReplayPlayerOwners(
           detailMatch?.telemetry?.engineAnalysis,

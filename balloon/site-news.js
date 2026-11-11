@@ -20,7 +20,8 @@
       let link;
       if (entry.link != null) {
         if (typeof entry.link.label !== 'string' || !entry.link.label.trim() || typeof entry.link.href !== 'string'
-          || !/^(?:[a-z0-9_-]+\/)+(?:[a-z0-9_-]+\.html)?$/i.test(entry.link.href)) throw new Error('Invalid news link.');
+          || (!/^(?:[a-z0-9_-]+\/)+(?:[a-z0-9_-]+\.html)?$/i.test(entry.link.href)
+            && !['index.html?tab=wavehoster', 'index.html?tab=leaderboards'].includes(entry.link.href))) throw new Error('Invalid news link.');
         link = { label: entry.link.label, href: entry.link.href };
       }
       let image;

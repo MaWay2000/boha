@@ -1,5 +1,6 @@
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261108-maway-fields-1";
+import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261111-combined-recent-1';
 
 const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
 const RATING_PERFORMANCE_URL = new URL('./published/rating-performance.json', import.meta.url);
@@ -87,6 +88,8 @@ const playerSearchElement = document.getElementById("statsPlayerSearch");
 const playerSearchClearElement = document.getElementById("statsPlayerSearchClear");
 const playerSearchFieldElement = playerSearchElement?.closest(".stats-search-field");
 const matchesSearchElement = document.getElementById("statsMatchesSearch");
+const matchesSourceElement = document.getElementById("statsMatchesSource");
+const matchesFeedStatusElement = document.getElementById("statsMatchesFeedStatus");
 const matchesElement = document.getElementById("statsMatches");
 const matchesActionsElement = document.getElementById("statsMatchesActions");
 const matchFiltersElement = document.getElementById("statsMatchFilters");
@@ -106,6 +109,8 @@ let selectedLeaderboard = "Global";
 let leaderboardData = null;
 let personalRatings = null;
 let leaderboardDataSignature = "";
+let arcRecentGames = [];
+let arcRecentSignature = null;
 let bannedAccountIds = new Set();
 let liveFeedState = "idle";
 let upstreamManifest = null;
@@ -118,6 +123,7 @@ let playerSearchQuery = "";
 let renderedAccountList = null;
 let renderedGameList = null;
 let matchesSearchQuery = "";
+let matchesSource = 'all';
 let matchesDateFrom = "";
 let matchesDateTo = "";
 let matchesMap = "";
@@ -375,6 +381,17 @@ async function ensureLeaderboardData(force = false) {
   return true;
 }
 
+async function ensureArcRecentData(force = false) {
+  if (!matchesSourceElement) return false;
+  const payload = await readJson(new URL('./published/wavehoster.json', import.meta.url), 'arc', force);
+  const signature = `${payload.generatedAt || ''}:${payload.games?.length}`;
+  if (!force && signature === arcRecentSignature) return false;
+  const games = normalizeArcRecentGames(payload);
+  arcRecentGames = games;
+  arcRecentSignature = signature;
+  return true;
+}
+
 function hydratePublishedBoard(name) {
   const board = leaderboardData?.leaderboards?.[name];
   if (!board) {
@@ -588,6 +605,8 @@ function applyStateFromUrl() {
   );
   playerSearchQuery = url.searchParams.get("playerSearch") || "";
   matchesSearchQuery = url.searchParams.get("matchesSearch") || "";
+  matchesSource = ['main', 'arc'].includes(url.searchParams.get('matchesSource')) ? url.searchParams.get('matchesSource') : 'all';
+  if (matchesSourceElement) matchesSourceElement.value = matchesSource;
   matchesDateFrom = url.searchParams.get("matchesFrom") || "";
   matchesDateTo = url.searchParams.get("matchesTo") || "";
   matchesMap = url.searchParams.get("matchesMap") || "";
@@ -670,6 +689,7 @@ function buildStateParams() {
   if (matchesSearchElement && matchesSearchQuery.trim()) {
     params.set("matchesSearch", matchesSearchQuery.trim());
   }
+  if (matchesSourceElement && matchesSource !== 'all') params.set('matchesSource', matchesSource);
 
   [
     ["matchesFrom", matchesDateFrom],
@@ -2237,6 +2257,7 @@ function getMatchTeamStrengths(game) {
 }
 
 function getMatchTeamPowerDifference(game) {
+  if (game.arcMatch) return null;
   const strengths = getMatchTeamStrengths(game)
     .map(({ strength }) => strength)
     .filter((strength) => Number.isFinite(strength));
@@ -2248,6 +2269,7 @@ function getMatchTeamPowerDifference(game) {
 }
 
 function isUpsetMatch(game) {
+  if (game.arcMatch) return false;
   const strengths = getMatchTeamStrengths(game);
   const winnerStrengths = strengths
     .filter(({ userType, strength }) => userType === "winner" && Number.isFinite(strength))
@@ -2278,6 +2300,7 @@ function parseFilterDate(value, includeWholeDay = false) {
 }
 
 function matchesAdvancedFilters(game) {
+  if (matchesSourceElement && matchesSource !== 'all' && (game.arcMatch ? 'arc' : 'main') !== matchesSource) return false;
   const fromTime = parseFilterDate(matchesDateFrom);
   const toTime = parseFilterDate(matchesDateTo, true);
   const gameTime = Number(game.endDate || 0);
@@ -2325,6 +2348,7 @@ function matchesAdvancedFilters(game) {
 
 function getActiveMatchFilterCount() {
   return [
+    matchesSourceElement && matchesSource !== 'all',
     matchesDateFrom,
     matchesDateTo,
     matchesMap,
@@ -2804,6 +2828,16 @@ function renderPlayerGameActions(totalGames) {
 }
 
 function renderMatchup(game, options = {}) {
+  if (game.arcMatch) {
+    const labels = {winner: 'Win', loser: 'Lost', contender: 'Draw'};
+    return `<div class="stats-matchup-list stats-arc-matchup">${game.players.map(slot => {
+      const account = slot.account;
+      const name = escapeHtml(account.name);
+      const player = account.arcProfileUrl
+        ? `<a class="stats-team-player-link" href="${escapeHtml(account.arcProfileUrl)}" target="_parent" aria-label="Open ${name} on Arc Mod leaderboards">${name}</a>` : name;
+      return `<div class="stats-matchup-team-row"><span class="stats-team ${getTeamToneClass(slot.userType)}">${player}</span><span class="stats-note">${labels[slot.userType] || 'Unknown'}</span></div>`;
+    }).join('')}</div>`;
+  }
   const {
     variant = "chips",
     includePlayerPower = false,
@@ -3461,7 +3495,8 @@ function renderMatches(gameList) {
     return;
   }
 
-  renderMatchMapOptions(gameList);
+  const recentGames = matchesSourceElement ? mergeRecentGames(gameList, arcRecentGames) : gameList;
+  renderMatchMapOptions(recentGames);
   const activeFilterCount = leaderboardRecentMatchesElement ? 0 : getActiveMatchFilterCount();
   if (matchFilterCountElement) {
     matchFilterCountElement.textContent = activeFilterCount
@@ -3470,7 +3505,7 @@ function renderMatches(gameList) {
   }
 
   const searchQuery = leaderboardRecentMatchesElement ? "" : normalizeSearchQuery(matchesSearchQuery);
-  const filteredGames = gameList
+  const filteredGames = recentGames
     .filter((game) => matchesRecentGameSearch(game, searchQuery))
     .filter((game) => leaderboardRecentMatchesElement || matchesAdvancedFilters(game))
     .sort(compareMatches);
@@ -3510,7 +3545,9 @@ function renderMatches(gameList) {
           })}</td>
           ${leaderboardRecentMatchesElement ? "" : `
             <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
-            <td><span class="stats-note">${escapeHtml(game.sourceLabel || "Legacy")}</span></td>
+            <td>${game.arcMatch
+              ? `<a class="stats-replay-link stats-recent-source" href="${escapeHtml(game.arcMatch.leaderboardUrl)}" target="_parent">Arc Mod</a>`
+              : `<span class="stats-note">${escapeHtml(game.sourceLabel || "Legacy")}</span>`}</td>
           `}
           <td><a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replaySource.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replaySource.replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a></td>
         </tr>
@@ -3524,13 +3561,13 @@ function getSuccessfulMapPlayers(gameList) {
   gameList.forEach((game) => {
     const seenAccounts = new Set();
     (game.teams || []).forEach((team) => {
-      const won = getNormalizedTeamUserType(game, team) === "winner";
+      const won = (game.arcMatch ? team.userType : getNormalizedTeamUserType(game, team)) === "winner";
       (team.players || []).forEach((slot) => {
         const account = slot.account;
         if (!account) {
           return;
         }
-        const key = getAccountExpandKey(account);
+        const key = game.arcMatch ? `arc:${account.id || `${game.id}:${slot.position}`}` : getAccountExpandKey(account);
         if (seenAccounts.has(key)) {
           return;
         }
@@ -3654,6 +3691,7 @@ function render() {
     renderedGameList = null;
     updateStatusText([]);
     updateSortIndicators();
+    if (matchesSourceElement) renderMatches([]);
     syncStateToUrl();
     return;
   }
@@ -3859,6 +3897,7 @@ function bindMatchFilter(element, eventName, updateValue) {
 }
 
 bindMatchFilter(matchesDateFromElement, "change", (element) => { matchesDateFrom = element.value; });
+bindMatchFilter(matchesSourceElement, 'change', element => { matchesSource = element.value; });
 bindMatchFilter(matchesDateToElement, "change", (element) => { matchesDateTo = element.value; });
 bindMatchFilter(matchesMapElement, "change", (element) => { matchesMap = element.value; });
 bindMatchFilter(matchesMinDurationElement, "input", (element) => { matchesMinDuration = element.value; });
@@ -3874,9 +3913,17 @@ window.addEventListener("popstate", () => {
 });
 
 async function refreshFromMirror(force = false) {
-  const leaderboardChanged = await ensureLeaderboardData(force);
-
-  if (leaderboardChanged || force) {
+  const [main, arc] = await Promise.allSettled([ensureLeaderboardData(force), ensureArcRecentData(force)]);
+  if (matchesFeedStatusElement) {
+    const failed = [main.status === 'rejected' ? 'Main' : '', arc.status === 'rejected' ? 'Arc Mod' : ''].filter(Boolean);
+    matchesFeedStatusElement.hidden = failed.length === 0;
+    matchesFeedStatusElement.textContent = failed.length ? `${failed.join(' and ')} matches could not refresh. Showing available results.` : '';
+  }
+  if (main.status === 'rejected' && !leaderboardData && arcRecentSignature === null) {
+    if (matchesSourceElement) renderMatches([]);
+    throw main.reason;
+  }
+  if (main.value || arc.value || force) {
     render();
   }
 }

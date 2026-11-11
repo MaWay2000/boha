@@ -46,6 +46,7 @@ function matchFixture(sidebar) {
   const actions = [];
   const context = vm.createContext({
     matchesElement: {innerHTML: ''}, leaderboardRecentMatchesElement: sidebar ? {hidden: false} : null,
+    matchesSourceElement: sidebar ? null : {}, arcRecentGames: [], mergeRecentGames: (main, arc) => [...main, ...arc],
     renderMatchMapOptions() {}, getActiveMatchFilterCount: () => 1, matchFilterCountElement: null,
     matchesSearchQuery: 'keep', normalizeSearchQuery: value => value,
     matchesRecentGameSearch: (game, query) => !query || game.mapName.includes(query),
@@ -93,4 +94,17 @@ test('the separate Recent Matches page retains its search and advanced filters',
   assert.doesNotMatch(context.matchesElement.innerHTML, /blocked|other/);
   assert.match(context.matchesElement.innerHTML, /class="stats-duration"/);
   assert.equal((context.matchesElement.innerHTML.match(/<td(?:\s|>)/g) || []).length, 6);
+});
+
+test('only the standalone list includes Arc games; the main rankings sidebar stays within its category', () => {
+  for (const sidebar of [true, false]) {
+    const {context} = matchFixture(sidebar);
+    context.matchesSearchQuery = '';
+    context.arcRecentGames = [{mapName: 'Arc game', endDate: 4, allowed: true,
+      replayUrl: 'https://source.test/arc', arcMatch: {leaderboardUrl: 'index.html?tab=wavehoster'}}];
+    context.renderMatches([{mapName: 'Main game', endDate: 3, allowed: true, replayUrl: 'https://source.test/main'}]);
+    assert.match(context.matchesElement.innerHTML, /Main game/);
+    assert.equal(context.matchesElement.innerHTML.includes('Arc game'), !sidebar);
+    if (!sidebar) assert.match(context.matchesElement.innerHTML, /tab=wavehoster.*Arc Mod/);
+  }
 });

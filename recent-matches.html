@@ -60,6 +60,10 @@
       color: var(--cyan);
       text-decoration-color: currentColor;
     }
+
+    .stats-arc-matchup { width: 100%; }
+    .stats-arc-matchup .stats-matchup-team-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .stats-recent-source { white-space: nowrap; }
   </style>
 </head>
 <body class="embedded-page">
@@ -105,6 +109,14 @@
                 </select>
               </label>
               <label>
+                <span>Source</span>
+                <select id="statsMatchesSource">
+                  <option value="all">All sources</option>
+                  <option value="main">Main leaderboard</option>
+                  <option value="arc">Arc Mod</option>
+                </select>
+              </label>
+              <label>
                 <span>Min duration</span>
                 <span class="stats-filter-input-unit"><input id="statsMatchesMinDuration" type="number" min="0" step="1" inputmode="numeric" placeholder="0"><small>min</small></span>
               </label>
@@ -127,6 +139,7 @@
             </div>
           </details>
 
+            <p id="statsMatchesFeedStatus" class="stats-panel-note" role="status" hidden></p>
             <div class="stats-table-wrap stats-table-wrap-matches">
               <table class="stats-table">
                 <thead>
@@ -183,6 +196,6 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20261111-duel-labels-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20261111-combined-recent-1"></script>
 </body>
 </html>

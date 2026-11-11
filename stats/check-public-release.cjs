@@ -39,6 +39,13 @@ for (const file of files) {
       if (JSON.stringify(value) !== JSON.stringify(normalizePublication(value))) throw Error('Unexpected score fields');
     } catch { failures.push(`Private or invalid score publication in ${file}; details suppressed.`); }
   }
+  if (file === 'stats/published/wavehoster.json') {
+    try {
+      const value = JSON.parse(text);
+      const {sanitizeWaveHoster} = require('./wavehoster-publication.cjs');
+      if (JSON.stringify(value) !== JSON.stringify(sanitizeWaveHoster(value))) throw Error('Unexpected WaveHoster fields');
+    } catch { failures.push(`Private or invalid Arc Mod publication in ${file}; details suppressed.`); }
+  }
 }
 try {
   const manifest = JSON.parse(read('stats/published/manifest.json'));

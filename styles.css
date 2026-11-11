@@ -3721,6 +3721,72 @@ main {
   outline-offset: -6px;
 }
 
+.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link {
+  position: absolute;
+  inset-inline-end: calc(100% + 16px);
+  top: 12%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 140px;
+  height: 76%;
+  border: 1px solid #72dbf4;
+  border-radius: 3px;
+  color: #d8f7ff;
+  background: linear-gradient(#174257, #061823);
+  box-shadow: 0 3px 12px #0009;
+  font: 700 17px "Oxanium", sans-serif;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  filter: none;
+}
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link:hover,
+.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link[aria-current="page"] {
+  color: #fff;
+  background: linear-gradient(#23617b, #0a293b);
+  box-shadow: 0 0 12px #6de8ff40;
+  filter: none;
+}
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link:focus-visible {
+  outline-offset: 3px;
+}
+
+@media (min-width: 1800px) {
+  .site-app-shell .topbar > .topnav > .topnav-actions {
+    translate: clamp(150px, 13vw, 250px) 0;
+  }
+}
+
+@media (max-width: 1080px) {
+  .site-app-shell .topbar > .topnav > .topnav-actions:has(.arc-mod-link) {
+    aspect-ratio: auto;
+    margin-bottom: 0;
+    row-gap: 6px;
+  }
+  .site-app-shell .topbar > .topnav > .topnav-actions > :is(.discord-link, .bohan-hub-link) {
+    height: auto;
+    aspect-ratio: 1002.5 / 290;
+  }
+  .site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link {
+    position: static;
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: end;
+    width: 110px;
+    height: 36px;
+    margin: 6px 6px 0 0;
+    font-size: 14px;
+  }
+  .site-app-shell .topbar > .topnav > .topnav-actions > .site-chat-button {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    margin-left: 6px;
+  }
+}
+
 .site-app-shell .brand {
   border: 0;
   background: transparent;

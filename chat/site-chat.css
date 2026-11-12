@@ -1,20 +1,4 @@
-.site-chat-button {
-  position: absolute;
-  inset-inline-start: calc(100% + 12px);
-  top: 12%;
-  height: 76%;
-  min-width: 86px;
-  border: 1px solid #72dbf4;
-  border-radius: 3px;
-  background: linear-gradient(#174257, #061823);
-  color: #d8f7ff;
-  font: 700 17px 'Oxanium', sans-serif;
-  text-transform: uppercase;
-  cursor: pointer;
-  box-shadow: 0 3px 12px #0009;
-}
-.site-chat-button:hover { background: #19526a; }
-.site-chat-button:focus-visible, .site-chat-dialog :focus-visible { outline: 2px solid #81eaff; outline-offset: 3px; }
+.site-chat-dialog :focus-visible { outline: 2px solid #81eaff; outline-offset: 3px; }
 .site-chat-dialog {
   box-sizing: border-box;
   width: 90vw;
@@ -55,10 +39,6 @@
 .site-chat-compose textarea { resize: none; height: 70px; }
 .site-chat-form small { color: #90adbc; font-size: 11px; }
 body.site-chat-open { overflow: hidden; }
-@media (max-width: 1080px) {
-  .site-chat-button { position: static; height: 36px; grid-column: 1 / -1; justify-self: center; margin-top: 6px; font-size: 14px; }
-  .site-app-shell .topbar > .topnav > .topnav-actions { margin-bottom: 42px; }
-}
 @media (max-width: 500px) {
   .site-chat-header { padding: 14px 16px; }
   .site-chat-empty { margin-inline: 16px; }

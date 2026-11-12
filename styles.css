@@ -3671,86 +3671,99 @@ main {
 }
 
 .site-app-shell .topbar > .topnav > .topnav-actions {
-  display: grid;
-  position: relative;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
-  width: min(100%, clamp(340px, 24vw, 450px));
-  aspect-ratio: 2005 / 290;
-  margin-inline: auto;
-  background: transparent;
-}
-
-.site-app-shell .topbar > .topnav > .topnav-actions > a {
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  color: transparent;
-  font-size: 0;
-  background-color: transparent;
-  background-image: url("assets/community-navigation-strip.png");
-  background-repeat: no-repeat;
-  background-size: 200% 100%;
-  box-shadow: none;
-  transform: none;
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.34));
-  transition: filter 180ms ease;
-}
-
-.site-app-shell .topbar > .topnav > .topnav-actions > a:first-child {
-  background-position: left center;
-}
-
-.site-app-shell .topbar > .topnav > .topnav-actions > .bohan-hub-link {
-  background-position: right center;
-}
-
-.site-app-shell .topbar > .topnav > .topnav-actions > a:hover {
-  filter:
-    brightness(1.12)
-    drop-shadow(0 0 10px rgba(109, 232, 255, 0.34))
-    drop-shadow(0 7px 12px rgba(0, 0, 0, 0.4));
-}
-
-.site-app-shell .topbar > .topnav > .topnav-actions > a:focus-visible {
-  outline: 2px solid rgba(109, 232, 255, 0.9);
-  outline-offset: -6px;
-}
-
-.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link {
-  position: absolute;
-  inset-inline-end: calc(100% + 16px);
-  top: 12%;
+  --community-notch: 16px;
+  --community-shape: polygon(0 0, calc(100% - var(--community-notch)) 0, 100% 50%, calc(100% - var(--community-notch)) 100%, 0 100%, var(--community-notch) 50%);
   display: flex;
+  position: relative;
+  container-type: inline-size;
+  width: min(100%, 800px);
+  height: clamp(44px, 3.5vw, 64px);
+  aspect-ratio: auto;
+  margin: 0 auto;
+  gap: 0;
+  flex-wrap: nowrap;
+  translate: none;
+  background: transparent;
+  filter: drop-shadow(0 4px 5px #000b);
+}
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .community-link {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex: 1 1 0;
   align-items: center;
   justify-content: center;
-  width: 140px;
-  height: 76%;
-  border: 1px solid #72dbf4;
-  border-radius: 3px;
-  color: #d8f7ff;
-  background: linear-gradient(#174257, #061823);
-  box-shadow: 0 3px 12px #0009;
-  font: 700 17px "Oxanium", sans-serif;
-  letter-spacing: .05em;
+  min-width: 0;
+  width: auto;
+  height: 100%;
+  margin: 0 0 0 calc(-1 * var(--community-notch));
+  padding: 0 calc(var(--community-notch) + 5px);
+  border: 0;
+  border-radius: 0;
+  clip-path: var(--community-shape);
+  background: #02070c;
+  box-shadow: none;
+  color: #e4f7ff;
+  font: 400 clamp(18px, 4cqi, 32px)/1 Impact, "Arial Narrow", "Oxanium", sans-serif;
+  letter-spacing: .025em;
   text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
   filter: none;
+  transform: none;
+  transition: filter 160ms ease;
+  isolation: isolate;
 }
 
-.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link:hover,
-.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link[aria-current="page"] {
-  color: #fff;
-  background: linear-gradient(#23617b, #0a293b);
-  box-shadow: 0 0 12px #6de8ff40;
-  filter: none;
+.site-app-shell .topbar > .topnav > .topnav-actions > .community-link:first-child {
+  --community-shape: polygon(var(--community-notch) 0, calc(100% - var(--community-notch)) 0, 100% 50%, calc(100% - var(--community-notch)) 100%, var(--community-notch) 100%, 0 50%);
+  margin-left: 0;
 }
 
-.site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link:focus-visible {
-  outline-offset: 3px;
+.site-app-shell .topbar > .topnav > .topnav-actions > .discord-link { flex-grow: 1.5; }
+.site-app-shell .topbar > .topnav > .topnav-actions > .bohan-hub-link { flex-grow: 1.2; }
+.site-app-shell .topbar > .topnav > .topnav-actions > .site-chat-button { flex-grow: 1.08; }
+
+.community-link::before, .community-link::after {
+  content: "";
+  position: absolute;
+  clip-path: var(--community-shape);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.community-link::before {
+  inset: 2px;
+  background: linear-gradient(160deg, #fff 0%, #e5f5ff 13%, #69bfe9 23%, #2f6c9b 35%, #b9e6ff 48%, #fff 51%, #71c9f4 67%, #26567b 84%, #bceeff 100%);
+}
+
+.community-link::after {
+  inset: 7px;
+  background: linear-gradient(#05101f70, #13375220 48%, #010a16a8), url("assets/community-metal.svg") center / 280px 100%;
+  box-shadow: inset 0 0 0 3px #020914, inset 0 0 12px 4px #010813;
+}
+
+.community-link > span {
+  white-space: nowrap;
+  background: linear-gradient(#fff 8%, #c8e5f5 37%, #fff 48%, #9ad6f2 74%, #81b4d5 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: .6px #07131d;
+  paint-order: stroke fill;
+  filter: drop-shadow(2px 3px 0 #000);
+}
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .community-link:is(:hover, :focus-visible, [aria-current="page"]) {
+  filter: brightness(1.25);
+  background: #6de8ff;
+  transform: none;
+}
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .community-link:focus-visible > span {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 @media (min-width: 1800px) {
@@ -3759,31 +3772,20 @@ main {
   }
 }
 
-@media (max-width: 1080px) {
-  .site-app-shell .topbar > .topnav > .topnav-actions:has(.arc-mod-link) {
-    aspect-ratio: auto;
-    margin-bottom: 0;
-    row-gap: 6px;
-  }
-  .site-app-shell .topbar > .topnav > .topnav-actions > :is(.discord-link, .bohan-hub-link) {
+@media (max-width: 680px) {
+  .site-app-shell .topbar > .topnav > .topnav-actions {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    grid-auto-rows: clamp(44px, 10vw, 58px);
     height: auto;
-    aspect-ratio: 1002.5 / 290;
+    row-gap: 5px;
   }
-  .site-app-shell .topbar > .topnav > .topnav-actions > .arc-mod-link {
-    position: static;
-    grid-column: 1;
-    grid-row: 2;
-    justify-self: end;
-    width: 110px;
-    height: 36px;
-    margin: 6px 6px 0 0;
-    font-size: 14px;
+  .site-app-shell .topbar > .topnav > .topnav-actions > .community-link {
+    font-size: clamp(22px, 5cqi, 32px);
   }
-  .site-app-shell .topbar > .topnav > .topnav-actions > .site-chat-button {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: start;
-    margin-left: 6px;
+  .site-app-shell .topbar > .topnav > .topnav-actions > .community-link:nth-child(3) {
+    --community-shape: polygon(var(--community-notch) 0, calc(100% - var(--community-notch)) 0, 100% 50%, calc(100% - var(--community-notch)) 100%, var(--community-notch) 100%, 0 50%);
+    margin-left: 0;
   }
 }
 

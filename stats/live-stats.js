@@ -3554,6 +3554,12 @@ function renderMatches(gameList) {
       `;
     })
     .join("");
+
+  if (leaderboardRecentMatchesElement) {
+    matchesElement.querySelectorAll("tr").forEach((row) => {
+      row.querySelectorAll(".stats-upset-victory").forEach((badge) => row.cells[1].append(badge));
+    });
+  }
 }
 
 function getSuccessfulMapPlayers(gameList) {

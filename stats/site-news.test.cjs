@@ -10,10 +10,15 @@ test('all balloon/game source files live in balloon with no root compatibility c
   for (const file of files) assert.equal(fs.existsSync(path.join(root, file)), false, `Root copy remains: ${file}`);
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const entrypoints = [...html.matchAll(/(?:src|href)="((?:balloon\/)?site-(?:armory|news)[^"?]+)(?:\?[^" ]*)?"/g)].map(match => match[1]);
-  assert.equal(entrypoints.length, 12);
-  for (const entry of entrypoints) {
-    assert.ok(entry.startsWith('balloon/')); assert.ok(fs.existsSync(path.join(root, entry)));
-    assert.equal(new URL(entry, 'https://example.test/boha/index.html').pathname, '/boha/' + entry);
+  assert.equal(entrypoints.length, 0, 'Disabled balloon and game must not load scripts, styles or models');
+  for (const [template, id] of [
+    ['disabledBalloonNews', 'siteNewsBalloon'],
+    ['disabledBalloonArmory', 'siteArmory'],
+    ['disabledBalloonGame', 'armoryShield'],
+  ]) {
+    const markup = html.match(new RegExp('<template id="' + template + '">([\\s\\S]*?)</template>'));
+    assert.ok(markup, 'Missing inactive template: ' + template);
+    assert.ok(markup[1].includes('id="' + id + '"'), id + ' must remain inactive');
   }
 });
 

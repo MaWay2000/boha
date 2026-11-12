@@ -45,7 +45,7 @@ test('right panel switches between recent matches, a profile and selected-player
 function matchFixture(sidebar) {
   const actions = [];
   const context = vm.createContext({
-    matchesElement: {innerHTML: ''}, leaderboardRecentMatchesElement: sidebar ? {hidden: false} : null,
+    matchesElement: {innerHTML: '', querySelectorAll: () => []}, leaderboardRecentMatchesElement: sidebar ? {hidden: false} : null,
     matchesSourceElement: sidebar ? null : {}, arcRecentGames: [], mergeRecentGames: (main, arc) => [...main, ...arc],
     renderMatchMapOptions() {}, getActiveMatchFilterCount: () => 1, matchFilterCountElement: null,
     matchesSearchQuery: 'keep', normalizeSearchQuery: value => value,

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="128" viewBox="0 0 512 128">
+  <filter id="grain" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".12 .22" numOctaves="3" seed="21"/>
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer><feFuncR type="gamma" amplitude="1.4" exponent="2.2"/><feFuncG type="gamma" amplitude="1.4" exponent="2.2"/><feFuncB type="gamma" amplitude="1.4" exponent="2.2"/></feComponentTransfer>
+    <feBlend in="SourceGraphic" mode="multiply"/>
+  </filter>
+  <rect width="512" height="128" fill="#345b7b" filter="url(#grain)"/>
+  <path d="m24 27 53-7m106 69 76-18m93-33 58-11m-274 89 30-10m285-6 34-14" stroke="#98c0db" stroke-width="1" opacity=".2"/>
+</svg>

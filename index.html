@@ -17,21 +17,9 @@
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
   <script src="assets/atom-icon-renderer.js?v=20261021-circle-1" defer></script>
   <script src="assets/atom-favicon.js?v=20261022-static-1" defer></script>
-  <link rel="stylesheet" href="styles.css?v=20261111-arc-mod-1">
-  <link rel="stylesheet" href="chat/site-chat.css?v=20261106-2">
+  <link rel="stylesheet" href="styles.css?v=20261112-community-nav-1">
+  <link rel="stylesheet" href="chat/site-chat.css?v=20261112-community-nav-1">
   <script src="chat/site-chat.js?v=20261106-1" defer></script>
-  <link rel="stylesheet" href="balloon/site-news.css?v=20261101-mapmaker-news-image-2">
-  <script src="balloon/site-news.js?v=20261111-leaderboard-news-1" defer></script>
-  <script src="balloon/site-news-model.js?v=20261027-ready-3d-1" type="module"></script>
-  <link rel="stylesheet" href="balloon/site-armory.css?v=20261027-stop-menu-1">
-  <script src="balloon/site-armory-loot.js?v=20261024-roulette-1" defer></script>
-  <script src="balloon/site-armory-tech.js?v=20261024-tech-tiers-1" defer></script>
-  <script src="balloon/site-armory-audio.js?v=20261024-flamer-1" defer></script>
-  <script src="balloon/site-armory-battle.js?v=20261027-models-1" defer></script>
-  <script src="balloon/site-armory-scores.js?v=20261027-continue-score-1" defer></script>
-  <script src="balloon/site-armory.js?v=20261027-continue-score-1" defer></script>
-  <script src="balloon/site-armory-model.js?v=20261027-stop-menu-1" type="module"></script>
-  <script src="balloon/site-armory-units.js?v=20261027-models-1" type="module"></script>
   <style>
     body.radio-playlist-open {
       overflow: hidden;
@@ -157,6 +145,8 @@
   </style>
 </head>
 <body class="site-app-shell">
+  <!-- Balloon and mini-game are disabled to avoid background 3D and animation work. -->
+  <template id="disabledBalloonNews">
   <button class="news-balloon" id="siteNewsBalloon" type="button" aria-label="Open latest Warzone 2100 news" aria-haspopup="dialog" aria-controls="siteNewsDialog" aria-expanded="false" style="transform: translate3d(16px, 24px, 0)">
     <span class="news-balloon-label" aria-hidden="true">NEWS</span>
     <span class="news-balloon-unread" id="siteNewsUnread" aria-hidden="true">NEW</span>
@@ -175,6 +165,7 @@
       <label><input type="checkbox" id="siteNewsMotion"> Animate balloon</label>
     </div>
   </dialog>
+  </template>
   <div class="page-shell">
     <div class="page-noise" aria-hidden="true"></div>
 
@@ -186,12 +177,10 @@
 
         <nav class="topnav" aria-label="Primary">
           <span class="topnav-actions">
-            <a class="discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer">
-              Discord Server
-            </a>
-            <a class="bohan-hub-link" href="open-data.html" target="contentFrame" data-tab="open-data">Bohan Hub</a>
-            <button class="site-chat-button" id="siteChatButton" type="button" aria-haspopup="dialog" aria-controls="siteChatDialog">Chat</button>
-            <a class="arc-mod-link" href="wavehoster.html" target="contentFrame" data-tab="wavehoster">Arc Mod</a>
+            <a class="community-link arc-mod-link" href="wavehoster.html" target="contentFrame" data-tab="wavehoster"><span>Arc Mod</span></a>
+            <a class="community-link discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer"><span>Discord Server</span></a>
+            <a class="community-link bohan-hub-link" href="open-data.html" target="contentFrame" data-tab="open-data"><span>Bohan Hub</span></a>
+            <button class="community-link site-chat-button" id="siteChatButton" type="button" aria-haspopup="dialog" aria-controls="siteChatDialog"><span>Web Chat</span></button>
           </span>
           <span class="topnav-row topnav-primary">
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
@@ -209,6 +198,7 @@
           ></iframe>
         </div>
       </header>
+      <template id="disabledBalloonArmory">
       <section class="site-armory" id="siteArmory" aria-label="Optional balloon shooting game">
         <div class="armory-rack" role="group" aria-label="Choose a weapon; select again to disarm">
           <button type="button" data-weapon="rockets" aria-pressed="false" aria-describedby="armoryReloadLabel-rockets" title="Homing rockets — auto-lock enemy tanks; two rockets per salvo, one salvo per second; hold to fire">
@@ -259,6 +249,7 @@
           <button type="button" id="armoryTops">Top scores</button>
         </div>
       </section>
+      </template>
     </div>
 
     <main class="frame-shell-main" id="top">
@@ -286,6 +277,7 @@
     </footer>
   </div>
 
+  <template id="disabledBalloonGame">
   <div class="armory-shield" id="armoryShield" hidden aria-hidden="true"></div>
   <div class="armory-damage" id="armoryDamage" aria-hidden="true"></div>
   <div class="armory-targets" id="armoryTargets" aria-hidden="true" hidden></div>
@@ -368,6 +360,8 @@
     </section>
     <footer><button type="button" id="armoryNewPlayer" hidden>New player / reset round</button></footer>
   </dialog>
+
+  </template>
 
   <div
     class="replay-analyzer-modal"
@@ -947,7 +941,7 @@
   <dialog class="site-chat-dialog" id="siteChatDialog" aria-labelledby="siteChatTitle">
     <div class="site-chat-layout">
       <header class="site-chat-header">
-        <div><span class="site-chat-eyebrow">Warzone 2100 · Community</span><h2 id="siteChatTitle">Public chat</h2></div>
+        <div><span class="site-chat-eyebrow">Warzone 2100 · Community</span><h2 id="siteChatTitle">Web Chat</h2></div>
         <button class="site-chat-close" type="button" aria-label="Close chat">×</button>
       </header>
       <p class="site-chat-empty">No messages yet. Say hello!</p>

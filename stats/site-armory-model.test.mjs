@@ -93,7 +93,7 @@ test('preview reuses the existing textured 3D renderer without extra WebGL conte
   assert.doesNotMatch(source, /new .*WebGLRenderer|https:\/\/|innerHTML/);
 });
 
-test('reload text has no visible layout row while progress bars and accessible descriptions remain', async () => {
+test('dormant weapon markup preserves accessible reload bars without loading 3D previews', async () => {
   const css = await read('balloon/site-armory.css'), html = await read('index.html');
   assert.match(css, /\.armory-rack \.armory-reload-label \{[^}]*position: absolute;[^}]*height: 1px;[^}]*clip-path: inset\(50%\)/);
   assert.match(css, /width: 80px;/); assert.match(css, /height: 44px;/);
@@ -102,7 +102,7 @@ test('reload text has no visible layout row while progress bars and accessible d
     assert.ok(html.includes(`id="armoryReload-${weapon}"`));
   }
   assert.equal((html.match(/class="armory-gun-preview"/g) || []).length, 5);
-  assert.match(html, /src="balloon\/site-armory-model.js[^>]*type="module"/);
+  assert.doesNotMatch(html, /src="balloon\/site-armory-model.js/);
   assert.doesNotMatch(html, /Balloon target practice · select to arm|class="armory-invitation"/);
 });
 

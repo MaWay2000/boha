@@ -139,10 +139,9 @@ test('polyphony is bounded and disposal closes audio; a later firing gesture can
   f.audio.play('cannon'); assert.equal(f.contexts.length, 2); assert.equal(f.reports.at(-1).state, 'running');
 });
 
-test('audio is self-contained and is loaded before gameplay with accessible mute control', () => {
+test('dormant audio stays self-contained and the disabled game loads no audio runtime', () => {
   const html = fs.readFileSync(require.resolve('../index.html'), 'utf8');
-  const audioScript = html.indexOf('src="balloon/site-armory-audio.js'), gameScript = html.indexOf('src="balloon/site-armory.js');
-  assert.ok(audioScript >= 0 && gameScript > audioScript);
+  assert.doesNotMatch(html, /<script[^>]+src="balloon\/site-armory(?:-audio)?\.js/);
   assert.match(html, /id="armorySound" aria-label="Gun sounds" aria-pressed="true"/);
   const source = fs.readFileSync(require.resolve('../balloon/site-armory-audio.js'), 'utf8');
   assert.doesNotMatch(source, /fetch\(|new Audio\(|https:\/\/|localStorage|setInterval/);

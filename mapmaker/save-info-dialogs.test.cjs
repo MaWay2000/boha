@@ -4,6 +4,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 (async () => {
+  const {hasWaveRuntime} = await import('./js/waveMapPack.js');
   const {showSaveInfoDialog, showSaveLicenseHelp} = await import('./js/saveInfoDialogs.js');
   const {metadataText} = await import('./js/archiveImport.js');
   const {getNextMapVersion} = await import('./js/mapVersion.js');
@@ -123,7 +124,7 @@ const vm = require('node:vm');
     let userInfo = {author:'My author',license:'MIT',source:'My page'}, dirty = 0, picks = [], packed = [], writes = 0, failWrite = false;
     const status = [];
     const ctx = vm.createContext({document:doc, showSaveInfoDialog, showSaveLicenseHelp, licenseHelpDialog, licenseHelpBody, licenseHelpBackdrop, metadataText, getNextMapVersion, console, mapSaveInProgress:false,
-      mapDirty:false,savedMapVersion:'',
+      mapDirty:false,savedMapVersion:'', currentMapScript:null, hasWaveRuntime, wavePackSaveOptions:{enabled:false,checked:false},
       currentMapArchive:null,tilesetIndex:0,getOfficialTilesetName:() => 'arizona',
       currentLevelJson:{name:'Black',author:'Original author',license:'GPL 2+',players:4,source:'Original page',description:'Original description'},
       currentServerMapMetadata:null, currentServerMapSourceName:'', currentMapInfoOverrides:{},
@@ -134,8 +135,8 @@ const vm = require('node:vm');
       validation:{errors:[],warnings:[],info:[]}, validateMapForExport:() => ctx.validation,
       validationAccepted:true, showValidationDialog:async () => ctx.validationAccepted,
       hideSaveResult(){}, setFileStatus:text => status.push(text), setLoadingProgress(){}, markMapClean(){ ctx.mapDirty = false; }, setTimeout(){},
-      buildWzFileBlob:async () => {
-        packed.push({name:ctx.getSaveMapName(),author:ctx.getSaveAuthor(),license:ctx.getSaveLicense(),source:ctx.getSaveSourceName(),version:ctx.getSaveMapVersion(),info:{...ctx.currentMapInfoOverrides}});
+      buildWzFileBlob:async (asWavePack) => {
+        packed.push({asWavePack, name:ctx.getSaveMapName(),author:ctx.getSaveAuthor(),license:ctx.getSaveLicense(),source:ctx.getSaveSourceName(),version:ctx.getSaveMapVersion(),info:{...ctx.currentMapInfoOverrides}});
         return {size:10};
       },
       window:{showSaveFilePicker:async options => {
@@ -350,6 +351,23 @@ const vm = require('node:vm');
     assert.equal(versionButton(activeDialog()), undefined, 'Retry keeps the selected version instead of suggesting 4.2');
     submit(activeDialog()); await saving; assert.equal(ctx.savedMapVersion, '4.1');
     assert.equal(ctx.currentLevelJson.versionName, '4.1', 'Successful saves retain the recorded version in local-save metadata');
+    ctx.currentMapScript = {filename:'game.js',enabled:true,source:'/* MAPMAKER_RUNTIME_BEGIN\nfunction waves() {}\nMAPMAKER_RUNTIME_END */'};
+    saving = ctx.saveCurrentMap(); await flush();
+    assert(!activeDialog().querySelectorAll('input').some(e => e.id.endsWith('-wave-pack')), 'My info has no export checkbox');
+    submit(activeDialog()); await flush();
+    let checkbox = activeDialog().querySelectorAll('input').find(e => e.id.endsWith('-wave-pack'));
+    assert(checkbox, 'Wave maps offer a one-file pack checkbox'); assert.equal(checkbox.checked,false);
+    checkbox.checked = true; cancel(activeDialog()); await saving;
+    assert.equal(ctx.wavePackSaveOptions.checked,false,'Cancel does not change the pack selection');
+    saving = ctx.saveCurrentMap(); await flush(); submit(activeDialog()); await flush();
+    checkbox = activeDialog().querySelectorAll('input').find(e => e.id.endsWith('-wave-pack'));
+    checkbox.checked = true; submit(activeDialog()); await saving;
+    assert.equal(packed.at(-1).asWavePack,true); assert(picks.at(-1).endsWith('-Pack.wz'));
+    ctx.currentMapScript.enabled = false;
+    saving = ctx.saveCurrentMap(); await flush(); submit(activeDialog()); await flush();
+    assert(!activeDialog().querySelectorAll('input').some(e => e.id.endsWith('-wave-pack')), 'Disabled waves hide the pack option');
+    submit(activeDialog()); await saving;
+    assert.equal(packed.at(-1).asWavePack,false); assert(!picks.at(-1).endsWith('-Pack.wz'));
     console.log('PASS: save steps, license help, CC0 defaults in Settings/popups/exports, legacy preferences, existing licenses/Unknown choices, cancellation and validation; no browser used.');
   } finally { globalThis.document = oldDocument; }
 })().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,3 +1,4 @@
+import {hasWaveRuntime, buildWaveMapPack} from './waveMapPack.js';
 import {createCliffOverlay,disposeCliffOverlay} from './cliffOverlay.js';
 import * as THREE from './three.module.js';
 import { mapExportOwner } from './mapOwnership.mjs?v=20261101-scav-owner-1';
@@ -9244,7 +9245,7 @@ function updateFeatureJson(zip) {
   zip.file(featurePath, buildFeatureJson());
 }
 
-async function buildWzFileBlob() {
+async function buildWzFileBlob(asWavePack = false) {
   const zip = currentMapArchive || new JSZip();
   const base = getSafeMapBase();
   const mapPath = currentMapArchivePath || 'game.map';
@@ -9258,10 +9259,12 @@ async function buildWzFileBlob() {
   writeMapVersion(zip, getSaveMapVersion());
   zip.file(mapPath, buildMapFileBytes());
   zip.file(getTileTypesArchivePath(mapPath), buildTileTypesFileBytes());
-  return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const output = asWavePack ? await buildWaveMapPack(zip, base) : zip;
+  return await output.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
 
 let mapSaveInProgress = false;
+let wavePackSaveOptions = {enabled:false, checked:false};
 
 async function confirmMapSaveInfo() {
   const suggestedVersion = mapDirty && savedMapVersion && getSaveMapVersion() === savedMapVersion
@@ -9269,9 +9272,11 @@ async function confirmMapSaveInfo() {
   syncMyInfoInputs();
   if (!await showSaveInfoDialog(document.getElementById('settingsMyInfoPanel'), 'My info', 'Next: Map info', () => showLicenseHelpDialog(true))) return false;
   updateMapInfoInputs();
+  wavePackSaveOptions.enabled = hasWaveRuntime(currentMapScript);
+  if (!wavePackSaveOptions.enabled) wavePackSaveOptions.checked = false;
   return showSaveInfoDialog(document.getElementById('settingsMapInfoPanel'), 'Map info', 'Save map', null, [
     'settingsMapAuthorInput', 'settingsMapLicenseInput', 'settingsMapSourceInput', 'settingsMapUploadedInput'
-  ], suggestedVersion);
+  ], suggestedVersion, wavePackSaveOptions);
 }
 
 async function saveCurrentMap() {
@@ -9297,7 +9302,8 @@ async function saveCurrentMap() {
       setFileStatus('Save cancelled.');
       return;
     }
-    const savedName = makeSaveFilename();
+    const asWavePack = wavePackSaveOptions.checked;
+    const savedName = asWavePack ? makeSaveFilename().replace(/\.wz$/i, '-Pack.wz') : makeSaveFilename();
     if (typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function') {
       try {
         setFileStatus('Choose save location...');
@@ -9319,7 +9325,7 @@ async function saveCurrentMap() {
     }
     setFileStatus('Packing .wz map...');
     setLoadingProgress('Packing WZ archive', 15);
-    const blob = await buildWzFileBlob();
+    const blob = await buildWzFileBlob(asWavePack);
     let saveMode = 'download';
     if (fileHandle) {
       setLoadingProgress('Writing WZ file', 95);
@@ -9344,7 +9350,9 @@ async function saveCurrentMap() {
     savedMapVersion = getSaveMapVersion();
     setTimeout(() => {
       hideLoadingProgress();
-      const baseTip = savedMapNeedsAdvancedBases() ? ' Use Advanced Bases in Warzone to keep defenses/sensors.' : '';
+      const baseTip = asWavePack
+        ? ' Install this pack in mods/<game-version>/autoload; remove it before playing other maps.'
+        : savedMapNeedsAdvancedBases() ? ' Use Advanced Bases in Warzone to keep defenses/sensors.' : '';
       setFileStatus('Saved ' + savedName + baseTip);
       getBlobSha256(blob).then(hash => {
         showSaveResult(savedName, saveMode, baseTip, buildSaveResultDetails(blob, hash));

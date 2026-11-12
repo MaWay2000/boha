@@ -258,6 +258,12 @@ export function writeMapScriptSource(zip, value) {
   const runtimePath = 'multiplay/script/mods/init.js';
   const ownershipPath = 'mapmaker-timed-waves.json';
   const runtime = script && script.enabled && script.source.match(/\/\* MAPMAKER_RUNTIME_BEGIN\r?\n([\s\S]*?)MAPMAKER_RUNTIME_END \*\//);
+  const aiPath = 'multiplay/skirmish/nexus.js';
+  const aiOwnershipPath = 'mapmaker-wave-ai.json';
+  const waveAi = runtime && runtime[1].includes('// MAPMAKER_WAVE_OPPONENT_NEXUS');
+  if (waveAi && zip.file(aiPath) && !zip.file(aiOwnershipPath)) {
+    throw new Error('This map already supplies a NEXUS AI. The library cannot replace its custom AI.');
+  }
   // Never replace another map/mod's gameplay entry point.
   if (runtime && zip.file(runtimePath) && !zip.file(ownershipPath)) {
     throw new Error('This map already has a gameplay mod. Timed waves cannot replace its mods/init.js.');
@@ -269,6 +275,14 @@ export function writeMapScriptSource(zip, value) {
   if (runtime) {
     zip.file(runtimePath, runtime[1]);
     zip.file(ownershipPath, JSON.stringify({version:1, runtimePath}));
+  }
+  if (zip.file(aiOwnershipPath)) {
+    zip.remove(aiPath);
+    zip.remove(aiOwnershipPath);
+  }
+  if (waveAi) {
+    zip.file(aiPath, '// Wave movement, spawning and research are controlled by mods/init.js.\nfunction eventStartLevel() {}\n');
+    zip.file(aiOwnershipPath, JSON.stringify({version:1, aiPath}));
   }
   if (script) zip.file('mapmaker-script.json', JSON.stringify({version:1, ...script}));
 }

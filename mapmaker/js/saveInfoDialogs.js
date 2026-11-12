@@ -1,7 +1,7 @@
 let nextDialogId = 0;
 
 // Reuse the Settings fields without moving them or changing live values on Cancel.
-export function showSaveInfoDialog(sourcePanel, title, continueLabel, onLicenseHelp, omittedFields = [], suggestedVersion = '') {
+export function showSaveInfoDialog(sourcePanel, title, continueLabel, onLicenseHelp, omittedFields = [], suggestedVersion = '', wavePackOptions = null) {
   return new Promise(resolve => {
     const previousFocus = document.activeElement;
     const dialog = document.createElement('dialog');
@@ -67,6 +67,26 @@ export function showSaveInfoDialog(sourcePanel, title, continueLabel, onLicenseH
       }
     });
 
+    let wavePackCheckbox = null;
+    if (wavePackOptions?.enabled) {
+      const option = document.createElement('div');
+      option.className = 'save-wave-pack-option';
+      const label = document.createElement('label');
+      wavePackCheckbox = document.createElement('input');
+      wavePackCheckbox.type = 'checkbox';
+      wavePackCheckbox.id = prefix + 'wave-pack';
+      wavePackCheckbox.checked = !!wavePackOptions.checked;
+      label.htmlFor = wavePackCheckbox.id;
+      const text = document.createElement('span');
+      text.textContent = 'Save waves as one-file pack';
+      label.append(wavePackCheckbox, text);
+      const hint = document.createElement('div');
+      hint.className = 'app-dialog-hint';
+      hint.textContent = 'Install in mods/<game-version>/autoload. Remove the pack before playing other maps.';
+      option.append(label, hint);
+      fields.append(option);
+    }
+
     const actions = document.createElement('div');
     actions.className = 'app-dialog-actions';
     const cancel = document.createElement('button');
@@ -90,6 +110,7 @@ export function showSaveInfoDialog(sourcePanel, title, continueLabel, onLicenseH
         originals[index].value = input.value;
         originals[index].dispatchEvent(new Event('change', { bubbles: true }));
       });
+      if (wavePackCheckbox) wavePackOptions.checked = wavePackCheckbox.checked;
       dialog.close('continue');
     });
     dialog.addEventListener('keydown', event => event.stopPropagation());

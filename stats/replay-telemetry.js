@@ -9,6 +9,57 @@
   const number = value => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
   const index = value => number(value) != null && Number.isSafeInteger(value) ? value : null;
   const label = value => typeof value === "string" ? value.slice(0, 160) : null;
+  const nativeReasons = {
+    killHistory: "Engine-confirmed kill credit is recorded separately from uncredited combat deaths.",
+    combatValue: "Nominal unit value at confirmed enemy kills. Friendly fire, recycling and captures are excluded; this is not actual power spent.",
+    damage: "Actual combat HP removed and shield loss, recorded separately. Damage with no surviving attacker reference remains unattributed.",
+    repairs: "Actual restored HP and repairer from repair units, trucks, facilities, rearm pads and self-repair. Script health edits are separate.",
+    donations: "Applied object gifts and actual power debited/credited. Captures and recipient storage losses remain distinct.",
+    economy: "Exact fixed-point power changes: generation, spending, refunds, gifts, adjustments and storage waste. Adjustments are not earned income."
+  };
+  function nativeEvidence(value, duration) {
+    if (!value || value.schemaVersion !== 1 || value.profile !== "maway-native-events-v1"
+      || value.durationMilliseconds !== duration || !Number.isSafeInteger(value.rawRecords) || value.rawRecords < 2
+      || !/^[a-f0-9]{64}$/.test(value.logSha256 || "") || !/^[a-f0-9]{64}$/.test(value.engineSha256 || "")
+      || !Array.isArray(value.errors) || !Array.isArray(value.players) || value.players.length > 32
+      || !Array.isArray(value.events) || value.events.length > 200000) return null;
+    const numeric = ["hitPointsDealt", "hitPointsLost", "shieldPointsDealt", "shieldPointsLost", "unattributedHitPointsLost",
+      "enemyKills", "enemyStructureKills", "alliedKills", "alliedStructureKills", "combatDeaths", "unattributedCombatDeaths", "enemyUnitValueDestroyed", "enemyUnitValueLost",
+      "repairPointsGiven", "repairPointsReceived", "donatedObjects", "receivedObjects"];
+    const exact = ["donatedPowerDebitFixed", "receivedPowerCreditFixed", "powerCreditFixed", "powerDebitFixed", "wastedPowerFixed"];
+    const slots = new Set(), nativeTypes = new Set(["damage", "combatKill", "repair", "objectDonation", "capture", "powerDonation", "powerFlow", "scriptHealth"]);
+    for (const player of value.players) {
+      if (!player || index(player.player) == null || player.player > 31 || slots.has(player.player)
+        || numeric.some(key => index(player[key]) == null)
+        || exact.some(key => typeof player[key] !== "string" || !/^\d{1,30}$/.test(player[key]))) return null;
+      slots.add(player.player);
+      if (!player.powerOperations || typeof player.powerOperations !== "object" || Array.isArray(player.powerOperations)
+        || Object.keys(player.powerOperations).length > 64 || Object.values(player.powerOperations).some(operation => !operation
+          || index(operation.transactions) == null || ["creditFixed", "debitFixed", "wastedFixed"].some(key => typeof operation[key] !== "string" || !/^\d{1,30}$/.test(operation[key])))) return null;
+      if (player.initialPowerFixed != null || player.finalPowerFixed != null) {
+        if (typeof player.initialPowerFixed !== "string" || !/^-?\d{1,30}$/.test(player.initialPowerFixed)
+          || typeof player.finalPowerFixed !== "string" || !/^-?\d{1,30}$/.test(player.finalPowerFixed)) return null;
+        if (BigInt(player.finalPowerFixed) - BigInt(player.initialPowerFixed)
+          !== BigInt(player.powerCreditFixed) - BigInt(player.powerDebitFixed)) return null;
+      }
+    }
+    if (value.events.some(event => !event || !nativeTypes.has(event.type) || number(event.timeMilliseconds) == null
+      || event.timeMilliseconds > duration)) return null;
+    const nativeSlot = value => index(value) != null && value < 32;
+    const nativeFixed = (value, signed = false) => typeof value === "string" && (signed ? /^-?\d{1,30}$/ : /^\d{1,30}$/).test(value);
+    for (const event of value.events) {
+      if (["combatKill", "repair", "objectDonation", "capture", "scriptHealth"].includes(event.type) && !object(event.object)) return null;
+      if (event.type === "combatKill" && (typeof event.credited !== "boolean" || (event.credited && !nativeSlot(event.source?.player)))) return null;
+      if (event.type === "damage" && (!nativeSlot(event.targetPlayer) || (event.player != null && !nativeSlot(event.player)) || index(event.hitPoints) == null || index(event.shieldPoints) == null)) return null;
+      if (event.type === "repair" && (index(event.hitPoints) == null || (event.repairer && !object(event.repairer)) || typeof event.mechanism !== "string")) return null;
+      if (["objectDonation", "capture", "powerDonation"].includes(event.type) && (!nativeSlot(event.from) || !nativeSlot(event.to) || event.from === event.to)) return null;
+      if (event.type === "powerDonation" && (!nativeFixed(event.debitedFixed) || !nativeFixed(event.creditedFixed))) return null;
+      if (event.type === "powerFlow" && (!nativeSlot(event.player) || !nativeFixed(event.beforeFixed, true) || !nativeFixed(event.afterFixed, true)
+        || ["creditFixed", "debitFixed", "wastedFixed"].some(key => !nativeFixed(event[key])) || index(event.transactions) == null)) return null;
+      if (event.type === "scriptHealth" && (index(event.before) == null || index(event.after) == null)) return null;
+    }
+    return { ...value, complete: value.complete === true && value.errors.length === 0 };
+  }
   function object(value) {
     if (!value || index(value.id) == null || index(value.player) == null
       || !["unit", "structure"].includes(value.kind)) return null;
@@ -95,6 +146,11 @@
     };
     const availability = {};
     for (const [key, reason] of Object.entries(reasons)) availability[key] = { available: false, reason };
+    const native = nativeEvidence(options.nativeTelemetry, duration);
+    if (native?.complete) for (const [key, reason] of Object.entries(nativeReasons)) availability[key] = { available: true, reason };
+    else if (options.nativeTelemetry) for (const key of Object.keys(nativeReasons)) availability[key] = {
+      available: false, reason: "Native engine recording is incomplete or could not be verified. Reanalysis is needed before these totals can be shown."
+    };
     const historyReason = !tracked ? "Reanalyse with telemetry v1 to collect these events."
       : !complete ? "Partial or unverified replay coverage; records are observations, not complete totals." : null;
     for (const key of ["objectHistory", "construction", "research", "ownershipTransfers", "armyValueHistory", "powerBalanceHistory"])
@@ -153,7 +209,7 @@
     });
     return { schemaVersion: SCHEMA_VERSION, source: "warzone-script-events-v1", complete,
       durationMilliseconds: duration, rejectedRecords, observedRecords: observed,
-      availability, players: totals, events, samples };
+      availability, players: totals, events, samples, ...(native ? { native } : {}) };
   }
-  return { SCHEMA_VERSION, normalize, parseLogs, compile };
+  return { SCHEMA_VERSION, normalize, parseLogs, compile, nativeEvidence };
 });

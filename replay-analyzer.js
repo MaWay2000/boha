@@ -6050,12 +6050,17 @@
     const duration = extraction.engineAnalysis?.game?.elapsedMilliseconds ?? extraction.match?.elapsedMilliseconds;
     const data = library.compile(received?.schemaVersion === 1 ? received.events : [], {
       complete: received?.complete === true, durationMilliseconds: duration,
-      malformedRecords: received?.rejectedRecords || 0
+      malformedRecords: received?.rejectedRecords || 0, nativeTelemetry: received?.native
     });
+    const native = data.native?.complete ? data.native : null;
     panel.hidden = false;
-    document.getElementById("replayTelemetryStatus").textContent = data.complete ? "Verified event coverage · v1"
+    document.getElementById("replayTelemetryStatus").textContent = native
+      ? (data.complete ? "Verified engine and event coverage" : "Verified engine coverage · partial event logs")
+      : data.complete ? "Verified event coverage · v1"
       : data.observedRecords == null ? "Reanalysis needed" : "Partial / unverified coverage";
-    document.getElementById("replayTelemetryNote").textContent = "Unavailable is not zero. Observed destructions are not confirmed enemy kills; ownership transfers are not necessarily donations. Completed-asset value is nominal build value, not exact power spent.";
+    document.getElementById("replayTelemetryNote").textContent = native
+      ? "Engine records include confirmed kill credit, actual damage, repairs, applied gifts and exact power changes. Uncredited deaths and script health edits stay separate. Unit value uses nominal build cost."
+      : "Unavailable is not zero. Observed destructions are not confirmed enemy kills; ownership transfers are not necessarily donations. Completed-asset value is nominal build value, not exact power spent.";
     const metrics = [
       ["objectHistory", "Object-event history"], ["construction", "Completed construction"],
       ["research", "Research completions"], ["ownershipTransfers", "Ownership transfers"],
@@ -6076,6 +6081,12 @@
       return player ? player.name : `Engine player ${index}`;
     };
     const display = value => value == null ? "—" : Number(value).toLocaleString();
+    const powerDisplay = value => {
+      if (typeof value !== "string" || !/^-?\d+$/.test(value)) return "—";
+      const amount = BigInt(value), absolute = amount < 0n ? -amount : amount, scale = 4294967296n;
+      const fraction = ((absolute % scale) * 10000n / scale).toString().padStart(4, "0").replace(/0+$/, "");
+      return `${amount < 0n ? "−" : ""}${(absolute / scale).toLocaleString()}${fraction ? `.${fraction}` : ""}`;
+    };
     const playerRows = data.players.map(player => {
       const row = document.createElement("tr");
       row.append(createCell(playerName(player.player)), createCell(display(player.completedUnits)),
@@ -6090,10 +6101,38 @@
       cell.colSpan = 8; row.append(cell); playerRows.push(row);
     }
     replaceChildren(document.getElementById("replayTelemetryPlayers"), playerRows);
+    let nativeSection = document.getElementById("replayNativeTelemetryDetails");
+    if (!nativeSection) {
+      nativeSection = document.createElement("section"); nativeSection.id = "replayNativeTelemetryDetails";
+      document.getElementById("replayTelemetryPlayers").closest(".stats-table-wrap").after(nativeSection);
+    }
+    nativeSection.replaceChildren(); nativeSection.hidden = !native;
+    if (native) {
+      const activePlayers = native.players.filter(player => extraction.players.some(item => Number(item.index) === player.player));
+      const heading = document.createElement("h3"); heading.textContent = "Combat, repairs and power"; nativeSection.append(heading);
+      const table = (headings, rows) => {
+        const wrap = document.createElement("div"), element = document.createElement("table"), head = document.createElement("thead"), headRow = document.createElement("tr"), body = document.createElement("tbody");
+        wrap.className = "stats-table-wrap"; element.className = "replay-telemetry-table";
+        headings.forEach(text => { const cell = document.createElement("th"); cell.textContent = text; headRow.append(cell); });
+        head.append(headRow); rows.forEach(values => { const row = document.createElement("tr"); values.forEach(value => row.append(createCell(value))); body.append(row); });
+        element.append(head, body); wrap.append(element); return wrap;
+      };
+      nativeSection.append(table(["Player", "Enemy unit kills", "Enemy structures", "Allied unit / structure kills", "Uncredited deaths", "HP damage dealt", "HP damage received", "Shield damage dealt", "Repair HP given", "Enemy unit value won / lost"],
+        activePlayers.map(player => [playerName(player.player), display(player.enemyKills), display(player.enemyStructureKills), `${display(player.alliedKills)} / ${display(player.alliedStructureKills)}`, display(player.unattributedCombatDeaths), display(player.hitPointsDealt), display(player.hitPointsLost), display(player.shieldPointsDealt), display(player.repairPointsGiven), `${display(player.enemyUnitValueDestroyed)} / ${display(player.enemyUnitValueLost)}`])));
+      nativeSection.append(table(["Player", "Power credits", "Power debits", "Power given / received", "Objects given / received", "Storage waste", "Final power"],
+        activePlayers.map(player => [playerName(player.player), powerDisplay(player.powerCreditFixed), powerDisplay(player.powerDebitFixed), `${powerDisplay(player.donatedPowerDebitFixed)} / ${powerDisplay(player.receivedPowerCreditFixed)}`, `${display(player.donatedObjects)} / ${display(player.receivedObjects)}`, powerDisplay(player.wastedPowerFixed), powerDisplay(player.finalPowerFixed)])));
+      const breakdown = document.createElement("details"), summary = document.createElement("summary"); summary.textContent = "Power breakdown"; breakdown.append(summary);
+      const operationNames = { generated: "Generation", production: "Factory spending", construction: "Other construction", research: "Research-facility spending", "production-refund": "Production refund", "demolition-refund": "Demolition refund", "recycle-refund": "Recycling refund", "power-gift": "Power gift", "script-grant": "Script grant", "storage-cap": "Storage cap", set: "Power adjustment", reset: "Power reset", credit: "Other credit", debit: "Other debit" };
+      const spendingNote = document.createElement("p"); spendingNote.textContent = "Factory and research-facility spending include construction and upgrades of those buildings."; breakdown.append(spendingNote);
+      breakdown.append(table(["Player", "Operation", "Credited", "Debited", "Wasted", "Transactions"], activePlayers.flatMap(player => Object.entries(player.powerOperations || {}).map(([operation, totals]) => [playerName(player.player), operationNames[operation] || operation, powerDisplay(totals.creditFixed), powerDisplay(totals.debitFixed), powerDisplay(totals.wastedFixed), display(totals.transactions)]))));
+      nativeSection.append(breakdown);
+    }
     const eventNames = { unitBuilt: "Unit completed", structureBuilt: "Structure completed", destroyed: "Destruction observed",
       demolitionStarted: "Demolition started", ownershipTransfer: "Ownership transfer", researchCompleted: "Research completed",
-      attackNotice: "Attack notice (not a hit/kill counter)", sample: "Army / power sample" };
-    const events = data.events.filter(event => event.type !== "start");
+      attackNotice: "Attack notice (not a hit/kill counter)", sample: "Army / power sample", damage: "Exact combat damage",
+      combatKill: "Combat death / kill credit", repair: "Repair performed", objectDonation: "Confirmed object gift",
+      capture: "Confirmed capture", powerDonation: "Applied power gift", powerFlow: "Exact power flow", scriptHealth: "Script health change" };
+    const events = [...data.events.filter(event => event.type !== "start"), ...(native?.events || [])].sort((a, b) => a.timeMilliseconds - b.timeMilliseconds);
     const filter = document.getElementById("replayTelemetryFilter"), more = document.getElementById("replayTelemetryMore");
     filter.replaceChildren(); appendOption(filter, "", "All events");
     [...new Set(events.map(event => event.type))].forEach(type => appendOption(filter, type, eventNames[type] || type));
@@ -6107,6 +6146,14 @@
         if (event.type === "ownershipTransfer") details += `; ${playerName(event.from)} → ${playerName(event.to)}; gift/capture reason unknown`;
         if (event.type === "researchCompleted") details = `${event.research}; ${event.locallyCompleted ? "completed in own lab" : "shared or unattributed lab"}`;
         if (event.type === "sample") details = event.players.map(player => `${playerName(player.player)}: army value ${display(player.unitValue)}, power balance ${display(player.powerBalance)}`).join(" · ");
+        if (event.type === "damage") details = `${display(event.hitPoints)} HP + ${display(event.shieldPoints)} shield; target ${playerName(event.targetPlayer)}; ${event.allied == null ? "unattributed" : event.allied ? "allied fire" : "enemy fire"}`;
+        if (event.type === "combatKill") details += `; ${event.credited ? `engine kill credit: ${playerName(event.source.player)}` : "no engine kill credit"}; ${event.allied == null ? "attacker unknown" : event.allied ? "allied fire" : "enemy fire"}`;
+        if (event.type === "repair") details += `; restored ${display(event.hitPoints)} HP; ${event.repairer ? `${playerName(event.repairer.player)} / ${event.repairer.name} #${event.repairer.id}` : "repairer unknown"}; ${event.mechanism}`;
+        if (event.type === "objectDonation" || event.type === "capture") details += `; ${playerName(event.from)} → ${playerName(event.to)}`;
+        if (event.type === "powerDonation") details = `${playerName(event.from)} → ${playerName(event.to)}; ${powerDisplay(event.debitedFixed)} debited / ${powerDisplay(event.creditedFixed)} credited`;
+        if (event.type === "powerFlow") details = `Balance ${powerDisplay(event.beforeFixed)} → ${powerDisplay(event.afterFixed)}; +${powerDisplay(event.creditFixed)} / −${powerDisplay(event.debitFixed)}; storage waste ${powerDisplay(event.wastedFixed)}; ${display(event.transactions)} transactions`;
+        if (event.type === "scriptHealth") details += `; HP ${display(event.before)} → ${display(event.after)}; scripted adjustment`;
+        if (["damage", "repair", "powerFlow"].includes(event.type) && Number.isFinite(event.windowStartMilliseconds) && Number.isFinite(event.windowEndMilliseconds)) details += `; exact totals for ${formatDuration(event.windowStartMilliseconds)}–${formatDuration(event.windowEndMilliseconds)}`;
         row.append(createCell(formatDuration(event.timeMilliseconds)), createCell(eventNames[event.type] || event.type),
           createCell(event.object ? playerName(event.object.player) : event.player != null ? playerName(event.player) : "—"), createCell(details));
         return row;

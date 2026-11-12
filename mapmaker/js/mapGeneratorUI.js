@@ -70,12 +70,12 @@ const fieldHelp={
 };
 for(const [key,label] of startingBuildingOptions) fieldHelp[key]='Number of '+label.toLowerCase()+' requested for each player. Set to 0 to omit this building. This controls initial placement, not how many can be built during the game. If there is not enough room, the generator reports a warning.';
 const sectionHelp={
-  "Map": "Choose map dimensions, player count, tileset and a preset. Settings are applied only when you click Generate or Update map.",
+  "Map settings": "Choose map dimensions, player count, tileset and a preset. Settings are applied only when you click Generate or Update map.",
   "Layout": "Arrange player starts, group them into teams, and control the space and routes between bases.",
   "Terrain": "Control terrain symmetry, height, hills, smoothing and the mountain border.",
   "Water and textures": "Choose water patterns, roads, ground textures and coastline blending.",
-  "Starting bases": "Choose a building preset and adjust the starting buildings and construction trucks for each player. These are placement counts, not game build limits.",
-  "Starting units": "Configure additional starting tanks, sensor vehicles and cyborgs, plus truck components.",
+  "Starting bases": "Adjust the starting buildings and construction trucks for each player. These are placement counts, not game build limits.",
+  "Starting units / structures": "Configure starting defenses, additional tanks, sensor vehicles and cyborgs, plus truck components.",
   "Oil and resources": "Control base oil, expansion clusters, contested resources and collectible objects.",
   "Scenery and scavengers": "Add decorative objects and optional scavenger camps.",
   "Keep / regenerate": "Choose which parts of the current map to replace and which layers to preserve."
@@ -83,12 +83,12 @@ const sectionHelp={
 
 // Every field is read by the pure generation engine; presets are editable starting points.
 const groups=[
- ['Map',['width|Width (tiles)|number|48|255','height|Height (tiles)|number|48|255','players|Players|number|2|10','tileset|Tileset|select|0:Arizona,1:Urban,2:Rockies','preset|Preset|select|arena:Open arena,ntw:NTW-style,hills:Hills,canyon:Canyon,islands:Islands,city:City']],
+ ['Map settings',['width|Width (tiles)|number|48|255','height|Height (tiles)|number|48|255','players|Players|number|2|10','preset|Preset|select|arena:Open arena,ntw:NTW-style,hills:Hills,canyon:Canyon,islands:Islands,city:City']],
+ ['Starting bases',['trucks|Trucks|number|1|15',...startingBuildingOptions.map(([key,label,,max])=>`${key}|${label}|number|0|${max}`),'modules|Factory modules (other buildings max 1)|number|0|2','orientation|Building / unit facing|select|centre:Face centre,north:North']],
+ ['Starting units / structures',['defenses|Defenses|number|0|12','defenseType|Defense building ID|text','truckBody|Truck body ID|text','truckPropulsion|Truck propulsion ID|text','tanks|Tanks|number|0|12','tankWeapon|Tank weapon ID|text','support|Sensor units|number|0|4','cyborgs|Cyborgs|number|0|8']],
  ['Layout',['layout|Starting layout|select|corners:Corners (4 players),circle:Circle,edges:Edges,opposite:Opposite edges,teams:Team groups','teams|Total teams|number|1|5','edge|Base edge distance|number|8|64','baseRadius|Flat base radius|number|7|24','centreRadius|Central arena radius|number|0|30','routes|Routes|number|1|4','routeWidth|Route / ramp width|number|3|14','connected|Require land routes|checkbox']],
- ['Terrain',['symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','showCliffs|Show on map|checkbox','border|Mountain border width|number|0|8']],
+ ['Terrain',['tileset|Tileset|select|0:Arizona,1:Urban,2:Rockies','symmetry|Terrain symmetry|select|none:None,vertical:Vertical,horizontal:Horizontal,both:Both axes,rotation:180° rotation','terrain|Terrain shape|select|flat:Flat,hills:Rolling hills,mountains:Mountains,plateaus:Plateaus,canyon:Canyon','minHeight|Minimum height|number|0|255','maxHeight|Maximum height|number|0|255','frequency|Hill frequency|number|1|12','smoothness|Smoothing passes|number|0|8','cliffs|High cliffs|checkbox','showCliffs|Show on map|checkbox','border|Mountain border width|number|0|8']],
  ['Water and textures',['water|Water amount (%) target|number|0|60','waterStyle|Water shape|select|lakes:Lakes,river:River,coast:Coast,islands:Islands','riverWidth|River width|number|2|16','crossings|River crossings|number|1|6','roads|Connect bases with roads|checkbox','roadWidth|Road width|number|1|5','groundTile|Ground tile ID|number|0|77','textureVariety|Ground texture variety|number|1|'+getTileCount(generatorDefaults.tileset),'transitions|Blend terrain edges|checkbox']],
- ['Starting bases',['base|Starting base|select|trucks:Trucks only,small:Small base (33%),medium:Medium base (66%),full:Full base (100%)','trucks|Trucks|number|1|15',...startingBuildingOptions.map(([key,label,,max])=>`${key}|${label}|number|0|${max}`),'modules|Factory modules (other buildings max 1)|number|0|2','orientation|Building / unit facing|select|centre:Face centre,north:North','defenses|Defenses|number|0|12','defenseType|Defense building ID|text']],
- ['Starting units',['truckBody|Truck body ID|text','truckPropulsion|Truck propulsion ID|text','tanks|Tanks|number|0|12','tankWeapon|Tank weapon ID|text','support|Sensor units|number|0|4','cyborgs|Cyborgs|number|0|8']],
  ['Oil and resources',['baseOil|Base oil|number|0|40','oilDistance|Base oil distance|number|6|24','expansions|Expansion clusters|number|0|6','expansionOil|Oil per expansion cluster|number|1|8','neutralOil|Contested centre oil|number|0|40','oilSpacing|Minimum oil spacing|number|2|8','derricks|Prebuild owned oil derricks|checkbox','drums|Neutral oil drums|number|0|20','artifacts|Neutral artifacts|number|0|12']],
  ['Scenery and scavengers',['scenery|Scenery density|number|0|5','sceneryStyle|Scenery|select|rocks:Rocks,trees:Trees,ruins:Ruins / wrecks,city:City buildings','symmetricScenery|Mirror scenery|checkbox','scavengers|Scavenger camps|checkbox','scavCamps|Camp count|number|1|6','scavUnits|Units per camp|number|0|10']],
  ['Keep / regenerate',['regenerate|Regenerate|select|all:Whole map,terrain:Terrain only,bases:Bases and units only,resources:Resources only,scenery:Scenery only','lockTerrain|Lock terrain|checkbox','lockBases|Lock bases and units|checkbox','lockResources|Lock resources|checkbox','lockScenery|Lock scenery|checkbox']]
@@ -109,7 +109,7 @@ export function mountMapGenerator(host,bridge) {
   const form=document.createElement('form');form.className='generator-form';box.append(form);
   const inputs=new Map(),values=new Map(),maxLabels=new Map(),minLabels=new Map(),supportedRanges=new Map(),fieldLabels=new Map(),sectionLabels=new Map();
   for(const [title,fields] of groups){
-    const details=document.createElement('details');details.open=title==='Map';
+    const details=document.createElement('details');details.open=title==='Map settings';
     const summary=document.createElement('summary');summary.textContent=title;sectionLabels.set(title,summary);details.append(summary);
     let cliffRow=null;
     for(const field of fields){const [key,label,type,min,max]=field.split('|');
@@ -286,7 +286,7 @@ export function mountMapGenerator(host,bridge) {
     if(updating)return;
     live.cancel();setOptions(appliedOptions);syncButton();status('Changes cancelled. Current map unchanged.');
   });
-  inputs.get('base').addEventListener('change',()=>{setOptions(getStartingBuildingCounts(inputs.get('base').value));invalidate();});
+
   inputs.get('cliffs').addEventListener('click',()=>{const cliffs=inputs.get('cliffs');cliffs.checked=!cliffs.checked;invalidate();});
   const showCliffs=inputs.get('showCliffs');
   let showCliffsEnabled=false;

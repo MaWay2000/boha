@@ -21,7 +21,7 @@ const vm=require('node:vm');
   const trucks=generateMap({base:'trucks'},catalog);
   assert.equal(trucks.snapshot.structures.length,4);
   assert(trucks.snapshot.structures.every(s=>s.name==='A0CommandCentre'));
-  assert.equal(trucks.snapshot.droids.length,8);
+  assert.equal(trucks.snapshot.droids.length,16);
   assert.equal(getBaseEdgeLimit({width:65,height:128,players:4,layout:'teams',teams:2,baseRadius:12}).max,17);
   assert.equal(getBaseEdgeLimit({width:96,height:128,players:4,layout:'teams',teams:2,baseRadius:12}).max,32);
   assert.equal(getBaseEdgeLimit({width:48,height:48,players:10,layout:'teams',teams:2,baseRadius:12}).max,null);
@@ -63,6 +63,8 @@ const vm=require('node:vm');
       assert(row.every(p=>p.y===row[0].y),'teammates share an edge');
     }
   }
+  const defaults=normalizeGeneratorOptions();
+  for(const [key,value] of Object.entries({trucks:4,hqCount:1,factoryCount:5,cyborgFactoryCount:5,vtolFactoryCount:0,researchCount:5,powerCount:10,repairCount:0,rearmCount:0,relayCount:0,uplinkCount:0,lassatCount:0,modules:0,defenses:0}))assert.equal(defaults[key],value,key+' new default');
   const a=generateMap({},catalog),b=generateMap({},catalog);
   assert.equal(a.snapshot.mapInfo.license,'CC0-1.0','generated maps default to CC0');
   assert.equal(a.snapshot.mapInfo.version,'1.0','generated maps default to version 1.0');
@@ -78,8 +80,8 @@ const vm=require('node:vm');
   assert(scavs.snapshot.droids.some(entry=>entry.player==='scavenger'));
   assert(scavs.snapshot.droids.filter(entry=>entry.player==='scavenger').every(entry=>entry.template==='BaBaPeople'),'Generated scavengers use a real game prefab');
   assert(scavs.snapshot.structures.concat(scavs.snapshot.droids).every(entry=>entry.startpos!==10));
-  assert(a.report.connected);assert.equal(a.snapshot.droids.length,8);
-  for(let i=0;i<4;i++)assert.equal(a.snapshot.droids.filter(d=>d.startpos===i).length,2);
+  assert(a.report.connected);assert.equal(a.snapshot.droids.length,16);
+  for(let i=0;i<4;i++)assert.equal(a.snapshot.droids.filter(d=>d.startpos===i).length,4);
   assert.notDeepEqual(a.snapshot.mapHeights,generateMap({seed:'different'},catalog).snapshot.mapHeights);
   for(let tileset=0;tileset<3;tileset++)for(const players of [2,4,6,10]) {
     const result=generateMap({tileset,players,width:192,height:192,layout:'circle',symmetry:'none'},catalog);

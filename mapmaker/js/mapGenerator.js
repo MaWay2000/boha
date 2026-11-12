@@ -21,14 +21,15 @@ export function getStartingBuildingCounts(base='small') {
   return Object.fromEntries(startingBuildingOptions.map(([key])=>[key,key==='hqCount'?1:standard[key]?Math.max(fraction?1:0,Math.round(standard[key]*fraction)):0]));
 }
 export const generatorDefaults = {
-  ...getStartingBuildingCounts(),
+  hqCount:1, factoryCount:5, cyborgFactoryCount:5, vtolFactoryCount:0, researchCount:5, powerCount:10,
+  repairCount:0, rearmCount:0, relayCount:0, uplinkCount:0, lassatCount:0,
   name:'Generated battlefield', width:65, height:128, players:4, tileset:0, seed:'map-1',
   preset:'hills', symmetry:'both', layout:'teams', teams:2, edge:16, baseRadius:12,
   terrain:'hills', minHeight:0, maxHeight:175, frequency:4, smoothness:3, cliffs:false,
   border:3, centreRadius:10, routes:2, routeWidth:5, connected:true,
   water:0, waterStyle:'lakes', riverWidth:5, crossings:2, roads:true, roadWidth:2,
   groundTile:0, textureVariety:3, transitions:true,
-  base:'small', trucks:2, tanks:0, support:0, cyborgs:0, truckBody:'Body1REC',
+  base:'small', trucks:4, tanks:0, support:0, cyborgs:0, truckBody:'Body1REC',
   truckPropulsion:'wheeled01', tankWeapon:'MG1Mk1', orientation:'north', modules:0,
   defenses:0, defenseType:'GuardTower1',
   baseOil:4, oilDistance:10, expansions:2, expansionOil:2, neutralOil:8, oilSpacing:3,
@@ -47,7 +48,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const grid=(w,h,value)=>Array.from({length:h},()=>Array(w).fill(value));
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 export function normalizeGeneratorOptions(input={},catalog={}) {
-  const o={...generatorDefaults,...getStartingBuildingCounts(input.base||generatorDefaults.base),...input};
+  const o={...generatorDefaults,...(input.base?getStartingBuildingCounts(input.base):{}),...input};
   const ranges={width:[48,255],height:[48,255],players:[2,10],teams:[1,5],edge:[8,64],baseRadius:[7,24],
     minHeight:[0,255],maxHeight:[0,255],frequency:[1,12],smoothness:[0,8],border:[0,8],centreRadius:[0,30],
     routes:[1,4],routeWidth:[3,14],water:[0,60],riverWidth:[2,16],crossings:[1,6],roadWidth:[1,5],

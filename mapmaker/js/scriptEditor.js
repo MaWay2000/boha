@@ -1,3 +1,4 @@
+import {scriptLibraryExamples} from './scriptLibrary.js';
 import { findScriptMatches, replaceScriptMatches, highlightScriptSearch } from './scriptSearch.js';
 
 export function getScriptLineNumbers(source) {
@@ -10,7 +11,19 @@ export function mountScriptEditor(panel, {onChange, onRun, onEnable}) {
     '<div class="script-header"><span class="script-title">Map script:</span>' +
     '<span data-script-filename class="script-filename"></span>' +
     '<button type="button" class="action-btn" data-script-find-open title="Find (Ctrl+F) / Replace (Ctrl+H)">Find / replace</button>' +
-    '<label class="script-enable"><input type="checkbox" data-script-enable>Enable Script</label></div>' +
+    '<label class="script-enable"><input type="checkbox" data-script-enable>Enable Script</label>' +
+    '<button type="button" class="action-btn" data-script-library-open aria-expanded="false" aria-controls="mapScriptLibrary">Library</button></div>' +
+    '<section id="mapScriptLibrary" class="script-library" data-script-library hidden aria-label="Map script library">' +
+    '<div class="script-library-toolbar"><label for="mapScriptExample">Example</label>' +
+    '<select id="mapScriptExample" data-script-library-choice aria-label="Choose a map-generation example">' +
+    scriptLibraryExamples.map(entry => '<option value="' + entry.id + '">' + entry.name + '</option>').join('') +
+    '</select><button type="button" class="action-btn" data-script-library-close aria-label="Close library">×</button></div>' +
+    '<p class="script-library-purpose" data-script-library-purpose></p>' +
+    '<p data-script-library-description></p>' +
+    '<pre class="script-library-preview" tabindex="0" aria-label="Example source preview"><code data-script-library-source></code></pre>' +
+    '<p class="script-hint">Timed-wave examples include an editable runtime section. Save the .wz to play the waves in Warzone with Scavengers enabled.</p>' +
+    '<button type="button" class="action-btn" data-script-library-load>Load into editor</button>' +
+    '<p class="script-hint">Replaces the editor source. Click Run script to apply it to the map.</p></section>' +
     '<div class="script-search" data-script-search hidden role="search" aria-label="Find in map script">' +
     '<div class="script-search-row">' +
     '<label for="mapScriptFind">Find</label><input id="mapScriptFind" type="text" spellcheck="false" autocomplete="off" aria-label="Find in script">' +
@@ -55,7 +68,44 @@ export function mountScriptEditor(panel, {onChange, onRun, onEnable}) {
   const open = panel.querySelector('[data-script-find-open]');
   const close = panel.querySelector('[data-script-find-close]');
   const enable = panel.querySelector('[data-script-enable]');
+  const libraryOpen=panel.querySelector('[data-script-library-open]');
+  const library=panel.querySelector('[data-script-library]');
+  const libraryChoice=panel.querySelector('[data-script-library-choice]');
+  const libraryClose=panel.querySelector('[data-script-library-close]');
+  const libraryLoad=panel.querySelector('[data-script-library-load]');
+  const libraryPurpose=panel.querySelector('[data-script-library-purpose]');
+  const libraryDescription=panel.querySelector('[data-script-library-description]');
+  const librarySource=panel.querySelector('[data-script-library-source]');
   let script = null, busy = false, matches = [], activeMatch = -1;
+  library.hidden=true;
+  libraryChoice.value=scriptLibraryExamples[0].id;
+  function showLibraryEntry(){
+    const entry=scriptLibraryExamples.find(item=>item.id===libraryChoice.value)||scriptLibraryExamples[0];
+    libraryPurpose.textContent=entry.purpose;
+    libraryDescription.textContent=entry.description;
+    librarySource.innerHTML=highlightScriptSearch(entry.source,[],-1);
+    return entry;
+  }
+  function closeLibrary(){library.hidden=true;libraryOpen.setAttribute('aria-expanded','false');libraryOpen.focus?.();}
+  libraryOpen.addEventListener('click',()=>{
+    if(busy)return;
+    if(!library.hidden){closeLibrary();return;}
+    showLibraryEntry();library.hidden=false;libraryOpen.setAttribute('aria-expanded','true');libraryChoice.focus?.();
+  });
+  libraryChoice.addEventListener('change',showLibraryEntry);
+  libraryClose.addEventListener('click',closeLibrary);
+  library.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();closeLibrary();}});
+  libraryLoad.addEventListener('click',()=>{
+    if(busy)return;
+    const entry=showLibraryEntry();
+    if(!isEnabled())onEnable?.(true);
+    script={...(script||{}),filename:script?.filename||'game.js',source:entry.source,enabled:true,pendingChanges:true};
+    editor.value=entry.source;
+    filename.textContent=script.filename;
+    onChange(entry.source);
+    closeLibrary();refreshSearch(0);editor.focus?.();
+    showStatus(entry.name+' loaded — Run script to update the map.');
+  });
   search.hidden = true;
   replaceRow.hidden = true;
 
@@ -81,6 +131,7 @@ export function mountScriptEditor(panel, {onChange, onRun, onEnable}) {
   }
   function updateControls() {
     const disabled = busy || !isEnabled();
+    libraryOpen.disabled=busy;libraryLoad.disabled=busy;libraryChoice.disabled=busy;
     enable.checked = isEnabled();
     enable.disabled = busy;
     editor.disabled = disabled;

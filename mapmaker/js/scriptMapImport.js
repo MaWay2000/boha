@@ -255,6 +255,21 @@ export async function readMapScriptSource(zip) {
 
 export function writeMapScriptSource(zip, value) {
   const script = normalizeMapScriptSource(value);
+  const runtimePath = 'multiplay/script/mods/init.js';
+  const ownershipPath = 'mapmaker-timed-waves.json';
+  const runtime = script && script.enabled && script.source.match(/\/\* MAPMAKER_RUNTIME_BEGIN\r?\n([\s\S]*?)MAPMAKER_RUNTIME_END \*\//);
+  // Never replace another map/mod's gameplay entry point.
+  if (runtime && zip.file(runtimePath) && !zip.file(ownershipPath)) {
+    throw new Error('This map already has a gameplay mod. Timed waves cannot replace its mods/init.js.');
+  }
+  if (zip.file(ownershipPath)) {
+    zip.remove(runtimePath);
+    zip.remove(ownershipPath);
+  }
+  if (runtime) {
+    zip.file(runtimePath, runtime[1]);
+    zip.file(ownershipPath, JSON.stringify({version:1, runtimePath}));
+  }
   if (script) zip.file('mapmaker-script.json', JSON.stringify({version:1, ...script}));
 }
 

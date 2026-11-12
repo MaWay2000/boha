@@ -660,6 +660,14 @@
 
     #scriptPanel .script-header { display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:8px; text-align:left; }
     #scriptPanel .script-title { font-size:1rem; white-space:nowrap; }
+    #scriptPanel .script-library { margin:10px 0; padding:12px; border:1px solid #435b71; border-radius:4px; background:#142333; font-size:13px; }
+    #scriptPanel .script-library[hidden] { display:none; }
+    #scriptPanel .script-library-toolbar { display:flex; align-items:center; gap:8px; }
+    #scriptPanel .script-library-toolbar select { flex:1; min-width:0; background:#26384d; color:#eef5fc; border:1px solid #526780; padding:5px; }
+    #scriptPanel .script-library-purpose { color:#7cdeff; font-weight:700; margin-bottom:4px; }
+    #scriptPanel .script-library-preview { max-height:180px; overflow:auto; padding:8px; background:#0d1722; border:1px solid #3f5366; color:#dce8f4; font:12px/1.5 monospace; white-space:pre; }
+    #scriptPanel [data-script-library-open][aria-expanded=true] { background:#6cf527; color:#000; }
+
     #scriptPanel .script-enable { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; font-size:0.85rem; }
     #scriptPanel .script-enable input { margin:0; accent-color:#6CF527; }
     #scriptPanel .script-search {

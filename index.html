@@ -20,6 +20,8 @@
   <link rel="stylesheet" href="styles.css?v=20261112-community-nav-1">
   <link rel="stylesheet" href="chat/site-chat.css?v=20261112-community-nav-1">
   <script src="chat/site-chat.js?v=20261106-1" defer></script>
+  <link rel="stylesheet" href="news/popup.css?v=20261113-static-1">
+  <script src="news/popup.js?v=20261113-static-1" defer></script>
   <style>
     body.radio-playlist-open {
       overflow: hidden;
@@ -151,6 +153,7 @@
     <span class="news-balloon-label" aria-hidden="true">NEWS</span>
     <span class="news-balloon-unread" id="siteNewsUnread" aria-hidden="true">NEW</span>
   </button>
+  </template>
   <dialog class="site-news-dialog" id="siteNewsDialog" aria-labelledby="siteNewsTitle">
     <header>
       <div><p class="site-news-eyebrow">WARZONE 2100 · WEB STATS</p><h2 id="siteNewsTitle">What's new</h2></div>
@@ -161,11 +164,7 @@
       <p id="siteNewsArchiveStatus" role="status" aria-live="polite">Loading news archive…</p>
       <button id="siteNewsOlder" type="button" hidden>Load older news</button>
     </div>
-    <div class="site-news-settings">
-      <label><input type="checkbox" id="siteNewsMotion"> Animate balloon</label>
-    </div>
   </dialog>
-  </template>
   <div class="page-shell">
     <div class="page-noise" aria-hidden="true"></div>
 
@@ -181,6 +180,7 @@
             <a class="community-link discord-link" href="https://discord.gg/9wbtUkGMgf" target="_blank" rel="noreferrer"><span>Discord Server</span></a>
             <a class="community-link bohan-hub-link" href="open-data.html" target="contentFrame" data-tab="open-data"><span>Bohan Hub</span></a>
             <button class="community-link site-chat-button" id="siteChatButton" type="button" aria-haspopup="dialog" aria-controls="siteChatDialog"><span>Web Chat</span></button>
+            <button class="site-news-button" id="siteNewsButton" type="button" aria-haspopup="dialog" aria-controls="siteNewsDialog" aria-expanded="false">News</button>
           </span>
           <span class="topnav-row topnav-primary">
             <a href="leaderboards.html" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
@@ -192,7 +192,7 @@
 
         <div class="topbar-radio" aria-label="Warzone Radio">
           <iframe
-            src="radio/?v=20260828-1"
+            src="radio/?v=20261113-click-to-play-1"
             title="Warzone Radio"
             loading="eager"
           ></iframe>

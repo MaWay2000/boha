@@ -94,7 +94,7 @@ test('integration is shell-only with a native accessible dialog and safe text re
   assert.doesNotMatch(script, /innerHTML|insertAdjacentHTML/);
 });
 
-function browserFixture({ reduced = false, blockedStorage = false, read = null, motion = null, url = null, records = NEWS, fetch = null } = {}) {
+function browserFixture({ popup = false, reduced = false, blockedStorage = false, read = null, motion = null, url = null, records = NEWS, fetch = null } = {}) {
   class Element {
     constructor(id) { this.id = id; this.listeners = {}; this.dataset = {}; this.style = {}; this.attributes = {}; this.children = []; this.hidden = false; this.open = false; this.offsetWidth = 132; this.offsetHeight = 184; }
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
@@ -107,7 +107,7 @@ function browserFixture({ reduced = false, blockedStorage = false, read = null, 
     close() { this.open = false; this.emit('close'); }
     getBoundingClientRect() { return { left: 100, right: 700, top: 50, bottom: 650 }; }
   }
-  const ids = ['siteNewsBalloon', 'siteNewsDialog', 'siteNewsClose', 'siteNewsUnread', 'siteNewsList', 'siteNewsMotion', 'siteNewsArchiveStatus', 'siteNewsOlder'];
+  const ids = ['siteNewsButton', 'siteNewsBalloon', 'siteNewsDialog', 'siteNewsClose', 'siteNewsUnread', 'siteNewsList', 'siteNewsMotion', 'siteNewsArchiveStatus', 'siteNewsOlder'];
   const elements = Object.fromEntries(ids.map(id => [id, new Element(id)]));
   const bodyClasses = new Set();
   const doc = new Element('document');
@@ -134,8 +134,8 @@ function browserFixture({ reduced = false, blockedStorage = false, read = null, 
   const timers = new Map();
   win.setTimeout = (fn, delay) => { timers.set(++id, { fn, delay }); return id; };
   win.clearTimeout = id => timers.delete(id);
-  const controller = mount(win, records);
-  return { win, doc, elements, bodyClasses, frames, storage, media, timers, ready: controller.ready,
+  const controller = (popup ? require('../news/popup.js').mount : mount)(win, records);
+  return { win, doc, elements, bodyClasses, frames, storage, media, timers, controller, ready: controller.ready,
     finishHoverPause() { const pending = [...timers.values()]; timers.clear(); pending.forEach(timer => timer.fn()); },
     step() { const pending = [...frames.values()]; frames.clear(); now += 16; pending.forEach(fn => fn(now)); } };
 }
@@ -392,4 +392,36 @@ test('Mapmaker news keeps its original post and link, with a responsive image',(
  const post=NEWS.find(entry=>entry.id==='2026-11-01-mapmaker-performance');assert.equal(NEWS.filter(entry=>entry.id===post.id).length,1);assert.equal(post.date,'2026-11-01');assert.equal(post.link.href,'mapmaker/');
  const f=browserFixture({records:[post]});const image=f.elements.siteNewsList.children[0].children.find(node=>node.id==='img');assert.equal(image.attributes.src,post.image.src);assert.equal(image.attributes.alt,post.image.alt);assert.equal(image.attributes.width,'421');assert.equal(image.attributes.height,'234');assert.ok(fs.existsSync(require('node:path').resolve(__dirname,'..',post.image.src)));
  for(const src of ['https://other.test/image.png','../private.png','news/images/../secret.png','javascript:alert(1)'])assert.throws(()=>normalizeArchive({schemaVersion:1,entries:[{...post,image:{...post.image,src}}]}));
+});
+
+
+test('static News loads its complete archive only on demand, paginates and restores focus without animation', async () => {
+  let calls = 0;
+  const f = browserFixture({ popup: true, records: [], fetch: async () => { calls++; return { ok: true, json: async () => ({schemaVersion: 1, entries: NEWS}) }; } });
+  const {siteNewsButton: button, siteNewsDialog: dialog, siteNewsList: list, siteNewsOlder: older} = f.elements;
+  assert.equal(calls, 0);
+  assert.equal(f.frames.size, 0);
+  button.emit('click'); await f.controller.ready;
+  assert.equal(dialog.open, true); assert.equal(calls, 1); assert.equal(list.children.length, 3);
+  while (!older.hidden) older.emit('click');
+  assert.equal(list.children.length, NEWS.length);
+  f.elements.siteNewsClose.emit('click');
+  assert.equal(dialog.open, false); assert.equal(f.doc.activeElement, button);
+  button.emit('click'); await f.controller.ready;
+  assert.equal(calls, 1); assert.equal(f.frames.size, 0); assert.equal(f.timers.size, 0);
+  assert.deepEqual(require('../news/popup.js').normalizeArchive({schemaVersion:1, entries:NEWS}), NEWS);
+  const source=fs.readFileSync(require.resolve('../news/popup.js'),'utf8');
+  assert.doesNotMatch(source, /requestAnimationFrame|setInterval|WebGL|\.\.\/balloon|innerHTML/);
+});
+
+test('static News provides a working retry after an archive request fails', async () => {
+  let calls=0;
+  const f=browserFixture({popup:true,records:[],fetch:async()=>{if(++calls===1)throw Error('offline');return{ok:true,json:async()=>({schemaVersion:1,entries:NEWS})};}});
+  f.elements.siteNewsButton.emit('click'); await f.controller.ready;
+  assert.equal(f.elements.siteNewsOlder.hidden,false);
+  assert.equal(f.elements.siteNewsOlder.textContent,'Retry loading news');
+  f.elements.siteNewsOlder.emit('click');
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.elements.siteNewsList.children.length,3);
+  assert.equal(calls,2); assert.equal(f.frames.size,0);
 });

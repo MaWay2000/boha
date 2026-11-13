@@ -159,7 +159,7 @@ export function calculatePersonalRatings(board, input, performance = {}) {
   return { accounts, games, ratedGames };
 }
 
-export function mountPersonalRatings(host, onChange, storage) {
+export function mountPersonalRatings(host, onChange, storage, prepareSettings) {
   let settings = readSettings(storage);
   let payload = null;
   const cache = new Map();
@@ -321,7 +321,19 @@ export function mountPersonalRatings(host, onChange, storage) {
   function showStatus() {
     badge.textContent = settings ? `${settings.algorithm === 'maway-beta3' ? 'Maway v1 · Beta 3' : 'Personal preview'} · K=${settings.k} · base ${settings.base} · boost ×${settings.multiplier}` : "Official published ratings";
   }
-  function apply(next, persist = true) {
+  let applyGeneration = 0;
+  async function apply(next, persist = true) {
+    const generation = ++applyGeneration;
+    try {
+      if (prepareSettings) {
+        feedback.textContent = "Loading rating data…";
+        await prepareSettings(next);
+      }
+    } catch {
+      if (generation === applyGeneration) feedback.textContent = "Could not load rating data. Previous settings kept. Please retry.";
+      return;
+    }
+    if (generation !== applyGeneration) return;
     const previous = settings;
     settings = next;
     cache.clear();
@@ -391,6 +403,7 @@ export function mountPersonalRatings(host, onChange, storage) {
   });
   return {
     placeButton,
+    requiresPerformance: () => settings?.algorithm === 'maway-beta3',
     getBoard(name, data, hydrate) {
       if (!settings) return hydrate(name);
       if (payload !== data) { payload = data; cache.clear(); }

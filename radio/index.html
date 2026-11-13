@@ -5,7 +5,7 @@
 <title>Warzone Radio</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>
-window.ASSET_VERSION = "20260828-restored-player1";
+window.ASSET_VERSION = "20261113-click-to-play-1";
 window.versionedAsset = function(path) {
   return path + "?v=" + window.ASSET_VERSION;
 };
@@ -129,14 +129,15 @@ document.head.appendChild(stylesheet);
   <span class="logo-sky" aria-hidden="true"></span>
  </button>
  <div class="player" id="playerBar">
+  <p id="radioStatus" role="status" hidden style="margin:0;font-size:11px;color:#bcefff"></p>
   <div class="player-main">
    <div class="btn" onclick="nextTrack()" title="Next">
     <svg viewBox="0 0 24 24"><polygon points="5,4 15,12 5,20"/><rect x="16" y="4" width="3" height="16"/></svg>
    </div>
 
-   <div class="btn" onclick="playPause()" id="pp" title="Play/Pause">
+   <button type="button" class="btn" onclick="playPause()" id="pp" title="Play/Pause" aria-label="Play" aria-pressed="false">
     <svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg>
-   </div>
+   </button>
 
    <div class="tube">
     <div class="eqGlow" id="eqGlow"></div>
@@ -185,7 +186,7 @@ document.head.appendChild(stylesheet);
  </div>
 </div>
 
-<script src="https://www.youtube.com/iframe_api"></script>
+<script src="youtube-loader.js?v=20261113-click-to-play-1"></script>
 <script>
 const playerScript = document.createElement("script");
 playerScript.src = window.versionedAsset("player.js");

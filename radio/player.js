@@ -41,6 +41,12 @@ const DEFAULT_DISABLED_TRACK_IDS = new Set([TRACKS[0].id]);
 let player;
 let playing = false;
 let playerInitialized = false;
+let playerReady = false;
+let youtubeRequested = false;
+let pendingPlayback = null;
+let youtubeReadyTimer = 0;
+let visualTimer = 0;
+const loadYouTube = window.BohaYouTubeLoader(window);
 let audioUnlocked = false;
 let settingsOpen = false;
 let disabledTrackIds = readStoredDisabledTrackIds();
@@ -710,6 +716,7 @@ function setVol(nextValue) {
 }
 
 function stopPlayback() {
+  pendingPlayback = null;
   if (hasPlayerMethod("pauseVideo")) {
     try {
       player.pauseVideo();
@@ -769,7 +776,9 @@ function loadTrack(index, options = {}) {
     }
   }
 
-  if (!hasPlayerMethod("loadVideoById")) {
+  if (!playerReady || !hasPlayerMethod("loadVideoById")) {
+    pendingPlayback = trackIndex;
+    syncPlaylistSelection(); updateTimebar();
     return false;
   }
 
@@ -793,7 +802,9 @@ function playTrack(index) {
     return false;
   }
 
+  unlockAudio();
   loadTrack(index, { resetShuffleOrder: shuffleEnabled });
+  if (!playerReady) requestYouTubePlayback();
   return true;
 }
 
@@ -874,7 +885,7 @@ function toggleShuffleMode() {
 }
 
 function initYouTubePlayer() {
-  if (playerInitialized || !window.YT || !window.YT.Player) {
+  if (!youtubeRequested || playerInitialized || !window.YT || !window.YT.Player) {
     return;
   }
 
@@ -890,13 +901,22 @@ function initYouTubePlayer() {
     },
     events: {
       onReady: () => {
-        setVol(vol.value);
-        cueTrack(currentTrackIndex);
+        window.clearTimeout(youtubeReadyTimer); playerReady = true;
+        setRadioStatus(''); setVol(vol.value);
+        const requested = pendingPlayback; pendingPlayback = null;
+        if (requested != null) loadTrack(requested); else cueTrack(currentTrackIndex);
         updateTimebar();
+      },
+      onAutoplayBlocked: () => {
+        playing = false; updateIcon(); setRadioStatus('Player ready. Press Play to start.');
+      },
+      onError: () => {
+        playing = false; updateIcon(); setRadioStatus('This track is unavailable. Try another track.');
       },
       onStateChange: (event) => {
         if (event.data === YT.PlayerState.PLAYING) {
           playing = true;
+          setRadioStatus('');
           playerBar.classList.remove("is-awaiting-play");
           updateIcon();
           syncPlaylistSelection();
@@ -922,13 +942,43 @@ function initYouTubePlayer() {
   });
 }
 
-window.onYouTubeIframeAPIReady = initYouTubePlayer;
+function setRadioStatus(message) {
+  const status = document.getElementById('radioStatus');
+  status.textContent = message; status.hidden = !message;
+}
 
-if (window.YT && window.YT.Player) {
-  initYouTubePlayer();
+function requestYouTubePlayback() {
+  if (youtubeRequested) return;
+  youtubeRequested = true; setRadioStatus('Loading player…');
+  loadYouTube().then(() => {
+    initYouTubePlayer();
+    youtubeReadyTimer = window.setTimeout(() => {
+      if (playerReady) return;
+      youtubeRequested = false; playerInitialized = false;
+      if (hasPlayerMethod('destroy')) player.destroy();
+      player = null; setRadioStatus('Player unavailable. Press Play to retry.');
+    }, 45000);
+  }).catch(error => {
+    youtubeRequested = false; playerInitialized = false; setRadioStatus(error.message);
+  });
+}
+
+function syncPlaybackVisuals() {
+  window.clearTimeout(visualTimer); visualTimer = 0;
+  animateBars();
+  if (playing && !document.hidden) visualTimer = window.setTimeout(syncPlaybackVisuals, 120);
 }
 
 function updateIcon() {
+  document.getElementById('pp').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  document.getElementById('pp').setAttribute('aria-pressed', String(playing));
+  syncPlaybackVisuals();
+  if (playing && !document.hidden) {
+    if (!logoPulseTimeoutId) startRandomLogoPulseLoop();
+  } else {
+    window.clearTimeout(logoPulseTimeoutId); logoPulseTimeoutId = 0;
+    updateLogoSkyIntensity(0, 0);
+  }
   document.getElementById("pp").innerHTML = playing
     ? '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>'
     : '<svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg>';
@@ -951,6 +1001,12 @@ function unlockAudio() {
 }
 
 function playPause() {
+  unlockAudio();
+  if (!playerReady) {
+    const index = isTrackEnabled(currentTrackIndex) ? currentTrackIndex : getFirstEnabledTrackIndex();
+    if (index === -1) return;
+    pendingPlayback = index; requestYouTubePlayback(); return;
+  }
   if (!hasPlayerMethod("playVideo") || !hasPlayerMethod("pauseVideo")) {
     return;
   }
@@ -1282,8 +1338,7 @@ if (window !== window.parent) {
 }
 animateBars();
 updateTimebar();
-startRandomLogoPulseLoop();
-setInterval(animateBars, 120);
+document.addEventListener("visibilitychange", updateIcon);
 window.addEventListener("resize", () => syncEq(parseInt(vol.value, 10) || 0));
 window.toggleSettingsPanel = toggleSettingsPanel;
 window.closeSettingsPanel = closeSettingsPanel;

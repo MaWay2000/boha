@@ -1,9 +1,9 @@
+import {createPublishedLoader} from './published-loader.mjs?v=20261113-efficient-1';
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
-import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261108-maway-fields-1";
+import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
 import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261111-combined-recent-1';
 
-const WZSTATS_LEADERBOARDS_URL = new URL("./published/leaderboards.json", import.meta.url);
-const RATING_PERFORMANCE_URL = new URL('./published/rating-performance.json', import.meta.url);
+const publishedLoader = createPublishedLoader({baseUrl: new URL('./published/', import.meta.url)});
 const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
@@ -108,7 +108,6 @@ const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data
 let selectedLeaderboard = "Global";
 let leaderboardData = null;
 let personalRatings = null;
-let leaderboardDataSignature = "";
 let arcRecentGames = [];
 let arcRecentSignature = null;
 let bannedAccountIds = new Set();
@@ -354,24 +353,11 @@ async function readJson(baseUrl, version, bust = false) {
 }
 
 async function ensureLeaderboardData(force = false) {
-  const payload = await readJson(
-    WZSTATS_LEADERBOARDS_URL,
-    force ? Date.now().toString() : "leaderboards",
-    force
-  );
-  const signature = `${payload.generatedAt || ""}:${payload.coverage?.attributedMatches || 0}`;
-  if (!force && signature === leaderboardDataSignature) {
-    return false;
-  }
-  if (!payload.leaderboards || !Array.isArray(payload.games)) {
-    throw new Error("Published leaderboard data is incomplete.");
-  }
-  try {
-    const performance = await readJson(RATING_PERFORMANCE_URL, payload.generatedAt || 'performance', force);
-    payload.ratingPerformance = performance.format === 2 && performance.games && typeof performance.games === 'object' ? performance.games : {};
-  } catch { payload.ratingPerformance = {}; }
+  const result = await publishedLoader.load();
+  const payload = result.payload;
+  if (personalRatings?.requiresPerformance()) await publishedLoader.loadPerformance(payload);
+  if (!result.changed && leaderboardData === payload) return false;
   leaderboardData = payload;
-  leaderboardDataSignature = signature;
   bannedAccountIds = new Set((payload.leaderboards.Global?.players || [])
     .filter((player) => player.banned)
     .map((player) => String(player.id)));
@@ -3937,6 +3923,7 @@ async function refreshFromMirror(force = false) {
 function startRefreshLoop() {
   if (!refreshTimer) {
     refreshTimer = window.setInterval(() => {
+      if (document.hidden) return;
       refreshFromMirror(false).catch((error) => {
         console.warn("Automatic upstream refresh failed.", error);
       });
@@ -3980,7 +3967,11 @@ async function init() {
   if (ratingsHost) {
     let storage;
     try { storage = window.localStorage; } catch {}
-    personalRatings = mountPersonalRatings(ratingsHost, render, storage);
+    personalRatings = mountPersonalRatings(ratingsHost, render, storage, async settings => {
+      if (settings?.algorithm !== 'maway-beta3') return;
+      let data;
+      do { data = leaderboardData; await publishedLoader.loadPerformance(data); } while (data !== leaderboardData);
+    });
   }
 
   try {

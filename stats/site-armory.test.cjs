@@ -1102,23 +1102,27 @@ test('rockets auto-lock off-target clicks, follow moving tanks, and credit damag
 });
 
 test('rockets still hit replacements after every launch-time enemy dies and the player switches guns', async () => {
-  const f = fixture({ reduced: true }); await f.ready; popBalloon(f); f.select('rockets');
-  const original = f.getBattle(), ids = new Set(original.units.map(unit => unit.id));
-  const point = original.units[0].point;
-  f.next(1000); f.shoot(point.x + 62, point.y + 40);
-  f.select('machinegun');
-  for (const id of ids) {
-    for (let attempt = 0; attempt < 100 && f.getBattle().units.some(unit => unit.id === id); attempt++) {
-      const target = f.getBattle().units.find(unit => unit.id === id);
-      f.next(160); f.shoot(target.point.x + 62, target.point.y + 40);
+  const savedRandom = Math.random; let seed = 42;
+  Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  try {
+    const f = fixture({ reduced: true }); await f.ready; popBalloon(f); f.select('rockets');
+    const original = f.getBattle(), ids = new Set(original.units.map(unit => unit.id));
+    const point = original.units[0].point;
+    f.next(1000); f.shoot(point.x + 62, point.y + 40);
+    f.select('machinegun');
+    for (const id of ids) {
+      for (let attempt = 0; attempt < 100 && f.getBattle().units.some(unit => unit.id === id); attempt++) {
+        const target = f.getBattle().units.find(unit => unit.id === id);
+        f.next(160); f.shoot(target.point.x + 62, target.point.y + 40);
+      }
+      assert.equal(f.getBattle().units.some(unit => unit.id === id), false);
     }
-    assert.equal(f.getBattle().units.some(unit => unit.id === id), false);
-  }
-  const rocketDamage = f.getState().weaponStats.rockets.damage;
-  f.fly(2200);
-  assert.equal(f.getProjectiles().length, 0);
-  assert.ok(f.getState().weaponStats.rockets.damage > rocketDamage);
-  assert.equal(f.getState().weaponStats.rockets.hits, 2);
+    const rocketDamage = f.getState().weaponStats.rockets.damage;
+    f.fly(2200);
+    assert.equal(f.getProjectiles().length, 0);
+    assert.ok(f.getState().weaponStats.rockets.damage > rocketDamage);
+    assert.equal(f.getState().weaponStats.rockets.hits, 2);
+  } finally { Math.random = savedRandom; }
 });
 
 test('every safe exit cancels homing rockets without delayed hits, and other guns stay manual', async () => {

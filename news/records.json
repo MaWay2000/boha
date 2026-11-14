@@ -2,6 +2,17 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "2026-11-14-low-fps-previews",
+      "date": "2026-11-14",
+      "category": "Performance",
+      "title": "Smoother browsing on older PCs",
+      "text": "Favorite-unit previews now switch to still images if FPS stays below 10 for 5 seconds. Use Enable 3D previews in the notice to try them again. Loading models and hidden tabs do not trigger the safeguard; offscreen previews stop rendering. Leaderboard refreshes now skip unchanged data, and the radio loads YouTube only after Play. Ratings and recorded match statistics are unchanged.",
+      "link": {
+        "label": "Open player statistics",
+        "href": "index.html?tab=leaderboards"
+      }
+    },
+    {
       "id": "2026-11-11-arc-mod-leaderboards",
       "date": "2026-11-11",
       "category": "Leaderboards",

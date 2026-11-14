@@ -1,5 +1,5 @@
 import {createPublishedLoader} from './published-loader.mjs?v=20261113-efficient-1';
-import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261010-software-3d-1";
+import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261113-low-fps-1";
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
 import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261111-combined-recent-1';
 

@@ -18,5 +18,5 @@ jobs:
       - run: node --test stats/player-game-expansion.test.cjs stats/leaderboard-recent.test.cjs stats/matchup-labels.test.cjs stats/replay-awards.test.cjs stats/replay-telemetry.test.cjs
       - run: node --test stats/site-news.test.cjs stats/site-news-model.test.mjs
       - run: node --test stats/site-armory.test.cjs stats/site-armory-audio.test.cjs stats/site-armory-battle.test.cjs stats/site-armory-model.test.mjs stats/site-armory-units.test.mjs
-      - run: node --test stats/published-loader.test.mjs radio/youtube-loader.test.cjs stats/personal-ratings.test.mjs
+      - run: node --test stats/published-loader.test.mjs radio/youtube-loader.test.cjs stats/personal-ratings.test.mjs mapmaker/preview-performance.test.mjs
       - run: node stats/check-public-release.cjs

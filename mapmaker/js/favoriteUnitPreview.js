@@ -1,3 +1,4 @@
+import {createLowFpsDetector, isPreviewVisible, freezePreviewItem} from './previewPerformance.mjs?v=20261113-low-fps-1';
 import * as THREE from "./three.module.js";
 import { buildDroidGroup, updateDroidAnimations } from "./droidGroup.js";
 import { drawSoftwareUnit } from "./softwareUnitPreview.js?v=20261010-software-3d-1";
@@ -6,6 +7,7 @@ const PIES_BASE = new URL("../pies/", import.meta.url).href;
 const TEX_BASE = new URL("../classic/texpages/texpages/", import.meta.url).href;
 let definitionsPromise = null;
 let activePreview = null;
+let previewsPausedForPerformance = false;
 const forceSoftwarePreview = ["2d", "software"].includes(new URLSearchParams(window.location.search).get("unitPreview"))
   || window.location.hash === "#unitPreview2d";
 
@@ -65,6 +67,13 @@ function addPreviewStyles() {
       background: linear-gradient(115deg, rgba(9, 31, 43, .82), rgba(3, 11, 18, .58));
       box-shadow: inset 0 0 30px rgba(52, 205, 234, .035);
     }
+    .stats-favorite-unit-performance-notice:not([hidden]) {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+      gap: 10px; margin: 12px 16px; padding: 10px 12px;
+      border: 1px solid #c8a15188; border-radius: 6px; background: #382d1633;
+    }
+    .stats-favorite-unit-performance-notice p { margin: 0; color: #edd8a8; font-size: .78rem; }
+    .stats-favorite-unit-performance-notice button:focus-visible { outline: 2px solid #79e8ff; outline-offset: 3px; }
     .stats-favorite-unit-heading {
       display: block;
       padding: 14px 16px 0;
@@ -696,10 +705,12 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
 
   window.PIES_BASE = PIES_BASE;
   window.TEX_BASE = TEX_BASE;
-  const preview = { items: [], frameId: 0, loadToken: 0, cleanup: null };
+  const preview = { items: [], frameId: 0, loadToken: 0, pendingLoads: 0, cleanup: null };
+  const detector = createLowFpsDetector();
   activePreview = preview;
 
   const definitions = await loadDefinitions();
+  if (activePreview !== preview) return;
   const componentLookups = buildComponentLookups(definitions, nameCandidatesBySignature);
   const rawDesigns = rawFavorites.map((unit) => findCanonicalDesign(
     unit,
@@ -825,6 +836,11 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
       return;
     }
 
+    if (previewsPausedForPerformance) {
+      message.textContent = '3D preview disabled';
+      return;
+    }
+    preview.pendingLoads++;
     let item = null;
     let loadTimeout = null;
     try {
@@ -841,7 +857,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
       light.position.set(4, 6, 5);
       scene.add(light);
       const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-      item = { renderer, scene, camera, model: null, resizeObserver: null };
+      item = { renderer, scene, camera, model: null, resizeObserver: null, message };
       preview.items.push(item);
 
       const resize = () => {
@@ -897,7 +913,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
           canvas.dataset.engine = "software-3d";
           stage.insertBefore(canvas, message);
           const redraw = () => drawSoftwareUnit(model, canvas);
-          const fallbackItem = { model, renderer: null, softwareCanvas: canvas, lastRender: 0, resizeObserver: new ResizeObserver(redraw) };
+          const fallbackItem = { model, renderer: null, softwareCanvas: canvas, lastRender: 0, resizeObserver: new ResizeObserver(redraw), message };
           preview.items.push(fallbackItem);
           fallbackItem.resizeObserver.observe(stage);
           redraw();
@@ -912,6 +928,7 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
           : "Unable to load 3D model";
       }
     } finally {
+      if (token === preview.loadToken) preview.pendingLoads = Math.max(0, preview.pendingLoads - 1);
       if (loadTimeout !== null) window.clearTimeout(loadTimeout);
     }
   };
@@ -922,6 +939,8 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     selectedCategory = category;
     categoryTabs.querySelectorAll("button").forEach((button) => button.classList.toggle("is-active", button.dataset.category === category.key));
     const token = ++preview.loadToken;
+    preview.pendingLoads = 0;
+    detector.reset();
     clearItems();
     gallery.replaceChildren();
     if (category.indexes.length) {
@@ -1012,6 +1031,37 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   modalHostWindow?.addEventListener("scroll", syncModalViewport, { passive: true });
   modalHostWindow?.addEventListener("resize", syncModalViewport);
 
+  const notices = [];
+  const createNotice = () => {
+    const notice = document.createElement('div');
+    notice.className = 'stats-favorite-unit-performance-notice';
+    const text = document.createElement('p'); text.setAttribute('role', 'status');
+    const enable = document.createElement('button'); enable.type = 'button';
+    enable.className = 'stats-favorite-unit-show-all'; enable.textContent = 'Enable 3D previews';
+    enable.addEventListener('click', () => {
+      if (activePreview !== preview) return;
+      previewsPausedForPerformance = false; detector.reset(); syncNotices();
+      if (modal.hidden) selectCategory(selectedCategory); else renderModalPage();
+      if (!preview.frameId) preview.frameId = requestAnimationFrame(render);
+    });
+    notice.append(text, enable); notices.push({notice, text});
+    return notice;
+  };
+  const syncNotices = () => notices.forEach(({notice, text}) => {
+    notice.hidden = !previewsPausedForPerformance;
+    text.textContent = previewsPausedForPerformance ? '3D previews disabled: FPS stayed below 10 for 5 seconds.' : '';
+  });
+  container.insertBefore(createNotice(), gallery);
+  modalPanel.insertBefore(createNotice(), modalGallery);
+  syncNotices();
+  const pauseForPerformance = () => {
+    previewsPausedForPerformance = true;
+    cancelAnimationFrame(preview.frameId); preview.frameId = 0;
+    preview.loadToken++; preview.pendingLoads = 0;
+    preview.items.forEach(item => freezePreviewItem(item, document, disposeGroup));
+    syncNotices();
+  };
+
   const modalPageSize = 10;
   let modalPageIndex = 0;
   const renderModalPage = () => {
@@ -1021,6 +1071,8 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
     const firstIndex = modalPageIndex * modalPageSize;
     const pageIndexes = category.indexes.slice(firstIndex, firstIndex + modalPageSize);
     const token = ++preview.loadToken;
+    preview.pendingLoads = 0;
+    detector.reset();
     clearItems();
     modalGallery.replaceChildren();
     pageIndexes.forEach((unitIndex) => { createUnitCard(unitIndex, token, modalGallery); });
@@ -1083,27 +1135,24 @@ export async function initFavoriteUnitPreview(container, units, nameCandidatesBy
   });
 
   const render = (time) => {
-    if (activePreview !== preview) return;
-    preview.items.forEach((item, index) => {
+    preview.frameId = 0;
+    if (activePreview !== preview || previewsPausedForPerformance) return;
+    const visibleItems = preview.items.filter(item => item.model && isPreviewVisible(item.renderer?.domElement || item.softwareCanvas));
+    if (detector.sample(time, !document.hidden && preview.pendingLoads === 0 && visibleItems.length > 0)) {
+      pauseForPerformance();
+      return;
+    }
+    visibleItems.forEach((item, index) => {
+      if (item.softwareCanvas && time - item.lastRender < 50) return;
+      item.model.rotation.y = time * 0.00042 + index * 0.22;
+      updateDroidAnimations(item.model, time);
       if (item.softwareCanvas) {
-        // Keep CPU rendering bounded, including the 20-model gallery.
-        if (document.hidden || time - item.lastRender < 50) return;
-        const rect = item.softwareCanvas.getBoundingClientRect();
-        if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) return;
         item.lastRender = time;
-      }
-      if (item.model) {
-        item.model.rotation.y = time * 0.00042 + index * 0.22;
-        updateDroidAnimations(item.model, time);
-      }
-      if (item.softwareCanvas) {
         drawSoftwareUnit(item.model, item.softwareCanvas);
-      } else {
-        item.renderer.render(item.scene, item.camera);
-      }
+      } else item.renderer.render(item.scene, item.camera);
     });
     preview.frameId = requestAnimationFrame(render);
   };
-  preview.frameId = requestAnimationFrame(render);
+  if (!previewsPausedForPerformance) preview.frameId = requestAnimationFrame(render);
   selectCategory(categories[0]);
 }

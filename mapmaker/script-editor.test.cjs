@@ -106,7 +106,7 @@ const vm = require('node:vm');
   assert(!elements['#mapScriptSource'].disabled); assert.equal(enable.checked,true);
 
   let enabledDirty = 0, enabledView;
-  const enabling = vm.createContext({currentMapScript:null,currentMapArchivePath:'multiplay/maps/Black/game.map',
+  const enabling = vm.createContext({currentUnitDesigns:[],currentMapScript:null,currentMapArchivePath:'multiplay/maps/Black/game.map',
     mapW:103,mapH:150,mapScriptEditor:{setScript:value=>{enabledView=value;}},markMapDirty:()=>{enabledDirty++;}});
   for(const name of ['syncMapScriptEditor','setMapScriptEnabled','updateMapScriptDraft']) vm.runInContext(extract(name),enabling);
   enabling.setMapScriptEnabled(false); assert.equal(enabledDirty,0);
@@ -139,7 +139,7 @@ const vm = require('node:vm');
   const originalArchive = new JSZip();
   originalArchive.file('original.txt','preserve me');
   originalArchive.file('old.map','previous terrain');
-  const ctx = vm.createContext({
+  const ctx = vm.createContext({currentUnitDesigns:[],
     ...scripts,...decoder,File,JSZip,Uint8Array,DataView,
     currentMapArchive:originalArchive,currentMapArchivePath:'old.map',currentMapExportInfo:{version:10},
     currentStructArchivePath:'old-struct.json',currentStructJsonStyle:'array',
@@ -290,7 +290,7 @@ const vm = require('node:vm');
   const body = control();
   let viewportResizes = 0, projections = 0;
   const cameraPose = {rotationX:-0.8, rotationY:0.4, zoom:1.3};
-  const layout = vm.createContext({
+  const layout = vm.createContext({currentUnitDesigns:[],
     document:{body}, renderer:{}, cameraState:cameraPose,
     camera:{aspect:1,updateProjectionMatrix:()=>{projections++;}},
     threeContainer:{get offsetWidth(){return body.classList.contains('script-tab-open')?640:850;},offsetHeight:700},

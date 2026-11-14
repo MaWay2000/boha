@@ -76,9 +76,10 @@ export function showSaveInfoDialog(sourcePanel, title, continueLabel, onLicenseH
       wavePackCheckbox.type = 'checkbox';
       wavePackCheckbox.id = prefix + 'wave-pack';
       wavePackCheckbox.checked = !!wavePackOptions.checked;
+      wavePackCheckbox.disabled = !!wavePackOptions.required;
       label.htmlFor = wavePackCheckbox.id;
       const text = document.createElement('span');
-      text.textContent = 'Save waves as one-file pack';
+      text.textContent = wavePackOptions.label || 'Save waves as one-file pack';
       label.append(wavePackCheckbox, text);
       const hint = document.createElement('div');
       hint.className = 'app-dialog-hint';

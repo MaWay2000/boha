@@ -6,8 +6,8 @@ export function hasWaveRuntime(script) {
 
 export async function buildWaveMapPack(archive, base) {
   const runtime = archive.file('multiplay/script/mods/init.js');
-  if (!runtime || !archive.file('mapmaker-timed-waves.json')) {
-    throw new Error('Enable a wave script before saving a one-file pack.');
+  if ((!runtime || !archive.file('mapmaker-timed-waves.json')) && !archive.file('mapmaker-unit-designs.json')) {
+    throw new Error('Enable a wave script or save a custom unit design before saving a one-file pack.');
   }
   const safeBase = String(base || 'Wave-map').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 100) || 'Wave-map';
   const pack = archive.clone();
@@ -21,6 +21,7 @@ export async function buildWaveMapPack(archive, base) {
   for (const [name, entry] of Object.entries(archive.files)) {
     if (!entry.dir && modPaths.test(name)) pack.file(name, await entry.async('uint8array'));
   }
+  if (archive.file('mapmaker-unit-designs.json')) pack.file('mapmaker-unit-pack.json',JSON.stringify({version:1,mapPath:'maps/' + safeBase + '.wz'}));
   pack.file('README.txt', [
     safeBase + ' — single-file map and wave gameplay pack', '',
     'Install this .wz in your Warzone config folder: mods/<game-version>/autoload (for example mods/4.7.0/autoload).',

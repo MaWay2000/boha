@@ -41,14 +41,14 @@ const vm = require('node:vm');
     const rest = source.slice(start), end = rest.search(/\n(?:async )?function /);
     return end < 0 ? rest : rest.slice(0, end);
   };
-  const tracking = vm.createContext({currentLevelJson:{versionName:'1.0'},savedMapVersion:'',mapDirty:true});
+  const tracking = vm.createContext({currentUnitDesigns:[],currentLevelJson:{versionName:'1.0'},savedMapVersion:'',mapDirty:true});
   tracking.setMapDirty = value => { tracking.mapDirty = value; };
   vm.runInContext(extract('markMapClean'),tracking); tracking.markMapClean();
   assert.equal(tracking.savedMapVersion,'1.0'); assert.equal(tracking.mapDirty,false,'Loading remembers the recorded version without marking an edit');
   const classic = new mod.exports(); classic.file('old.lev',originalLevel); classic.file('game.map',originalMap);
   const generate = classic.generateAsync.bind(classic);
   classic.generateAsync = options => generate({...options,type:'nodebuffer'});
-  const exporting = vm.createContext({currentMapArchive:classic,currentMapExportInfo:{gamma:false},currentMapArchivePath:'game.map',
+  const exporting = vm.createContext({currentUnitDesigns:[],currentMapArchive:classic,currentMapExportInfo:{gamma:false},currentMapArchivePath:'game.map',
     currentMapScript:null,getSafeMapBase:() => 'Classic map',getSaveMapVersion:() => '2.1',writeMapVersion,
     updateStructJson(){},updateFeatureJson(){},updateDroidJson(){},writeMapScriptSource(){},
     buildMapFileBytes:() => originalMap,getTileTypesArchivePath:() => 'ttypes.ttp',buildTileTypesFileBytes:() => Buffer.from([0])});

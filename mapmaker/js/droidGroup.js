@@ -1,5 +1,6 @@
 import * as THREE from "./three.module.js";
 import { loadPieGeometry } from "./pie.js";
+import {getUnitTextureSource} from './unitTextures.js';
 
 function normalizeTexPath(name) {
   let n = String(name || "").replace(/\\/g, "/").toLowerCase();
@@ -61,7 +62,7 @@ function makeDroidMaterial(geo, role = '') {
     if (missingDroidTextures.has(tn)) {
       return new THREE.MeshLambertMaterial({ color: 0x9a9a90 });
     }
-    const tex = tl.load(((typeof window !== 'undefined' && window.TEX_BASE) ? window.TEX_BASE : TEX_BASE) + tn, undefined, undefined, () => {});
+    const tex = tl.load(getUnitTextureSource(tn) || ((typeof window !== 'undefined' && window.TEX_BASE) ? window.TEX_BASE : TEX_BASE) + tn, undefined, undefined, () => {});
     tex.magFilter = THREE.NearestFilter;
     tex.minFilter = THREE.LinearMipMapLinearFilter;
     if (role === 'effect' || role === 'muzzle') {

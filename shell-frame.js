@@ -203,6 +203,16 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  if (event.data?.type === "boha:scroll-content-to") {
+    const offset = event.data.top;
+    if (!Number.isFinite(offset) || offset < 0) return;
+    window.scrollTo({
+      top: contentFrame.getBoundingClientRect().top + window.scrollY + Math.min(offset, contentFrame.scrollHeight),
+      behavior: "instant"
+    });
+    return;
+  }
+
   if (event.data?.type === "boha:scroll-content-top") {
     window.scrollTo({
       top: contentFrame.getBoundingClientRect().top + window.scrollY,

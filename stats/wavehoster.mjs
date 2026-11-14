@@ -32,6 +32,15 @@ function selectPlayer(id) {
   limit = 25;
   syncSelection();
   render();
+  if (!selectedPlayer) return;
+  requestAnimationFrame(() => {
+    const profile = $('waveProfile');
+    if (!selectedPlayer || profile.hidden) return;
+    const top = profile.getBoundingClientRect().top + window.scrollY;
+    if (window !== window.parent) {
+      window.parent.postMessage({type: 'boha:scroll-content-to', top}, window.location.origin);
+    } else window.scrollTo({top, behavior: 'instant'});
+  });
 }
 
 function identityDetails(player) {

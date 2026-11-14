@@ -128,6 +128,15 @@
 .wave-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 18px; color: #6f8c9d; font-size: 10px; line-height: 1.6; }
 .wave-footer [role="status"] { color: #efba7c; }
 .wave-controls :focus-visible { outline: 2px solid #8be8fa; outline-offset: 3px; }
+.wave-beta-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 12px; color: #c9f5ff; font: 600 14px "Oxanium", sans-serif; }
+.wave-beta-bar > div { display: flex; align-items: center; gap: 18px; font-size: 11px; }
+.wave-beta-bar button { font-size: 11px; }
+.wave-testers { padding: 12px 14px; border: 1px solid #286477; background: #071b26; color: #9dbbc8; font-size: 12px; }
+.wave-testers summary { cursor: pointer; color: #a7dbc3; font: 600 12px "Oxanium", sans-serif; }
+.wave-testers summary span { margin-left: 12px; color: #89a4b5; font-size: 10px; }
+.wave-testers p { max-width: 850px; line-height: 1.7; }
+.wave-tester-names { display: flex; flex-wrap: wrap; gap: 8px; }
+.wave-tester-name { padding: 5px 9px; border: 1px solid #285063; border-radius: 3px; color: #d9f3ff; background: #0c2835; overflow-wrap: anywhere; max-width: 100%; }
 
 @media (min-width: 1600px) { .wave-grid { gap: 45px; } }
 @media (max-width: 1120px) {

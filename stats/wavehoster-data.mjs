@@ -30,12 +30,23 @@ export function combineRulesets(snapshot) {
 
 function compareNames(a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; }
 
+export function participantResult(game, player) {
+  if (game.status === 'confirmed') return ['winner', 'loser', 'contender'].includes(player.result) ? player.result : 'unknown';
+  if (game.status === 'unknown' && game.modsVerified === true && player.result === 'loser' && player.resultReason === 'departure' &&
+      typeof game.durationMilliseconds === 'number' && Number.isFinite(game.durationMilliseconds) &&
+      typeof player.leftAtMilliseconds === 'number' && Number.isFinite(player.leftAtMilliseconds) &&
+      player.leftAtMilliseconds > 0 && player.leftAtMilliseconds <= game.durationMilliseconds) return 'loser';
+  return 'unknown';
+}
+
 export function matchResults(game) {
   const labels = {winner: 'Win', loser: 'Lost', contender: 'Draw'};
-  const players = game.status === 'confirmed' ? game.participants || [] : [];
+  const players = (game.participants || []).filter(player => participantResult(game, player) !== 'unknown');
   if (!players.length) return [{label: 'Unknown', result: 'unknown'}];
-  const results = players.map(player => ({name: player.name, result: labels[player.result] ? player.result : 'unknown',
-    label: labels[player.result] || 'Unknown'}));
+  const results = players.map(player => ({name: player.name, result: participantResult(game, player), label: labels[participantResult(game, player)]}));
+  if (game.status !== 'confirmed') for (const name of game.players || []) {
+    if (!players.some(player => player.name === name)) results.push({name, result: 'unknown', label: 'Unknown'});
+  }
   if (results.every(player => player.result === results[0].result)) {
     return [{label: results[0].label, result: results[0].result}];
   }

@@ -1,8 +1,11 @@
-import {combineRulesets, replaySource, matchResults} from './wavehoster-data.mjs?v=20261111-results-1';
+import {combineRulesets, replaySource, matchResults, participantResult} from './wavehoster-data.mjs?v=20261115-beta-1';
+import {betaSnapshot, betaRanking} from './arc-beta.mjs?v=20261115-beta-1';
 
 let data = null;
+let policy = null;
+let credits = null;
 const rulesetNames = new Map();
-let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
+let selected = new URLSearchParams(window.location.search).get('ruleset') || 'beta';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
 let limit = 25;
 
@@ -132,23 +135,27 @@ function updatedLabel(timestamp) {
 
 function render() {
   if (!data) return;
+  const beta = selected === 'beta';
   const all = selected === 'all';
-  const group = all ? combineRulesets(data) : data.groups.find(item => item.id === selected) || data.groups[0];
+  const scope = beta ? betaSnapshot(data, policy) : data;
+  const group = beta ? betaRanking(data, policy) : all ? combineRulesets(data) : data.groups.find(item => item.id === selected);
   if (!group) return;
   selected = group.id;
   const profile = group.players.find(player => player.id === selectedPlayer);
   if (!profile) selectedPlayer = null;
   $('waveRuleset').value = selected;
-  $('waveTotal').textContent = number(data.games.length);
-  $('waveGroups').textContent = number(data.groups.length);
-  $('waveConfirmed').textContent = number(data.games.filter(game => game.status === 'confirmed').length);
-  $('waveWaiting').textContent = number(data.games.filter(game => game.status === 'pending').length);
+  $('waveTotal').textContent = number(scope.games.filter(game => beta || all || game.group === selected).length);
+  $('waveGroups').textContent = number(beta ? scope.groups.length : data.groups.length);
+  $('waveConfirmed').textContent = number(group.confirmed);
+  $('waveWaiting').textContent = number(scope.games.filter(game => (beta || all || game.group === selected) && game.status === 'pending').length);
+  $('waveArchive').textContent = beta ? 'Replay archive' : 'Back to Beta';
+  $('waveRelease').textContent = beta ? `Beta · Arc-Mw Mod ${policy.version}` : 'Replay archive · all releases';
   $('waveRuleSummary').textContent = all
     ? `All ${number(data.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
-    : `${rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
+    : `${beta ? 'Beta · ' + policy.version : rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
   $('waveRankingNote').textContent = all
-    ? 'Combined totals across all mods. Only verified outcomes add wins and scores.'
-    : 'Each game version and mod pack has its own rankings. Only verified outcomes add wins and scores.';
+    ? 'Archived totals across all mods. Verified results and recorded departures count; only verified final results add scores.'
+    : 'Recorded departures count as defeats. Only verified final results add scores and kills.';
   $('waveProfileNote').textContent = all ? 'Stats and match history across all mods.' : 'Stats and match history for this mod.';
 
   const query = $('wavePlayerSearch').value.trim().toLocaleLowerCase();
@@ -230,7 +237,7 @@ function render() {
     header.append(th);
   }
   $('waveMatchesHead').replaceChildren(header);
-  const games = data.games.filter(game => (all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
+  const games = scope.games.filter(game => (beta || all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
   $('waveMatches').replaceChildren();
   games.slice(0, limit).forEach(game => {
     const row = document.createElement('tr');
@@ -242,8 +249,9 @@ function render() {
     }
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
     if (participant) {
-      const result = ({winner: 'Win', loser: 'Lost', contender: 'Draw'})[participant.result] || 'Unknown';
-      cell(row, result, 'wave-result-' + participant.result);
+      const outcome = participantResult(game, participant);
+      const result = ({winner: 'Win', loser: 'Lost', contender: 'Draw'})[outcome] || 'Unknown';
+      cell(row, result, 'wave-result-' + outcome);
       cell(row, participant.score === null ? '—' : number(participant.score));
     } else cell(row, game.players.join(', ') || 'No human player recorded');
     const seconds = Math.floor(game.durationMilliseconds / 1000);
@@ -284,35 +292,58 @@ function render() {
   $('waveMore').hidden = games.length <= limit;
   $('waveUpdated').textContent = updatedLabel(data.generatedAt);
   $('waveUpdated').title = new Date(data.generatedAt).toLocaleString();
+  const testers = credits.testers.filter(tester => tester.name.toLocaleLowerCase().includes(query));
+  $('waveTesterCount').textContent = `${number(credits.testers.length)} tester names saved`;
+  $('waveTesterNames').replaceChildren();
+  for (const tester of testers) {
+    const name = document.createElement('span');
+    name.className = 'wave-tester-name';
+    name.textContent = tester.name;
+    name.title = `${tester.replays.length} replay(s) · first seen ${tester.firstSeenAt ? new Date(tester.firstSeenAt).toLocaleDateString() : 'unknown'}`;
+    $('waveTesterNames').append(name);
+  }
+  $('waveTesterEmpty').hidden = testers.length > 0;
+}
+
+function renderOptions() {
+  $('waveRuleset').replaceChildren();
+  function option(value, text) {
+    const element = document.createElement('option');
+    element.value = value;
+    element.textContent = text;
+    $('waveRuleset').append(element);
+  }
+  if (selected === 'beta') option('beta', 'Beta');
+  else {
+    option('all', 'All replay history');
+    for (const group of data.groups) option(group.id, rulesetLabel(group));
+  }
+  $('waveRuleset').value = selected;
 }
 
 async function load() {
   try {
-    const response = await fetch('stats/published/wavehoster.json?t=' + Date.now(), {cache: 'no-store'});
-    if (!response.ok) throw new Error('The replay collection is temporarily unavailable.');
-    const next = await response.json();
+    const [next, nextPolicy, nextCredits] = await Promise.all(['stats/published/wavehoster.json', 'stats/arc-beta.json', 'stats/published/arc-beta-testers.json'].map(async path => {
+      const response = await fetch(path + '?t=' + Date.now(), {cache: 'no-store'});
+      if (!response.ok) throw new Error('The replay collection is temporarily unavailable.');
+      return response.json();
+    }));
     if (next.format !== 1 || !Array.isArray(next.groups) || !Array.isArray(next.games)) throw new Error('The replay collection could not be read.');
     data = next;
+    policy = nextPolicy;
+    credits = nextCredits;
     const previous = selected;
     rulesetNames.clear();
-    $('waveRuleset').replaceChildren();
-    const allOption = document.createElement('option');
-    allOption.value = 'all';
-    allOption.textContent = 'ALL';
-    $('waveRuleset').append(allOption);
     data.groups.forEach(group => {
-      const option = document.createElement('option');
-      option.value = group.id;
       const common = data.games.filter(game => game.group === group.id).reduce((counts, game) => {
         counts[game.map] = (counts[game.map] || 0) + 1;
         return counts;
       }, {});
       const map = Object.entries(common).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
-      rulesetNames.set(group.id, group.mods.length ? map : 'Unmodded');
-      option.textContent = rulesetLabel(group);
-      $('waveRuleset').append(option);
+      rulesetNames.set(group.id, `${group.mods.length ? map : 'Unmodded'} · ${group.version} · ${group.id.slice(0, 6)}`);
     });
-    selected = previous === 'all' || data.groups.some(group => group.id === previous) ? previous : 'all';
+    selected = previous === 'beta' || previous === 'all' || data.groups.some(group => group.id === previous) ? previous : 'beta';
+    renderOptions();
     $('waveError').textContent = '';
     render();
   } catch (error) {
@@ -325,6 +356,14 @@ $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;
   selectedPlayer = null;
   limit = 25;
+  syncSelection();
+  render();
+});
+$('waveArchive').addEventListener('click', () => {
+  selected = selected === 'beta' ? 'all' : 'beta';
+  selectedPlayer = null;
+  limit = 25;
+  renderOptions();
   syncSelection();
   render();
 });

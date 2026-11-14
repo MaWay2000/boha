@@ -31,7 +31,9 @@ test('failed downloads leave the last public snapshot intact', async () => {
   fs.writeFileSync(destination, 'previous');
   await assert.rejects(sync({destination, fetcher: async () => ({ok: false, status: 503})}), /503/);
   assert.equal(fs.readFileSync(destination, 'utf8'), 'previous');
+  fs.writeFileSync(destination, JSON.stringify(fixture()));
   assert.equal(await sync({destination, fetcher: async () => ({ok: true, arrayBuffer: async () => Buffer.from(JSON.stringify(fixture()))})}), true);
   assert.deepEqual(JSON.parse(fs.readFileSync(destination)), sanitizeWaveHoster(fixture()));
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory, 'arc-beta-testers.json'))), {format: 1, testers: []});
  } finally { fs.rmSync(directory, {recursive: true, force: true}); }
 });

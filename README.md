@@ -66,6 +66,14 @@ That script refreshes mirrored leaderboard logic, player-key mappings, snapshot 
 
 Running the static site locally does not start these backend or synchronization services. Features that use external APIs still depend on those services being available and allowing the request.
 
+## Arc Mod Beta policy
+
+The Arc Mod page shows one active Beta release and keeps older replays in its archive.
+Follow [the Beta rules](docs/ARC-BETA-RULES.md) when changing release selection,
+departure results, rankings, or tester credits. The active pack is pinned in
+`stats/arc-beta.json`; tester names are retained in `stats/published/arc-beta-testers.json`
+across releases, including defeats and unresolved replays.
+
 ## Personal rating previews
 
 Leaderboards, player comparison, and recent matches share a browser-local rating

@@ -21,8 +21,8 @@ function sanitizeWaveHoster(input) {
   result.groups = list(input.groups).map(group => ({...scalars(group, 'id version label matches confirmed'), mods: strings(group.mods),
     players: list(group.players).map(player => ({...scalars(player, 'id name identityVerified games wins losses draws bestScore kills'),
       names: list(player.names || []).map(alias => scalars(alias, 'name games')), publicKeys: strings(player.publicKeys || [])}))}));
-  result.games = list(input.games).map(game => ({...scalars(game, 'id matchId replaySha256 group map startedAt durationMilliseconds status modsVerified'),
-    players: strings(game.players), participants: list(game.participants || []).map(player => scalars(player, 'id name result score kills'))}));
+  result.games = list(input.games).map(game => ({...scalars(game, 'id matchId replaySha256 group map startedAt durationMilliseconds status modsVerified departureCheckedAt'),
+    players: strings(game.players), participants: list(game.participants || []).map(player => scalars(player, 'id name result score kills resultReason leftAtMilliseconds'))}));
   assertNoPrivateFields(result);
   return result;
 }
@@ -40,9 +40,29 @@ async function sync({fetcher = fetch, destination = path.join(__dirname, 'publis
   if (!response.ok) throw Error('WaveHoster publication HTTP ' + response.status);
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > 32 * 1024 * 1024) throw Error('WaveHoster snapshot exceeds the publication limit');
-  return publish(JSON.parse(bytes.toString('utf8')), destination);
+  return publishBeta(JSON.parse(bytes.toString('utf8')), destination, {fetcher});
 }
-module.exports = {sanitizeWaveHoster, publish, sync};
+async function publishBeta(input, destination, options = {}) {
+  const policy = JSON.parse(fs.readFileSync(path.join(__dirname, 'arc-beta.json'), 'utf8'));
+  const {collectTesters} = await import('./arc-beta.mjs');
+  const {mergeHistory, applyDepartures, rebuildArcRankings} = require('./arc-departures.cjs');
+  const previous = fs.existsSync(destination) ? sanitizeWaveHoster(JSON.parse(fs.readFileSync(destination, 'utf8'))) : null;
+  const snapshot = mergeHistory(previous, sanitizeWaveHoster(input));
+  await applyDepartures(snapshot, policy, options);
+  await rebuildArcRankings(snapshot, policy);
+  const testerPath = path.join(path.dirname(destination), 'arc-beta-testers.json');
+  const testers = fs.existsSync(testerPath) ? JSON.parse(fs.readFileSync(testerPath, 'utf8')) : undefined;
+  const credits = collectTesters(snapshot, policy, testers);
+  assertNoPrivateFields(credits);
+  const changed = publish(snapshot, destination);
+  const content = JSON.stringify(credits) + '\n';
+  if (fs.existsSync(testerPath) && fs.readFileSync(testerPath, 'utf8') === content) return changed;
+  const temp = testerPath + '.tmp-' + process.pid;
+  try { fs.writeFileSync(temp, content); fs.renameSync(temp, testerPath); }
+  finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
+  return true;
+}
+module.exports = {sanitizeWaveHoster, publish, publishBeta, sync};
 if (require.main === module) {
   const [input, output] = process.argv.slice(2);
   const action = input ? Promise.resolve().then(() => {

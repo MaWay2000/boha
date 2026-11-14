@@ -46,6 +46,20 @@ for (const file of files) {
       if (JSON.stringify(value) !== JSON.stringify(sanitizeWaveHoster(value))) throw Error('Unexpected WaveHoster fields');
     } catch { failures.push(`Private or invalid Arc Mod publication in ${file}; details suppressed.`); }
   }
+  if (file === 'stats/published/arc-beta-testers.json') {
+    try {
+      const value = JSON.parse(text);
+      assertNoPrivateFields(value);
+      if (value.format !== 1 || Object.keys(value).sort().join() !== 'format,testers' || !Array.isArray(value.testers)) throw Error('Invalid tester archive');
+      const seen = new Set();
+      for (const tester of value.testers) {
+        if (Object.keys(tester).sort().join() !== 'firstSeenAt,lastSeenAt,name,replays' || typeof tester.name !== 'string' || !tester.name.trim() || seen.has(tester.name)) throw Error('Invalid tester name');
+        seen.add(tester.name);
+        if (!Array.isArray(tester.replays) || tester.replays.some(id => typeof id !== 'string' || !id)) throw Error('Invalid tester replay');
+        for (const date of [tester.firstSeenAt, tester.lastSeenAt]) if (date !== null && (typeof date !== 'string' || !Number.isFinite(Date.parse(date)))) throw Error('Invalid tester date');
+      }
+    } catch { failures.push(`Private or invalid Beta tester archive in ${file}; details suppressed.`); }
+  }
 }
 try {
   const manifest = JSON.parse(read('stats/published/manifest.json'));

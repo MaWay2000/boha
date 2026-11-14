@@ -1,6 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { getUvMode, parsePie, serializePie, summarizeLevel } from "./pie-format.js";
+import { createTaskGate, createRenderScheduler, parseCoordinateInput } from "./viewer-runtime.js";
+import { selectableBodies, compatiblePropulsions, compatibleWeapons, reconcileDesign, validateDesign, designName, weaponSlotCount, isCyborgBody, isFlyingPropulsion, modulePartSpecs, assemblyPartTransform, DROID_TEXTURE_ALIASES } from "./droid-design.js";
 
 const elements = {
   exportButton: document.querySelector("#export-button"),
@@ -80,10 +82,22 @@ editPanel.hidden = true;
 const mapmakerBrowser = document.createElement("div");
 mapmakerBrowser.className = "mapmaker-browser";
 mapmakerBrowser.innerHTML = `
+  <div class="droid-designer" id="droid-designer">
+    <p class="section-kicker">Build a droid</p>
+    <label class="field"><span>Body</span><select id="design-body" disabled></select></label>
+    <label class="field"><span>Propulsion</span><select id="design-propulsion" disabled></select></label>
+    <label class="field"><span>Gun</span><select id="design-gun" disabled></select></label>
+    <label class="field" id="design-gun-2-field" hidden><span>Gun 2 (optional)</span><select id="design-gun-2" disabled></select></label>
+    <label class="field" id="design-gun-3-field" hidden><span>Gun 3 (optional)</span><select id="design-gun-3" disabled></select></label>
+    <button class="button ghost" id="build-droid-button" type="button" disabled>Build droid</button>
+    <p class="designer-help" id="design-help" role="status">Loading components...</p>
+  </div>
+  <label class="field" for="asset-search"><span id="asset-library-label">Presets</span></label>
   <label class="field">
     <input id="asset-search" type="search" placeholder="cannon, body, wheels..." disabled />
   </label>
-  <select class="asset-results" id="asset-results" size="7" disabled></select>
+  <select class="asset-results" id="asset-results" size="5" aria-label="Presets" disabled></select>
+  <p class="section-copy compact" id="asset-status" role="status">Loading model catalog...</p>
   <label class="field assembly-part-field" id="assembly-part-field" hidden>
     <span>Edit module part</span>
     <select id="assembly-part-select"></select>
@@ -97,12 +111,21 @@ document.querySelector(".library-section")?.append(
 );
 
 Object.assign(elements, {
+  designer: mapmakerBrowser.querySelector("#droid-designer"),
+  designBody: mapmakerBrowser.querySelector("#design-body"),
+  designPropulsion: mapmakerBrowser.querySelector("#design-propulsion"),
+  designGuns: ["#design-gun", "#design-gun-2", "#design-gun-3"].map((id) => mapmakerBrowser.querySelector(id)),
+  designGunFields: [null, mapmakerBrowser.querySelector("#design-gun-2-field"), mapmakerBrowser.querySelector("#design-gun-3-field")],
+  designHelp: mapmakerBrowser.querySelector("#design-help"),
+  buildDroidButton: mapmakerBrowser.querySelector("#build-droid-button"),
+  assetLibraryLabel: mapmakerBrowser.querySelector("#asset-library-label"),
   assemblyPartField: mapmakerBrowser.querySelector("#assembly-part-field"),
   assemblyPartSelect: mapmakerBrowser.querySelector("#assembly-part-select"),
   assetKind: assetKindControls.querySelector("#asset-kind"),
   assetKindButtons: assetKindControls.querySelectorAll("[data-asset-kind]"),
   assetResults: mapmakerBrowser.querySelector("#asset-results"),
   assetSearch: mapmakerBrowser.querySelector("#asset-search"),
+  assetStatus: mapmakerBrowser.querySelector("#asset-status"),
   editMenuButton: assetKindControls.querySelector("#edit-menu-button"),
   summaryMenuButton: assetKindControls.querySelector("#summary-menu-button"),
   viewportMenuButton: assetKindControls.querySelector("#viewport-menu-button"),
@@ -112,6 +135,9 @@ const state = {
   activeLevelIndex: 0,
   assembly: [],
   assemblyName: "",
+  design: null,
+  designDraft: { body: "Body1REC", propulsion: "wheeled01", weapons: ["MG1Mk1"] },
+  designNotice: "",
   model: null,
   mapmaker: {
     bodies: {},
@@ -123,6 +149,8 @@ const state = {
   },
   selectedPointIndex: null,
   loadedTextures: new Map(),
+  textureLoads: new Map(),
+  retiredTextureUrls: new Set(),
   textureUrls: new Map(),
   view: {
     axes: true,
@@ -171,11 +199,31 @@ fillLight.position.set(-24, 20, -22);
 scene.add(fillLight);
 
 const sceneObjects = {
+  mesh: null,
+  scale: 20,
+  partGroup: null,
   connectors: null,
   pointCloud: null,
   selectedPoint: null,
   wireframe: null,
 };
+
+const modelLoads = createTaskGate();
+const sceneBuilds = createTaskGate();
+const frameScheduler = createRenderScheduler({
+  requestFrame: (callback) => requestAnimationFrame(callback),
+  cancelFrame: (id) => cancelAnimationFrame(id),
+  update: () => controls.update(),
+  render: () => renderer.render(scene, camera),
+  isHidden: () => document.hidden,
+});
+controls.addEventListener("change", frameScheduler.request);
+controls.addEventListener("start", frameScheduler.request);
+controls.addEventListener("end", frameScheduler.request);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) frameScheduler.cancel();
+  else frameScheduler.request();
+});
 
 const resizeObserver = new ResizeObserver(() => {
   const width = elements.viewer.clientWidth || 1;
@@ -184,6 +232,7 @@ const resizeObserver = new ResizeObserver(() => {
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
   renderer.setSize(width, height);
+  frameScheduler.request();
 });
 
 resizeObserver.observe(elements.viewer);
@@ -199,6 +248,35 @@ function escapeHtml(value) {
 
 function setStatus(message) {
   elements.statusText.textContent = message;
+}
+
+function startModelLoad() {
+  sceneBuilds.begin();
+  return modelLoads.begin();
+}
+
+function reportLoaded(message) {
+  setStatus([message, state.textureWarning].filter(Boolean).join(" "));
+}
+
+function reportCatalogFailure(error) {
+  elements.assetStatus.textContent = `Could not load the model catalog: ${error.message} You can still open a local PIE file.`;
+  elements.designHelp.textContent = "Components unavailable. You can still open local PIE files.";
+}
+
+async function runAction(action, label) {
+  let token;
+  try {
+    const pending = action();
+    token = modelLoads.current();
+    return await pending;
+  } catch (error) {
+    if (token === undefined || modelLoads.isCurrent(token)) {
+      setStatus(`${label}: ${error.message}`);
+      renderChrome();
+    }
+    return false;
+  }
 }
 
 function getActiveLevel() {
@@ -223,44 +301,53 @@ function normalizeTextureKey(value) {
   return value.replaceAll("\\", "/").split("/").pop().toLowerCase();
 }
 
-async function loadTextureForModel(model) {
-  const textureName = model?.texture?.name;
-
-  if (!textureName) {
-    return null;
-  }
-
-  const key = normalizeTextureKey(textureName);
-  const textureUrl = state.textureUrls.get(key);
-
-  if (!textureUrl) {
-    return null;
-  }
-
-  const cachedTexture = state.loadedTextures.get(key);
-
-  if (cachedTexture) {
-    return cachedTexture;
-  }
-
-  const texture = await new THREE.TextureLoader().loadAsync(textureUrl);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.flipY = false;
-  texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  state.loadedTextures.set(key, texture);
-  return texture;
+function modelTexture(model, levelIndex = 0) {
+  return model?.levels?.[levelIndex]?.texture ?? model?.texture;
 }
 
-async function loadTextureForCurrentModel() {
-  return loadTextureForModel(state.model);
+async function loadTextureForModel(model, levelIndex = 0) {
+  const name = modelTexture(model, levelIndex)?.name;
+  const url = name && state.textureUrls.get(normalizeTextureKey(name));
+  if (!url) return null;
+  if (state.loadedTextures.has(url)) return state.loadedTextures.get(url);
+  if (!state.textureLoads.has(url)) {
+    const pending = new THREE.TextureLoader().loadAsync(url).then((texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = false;
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      state.loadedTextures.set(url, texture);
+      return texture;
+    }).finally(() => state.textureLoads.delete(url));
+    state.textureLoads.set(url, pending);
+  }
+  return state.textureLoads.get(url);
 }
 
-function uvToThree(uv, model = state.model) {
-  if (!model?.texture) {
+function collectRetiredTextures() {
+  const active = new Set();
+  modelGroup.traverse((node) => { if (node.material?.map) active.add(node.material.map); });
+  const registered = new Set(state.textureUrls.values());
+  for (const [url, texture] of state.loadedTextures) {
+    if (!registered.has(url) && !active.has(texture)) {
+      texture.dispose();
+      state.loadedTextures.delete(url);
+    }
+  }
+  for (const url of state.retiredTextureUrls) {
+    if (!state.loadedTextures.has(url) && !state.textureLoads.has(url)) {
+      URL.revokeObjectURL(url);
+      state.retiredTextureUrls.delete(url);
+    }
+  }
+}
+
+function uvToThree(uv, model = state.model, levelIndex = state.activeLevelIndex) {
+  const texture = modelTexture(model, levelIndex);
+  if (!texture) {
     return [uv.u, uv.v];
   }
 
-  const { width, height } = model.texture;
+  const { width, height } = texture;
   const useNormalized = model.version >= 3 || width === 0 || height === 0;
   const u = useNormalized ? uv.u : uv.u / width;
   const v = useNormalized ? uv.v : uv.v / height;
@@ -285,7 +372,7 @@ function clearGroup(group) {
   }
 }
 
-function buildLevelGeometry(level, model = state.model) {
+function buildLevelGeometry(level, model = state.model, levelIndex = state.activeLevelIndex) {
   const positions = [];
   const uvs = [];
 
@@ -294,13 +381,11 @@ function buildLevelGeometry(level, model = state.model) {
       for (const vertexIndex of [0, triangleIndex, triangleIndex + 1]) {
         const point = level.points[polygon.indices[vertexIndex]];
 
-        if (!point) {
-          continue;
-        }
+        if (!point) throw new Error(`Polygon references missing point ${polygon.indices[vertexIndex]}.`);
 
         positions.push(point.x, point.y, point.z);
         const uv = polygon.uvs[vertexIndex] ?? { u: 0, v: 0 };
-        const [u, v] = uvToThree(uv, model);
+        const [u, v] = uvToThree(uv, model, levelIndex);
         uvs.push(u, v);
       }
     }
@@ -344,33 +429,7 @@ function computeModelScale(level) {
   return Math.max(box.getSize(new THREE.Vector3()).length(), 8);
 }
 
-function getConnectorVector(model, index = 0) {
-  const connector = model?.levels?.[0]?.connectors?.[index];
-  return connector ? new THREE.Vector3(connector.x, connector.z, connector.y) : null;
-}
 
-function getAssemblyPartOffset(part) {
-  const body = state.assembly.find((item) => item.role === "body");
-
-  if (!body || !["mount", "weapon"].includes(part.role)) {
-    return new THREE.Vector3();
-  }
-
-  const offset = getConnectorVector(body.model, part.slot ?? 0) ?? new THREE.Vector3();
-
-  if (part.role === "weapon") {
-    const mount = state.assembly.find(
-      (item) => item.role === "mount" && (item.slot ?? 0) === (part.slot ?? 0),
-    );
-    const mountConnector = getConnectorVector(mount?.model, 0);
-
-    if (mountConnector) {
-      offset.add(mountConnector);
-    }
-  }
-
-  return offset;
-}
 
 function fitCameraToAssembly() {
   if (!state.assembly.length || !modelGroup.children.length) {
@@ -415,210 +474,119 @@ function fitCameraToCurrentLevel() {
   controls.update();
 }
 
-function updateSelectedPointMarker(level, scale, offset = new THREE.Vector3()) {
-  if (sceneObjects.selectedPoint) {
-    modelGroup.remove(sceneObjects.selectedPoint);
-    sceneObjects.selectedPoint.geometry.dispose();
-    sceneObjects.selectedPoint.material.dispose();
-    sceneObjects.selectedPoint = null;
-  }
-
-  if (state.selectedPointIndex === null) {
-    return;
-  }
-
-  const point = level.points[state.selectedPointIndex];
-
+function updateSelectedPointMarker() {
+  const level = getActiveLevel();
+  const point = level?.points[state.selectedPointIndex];
   if (!point) {
+    if (sceneObjects.selectedPoint) sceneObjects.selectedPoint.visible = false;
     return;
   }
-
-  const marker = new THREE.Mesh(
-    new THREE.SphereGeometry(Math.max(scale * 0.02, 0.45), 24, 24),
-    new THREE.MeshBasicMaterial({ color: 0xff9656 }),
-  );
-
-  marker.position.set(point.x, point.y, point.z).add(offset);
-  sceneObjects.selectedPoint = marker;
-  modelGroup.add(marker);
+  if (!sceneObjects.selectedPoint) {
+    sceneObjects.selectedPoint = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 16, 12),
+      new THREE.MeshBasicMaterial({ color: 0xff9656 }),
+    );
+    sceneObjects.partGroup.add(sceneObjects.selectedPoint);
+  }
+  const marker = sceneObjects.selectedPoint;
+  marker.visible = state.view.points;
+  marker.scale.setScalar(Math.max(sceneObjects.scale * 0.02, 0.45));
+  marker.position.set(point.x, point.y, point.z);
 }
 
 function updateOverlayVisibility() {
   gridHelper.visible = state.view.grid;
   axesHelper.visible = state.view.axes;
-
-  if (sceneObjects.wireframe) {
-    sceneObjects.wireframe.visible = state.view.wireframe;
-  }
-
-  if (sceneObjects.pointCloud) {
-    sceneObjects.pointCloud.visible = state.view.points;
-  }
-
-  if (sceneObjects.connectors) {
-    sceneObjects.connectors.visible = state.view.connectors;
-  }
+  if (sceneObjects.wireframe) sceneObjects.wireframe.visible = state.view.wireframe;
+  if (sceneObjects.pointCloud) sceneObjects.pointCloud.visible = state.view.points;
+  if (sceneObjects.connectors) sceneObjects.connectors.visible = state.view.connectors;
+  updateSelectedPointMarker();
+  frameScheduler.request();
 }
 
-async function rebuildAssemblyScene({ fitCamera = false } = {}) {
-  const activeLevel = getActiveLevel();
-  const texturePairs = await Promise.all(
-    state.assembly.map(async (part) => [part, await loadTextureForModel(part.model)]),
-  );
-
-  for (const [part, texture] of texturePairs) {
-    const level = part.model.levels[part.model === state.model ? state.activeLevelIndex : 0];
-
-    if (!level) {
-      continue;
-    }
-
-    const offset = getAssemblyPartOffset(part);
-    const geometry = buildLevelGeometry(level, part.model);
-    const material = new THREE.MeshStandardMaterial({
-      color: texture ? 0xffffff : 0x90a8ad,
-      map: texture,
-      flatShading: true,
-      metalness: 0.1,
-      roughness: 0.72,
-      side: THREE.DoubleSide,
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.copy(offset);
-    modelGroup.add(mesh);
-
-    if (part.model !== state.model) {
-      continue;
-    }
-
-    const scale = computeModelScale(level);
-    const wireframe = new THREE.LineSegments(
-      new THREE.WireframeGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0xff9656, opacity: 0.72, transparent: true }),
-    );
-    wireframe.position.copy(offset);
-    sceneObjects.wireframe = wireframe;
-    modelGroup.add(wireframe);
-
-    const pointCloud = new THREE.Points(
-      buildPointGeometry(level),
-      new THREE.PointsMaterial({
-        color: 0xffd2b2,
-        size: Math.max(scale * 0.03, 0.8),
-        sizeAttenuation: true,
-      }),
-    );
-    pointCloud.position.copy(offset);
-    sceneObjects.pointCloud = pointCloud;
-    modelGroup.add(pointCloud);
-
-    if (level.connectors.length) {
-      const connectors = new THREE.Points(
-        buildConnectorGeometry(level),
-        new THREE.PointsMaterial({
-          color: 0x7dcfc6,
-          size: Math.max(scale * 0.035, 0.85),
-          sizeAttenuation: true,
-        }),
-      );
-      connectors.position.copy(offset);
-      sceneObjects.connectors = connectors;
-      modelGroup.add(connectors);
-    }
-
-    raycaster.params.Points.threshold = Math.max(scale * 0.05, 1.2);
-    updateSelectedPointMarker(level, scale, offset);
-  }
-
-  updateOverlayVisibility();
-
-  if (fitCamera) {
-    fitCameraToAssembly();
-  }
-
-  elements.textureChip.textContent = `${state.assembly.length} PIE parts in module`;
+function captureModelState() {
+  const { model, assembly, assemblyName, activeLevelIndex, selectedPointIndex, design } = state;
+  return { model, assembly, assemblyName, activeLevelIndex, selectedPointIndex, design };
 }
 
-async function rebuildScene({ fitCamera = false } = {}) {
-  const level = getActiveLevel();
+async function prepareScene(snapshot) {
+  const group = new THREE.Group();
+  const objects = { mesh: null, connectors: null, pointCloud: null, selectedPoint: null, wireframe: null, scale: 20, partGroup: null };
+  const warnings = [];
+  const parts = snapshot.assembly.length ? snapshot.assembly : [{ model: snapshot.model }];
+  try {
+    const textures = await Promise.all(parts.map(async (part) => {
+      const index = part.model === snapshot.model ? snapshot.activeLevelIndex : 0;
+      try { return await loadTextureForModel(part.model, index); }
+      catch { warnings.push(`Could not load texture ${modelTexture(part.model, index)?.name}; showing untextured geometry.`); return null; }
+    }));
+    for (const [index, part] of parts.entries()) {
+      if (!part.model) continue;
+      const level = part.model.levels[part.model === snapshot.model ? snapshot.activeLevelIndex : 0];
+      if (!level) continue;
+      const transform = assemblyPartTransform(part, snapshot.assembly);
+      const partGroup = new THREE.Group();
+      partGroup.position.copy(transform.position);
+      partGroup.rotation.z = transform.rotationZ;
+      partGroup.userData.part = { role: part.role, slot: part.slot, path: part.path };
+      group.add(partGroup);
+      const geometry = buildLevelGeometry(level, part.model, part.model === snapshot.model ? snapshot.activeLevelIndex : 0);
+      const material = new THREE.MeshStandardMaterial({
+        color: textures[index] ? 0xffffff : 0x90a8ad, map: textures[index],
+        flatShading: true, metalness: 0.1, roughness: 0.72, side: THREE.DoubleSide,
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      partGroup.add(mesh);
+      if (part.model !== snapshot.model) continue;
+      objects.mesh = mesh;
+      objects.scale = computeModelScale(level);
+      objects.partGroup = partGroup;
+      const wireframe = new THREE.LineSegments(new THREE.WireframeGeometry(geometry),
+        new THREE.LineBasicMaterial({ color: 0xff9656, opacity: 0.72, transparent: true }));
+      objects.wireframe = wireframe; partGroup.add(wireframe);
+      const pointCloud = new THREE.Points(buildPointGeometry(level), new THREE.PointsMaterial({
+        color: 0xffd2b2, size: Math.max(objects.scale * 0.03, 0.8), sizeAttenuation: true,
+      }));
+      objects.pointCloud = pointCloud; partGroup.add(pointCloud);
+      if (level.connectors.length) {
+        const connectors = new THREE.Points(buildConnectorGeometry(level), new THREE.PointsMaterial({
+          color: 0x7dcfc6, size: Math.max(objects.scale * 0.035, 0.85), sizeAttenuation: true,
+        }));
+        objects.connectors = connectors; partGroup.add(connectors);
+      }
+    }
+    return { group, objects, warnings, textured: Boolean(objects.mesh?.material.map) };
+  } catch (error) { clearGroup(group); throw error; }
+}
 
+async function rebuildScene({ fitCamera = false, next = {}, loadToken = null } = {}) {
+  if (loadToken !== null && !modelLoads.isCurrent(loadToken)) return false;
+  const token = sceneBuilds.begin();
+  const snapshot = { ...captureModelState(), ...next };
+  const prepared = await prepareScene(snapshot);
+  if (!sceneBuilds.isCurrent(token) || (loadToken !== null && !modelLoads.isCurrent(loadToken))) {
+    clearGroup(prepared.group); collectRetiredTextures(); return false;
+  }
+  if (!("selectedPointIndex" in next)) snapshot.selectedPointIndex = state.selectedPointIndex;
+  // Neither state nor the displayed scene changes until preparation succeeds.
+  Object.assign(state, snapshot);
+  if ("design" in next && next.design) {
+    state.designDraft = { body: next.design.body, propulsion: next.design.propulsion, weapons: [...next.design.weapons] };
+  }
   clearGroup(modelGroup);
-  sceneObjects.connectors = null;
-  sceneObjects.pointCloud = null;
-  sceneObjects.selectedPoint = null;
-  sceneObjects.wireframe = null;
-
-  if (state.assembly.length) {
-    await rebuildAssemblyScene({ fitCamera });
-    return;
-  }
-
-  if (!level) {
-    renderer.render(scene, camera);
-    return;
-  }
-
-  const geometry = buildLevelGeometry(level);
-  const scale = computeModelScale(level);
-  const texture = await loadTextureForCurrentModel();
-
-  const material = new THREE.MeshStandardMaterial({
-    color: texture ? 0xffffff : 0x90a8ad,
-    map: texture,
-    flatShading: true,
-    metalness: 0.1,
-    roughness: 0.72,
-    side: THREE.DoubleSide,
-  });
-
-  modelGroup.add(new THREE.Mesh(geometry, material));
-
-  const wireframe = new THREE.LineSegments(
-    new THREE.WireframeGeometry(geometry),
-    new THREE.LineBasicMaterial({ color: 0xff9656, opacity: 0.72, transparent: true }),
-  );
-  sceneObjects.wireframe = wireframe;
-  modelGroup.add(wireframe);
-
-  const pointCloud = new THREE.Points(
-    buildPointGeometry(level),
-    new THREE.PointsMaterial({
-      color: 0xffd2b2,
-      size: Math.max(scale * 0.03, 0.8),
-      sizeAttenuation: true,
-    }),
-  );
-  sceneObjects.pointCloud = pointCloud;
-  modelGroup.add(pointCloud);
-
-  if (level.connectors.length) {
-    const connectors = new THREE.Points(
-      buildConnectorGeometry(level),
-      new THREE.PointsMaterial({
-        color: 0x7dcfc6,
-        size: Math.max(scale * 0.035, 0.85),
-        sizeAttenuation: true,
-      }),
-    );
-
-    sceneObjects.connectors = connectors;
-    modelGroup.add(connectors);
-  }
-
-  raycaster.params.Points.threshold = Math.max(scale * 0.05, 1.2);
-  updateSelectedPointMarker(level, scale);
+  for (const child of [...prepared.group.children]) modelGroup.add(child);
+  Object.assign(sceneObjects, prepared.objects);
+  raycaster.params.Points.threshold = Math.max(sceneObjects.scale * 0.05, 1.2);
   updateOverlayVisibility();
-
-  if (fitCamera) {
-    fitCameraToCurrentLevel();
-  }
-
-  const expectedTexture = state.model.texture?.name;
-  elements.textureChip.textContent = texture
-    ? `Texture: ${expectedTexture}`
-    : expectedTexture
-      ? `Texture missing: ${expectedTexture}`
-      : "Texture not defined";
+  renderChrome();
+  if (fitCamera) fitCameraToCurrentLevel();
+  const expected = modelTexture(state.model, state.activeLevelIndex)?.name;
+  elements.textureChip.textContent = state.assembly.length ? `${state.assembly.length} PIE parts in module`
+    : prepared.textured ? `Texture: ${expected}` : expected ? `Texture missing: ${expected}` : "Texture not defined";
+  state.textureWarning = prepared.warnings.join(" ");
+  collectRetiredTextures();
+  frameScheduler.request();
+  return true;
 }
 
 function renderSummary() {
@@ -634,7 +602,7 @@ function renderSummary() {
   const summaryItems = [
     ["File", state.model.sourceName],
     ["PIE", state.model.version],
-    ["Type", state.model.type ?? "N/A"],
+    ["Type", state.model.type?.toString(16) ?? "N/A"],
     ["Levels", state.model.levels.length],
     ["Points", levelStats.points],
     ["Polygons", levelStats.polygons],
@@ -719,6 +687,7 @@ function renderPointEditor() {
   elements.pointX.value = String(point.x);
   elements.pointY.value = String(point.y);
   elements.pointZ.value = String(point.z);
+  for (const input of [elements.pointX, elements.pointY, elements.pointZ]) input.removeAttribute("aria-invalid");
 }
 
 function renderPointList() {
@@ -791,41 +760,56 @@ function renderChrome() {
   renderPointEditor();
   renderPointList();
   renderConnectorList();
+  renderDesigner();
 }
 
-async function renderAll({ fitCamera = false } = {}) {
-  renderChrome();
-  await rebuildScene({ fitCamera });
+async function renderAll(options = {}) {
+  return rebuildScene(options);
 }
 
 function selectPoint(index) {
   const level = getActiveLevel();
-
-  if (!level || !level.points[index]) {
-    return;
-  }
-
+  if (!level?.points[index]) return;
+  elements.pointList.querySelector(".active")?.classList.remove("active");
   state.selectedPointIndex = index;
-  renderChrome();
-  rebuildScene();
+  elements.pointList.querySelector(`[data-point-index="${index}"]`)?.classList.add("active");
+  renderPointEditor();
+  updateSelectedPointMarker();
+  frameScheduler.request();
 }
 
 function updateSelectedPoint(axis, rawValue) {
   const level = getActiveLevel();
+  const point = level?.points[state.selectedPointIndex];
+  const value = parseCoordinateInput(rawValue);
+  if (!point || value === null) return false;
+  if (point[axis] === value) return true;
+  point[axis] = value;
+  // Only the edited part changes; other module parts, materials and textures stay.
+  const geometry = buildLevelGeometry(level);
+  sceneObjects.mesh.geometry.dispose();
+  sceneObjects.mesh.geometry = geometry;
+  sceneObjects.wireframe.geometry.dispose();
+  sceneObjects.wireframe.geometry = new THREE.WireframeGeometry(geometry);
+  const points = sceneObjects.pointCloud.geometry;
+  points.attributes.position.setXYZ(state.selectedPointIndex, point.x, point.y, point.z);
+  points.attributes.position.needsUpdate = true;
+  points.computeBoundingBox(); points.computeBoundingSphere();
+  const row = elements.pointList.querySelector(`[data-point-index="${state.selectedPointIndex}"] span`);
+  if (row) row.textContent = `X ${formatCoordinate(point.x)} | Y ${formatCoordinate(point.y)} | Z ${formatCoordinate(point.z)}`;
+  updateSelectedPointMarker();
+  frameScheduler.request();
+  setStatus(`Updated point ${state.selectedPointIndex} ${axis.toUpperCase()} to ${formatCoordinate(value)}.`);
+  return true;
+}
 
-  if (!level || state.selectedPointIndex === null) {
+function commitCoordinateInput(axis, input) {
+  if (input.validity.badInput || !updateSelectedPoint(axis, input.value)) {
+    input.setAttribute("aria-invalid", "true");
+    setStatus(`Enter a finite ${axis.toUpperCase()} coordinate. The saved point has not changed.`);
     return;
   }
-
-  const value = Number(rawValue);
-
-  if (!Number.isFinite(value)) {
-    return;
-  }
-
-  level.points[state.selectedPointIndex][axis] = value;
-  renderChrome();
-  rebuildScene();
+  input.removeAttribute("aria-invalid");
 }
 
 function mapmakerUrl(base, path) {
@@ -866,73 +850,8 @@ function resolveMapmakerPiePath(value, prefix = "") {
   return state.mapmaker.piePaths.find((path) => path.toLowerCase().endsWith(`/${fileName}`)) ?? null;
 }
 
-function getRightPropulsionModel(leftModel) {
-  const left = String(leftModel || "");
-
-  if (/^prmvtl/i.test(left)) {
-    return "";
-  }
-
-  const right = left.replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
-  return right === left ? "" : right;
-}
-
 function getModulePartSpecs(template) {
-  const specs = [];
-  const body = state.mapmaker.bodies[template.body];
-  const propulsion = state.mapmaker.propulsions[template.propulsion];
-
-  function add(role, value, prefix, label, slot = 0) {
-    const path = resolveMapmakerPiePath(value, prefix);
-
-    if (path && !specs.some((part) => part.path === path && part.role === role && part.slot === slot)) {
-      specs.push({ label, path, role, slot });
-    }
-  }
-
-  add("body", body?.model ?? template.body, "components/bodies/", body?.name ?? "Body");
-
-  const extra = body?.propulsionExtraModels?.[template.propulsion];
-  const leftModel = typeof extra === "string" ? extra : extra?.left ?? propulsion?.model;
-
-  if (leftModel) {
-    add(
-      "propulsion",
-      leftModel,
-      "components/prop/",
-      `${propulsion?.name ?? "Propulsion"} left`,
-    );
-    const rightModel = getRightPropulsionModel(leftModel);
-
-    if (rightModel) {
-      add(
-        "propulsion",
-        rightModel,
-        "components/prop/",
-        `${propulsion?.name ?? "Propulsion"} right`,
-      );
-    }
-  }
-
-  for (const [slot, weaponId] of (template.weapons ?? []).entries()) {
-    const weapon = state.mapmaker.weapons[weaponId];
-    add(
-      "mount",
-      weapon?.mountModel,
-      "components/weapons/",
-      `${weapon?.name ?? weaponId} mount`,
-      slot,
-    );
-    add(
-      "weapon",
-      weapon?.model ?? weaponId,
-      "components/weapons/",
-      weapon?.name ?? weaponId,
-      slot,
-    );
-  }
-
-  return specs;
+  return modulePartSpecs(template, state.mapmaker, resolveMapmakerPiePath);
 }
 
 async function fetchMapmakerJson(path) {
@@ -955,14 +874,11 @@ async function loadMapmakerModel(path) {
   const sourceName = path.split("/").pop();
   const model = parsePie(await response.text(), sourceName);
 
-  if (model.texture?.name) {
-    const textureKey = normalizeTextureKey(model.texture.name);
-
+  for (const texture of [model.texture, ...model.levels.map((level) => level.texture)]) {
+    if (!texture?.name) continue;
+    const textureKey = normalizeTextureKey(texture.name);
     if (!state.textureUrls.has(textureKey)) {
-      state.textureUrls.set(
-        textureKey,
-        mapmakerUrl(`${MAPMAKER_ROOT}/classic/texpages/texpages`, model.texture.name),
-      );
+      state.textureUrls.set(textureKey, mapmakerUrl(`${MAPMAKER_ROOT}/classic/texpages/texpages`, DROID_TEXTURE_ALIASES[textureKey] ?? texture.name));
     }
   }
 
@@ -970,41 +886,121 @@ async function loadMapmakerModel(path) {
 }
 
 async function loadMapmakerPie(path) {
+  const token = startModelLoad();
   setStatus(`Loading ${path} from Mapmaker...`);
   const model = await loadMapmakerModel(path);
-  state.assembly = [];
-  state.assemblyName = "";
-  state.model = model;
-  state.activeLevelIndex = 0;
-  state.selectedPointIndex = null;
-  await renderAll({ fitCamera: true });
-  setStatus(`Loaded Mapmaker PIE ${path}.`);
+  const committed = await renderAll({ fitCamera: true, loadToken: token, next: {
+    model, assembly: [], assemblyName: "", design: null, activeLevelIndex: 0, selectedPointIndex: null,
+  } });
+  if (committed) reportLoaded(`Loaded Mapmaker PIE ${path}.`);
+}
+
+async function loadDroidDesign(template, { custom = false } = {}) {
+  const token = startModelLoad();
+  if (custom) validateDesign(template, state.mapmaker);
+  const specs = getModulePartSpecs(template);
+  if (!specs.length) throw new Error(`No PIE parts were found for ${template.name}.`);
+  setStatus(`Assembling ${template.name} from ${specs.length} PIE files...`);
+  const parts = await Promise.all(specs.map(async (spec) => {
+    const previous = custom && state.assembly.find((part) => part.path === spec.path && part.role === spec.role && part.slot === spec.slot);
+    return { ...spec, model: previous ? previous.model : await loadMapmakerModel(spec.path) };
+  }));
+  const active = custom && parts.find((part) => part.model === state.model);
+  const model = active?.model ?? parts.find((part) => part.role === "body")?.model ?? parts[0].model;
+  const committed = await renderAll({ fitCamera: true, loadToken: token, next: {
+    assembly: parts, assemblyName: template.name, design: template, model,
+    activeLevelIndex: active ? state.activeLevelIndex : 0,
+    selectedPointIndex: active ? state.selectedPointIndex : null,
+  } });
+  if (committed) reportLoaded(`Loaded ${state.assemblyName}. Choose a module part to inspect or edit it.`);
+  return committed;
 }
 
 async function loadMapmakerModule(templateId) {
   const template = state.mapmaker.templates[templateId];
+  if (!template) throw new Error(`Unknown droid module ${templateId}.`);
+  state.designNotice = "";
+  return loadDroidDesign(template);
+}
 
-  if (!template) {
+function setDesignOptions(control, items, value, { optional = false, special = false, specialLabel = value } = {}) {
+  control.replaceChildren();
+  if (optional) {
+    const none = document.createElement("option"); none.value = ""; none.textContent = "None"; control.append(none);
+  }
+  if (special) {
+    const option = document.createElement("option"); option.value = value;
+    option.textContent = `${specialLabel} (preset only)`;
+    option.disabled = true; control.append(option);
+  }
+  for (const item of items) {
+    const option = document.createElement("option"); option.value = item.id;
+    option.textContent = item.id === "CyborgLegs" ? "Cyborg legs" : item.name ?? item.id;
+    control.append(option);
+  }
+  control.value = value ?? "";
+}
+
+function renderDesigner() {
+  if (!Object.keys(state.mapmaker.bodies).length) return;
+  const draft = state.designDraft;
+  const body = state.mapmaker.bodies[draft.body];
+  const bodies = selectableBodies(state.mapmaker);
+  const specialBody = !bodies.some((item) => item.id === draft.body);
+  setDesignOptions(elements.designBody, bodies, draft.body, { special: specialBody, specialLabel: body?.name ?? draft.body });
+  elements.designBody.disabled = false;
+  const props = compatiblePropulsions(draft.body, state.mapmaker);
+  const weapons = compatibleWeapons(draft.body, draft.propulsion, state.mapmaker);
+  const specialPropulsion = !props.some((item) => item.id === draft.propulsion);
+  const specialGuns = draft.weapons.some((id) => !weapons.some((item) => item.id === id));
+  const special = specialBody || specialPropulsion || specialGuns;
+  elements.buildDroidButton.disabled = special || !weapons.length;
+  setDesignOptions(elements.designPropulsion, props, draft.propulsion, { special: specialPropulsion, specialLabel: state.mapmaker.propulsions[draft.propulsion]?.name });
+  elements.designPropulsion.disabled = specialBody || !props.length;
+  for (const [slot, control] of elements.designGuns.entries()) {
+    const id = draft.weapons[slot];
+    setDesignOptions(control, weapons, id, { optional: slot > 0, special: Boolean(id) && !weapons.some((item) => item.id === id), specialLabel: state.mapmaker.weapons[id]?.name });
+    control.disabled = specialBody || specialPropulsion || !weapons.length;
+    if (slot > 0) elements.designGunFields[slot].hidden = specialBody || slot >= weaponSlotCount(body) || (slot === 2 && !draft.weapons[1]);
+  }
+  if (special) {
+    elements.designHelp.textContent = specialBody ? "Special preset. Choose a standard body to customize; the preset remains available below."
+      : specialPropulsion ? "Special preset propulsion. Choose compatible propulsion to customize this droid."
+      : "Special preset gun. Choose a compatible gun to customize this droid; the original preset remains available below.";
     return;
   }
+  const propulsion = state.mapmaker.propulsions[draft.propulsion];
+  const family = isCyborgBody(body) ? body.usageClass === "SuperCyborg" ? "Super cyborg guns only." : "Cyborg guns only."
+    : isFlyingPropulsion(propulsion) ? "VTOL propulsion uses aircraft guns." : "Ground and naval propulsion use ground guns.";
+  const bombs = draft.weapons.some((id) => !state.mapmaker.weapons[id]?.model) ? "Bomb bays can have a mount without a separate gun mesh." : "";
+  elements.designHelp.textContent = [!state.design ? "Build this droid or change a component to preview it." : "", state.designNotice, family, body.weaponSlots > 1 ? `${body.weaponSlots} gun slots available.` : "", bombs].filter(Boolean).join(" ");
+}
 
-  const specs = getModulePartSpecs(template);
+async function buildDraftDesign() {
+  validateDesign(state.designDraft, state.mapmaker);
+  return loadDroidDesign({ ...state.designDraft, weapons: [...state.designDraft.weapons], name: designName(state.designDraft, state.mapmaker) }, { custom: true });
+}
 
-  if (!specs.length) {
-    throw new Error(`No PIE parts were found for ${template.name ?? templateId}.`);
+async function changeDesignComponent(component, slot = 0) {
+  const previous = state.designDraft;
+  const draft = { body: previous.body, propulsion: previous.propulsion, weapons: [...previous.weapons] };
+  if (component === "body") draft.body = elements.designBody.value;
+  else if (component === "propulsion") draft.propulsion = elements.designPropulsion.value;
+  else {
+    const value = elements.designGuns[slot].value;
+    if (slot > 0 && !value) draft.weapons = draft.weapons.slice(0, slot);
+    else draft.weapons[slot] = value;
   }
-
-  setStatus(`Assembling ${template.name ?? templateId} from ${specs.length} PIE files...`);
-  const parts = await Promise.all(
-    specs.map(async (spec) => ({ ...spec, model: await loadMapmakerModel(spec.path) })),
-  );
-  state.assembly = parts;
-  state.assemblyName = template.name ?? templateId;
-  state.model = parts.find((part) => part.role === "body")?.model ?? parts[0].model;
-  state.activeLevelIndex = 0;
-  state.selectedPointIndex = null;
-  await renderAll({ fitCamera: true });
-  setStatus(`Loaded ${state.assemblyName}. Choose a module part to inspect or edit it.`);
+  const next = reconcileDesign(draft, state.mapmaker);
+  const notices = [];
+  if (next.propulsion !== draft.propulsion) notices.push("Propulsion changed to match the body.");
+  if (next.weapons[0] !== draft.weapons[0]) notices.push("Gun changed to a compatible option.");
+  if (draft.weapons.length > next.weapons.length) notices.push("Incompatible extra guns were removed.");
+  state.designNotice = notices.join(" ");
+  state.designDraft = next;
+  elements.assetResults.selectedIndex = -1;
+  renderDesigner();
+  await buildDraftDesign();
 }
 
 function getFilteredAssets() {
@@ -1027,6 +1023,11 @@ function getFilteredAssets() {
 
 function renderAssetResults() {
   const isModule = elements.assetKind.value === "module";
+  elements.designer.hidden = !isModule;
+  mapmakerBrowser.setAttribute("data-mode", isModule ? "module" : "pie");
+  elements.assetLibraryLabel.textContent = isModule ? "Presets" : "Individual PIE files";
+  elements.assetResults.setAttribute("aria-label", isModule ? "Presets" : "Individual PIE files");
+  elements.assetSearch.placeholder = isModule ? "Search presets..." : "Search PIE files...";
   const matches = getFilteredAssets();
   const visibleMatches = matches.slice(0, 200);
   elements.assetResults.innerHTML = "";
@@ -1071,54 +1072,52 @@ async function initializeMapmakerBrowser() {
   state.mapmaker.propulsions = propulsions;
   state.mapmaker.weapons = weapons;
   state.mapmaker.templates = templates;
+  state.designDraft = reconcileDesign(state.designDraft, state.mapmaker);
+  elements.assetStatus.textContent = "";
   elements.assetSearch.disabled = false;
   elements.assetResults.disabled = false;
   renderAssetResults();
+  renderDesigner();
 }
 
-async function loadPieFromText(text, sourceName) {
-  state.assembly = [];
-  state.assemblyName = "";
-  state.model = parsePie(text, sourceName);
-  state.activeLevelIndex = 0;
-  state.selectedPointIndex = null;
-  await renderAll({ fitCamera: true });
-  setStatus(`Loaded ${sourceName}. Drop a matching texture page to see textured faces.`);
+async function loadPieFromText(text, sourceName, token = startModelLoad()) {
+  const model = parsePie(text, sourceName);
+  const committed = await renderAll({ fitCamera: true, loadToken: token, next: {
+    model, assembly: [], assemblyName: "", design: null, activeLevelIndex: 0, selectedPointIndex: null,
+  } });
+  if (committed) reportLoaded(`Loaded ${sourceName}.`);
+}
+
+async function loadSample() {
+  const token = startModelLoad();
+  const response = await fetch(SAMPLE_PIE_URL);
+  if (!response.ok) throw new Error(`Sample returned HTTP ${response.status}.`);
+  await loadPieFromText(await response.text(), "trlcan.pie", token);
 }
 
 function registerTexture(file) {
   const key = normalizeTextureKey(file.name);
   const previousUrl = state.textureUrls.get(key);
-  const previousTexture = state.loadedTextures.get(key);
-
-  if (previousUrl) {
-    URL.revokeObjectURL(previousUrl);
-  }
-
-  if (previousTexture) {
-    previousTexture.dispose();
-    state.loadedTextures.delete(key);
-  }
-
+  if (previousUrl?.startsWith("blob:")) state.retiredTextureUrls.add(previousUrl);
+  // The currently displayed scene can still use the previous texture.
   state.textureUrls.set(key, URL.createObjectURL(file));
 }
 
 async function handleFiles(fileList) {
+  const token = startModelLoad();
   const files = Array.from(fileList);
-  const pieFile = files.find((file) => file.name.toLowerCase().endsWith(".pie"));
-  const textureFiles = files.filter((file) => /\.(png|jpe?g|webp|bmp)$/i.test(file.name));
-
-  textureFiles.forEach(registerTexture);
-
-  if (pieFile) {
-    await loadPieFromText(await pieFile.text(), pieFile.name);
-    return;
-  }
-
-  if (textureFiles.length && state.model) {
-    await renderAll();
-    setStatus(`Registered ${textureFiles.length} texture file(s).`);
-  }
+  const pieFiles = files.filter((file) => file.name.toLowerCase().endsWith(".pie"));
+  const textures = files.filter((file) => /\.(png|jpe?g|webp|bmp)$/i.test(file.name));
+  if (pieFiles.length > 1) throw new Error("Choose one PIE file and its textures at a time.");
+  if (!pieFiles.length && !textures.length) throw new Error("Choose a PIE file or a supported texture image.");
+  let model;
+  if (pieFiles.length) model = parsePie(await pieFiles[0].text(), pieFiles[0].name);
+  if (!modelLoads.isCurrent(token)) return;
+  textures.forEach(registerTexture);
+  const committed = await renderAll({ fitCamera: Boolean(model), loadToken: token, next: model ? {
+    model, assembly: [], assemblyName: "", design: null, activeLevelIndex: 0, selectedPointIndex: null,
+  } : {} });
+  if (committed) reportLoaded(model ? `Loaded ${model.sourceName}.` : `Registered ${textures.length} texture file(s).`);
 }
 
 function exportCurrentPie() {
@@ -1141,7 +1140,7 @@ function exportCurrentPie() {
 }
 
 function pickPointFromPointer(event) {
-  if (!sceneObjects.pointCloud) {
+  if (!sceneObjects.pointCloud || !state.view.points) {
     return;
   }
 
@@ -1158,26 +1157,28 @@ function pickPointFromPointer(event) {
 }
 
 function bindEvents() {
+  elements.buildDroidButton.addEventListener("click", () => runAction(buildDraftDesign, "Could not assemble droid"));
+  elements.designBody.addEventListener("change", () => runAction(() => changeDesignComponent("body"), "Could not assemble droid"));
+  elements.designPropulsion.addEventListener("change", () => runAction(() => changeDesignComponent("propulsion"), "Could not assemble droid"));
+  for (const [slot, control] of elements.designGuns.entries()) {
+    control.addEventListener("change", () => runAction(() => changeDesignComponent("weapon", slot), "Could not assemble droid"));
+  }
   elements.fileInput.addEventListener("change", async (event) => {
-    if (event.target.files?.length) {
-      await handleFiles(event.target.files);
-      event.target.value = "";
-    }
+    try {
+      if (event.target.files?.length) await runAction(() => handleFiles(event.target.files), "Could not open files");
+    } finally { event.target.value = ""; }
   });
 
-  elements.sampleButton.addEventListener("click", async () => {
-    const response = await fetch(SAMPLE_PIE_URL);
-    await loadPieFromText(await response.text(), "trlcan.pie");
-  });
+  elements.sampleButton.addEventListener("click", () => runAction(loadSample, "Could not load sample"));
 
-  elements.exportButton.addEventListener("click", exportCurrentPie);
+  elements.exportButton.addEventListener("click", () => runAction(exportCurrentPie, "Could not export PIE"));
   elements.fitButton.addEventListener("click", fitCameraToCurrentLevel);
 
   elements.levelSelect.addEventListener("change", async (event) => {
-    state.activeLevelIndex = Number(event.target.value);
-    state.selectedPointIndex = null;
-    await renderAll({ fitCamera: true });
-    setStatus(`Viewing level ${getActiveLevel()?.index ?? "-"}.`);
+    await runAction(async () => {
+      const committed = await renderAll({ fitCamera: true, next: { activeLevelIndex: Number(event.target.value), selectedPointIndex: null } });
+      if (committed) reportLoaded(`Viewing level ${getActiveLevel()?.index ?? "-"}.`);
+    }, "Could not change level");
   });
 
   elements.toggleWireframe.addEventListener("change", (event) => {
@@ -1207,13 +1208,19 @@ function bindEvents() {
 
   elements.toggleInvertV.addEventListener("change", async (event) => {
     state.view.invertV = event.target.checked;
-    await rebuildScene();
-    setStatus("Updated texture V orientation.");
+    await runAction(async () => {
+      if (await rebuildScene()) reportLoaded("Updated texture V orientation.");
+    }, "Could not update texture orientation");
   });
 
-  elements.pointX.addEventListener("input", (event) => updateSelectedPoint("x", event.target.value));
-  elements.pointY.addEventListener("input", (event) => updateSelectedPoint("y", event.target.value));
-  elements.pointZ.addEventListener("input", (event) => updateSelectedPoint("z", event.target.value));
+  for (const [axis, input] of [["x", elements.pointX], ["y", elements.pointY], ["z", elements.pointZ]]) {
+    input.addEventListener("input", () => input.removeAttribute("aria-invalid"));
+    input.addEventListener("change", () => commitCoordinateInput(axis, input));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") { event.preventDefault(); commitCoordinateInput(axis, input); }
+      if (event.key === "Escape") { event.preventDefault(); renderPointEditor(); }
+    });
+  }
 
   elements.pointList.addEventListener("click", (event) => {
     const trigger = event.target.closest("[data-point-index]");
@@ -1308,13 +1315,7 @@ function bindEvents() {
     elements.assetResults.disabled = true;
 
     try {
-      if (elements.assetKind.value === "module") {
-        await loadMapmakerModule(selection);
-      } else {
-        await loadMapmakerPie(selection);
-      }
-    } catch (error) {
-      setStatus(`Could not load the Mapmaker selection: ${error.message}`);
+      await runAction(() => elements.assetKind.value === "module" ? loadMapmakerModule(selection) : loadMapmakerPie(selection), "Could not load the Mapmaker selection");
     } finally {
       elements.assetResults.disabled = false;
     }
@@ -1327,11 +1328,11 @@ function bindEvents() {
       return;
     }
 
-    state.model = part.model;
-    state.activeLevelIndex = 0;
-    state.selectedPointIndex = null;
-    await renderAll();
-    setStatus(`Editing ${part.label} (${part.model.sourceName}) inside ${state.assemblyName}.`);
+    await runAction(async () => {
+      if (await renderAll({ next: { model: part.model, activeLevelIndex: 0, selectedPointIndex: null } })) {
+        reportLoaded(`Editing ${part.label} (${part.model.sourceName}) inside ${state.assemblyName}.`);
+      }
+    }, "Could not change module part");
   });
 
   let pointerDown = null;
@@ -1361,29 +1362,17 @@ function bindEvents() {
     event.preventDefault();
 
     if (event.dataTransfer?.files?.length) {
-      await handleFiles(event.dataTransfer.files);
+      await runAction(() => handleFiles(event.dataTransfer.files), "Could not open dropped files");
     }
   });
 }
 
-function animate() {
-  controls.update();
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
-}
+
 
 bindEvents();
-animate();
+frameScheduler.request();
 renderChrome();
 
-initializeMapmakerBrowser().catch((error) => {
-  elements.assetCount.textContent = "Unavailable";
-  elements.assetHelp.textContent = `Could not load the Mapmaker catalog: ${error.message}`;
-});
+initializeMapmakerBrowser().catch(reportCatalogFailure);
 
-fetch(SAMPLE_PIE_URL)
-  .then((response) => response.text())
-  .then((text) => loadPieFromText(text, "trlcan.pie"))
-  .catch(() => {
-    setStatus("Ready. Drop a PIE file to begin.");
-  });
+runAction(loadSample, "Could not load sample");

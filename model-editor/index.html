@@ -113,20 +113,21 @@
               <div class="field-grid">
                 <label class="field">
                   <span>X</span>
-                  <input id="point-x" type="number" step="0.1" />
+                  <input id="point-x" type="number" step="any" />
                 </label>
                 <label class="field">
                   <span>Y</span>
-                  <input id="point-y" type="number" step="0.1" />
+                  <input id="point-y" type="number" step="any" />
                 </label>
                 <label class="field">
                   <span>Z</span>
-                  <input id="point-z" type="number" step="0.1" />
+                  <input id="point-z" type="number" step="any" />
                 </label>
               </div>
 
               <p class="section-copy compact">
-                Changes apply live in the viewer and are included when you export the PIE file.
+                Press Enter or leave a field to apply its coordinate. Press Escape to cancel a draft.
+                Applied changes are included when you export the PIE file.
               </p>
             </div>
           </section>
@@ -144,7 +145,7 @@
           </div>
 
           <div class="viewer-surface" id="viewer"></div>
-          <p class="status-bar" id="status-text">Loading bundled sample...</p>
+          <p class="status-bar" id="status-text" role="status">Loading bundled sample...</p>
         </section>
 
         <aside class="panel inspector-column">

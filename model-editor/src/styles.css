@@ -58,6 +58,11 @@ code {
   font-size: 0.92em;
 }
 
+input[aria-invalid="true"] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .app-shell {
   padding: 24px;
 }
@@ -329,6 +334,34 @@ code {
 
 .mapmaker-browser[hidden] {
   display: none;
+}
+
+.droid-designer {
+  display: grid;
+  gap: 9px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.droid-designer[hidden],
+.droid-designer .field[hidden] {
+  display: none;
+}
+
+.droid-designer .field {
+  margin: 0;
+  gap: 5px;
+}
+
+.designer-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.mapmaker-browser[data-mode="module"] .asset-results {
+  min-height: 126px;
 }
 
 .mapmaker-browser > *,

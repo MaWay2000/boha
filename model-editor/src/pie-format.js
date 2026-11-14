@@ -1,396 +1,268 @@
-const SECTION_KEYWORDS = new Set([
-  "PIE",
-  "TYPE",
-  "TEXTURE",
-  "EVENT",
-  "LEVELS",
-  "LEVEL",
-  "POINTS",
-  "POLYGONS",
-  "CONNECTORS",
-  "ANIMOBJECT",
-  "SHADOWPOINTS",
-  "SHADOWPOLYGONS",
-]);
+// Preserve sections we do not interpret, along with original precision and layout.
+const sourceDocuments = new WeakMap();
 
 function formatNumber(value) {
-  if (!Number.isFinite(value)) {
-    return "0";
-  }
-
-  const normalized = Math.abs(value) < 1e-9 ? 0 : value;
-
-  if (Number.isInteger(normalized)) {
-    return String(normalized);
-  }
-
-  return normalized.toFixed(6).replace(/\.?0+$/, "");
+  if (!Number.isFinite(value)) throw new Error("Cannot export a non-finite number.");
+  return String(Object.is(value, -0) ? 0 : value);
 }
 
-function toNumericTriplet(line, label) {
-  const values = line
-    .trim()
-    .split(/\s+/)
-    .map((part) => Number(part));
-
-  if (values.length < 3 || values.some((value) => !Number.isFinite(value))) {
-    throw new Error(`Invalid ${label} line: "${line}"`);
-  }
-
-  return { x: values[0], y: values[1], z: values[2] };
+function integer(value, label, minimum = 0) {
+  if (!Number.isSafeInteger(value) || value < minimum) throw new Error(`${label} must be an integer of at least ${minimum}.`);
+  return value;
 }
 
-function parsePolygon(line) {
-  const parts = line.trim().split(/\s+/).map((part) => Number(part));
+function hex(token, label) {
+  if (!/^(?:0x)?[\da-f]+$/i.test(token ?? "")) throw new Error(`Invalid ${label}.`);
+  return integer(Number.parseInt(token.replace(/^0x/i, ""), 16), label);
+}
 
-  if (parts.length < 5 || parts.some((value) => !Number.isFinite(value))) {
-    throw new Error(`Invalid polygon line: "${line}"`);
+function numbers(tokens, count, label) {
+  const values = tokens.map(Number);
+  if (values.length !== count || values.some((value) => !Number.isFinite(value))) throw new Error(`${label} requires ${count} finite numbers.`);
+  return values;
+}
+
+function triplet(tokens, label) {
+  const [x, y, z] = numbers(tokens, 3, label);
+  return { x, y, z };
+}
+
+function parsePolygon(tokens) {
+  const flags = hex(tokens[0], "polygon flags");
+  const vertexCount = integer(Number(tokens[1]), "Polygon vertex count", 3);
+  const animated = Boolean(flags & 0x4000);
+  const textured = Boolean(flags & 0x200);
+  const expected = 2 + vertexCount + (animated ? 4 : 0) + (textured ? vertexCount * 2 : 0);
+  if (tokens.length !== expected) throw new Error(`Polygon requires ${expected} fields, got ${tokens.length}.`);
+  const indices = tokens.slice(2, 2 + vertexCount).map((token) => integer(Number(token), "Point index"));
+  let cursor = 2 + vertexCount;
+  let animation = null;
+  if (animated) {
+    const [frames, rate, width, height] = numbers(tokens.slice(cursor, cursor + 4), 4, "Polygon animation");
+    integer(frames, "Animation frame count", 1);
+    if (rate < 0 || width <= 0 || height <= 0) throw new Error("Invalid polygon animation dimensions or rate.");
+    animation = { frames, rate, width, height };
+    cursor += 4;
   }
-
-  const flags = parts[0];
-  const vertexCount = parts[1];
-  const indices = parts.slice(2, 2 + vertexCount);
-  const uvValues = parts.slice(2 + vertexCount);
-
-  if (indices.length !== vertexCount) {
-    throw new Error(`Polygon is missing vertex indices: "${line}"`);
-  }
-
-  if (uvValues.length !== vertexCount * 2) {
-    throw new Error(`Polygon UV count does not match vertex count: "${line}"`);
-  }
-
+  const uvValues = numbers(tokens.slice(cursor), textured ? vertexCount * 2 : 0, "Polygon UVs");
   const uvs = [];
-
-  for (let index = 0; index < uvValues.length; index += 2) {
-    uvs.push({ u: uvValues[index], v: uvValues[index + 1] });
-  }
-
-  return {
-    flags,
-    vertexCount,
-    indices,
-    uvs,
-  };
+  for (let index = 0; index < uvValues.length; index += 2) uvs.push({ u: uvValues[index], v: uvValues[index + 1] });
+  return { flags, vertexCount, indices, animation, uvs };
 }
 
-function isSectionLine(line) {
-  const keyword = line.trim().split(/\s+/, 1)[0]?.toUpperCase();
-  return SECTION_KEYWORDS.has(keyword);
+function serializePolygon(polygon) {
+  return [polygon.flags.toString(16), polygon.vertexCount, ...polygon.indices,
+    ...(polygon.animation ? [polygon.animation.frames, polygon.animation.rate, polygon.animation.width, polygon.animation.height] : []),
+    ...polygon.uvs.flatMap(({ u, v }) => [u, v]),
+  ].map((value) => typeof value === "number" ? formatNumber(value) : value).join(" ");
+}
+
+function validateLevel(level) {
+  integer(level.index, "LEVEL number", 1);
+  for (const point of [...level.points, ...level.connectors]) numbers([point.x, point.y, point.z], 3, "Coordinates");
+  for (const polygon of level.polygons) {
+    parsePolygon(serializePolygon(polygon).split(/\s+/));
+    for (const index of polygon.indices) {
+      if (index >= level.points.length) throw new Error(`Polygon references missing point ${index} in level ${level.index}.`);
+    }
+  }
 }
 
 export function parsePie(text, sourceName = "model.pie") {
-  const lines = text.replace(/\r/g, "").split("\n");
-
-  const model = {
-    sourceName,
-    version: 0,
-    type: null,
-    texture: null,
-    events: [],
-    levelsExpected: null,
-    levels: [],
-    topLevelExtras: [],
-  };
-
+  const lines = text.split(/\r\n|\n|\r/);
+  const lineEndings = text.match(/\r\n|\n|\r/g) ?? [];
+  const entries = [];
+  const model = { sourceName, version: 0, type: null, texture: null, events: [], levelsExpected: null, levels: [], topLevelExtras: [] };
   let pointer = 0;
-
-  function skipBlankLines() {
-    while (pointer < lines.length && !lines[pointer].trim()) {
+  let level = null;
+  const seenModel = new Set();
+  let seenLevel = new Set();
+  let inUnknownSection = false;
+  const opaqueBlocks = new Map();
+  const tokensAt = (index) => lines[index].replace(/(?:\/\/|#).*$/, "").trim().replace(/^\uFEFF/, "").split(/\s+/).filter(Boolean);
+  const fail = (message, line = pointer) => new Error(`${sourceName}:${line + 1}: ${message}`);
+  const unique = (set, key) => {
+    if (set.has(key)) throw new Error(`Duplicate ${key} section.`);
+    set.add(key);
+  };
+  const countFrom = (tokens, label) => {
+    if (tokens.length !== 2) throw new Error(`${label} requires a count.`);
+    return integer(Number(tokens[1]), `${label} count`);
+  };
+  function readBlock(count, label, parse) {
+    const values = [];
+    const rowLines = [];
+    for (let index = 0; index < count; index += 1) {
+      while (pointer < lines.length && !tokensAt(pointer).length) pointer += 1;
+      if (pointer >= lines.length) throw new Error(`Unexpected end of file in ${label}.`);
+      rowLines.push(pointer);
+      values.push(parse(tokensAt(pointer)));
       pointer += 1;
     }
+    return { values, rowLines };
   }
-
-  function readBlock(count, label, parser) {
-    const items = [];
-
-    for (let blockIndex = 0; blockIndex < count; blockIndex += 1) {
-      skipBlankLines();
-
-      if (pointer >= lines.length) {
-        throw new Error(`Unexpected end of file while reading ${label}`);
-      }
-
-      items.push(parser(lines[pointer]));
-      pointer += 1;
-    }
-
-    return items;
+  function record(start, kind, target, key, read, render, rowLines = []) {
+    entries.push({ start, end: pointer, kind, target, key, read, render, rowLines, original: JSON.stringify(read()) });
   }
-
-  function parseAnimObject(level) {
-    const line = lines[pointer].trim();
-    const headerTokens = line.split(/\s+/).slice(1);
-    pointer += 1;
-
-    const frames = [];
-
-    while (pointer < lines.length) {
-      const currentLine = lines[pointer];
-      const trimmed = currentLine.trim();
-
-      if (!trimmed) {
-        pointer += 1;
-        continue;
-      }
-
-      if (isSectionLine(trimmed)) {
-        break;
-      }
-
-      const values = trimmed.split(/\s+/).map((part) => Number(part));
-
-      if (!values.length || values.some((value) => !Number.isFinite(value))) {
-        level.extraLines.push(trimmed);
-      } else {
-        frames.push(values);
-      }
-
-      pointer += 1;
-    }
-
-    level.animObject = {
-      headerTokens,
-      frames,
-    };
-  }
-
-  function parseLevel() {
-    const levelLine = lines[pointer].trim();
-    const levelNumber = Number(levelLine.split(/\s+/)[1]);
-
-    const level = {
-      index: Number.isFinite(levelNumber) ? levelNumber : model.levels.length + 1,
-      points: [],
-      polygons: [],
-      connectors: [],
-      animObject: null,
-      extraLines: [],
-    };
-
-    pointer += 1;
-
-    while (pointer < lines.length) {
-      skipBlankLines();
-
-      if (pointer >= lines.length) {
-        break;
-      }
-
-      const line = lines[pointer].trim();
-
-      if (!line) {
-        pointer += 1;
-        continue;
-      }
-
-      if (line.startsWith("LEVEL ")) {
-        break;
-      }
-
-      if (line.startsWith("POINTS ")) {
-        const count = Number(line.split(/\s+/)[1]);
-        pointer += 1;
-        level.points = readBlock(count, "points", (value) => toNumericTriplet(value, "point"));
-        continue;
-      }
-
-      if (line.startsWith("POLYGONS ")) {
-        const count = Number(line.split(/\s+/)[1]);
-        pointer += 1;
-        level.polygons = readBlock(count, "polygons", parsePolygon);
-        continue;
-      }
-
-      if (line.startsWith("CONNECTORS ")) {
-        const count = Number(line.split(/\s+/)[1]);
-        pointer += 1;
-        level.connectors = readBlock(count, "connectors", (value) =>
-          toNumericTriplet(value, "connector"),
-        );
-        continue;
-      }
-
-      if (line.startsWith("ANIMOBJECT ")) {
-        parseAnimObject(level);
-        continue;
-      }
-
-      if (
-        line.startsWith("TYPE ") ||
-        line.startsWith("TEXTURE ") ||
-        line.startsWith("EVENT ") ||
-        line.startsWith("LEVELS ")
-      ) {
-        break;
-      }
-
-      level.extraLines.push(line);
-      pointer += 1;
-    }
-
-    return level;
-  }
-
   while (pointer < lines.length) {
-    skipBlankLines();
-
-    if (pointer >= lines.length) {
-      break;
-    }
-
-    const line = lines[pointer].trim();
-
-    if (!line) {
-      pointer += 1;
-      continue;
-    }
-
-    if (line.startsWith("PIE ")) {
-      model.version = Number(line.split(/\s+/)[1]);
-      pointer += 1;
-      continue;
-    }
-
-    if (line.startsWith("TYPE ")) {
-      model.type = Number(line.split(/\s+/)[1]);
-      pointer += 1;
-      continue;
-    }
-
-    if (line.startsWith("TEXTURE ")) {
-      const parts = line.split(/\s+/);
-      model.texture = {
-        index: Number(parts[1]),
-        name: parts[2] ?? "",
-        width: Number(parts[3] ?? 0),
-        height: Number(parts[4] ?? 0),
-      };
-      pointer += 1;
-      continue;
-    }
-
-    if (line.startsWith("EVENT ")) {
-      const parts = line.split(/\s+/);
-      model.events.push({
-        index: Number(parts[1]),
-        name: parts.slice(2).join(" "),
-      });
-      pointer += 1;
-      continue;
-    }
-
-    if (line.startsWith("LEVELS ")) {
-      model.levelsExpected = Number(line.split(/\s+/)[1]);
-      pointer += 1;
-      continue;
-    }
-
-    if (line.startsWith("LEVEL ")) {
-      model.levels.push(parseLevel());
-      continue;
-    }
-
-    model.topLevelExtras.push(line);
-    pointer += 1;
+    const start = pointer;
+    const tokens = tokensAt(pointer);
+    if (!tokens.length) { pointer += 1; continue; }
+    const keyword = tokens[0];
+    try {
+      if (!model.version && keyword !== "PIE") throw new Error("Missing PIE header before model data.");
+      if (["PIE", "TYPE", "TEXTURE", "EVENT", "LEVELS", "LEVEL", "POINTS", "POLYGONS", "CONNECTORS", "ANIMOBJECT"].includes(keyword)) inUnknownSection = false;
+      if (keyword === "PIE") {
+        unique(seenModel, keyword);
+        if (tokens.length !== 2 || ![2, 3, 4].includes(Number(tokens[1]))) throw new Error("Only PIE versions 2, 3 and 4 are supported.");
+        model.version = Number(tokens[1]); pointer += 1;
+        record(start, keyword, model, "version", () => model.version, (value) => [`PIE ${value}`]);
+      } else if (keyword === "TYPE") {
+        unique(level && model.version === 4 ? seenLevel : seenModel, keyword);
+        if (tokens.length !== 2) throw new Error("TYPE requires hexadecimal flags.");
+        const target = level && model.version === 4 ? level : model;
+        target.type = hex(tokens[1], "TYPE flags"); pointer += 1;
+        record(start, keyword, target, "type", () => target.type, (value) => [`TYPE ${value.toString(16)}`]);
+      } else if (keyword === "TEXTURE") {
+        unique(level && model.version === 4 ? seenLevel : seenModel, keyword);
+        if (tokens.length !== 5 && !(model.version === 4 && tokens.length === 3)) throw new Error("TEXTURE requires an index, filename and (for PIE 2/3) width and height.");
+        const target = level && model.version === 4 ? level : model;
+        target.texture = { index: integer(Number(tokens[1]), "Texture index"), name: tokens[2], width: integer(Number(tokens[3] ?? 0), "Texture width"), height: integer(Number(tokens[4] ?? 0), "Texture height") };
+        pointer += 1;
+        record(start, keyword, target, "texture", () => target.texture, (value) => [`TEXTURE ${value.index} ${value.name}${model.version === 4 ? "" : ` ${value.width} ${value.height}`}`]);
+      } else if (keyword === "EVENT") {
+        if (tokens.length < 3) throw new Error("EVENT requires an index and filename.");
+        const eventIndex = model.events.length;
+        model.events.push({ index: integer(Number(tokens[1]), "Event index"), name: tokens.slice(2).join(" ") });
+        pointer += 1;
+        record(start, keyword, model, "events", () => model.events[eventIndex], (value) => [`EVENT ${value.index} ${value.name}`]);
+      } else if (keyword === "LEVELS") {
+        unique(seenModel, keyword);
+        model.levelsExpected = countFrom(tokens, keyword); pointer += 1;
+        record(start, keyword, model, "levelsExpected", () => model.levels.length, (value) => [`LEVELS ${value}`]);
+      } else if (keyword === "LEVEL") {
+        if (tokens.length !== 2) throw new Error("LEVEL requires an index.");
+        level = { index: integer(Number(tokens[1]), "LEVEL number", 1), points: [], polygons: [], connectors: [], animObject: null, extraLines: [] };
+        model.levels.push(level); seenLevel = new Set(); pointer += 1;
+        const current = level;
+        record(start, keyword, current, "index", () => current.index, (value) => [`LEVEL ${value}`]);
+      } else if (["POINTS", "POLYGONS", "CONNECTORS", "ANIMOBJECT"].includes(keyword)) {
+        if (!level) throw new Error(`${keyword} must be inside a LEVEL.`);
+        unique(seenLevel, keyword);
+        const current = level;
+        let count, key, parser, render;
+        if (keyword === "ANIMOBJECT") {
+          const header = numbers(tokens.slice(1), 3, keyword);
+          integer(header[0], "Animation time"); integer(header[1], "Animation cycles");
+          count = integer(header[2], "Animation frames"); key = "animObject";
+          parser = (row) => numbers(row, 10, "Animation frame");
+          render = (value) => [`ANIMOBJECT ${value.headerTokens.join(" ")}`, ...value.frames.map((row) => `\t\t${row.map(formatNumber).join("\t")}`)];
+        } else {
+          count = countFrom(tokens, keyword);
+          key = { POINTS: "points", POLYGONS: "polygons", CONNECTORS: "connectors" }[keyword];
+          parser = keyword === "POLYGONS" ? parsePolygon : (row) => triplet(row, keyword);
+          render = (value) => [`${keyword} ${value.length}`, ...value.map((row) => `\t${keyword === "POLYGONS" ? serializePolygon(row) : [row.x, row.y, row.z].map(formatNumber).join(" ")}`)];
+        }
+        pointer += 1;
+        const block = readBlock(count, keyword, parser);
+        current[key] = keyword === "ANIMOBJECT" ? { headerTokens: tokens.slice(1), frames: block.values } : block.values;
+        record(start, keyword, current, key, () => current[key], render, block.rowLines);
+      } else if (["NORMALS", "SHADOWPOINTS", "SHADOWPOLYGONS"].includes(keyword)) {
+        if (!level) throw new Error(`${keyword} must be inside a LEVEL.`);
+        unique(seenLevel, keyword);
+        const count = countFrom(tokens, keyword);
+        pointer += 1;
+        const parser = keyword === "NORMALS" ? (row) => numbers(row, 9, "Normals")
+          : keyword === "SHADOWPOINTS" ? (row) => triplet(row, "Shadow point") : parsePolygon;
+        const block = readBlock(count, keyword, parser);
+        if (!opaqueBlocks.has(level)) opaqueBlocks.set(level, {});
+        opaqueBlocks.get(level)[keyword] = block.values;
+        level.extraLines.push(...lines.slice(start, pointer));
+        inUnknownSection = false;
+      } else {
+        if (Number.isFinite(Number(keyword)) && !inUnknownSection) throw new Error("Unexpected data outside a counted section.");
+        (level ? level.extraLines : model.topLevelExtras).push(lines[pointer]); pointer += 1;
+        if (/^[A-Za-z]/.test(keyword)) inUnknownSection = !["NORMALMAP", "SPECULARMAP", "TCMASK", "INTERPOLATE"].includes(keyword);
+      }
+    } catch (error) { throw fail(error.message); }
   }
-
-  if (!model.levels.length) {
-    throw new Error("No LEVEL sections were found in the PIE file.");
+  for (const keyword of ["PIE", "TYPE", "LEVELS"]) {
+    if (!seenModel.has(keyword)) throw fail(`Missing ${keyword} header.`, 0);
   }
-
+  if (!model.levels.length || model.levelsExpected !== model.levels.length) throw fail(`LEVELS declares ${model.levelsExpected}, but found ${model.levels.length} levels.`, 0);
+  const levelNumbers = new Set();
+  for (const current of model.levels) {
+    if (levelNumbers.has(current.index)) throw fail(`Duplicate LEVEL ${current.index}.`, 0);
+    levelNumbers.add(current.index);
+    if (!entries.some((entry) => entry.target === current && entry.kind === "POINTS") || !entries.some((entry) => entry.target === current && entry.kind === "POLYGONS")) throw fail(`LEVEL ${current.index} requires POINTS and POLYGONS.`, 0);
+    try { validateLevel(current); } catch (error) { throw fail(error.message, 0); }
+    const blocks = opaqueBlocks.get(current);
+    if (blocks?.NORMALS && blocks.NORMALS.length !== current.polygons.length) throw fail(`NORMALS count must match POLYGONS in level ${current.index}.`, 0);
+    for (const polygon of blocks?.SHADOWPOLYGONS ?? []) {
+      if (polygon.indices.some((index) => index >= (blocks.SHADOWPOINTS?.length ?? 0))) throw fail(`Shadow polygon references a missing point in level ${current.index}.`, 0);
+    }
+  }
+  // The LEVELS baseline is only known after reading all levels.
+  for (const entry of entries) entry.original = JSON.stringify(entry.read());
+  sourceDocuments.set(model, { text, lines, lineEndings, entries, levels: [...model.levels], newline: lineEndings[0] ?? "\n" });
   return model;
 }
 
 export function serializePie(model) {
-  const lines = [];
-
-  lines.push(`PIE ${formatNumber(model.version || 3)}`);
-
-  if (model.type !== null) {
-    lines.push(`TYPE ${formatNumber(model.type)}`);
+  for (const level of model.levels) validateLevel(level);
+  const source = sourceDocuments.get(model);
+  if (source) {
+    if (source.levels.length !== model.levels.length || source.levels.some((level, index) => model.levels[index] !== level)) throw new Error("Changing the level structure is not supported by this vertex editor.");
+    const changes = source.entries.filter((entry) => JSON.stringify(entry.read()) !== entry.original);
+    if (!changes.length) return source.text;
+    const lines = [...source.lines];
+    const endings = [...source.lineEndings];
+    for (const entry of changes.reverse()) {
+      // Only rewrite changed coordinates; keep all other tokens and comments.
+      if (["POINTS", "CONNECTORS"].includes(entry.kind) && entry.read().length === entry.rowLines.length) {
+        const original = JSON.parse(entry.original);
+        entry.read().forEach((point, index) => {
+          if (JSON.stringify(point) === JSON.stringify(original[index])) return;
+          const rowIndex = entry.rowLines[index];
+          let coordinate = 0;
+          lines[rowIndex] = lines[rowIndex].replace(/\S+/g, (token) => {
+            if (coordinate >= 3) return token;
+            const axis = ["x", "y", "z"][coordinate++];
+            return point[axis] === original[index][axis] ? token : formatNumber(point[axis]);
+          });
+        });
+      } else {
+        const replacement = entry.render(entry.read());
+        const replacementEndings = replacement.map((_, index) => index === replacement.length - 1 ? (endings[entry.end - 1] ?? "") : source.newline);
+        lines.splice(entry.start, entry.end - entry.start, ...replacement);
+        endings.splice(entry.start, entry.end - entry.start, ...replacementEndings);
+      }
+    }
+    return lines.map((line, index) => line + (endings[index] ?? "")).join("");
   }
-
+  const lines = [`PIE ${model.version}`, `TYPE ${model.type.toString(16)}`];
   if (model.texture) {
-    lines.push(
-      `TEXTURE ${formatNumber(model.texture.index)} ${model.texture.name} ${formatNumber(model.texture.width)} ${formatNumber(model.texture.height)}`,
-    );
+    const { index, name, width, height } = model.texture;
+    lines.push(`TEXTURE ${index} ${name} ${width} ${height}`);
   }
-
-  for (const event of model.events ?? []) {
-    lines.push(`EVENT ${formatNumber(event.index)} ${event.name}`);
-  }
-
-  lines.push(`LEVELS ${formatNumber(model.levels.length)}`);
-
+  for (const event of model.events ?? []) lines.push(`EVENT ${event.index} ${event.name}`);
+  lines.push(...(model.topLevelExtras ?? []), `LEVELS ${model.levels.length}`);
   for (const level of model.levels) {
-    lines.push(`LEVEL ${formatNumber(level.index)}`);
-    lines.push(`POINTS ${formatNumber(level.points.length)}`);
-
-    for (const point of level.points) {
-      lines.push(`\t${formatNumber(point.x)} ${formatNumber(point.y)} ${formatNumber(point.z)}`);
-    }
-
-    lines.push(`POLYGONS ${formatNumber(level.polygons.length)}`);
-
-    for (const polygon of level.polygons) {
-      const tokens = [
-        formatNumber(polygon.flags),
-        formatNumber(polygon.vertexCount),
-        ...polygon.indices.map((value) => formatNumber(value)),
-        ...polygon.uvs.flatMap((uv) => [formatNumber(uv.u), formatNumber(uv.v)]),
-      ];
-
-      lines.push(`\t${tokens.join(" ")}`);
-    }
-
-    if (level.connectors?.length) {
-      lines.push(`CONNECTORS ${formatNumber(level.connectors.length)}`);
-
-      for (const connector of level.connectors) {
-        lines.push(
-          `\t${formatNumber(connector.x)} ${formatNumber(connector.y)} ${formatNumber(connector.z)}`,
-        );
-      }
-    }
-
-    if (level.animObject) {
-      lines.push(`ANIMOBJECT ${level.animObject.headerTokens.join(" ")}`.trimEnd());
-
-      for (const frame of level.animObject.frames) {
-        lines.push(`\t\t${frame.map((value) => formatNumber(value)).join("\t")}`);
-      }
-    }
-
-    for (const extraLine of level.extraLines ?? []) {
-      lines.push(extraLine);
-    }
+    lines.push(`LEVEL ${level.index}`, `POINTS ${level.points.length}`, ...level.points.map(({ x, y, z }) => `\t${[x, y, z].map(formatNumber).join(" ")}`),
+      `POLYGONS ${level.polygons.length}`, ...level.polygons.map((polygon) => `\t${serializePolygon(polygon)}`));
+    if (level.connectors.length) lines.push(`CONNECTORS ${level.connectors.length}`, ...level.connectors.map(({ x, y, z }) => `\t${[x, y, z].map(formatNumber).join(" ")}`));
+    if (level.animObject) lines.push(`ANIMOBJECT ${level.animObject.headerTokens.join(" ")}`, ...level.animObject.frames.map((row) => `\t\t${row.map(formatNumber).join("\t")}`));
+    lines.push(...(level.extraLines ?? []));
   }
-
-  for (const extraLine of model.topLevelExtras ?? []) {
-    lines.push(extraLine);
-  }
-
   return `${lines.join("\n")}\n`;
 }
 
 export function getUvMode(model) {
-  if (!model.texture) {
-    return "No texture info";
-  }
-
-  if (model.version >= 3 || model.texture.width === 0 || model.texture.height === 0) {
-    return "Normalized UVs";
-  }
-
-  return `${formatNumber(model.texture.width)}x${formatNumber(model.texture.height)} texture page`;
+  if (!model.texture) return "No texture info";
+  if (model.version >= 3 || model.texture.width === 0 || model.texture.height === 0) return "Normalized UVs";
+  return `${model.texture.width}x${model.texture.height} texture page`;
 }
 
 export function summarizeLevel(level) {
-  return {
-    points: level.points.length,
-    polygons: level.polygons.length,
-    connectors: level.connectors?.length ?? 0,
-    frames: level.animObject?.frames.length ?? 0,
-  };
+  return { points: level.points.length, polygons: level.polygons.length, connectors: level.connectors?.length ?? 0, frames: level.animObject?.frames.length ?? 0 };
 }

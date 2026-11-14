@@ -265,7 +265,7 @@ export function writeMapScriptSource(zip, value) {
     throw new Error('This map already supplies a NEXUS AI. The library cannot replace its custom AI.');
   }
   // Never replace another map/mod's gameplay entry point.
-  if (runtime && zip.file(runtimePath) && !zip.file(ownershipPath)) {
+  if (runtime && zip.file(runtimePath) && !zip.file(ownershipPath) && !zip.file('mapmaker-unit-loader.json')) {
     throw new Error('This map already has a gameplay mod. Timed waves cannot replace its mods/init.js.');
   }
   if (zip.file(ownershipPath)) {

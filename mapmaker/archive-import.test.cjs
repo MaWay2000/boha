@@ -34,7 +34,7 @@ const assert = require('node:assert/strict'), fs = require('node:fs'), path = re
   }
   const defs=JSON.parse(fs.readFileSync(path.join(__dirname,'structure.json'),'utf8'));
   const groups=structures.entries.map(e=>({userData:{structureExport:{player:e.player??e.startpos,sourceEntry:e,name:e.name}}}));
-  const ctx=vm.createContext({...h,...scripts,mapScriptEditor:null,currentMapScript:null,currentMapInfoOverrides:{},currentServerMapMetadata:{author:'Catalogue fallback',license:'Fallback',slots:2},
+  const ctx=vm.createContext({currentUnitDesigns:[],applyUnitDesigns:async()=>{},...h,...scripts,mapScriptEditor:null,currentMapScript:null,currentMapInfoOverrides:{},currentServerMapMetadata:{author:'Catalogue fallback',license:'Fallback',slots:2},
     currentServerMapSourceName:filename,currentLevelJson:metadata,currentGamJson:null,currentDroidEntries:droids.entries,currentFeatureEntries:features.entries,
     objectsGroup:{children:groups},currentMapArchive:zip,
     getStructureGroupDef:g=>({id:g.userData.structureExport.name,...defs[g.userData.structureExport.name]}),getStructureFootprint:()=>null,

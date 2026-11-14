@@ -124,7 +124,7 @@ const vm = require('node:vm');
     let userInfo = {author:'My author',license:'MIT',source:'My page'}, dirty = 0, picks = [], packed = [], writes = 0, failWrite = false;
     const status = [];
     const ctx = vm.createContext({document:doc, showSaveInfoDialog, showSaveLicenseHelp, licenseHelpDialog, licenseHelpBody, licenseHelpBackdrop, metadataText, getNextMapVersion, console, mapSaveInProgress:false,
-      mapDirty:false,savedMapVersion:'', currentMapScript:null, hasWaveRuntime, wavePackSaveOptions:{enabled:false,checked:false},
+      mapDirty:false,savedMapVersion:'', currentMapScript:null,currentUnitDesigns:[], hasWaveRuntime, wavePackSaveOptions:{enabled:false,checked:false},
       currentMapArchive:null,tilesetIndex:0,getOfficialTilesetName:() => 'arizona',
       currentLevelJson:{name:'Black',author:'Original author',license:'GPL 2+',players:4,source:'Original page',description:'Original description'},
       currentServerMapMetadata:null, currentServerMapSourceName:'', currentMapInfoOverrides:{},

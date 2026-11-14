@@ -899,7 +899,24 @@
         min-width: 0;
       }
 
-    </style>
+      #unitEditorPanel .unit-editor label { display:block; margin:10px 0; font-size:13px; }
+    #unitEditorPanel .unit-editor input, #unitEditorPanel .unit-editor select { display:block; width:100%; box-sizing:border-box; margin-top:5px; padding:6px; background:#283747; color:#e0e7f0; border:1px solid #496078; }
+    #unitEditorPanel .unit-editor input:focus, #unitEditorPanel .unit-editor select:focus { outline:1px solid #6CF527; }
+    #unitEditorPanel .unit-editor-preview { position:relative; height:220px; width:100%; margin-top:12px; border:1px solid #496078; background:radial-gradient(ellipse at center,#263c4b,#111d28); border-radius:3px; overflow:hidden; cursor:grab; }
+    #unitEditorPanel .unit-editor-preview[data-preview-error]:after { content:attr(data-preview-error); position:absolute; inset:0; display:grid; place-items:center; padding:15px; color:#ffaaa1; background:#111d28; text-align:center; font-size:13px; }
+    #unitEditorPanel .unit-editor-preview:active { cursor:grabbing; }
+    #unitEditorPanel .unit-editor-preview[aria-busy="true"] { opacity:0.65; }
+    #unitEditorPanel .unit-editor-preview-hint { margin:5px 0 12px; color:#a9bdce; font-size:12px; text-align:center; }
+    #unitEditorPanel .unit-editor-stats { display:grid; grid-template-columns:1fr 1fr; gap:0 12px; }
+    #unitEditorPanel .unit-editor-textures { margin:12px 0; padding:8px 10px; border:1px solid #496078; border-radius:3px; }
+    #unitEditorPanel .unit-editor-textures small { color:#a9bdce; overflow-wrap:anywhere; }
+    #unitEditorPanel .unit-editor-textures button { font-size:12px; margin:0 0 5px 6px; }
+    #unitEditorPanel input[type="file"]::file-selector-button { background:#283747; color:#e0e7f0; border:1px solid #496078; padding:4px 8px; cursor:pointer; margin-right:8px; }
+    #unitEditorPanel input[type="file"]::file-selector-button:hover { background:#6cf527; color:#000; }
+    #unitEditorPanel .unit-editor-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+    #unitEditorPanel .unit-editor-hint { font-size:12px; color:#a9bdce; line-height:1.5; }
+    #unitEditorPanel .unit-editor-error { color:#ff8b83; font-weight:bold; }
+  </style>
   </head>
   <body class="overlay-open">
   <style>
@@ -955,6 +972,7 @@
     <button type="button" class="tab-btn" data-tab="size">Resize</button>
     <button type="button" class="tab-btn" data-tab="objects">Structures</button>
     <button type="button" class="tab-btn" data-tab="droids">Droids</button>
+    <button type="button" class="tab-btn" data-tab="unitEditor">Unit editor</button>
     <button type="button" class="tab-btn" data-tab="features">Objects</button>
     <button type="button" class="tab-btn" data-tab="templates">Templates</button>
     <button type="button" class="tab-btn" data-tab="about">About</button>
@@ -1672,6 +1690,7 @@
     </div>
 
     <!-- SCRIPT TAB -->
+    <div id="unitEditorPanel" class="panel" style="display:none;"></div>
     <div id="scriptPanel" class="panel" style="display:none;"></div>
 
     <!-- ABOUT TAB -->

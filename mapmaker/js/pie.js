@@ -1,5 +1,16 @@
 import * as THREE from "./three.module.js";
+import {registerUnitTextureSources} from './unitTextures.js';
 const pieCache = {};
+export function registerUnitPieModels(assets) {
+  registerUnitTextureSources(assets);
+  for(const [path,text] of assets) {
+    if(!path.endsWith('.pie'))continue;
+    const name=path.split('/').pop().toLowerCase(), geometry=parsePie(text);
+    const previous=pieCache['components/bodies/'+name];
+    if(previous)previous.dispose();
+    for(const prefix of ['', 'components/bodies/', 'components/prop/', 'components/weapons/'])pieCache[prefix+name]=geometry;
+  }
+}
 export function parsePie(data) {
   const lines = data.split(/\r?\n/);
   let i = 0;

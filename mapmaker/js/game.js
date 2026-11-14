@@ -1,3 +1,8 @@
+import {clearUnitTextureSources} from './unitTextures.js';
+import {prepareUnitModels} from './unitModels.js';
+import {createUnitEditorPreview} from './unitEditorPreview.js';
+import {mountUnitEditor} from './unitEditor.js';
+import {defaultUnitStats,compileUnitDesign,normalizeUnitDesigns,readUnitDesigns,writeUnitDesigns,unwrapUnitMapPack} from './unitDesigns.js';
 import {hasWaveRuntime, buildWaveMapPack} from './waveMapPack.js';
 import {createCliffOverlay,disposeCliffOverlay} from './cliffOverlay.js';
 import * as THREE from './three.module.js';
@@ -27,7 +32,7 @@ import { TILESETS, getTileCount, loadAllTiles, clearTileCache } from './tileset.
 import { loadMapUnified, getTilesetIndexFromTtp } from './maploader.js';
 import { convertGammaGameMapToClassic, parseTTypes } from './convert.js';
 import { cameraState, resetCameraTarget, setupKeyboard } from './camera.js';
-import { parsePie, loadPieGeometry } from "./pie.js";
+import { parsePie, loadPieGeometry, registerUnitPieModels } from "./pie.js";
 import { buildStructureGroup, setStructureGroupPlayerColor, disposeUnsharedTexture } from "./structureGroup.js?v=wall-live-refresh";
 import { STRUCTURE_TURRETS } from "./structure_turrets.js";
 import { loadSensorDefs, getSensorModels } from "./sensors.js";
@@ -7233,6 +7238,7 @@ function makeLocalSaveSnapshot() {
     serverMetadata: currentServerMapMetadata ? JSON.parse(JSON.stringify(currentServerMapMetadata)) : null,
     serverSourceName: currentServerMapSourceName,
     mapScript: currentMapScript ? {...currentMapScript} : null,
+    unitDesigns: currentUnitDesigns.map(d => ({...d})),
     structures: getLocalSaveEntriesFromJson(buildStructJson(), 'structures'),
     features: getLocalSaveEntriesFromJson(buildFeatureJson(), 'features'),
     droids: getLocalSaveEntriesFromJson(buildDroidJson(), 'droids')
@@ -7622,6 +7628,45 @@ let currentLevelJson = null;
 let currentServerMapMetadata = null;
 let currentServerMapSourceName = '';
 let currentMapScript = null;
+let currentUnitDesigns = [];
+let unitEditorUI = null;
+let unitStatsPromise = null;
+function loadUnitEditorStats() {
+  if (!unitStatsPromise) unitStatsPromise = fetch(new URL('./unitEditorStats.json', import.meta.url)).then(r => { if (!r.ok) throw new Error('Could not load unit stats.'); return r.json(); }).catch(error => { unitStatsPromise = null; throw error; });
+  return unitStatsPromise;
+}
+function clearCustomUnitDefinitions() {
+  for (const d of currentUnitDesigns) {
+    clearUnitTextureSources(d.id);
+    const prefix = 'MMU_' + d.id;
+    if (bodyDefs) delete bodyDefs[prefix + '_Body'];
+    if (propDefs) delete propDefs[prefix + '_Prop'];
+    if (weaponDefs) delete weaponDefs[prefix + '_Weapon'];
+    if (templateDefs) delete templateDefs[prefix];
+  }
+}
+async function applyUnitDesigns(list) {
+  if (!list.length && !currentUnitDesigns.length) { unitEditorUI?.setDesigns([]); return; }
+  await loadComponentDefs();
+  const stats = await loadUnitEditorStats();
+  const next = normalizeUnitDesigns(list,stats);
+  const compiled=[];
+  for(const d of next) {
+    const c=compileUnitDesign(d,stats);
+    const models=await prepareUnitModels(c);
+    compiled.push({c,models});
+  }
+  clearCustomUnitDefinitions();
+  currentUnitDesigns = next;
+  for (const {c,models} of compiled) {
+    registerUnitPieModels(models);
+    bodyDefs[c.ids.body] = c.body; propDefs[c.ids.propulsion] = c.propulsion;
+    weaponDefs[c.ids.weapon] = c.weapon; templateDefs[c.ids.template] = c.template;
+  }
+  populateDroidTemplateSelect();
+  unitEditorUI?.setDesigns(next);
+}
+
 let mapScriptEditor = null;
 let currentMapInfoOverrides = {
   name: '',
@@ -8207,10 +8252,12 @@ async function loadArchiveMetadata(zip) {
   currentFeatureEntries = features.filter(entry => entry && typeof entry === 'object');
   currentDroidEntries = droids.filter(entry => entry && typeof entry === 'object');
   currentMapScript = await readMapScriptSource(zip);
+  await applyUnitDesigns(zip.file('mapmaker-unit-designs.json') ? await readUnitDesigns(zip,await loadUnitEditorStats()) : []);
   syncMapScriptEditor();
 }
 
 function resetLoadedMetadata() {
+  clearCustomUnitDefinitions(); currentUnitDesigns = []; unitEditorUI?.setDesigns([]);
   currentDroidArchivePath = null;
   currentFeatureArchivePath = null;
   currentTileTypesArchivePath = null;
@@ -8494,7 +8541,7 @@ function getDroidPieList(entry) {
     const leftModel = typeof extra === 'string' ? extra : extra?.left;
     if (!leftModel) return false;
     parts.push({ role: 'propulsion', path: toPath(leftModel, 'components/prop/'), side: 'left' });
-    const rightModel = getRightPropulsionModel(leftModel);
+    const rightModel = extra?.right || getRightPropulsionModel(leftModel);
     if (rightModel) parts.push({ role: 'propulsion', path: toPath(rightModel, 'components/prop/'), side: 'right' });
     const effectModel = extra?.still || extra?.moving;
     if (effectModel) {
@@ -9256,10 +9303,11 @@ async function buildWzFileBlob(asWavePack = false) {
   updateFeatureJson(zip);
   updateDroidJson(zip);
   writeMapScriptSource(zip, currentMapScript);
+  if (currentUnitDesigns.length || zip.file('mapmaker-unit-designs.json')) await writeUnitDesigns(zip,currentUnitDesigns,await loadUnitEditorStats());
   writeMapVersion(zip, getSaveMapVersion());
   zip.file(mapPath, buildMapFileBytes());
   zip.file(getTileTypesArchivePath(mapPath), buildTileTypesFileBytes());
-  const output = asWavePack ? await buildWaveMapPack(zip, base) : zip;
+  const output = (asWavePack || currentUnitDesigns.length) ? await buildWaveMapPack(zip, base) : zip;
   return await output.generateAsync({ type: 'blob', compression: 'DEFLATE' });
 }
 
@@ -9272,7 +9320,10 @@ async function confirmMapSaveInfo() {
   syncMyInfoInputs();
   if (!await showSaveInfoDialog(document.getElementById('settingsMyInfoPanel'), 'My info', 'Next: Map info', () => showLicenseHelpDialog(true))) return false;
   updateMapInfoInputs();
-  wavePackSaveOptions.enabled = hasWaveRuntime(currentMapScript);
+  wavePackSaveOptions.enabled = hasWaveRuntime(currentMapScript) || currentUnitDesigns.length > 0;
+  wavePackSaveOptions.required = currentUnitDesigns.length > 0;
+  wavePackSaveOptions.label = currentUnitDesigns.length ? 'Save map and custom units as one-file mod pack' : '';
+  if (currentUnitDesigns.length) wavePackSaveOptions.checked = true;
   if (!wavePackSaveOptions.enabled) wavePackSaveOptions.checked = false;
   return showSaveInfoDialog(document.getElementById('settingsMapInfoPanel'), 'Map info', 'Save map', null, [
     'settingsMapAuthorInput', 'settingsMapLicenseInput', 'settingsMapSourceInput', 'settingsMapUploadedInput'
@@ -11789,6 +11840,7 @@ function setActiveTab(tab) {
   const previousTab = activeTab;
   activeTab = tab;
   updateScriptPanelLayout(tab);
+  if (tab !== 'unitEditor') unitEditorUI?.close();
   window.activeTab = activeTab;
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
     const isActive = btn.getAttribute('data-tab') === tab;
@@ -11798,6 +11850,7 @@ function setActiveTab(tab) {
   panels.forEach(p => { p.style.display = 'none'; });
   const panel = document.getElementById(tab + 'Panel');
   if (panel) panel.style.display = 'block';
+  if (tab === 'unitEditor') unitEditorUI?.open().catch(error => setFileStatus(error.message));
   if (tab === 'settings') updateScavengerInfoInput();
   if (previousTab !== tab) clearViewBulkSelection();
   if (tab === 'objects') {
@@ -12876,6 +12929,7 @@ async function loadLocalSaveSnapshot(snapshot) {
   currentServerMapMetadata = snapshot.serverMetadata && typeof snapshot.serverMetadata === 'object' ? snapshot.serverMetadata : null;
   currentServerMapSourceName = String(snapshot.serverSourceName || '');
   currentMapScript = normalizeMapScriptSource(snapshot.mapScript);
+  await applyUnitDesigns(snapshot.unitDesigns || []);
   syncMapScriptEditor();
   currentMapInfoOverrides = { ...getDefaultMapInfoOverrides(), ...(snapshot.mapInfo || {}), scavengers: '' };
   if (!currentMapInfoOverrides.name) currentMapInfoOverrides.name = String(name || '').trim();
@@ -13052,7 +13106,7 @@ async function loadMapFile(file, options = {}) {
     setLoadingProgress('Reading archive file', 20);
     const buf = await file.arrayBuffer();
     setLoadingProgress('Opening map archive', 30);
-    const zip = await JSZip.loadAsync(buf);
+    const zip = await unwrapUnitMapPack(await JSZip.loadAsync(buf),JSZip);
     await loadArchiveMetadata(zip);
     updateMapInfoInputs();
     applyUserMapInfoToMapInfo();
@@ -14169,6 +14223,49 @@ if (document.readyState === 'loading') {
 } else {
   initDom();
 }
+
+unitEditorUI = mountUnitEditor(document.getElementById('unitEditorPanel'), {
+  loadStats: loadUnitEditorStats,
+  createPreview: host => createUnitEditorPreview(host, {
+    buildModel: async design => {
+      await loadComponentDefs();
+      const stats=await loadUnitEditorStats();
+      const c=compileUnitDesign({...design,id:'preview',name:'Preview',...defaultUnitStats(design.body,design.propulsion,design.weapon,stats)},stats);
+      registerUnitPieModels(await prepareUnitModels(c));
+      const previewBody=bodyDefs[c.ids.body],previewProp=propDefs[c.ids.propulsion],previewWeapon=weaponDefs[c.ids.weapon];
+      bodyDefs[c.ids.body]=c.body;propDefs[c.ids.propulsion]=c.propulsion;weaponDefs[c.ids.weapon]=c.weapon;
+      let parts;
+      try {parts=getDroidPieList({body:c.ids.body,propulsion:c.ids.propulsion,weapons:[c.ids.weapon]});}
+      finally {if(previewBody)bodyDefs[c.ids.body]=previewBody;else delete bodyDefs[c.ids.body];if(previewProp)propDefs[c.ids.propulsion]=previewProp;else delete propDefs[c.ids.propulsion];if(previewWeapon)weaponDefs[c.ids.weapon]=previewWeapon;else delete weaponDefs[c.ids.weapon];}
+      if (!parts?.length) throw new Error('No model parts found for this design.');
+      const model=await buildDroidGroup(parts);updateDroidAnimations(model,0);return model;
+    },
+    disposeModel: model => {
+      model.traverse(child => {
+        const materials=Array.isArray(child.material)?child.material:[child.material];
+        materials.forEach(material => { if (material?.userData?.teamColorMask) disposeUnsharedTexture(material.userData.teamColorMask); });
+      });
+      disposeObject3D(model);
+    }
+  }),
+  onSave: async design => {
+    const placed = getLocalSaveEntriesFromJson(buildDroidJson(),'droids');
+    await applyUnitDesigns([...currentUnitDesigns.filter(d=>d.id!==design.id),design]);
+    if (placed.some(d=>d.body==='MMU_'+design.id+'_Body')) await loadDroidEntries(placed);
+    markMapDirty();
+  },
+  onUse: async id => {
+    setActiveTab('droids'); setDroidMode('build');
+    const select=document.getElementById('droidTemplateSelect'); select.value='MMU_'+id;
+    setDroidDesignerParts(getDroidTemplateById(select.value)); updateDroidPreview();
+    setFileStatus('Custom unit selected. Click the map to place it.');
+  },
+  onDelete: async id => {
+    const placed=getLocalSaveEntriesFromJson(buildDroidJson(),'droids');
+    if (placed.some(d=>d.body==='MMU_'+id+'_Body')) throw new Error('Remove this design’s units from the map before deleting it.');
+    await applyUnitDesigns(currentUnitDesigns.filter(d=>d.id!==id)); markMapDirty();
+  }
+});
 
 mapScriptEditor = mountScriptEditor(document.getElementById('scriptPanel'), {
   onChange: updateMapScriptDraft,

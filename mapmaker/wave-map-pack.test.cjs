@@ -21,7 +21,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
  const sanitized=await buildWaveMapPack(map,'../map\\bad');assert(!Object.keys(sanitized.files).some(p=>p.includes('..')||p.includes('\\')));
  await assert.rejects(()=>buildWaveMapPack(new Zip(),'plain'),/Enable a wave script/);
  const game=fs.readFileSync(__dirname+'/js/game.js','utf8'),start=game.indexOf('async function buildWzFileBlob('),rest=game.slice(start),end=rest.search(/\n(?:async )?function /);
- const context=vm.createContext({currentMapArchive:map,currentMapExportInfo:{gamma:false},currentMapArchivePath:'game.map',currentMapScript:script,
+ const context=vm.createContext({currentMapArchive:map,currentMapExportInfo:{gamma:false},currentMapArchivePath:'game.map',currentMapScript:script,currentUnitDesigns:[],
  getSafeMapBase:()=> 'Wave map',getSaveMapVersion:()=> '1.2',writeMapScriptSource,writeMapVersion:(zip,version)=>zip.file('mapmaker-version.json',JSON.stringify({version})),
  updateStructJson(){},updateFeatureJson(){},updateDroidJson(){},buildMapFileBytes:()=>new Uint8Array([1,2,3]),getTileTypesArchivePath:()=> 'ttypes.ttp',buildTileTypesFileBytes:()=>new Uint8Array([4]),buildWaveMapPack});
  vm.runInContext(rest.slice(0,end),context);

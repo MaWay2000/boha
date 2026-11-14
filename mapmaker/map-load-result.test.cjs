@@ -43,7 +43,7 @@ const vm = require('node:vm');
   }
   function harness(bytes, filename) {
     const timers = [], events = {loaded:0,license:0,draws:0,structures:0,features:0,overlay:''};
-    const ctx = vm.createContext({
+    const ctx = vm.createContext({currentUnitDesigns:[],unwrapUnitMapPack:async zip=>zip,
       JSZip,File,Uint8Array,DataView,console:{log(){},error(){}},window:{},
       document:{body:element(),getElementById:()=>null},
       loadingOverlay:element(true),loadingDetail:element(),loadingBarInner:element(),loadingPercent:element(),

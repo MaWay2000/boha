@@ -7,7 +7,8 @@ let credits = null;
 const rulesetNames = new Map();
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'beta';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
-let limit = 25;
+const MATCH_PAGE_SIZE = 10;
+let limit = MATCH_PAGE_SIZE;
 
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
@@ -32,7 +33,7 @@ function syncSelection() {
 
 function selectPlayer(id) {
   selectedPlayer = selectedPlayer === id ? null : id;
-  limit = 25;
+  limit = MATCH_PAGE_SIZE;
   syncSelection();
   render();
   if (!selectedPlayer) return;
@@ -355,21 +356,21 @@ async function load() {
 $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;
   selectedPlayer = null;
-  limit = 25;
+  limit = MATCH_PAGE_SIZE;
   syncSelection();
   render();
 });
 $('waveArchive').addEventListener('click', () => {
   selected = selected === 'beta' ? 'all' : 'beta';
   selectedPlayer = null;
-  limit = 25;
+  limit = MATCH_PAGE_SIZE;
   renderOptions();
   syncSelection();
   render();
 });
 $('waveClearPlayer').addEventListener('click', () => selectPlayer(null));
 $('wavePlayerSearch').addEventListener('input', render);
-$('waveMore').addEventListener('click', () => { limit += 25; render(); });
+$('waveMore').addEventListener('click', () => { limit += MATCH_PAGE_SIZE; render(); });
 
 load();
 setInterval(() => { if (!document.hidden) load(); }, 30000);

@@ -1,4 +1,4 @@
-import {combineRulesets} from './wavehoster-data.mjs?v=20261115-beta-1';
+import {combineRulesets} from './wavehoster-data.mjs?v=20261116-results-1';
 
 export function isBetaGroup(group, policy) {
   return group.version === policy.gameVersion && group.mods.length === 1 && group.mods[0] === policy.modHash;
@@ -43,3 +43,4 @@ export function collectTesters(snapshot, policy, previous = {format: 1, testers:
   return {format: 1, testers: [...testers.values()].map(tester => ({...tester, replays: [...tester.replays].sort()}))
     .sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)};
 }
+

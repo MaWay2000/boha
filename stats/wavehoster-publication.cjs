@@ -21,7 +21,7 @@ function sanitizeWaveHoster(input) {
   result.groups = list(input.groups).map(group => ({...scalars(group, 'id version label matches confirmed'), mods: strings(group.mods),
     players: list(group.players).map(player => ({...scalars(player, 'id name identityVerified games wins losses draws bestScore kills'),
       names: list(player.names || []).map(alias => scalars(alias, 'name games')), publicKeys: strings(player.publicKeys || [])}))}));
-  result.games = list(input.games).map(game => ({...scalars(game, 'id matchId replaySha256 group map startedAt durationMilliseconds status modsVerified departureCheckedAt'),
+  result.games = list(input.games).map(game => ({...scalars(game, 'id matchId replaySha256 group map startedAt durationMilliseconds status modsVerified departureCheckedAt waveReached waveEndedAtMilliseconds waveOutcome waveEndReason'),
     players: strings(game.players), participants: list(game.participants || []).map(player => scalars(player, 'id name result score kills resultReason leftAtMilliseconds'))}));
   assertNoPrivateFields(result);
   return result;
@@ -72,3 +72,4 @@ if (require.main === module) {
   action.then(changed => console.log(changed ? 'Published public Arc Mod snapshot.' : 'Arc Mod snapshot unchanged.'))
     .catch(error => { console.error(error.message); process.exitCode = 1; });
 }
+

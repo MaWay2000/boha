@@ -107,7 +107,7 @@
 .wave-profile-metrics strong { color: #d2f4ff; font: 700 15px "Oxanium", sans-serif; overflow-wrap: anywhere; }
 .wave-result-winner { color: #9bdfbd; }
 .wave-result-loser { color: #f09787; }
-.wave-match-result { display: block; }
+.wave-match-result { display: block; white-space: normal; line-height: 1.45; }
 .wave-score { color: #d9f3ff; font-weight: 700 !important; }
 .wave-wins { color: #a7dbc3; }
 .wave-matches-table td:nth-child(2) { color: #80d8ed; }
@@ -166,3 +166,4 @@
   .wave-panel-head { align-items: flex-start; }
   .wave-panel-head > span { max-width: 110px; text-align: right; line-height: 1.5; }
 }
+

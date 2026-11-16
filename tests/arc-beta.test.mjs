@@ -49,8 +49,8 @@ test('a recorded human departure produces a defeat without fabricating scores or
   assert.deepEqual([facts[0].result, facts[0].resultReason, facts[0].leftAtMilliseconds, facts[0].score, facts[0].kills], ['loser', 'departure', 300000, null, null]);
   const departed = {...game(), participants: facts};
   assert.equal(departed.status, 'unknown');
-  assert.deepEqual(matchResults(departed), [{label: 'Lost', result: 'loser'}]);
-  assert.deepEqual(matchResults({...departed, players: ['Tester', 'Still playing']}).map(result => result.label), ['Tester: Lost', 'Still playing: Unknown']);
+  assert.deepEqual(matchResults(departed), [{label: 'Left game (loss)', result: 'loser'}]);
+  assert.deepEqual(matchResults({...departed, players: ['Tester', 'Still playing']}).map(result => result.label), ['Tester: Left game (loss)', 'Still playing: Result unavailable']);
 });
 
 test('departure evidence must match the replay and verified mods, exclude spectators/bots, and have valid timing', () => {

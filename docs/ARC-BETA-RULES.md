@@ -4,13 +4,17 @@ These rules preserve the decision to show the newest Arc release as **Beta**, ke
 
 ## Active release
 
-- The main Arc Mod board shows one release: **Beta (Arc-Mw Mod v152, Warzone 4.7.0)**.
-- Its exact mod SHA-256 is `3804e31196ec71f0c85c721d1d6fcde194116e4aa0d6fe7babd8d29f7b77f0f8`.
+- The main Arc Mod board shows one release: **Beta (Arc-Mw Mod v154, Warzone 4.7.0)**.
+- Its exact mod SHA-256 is `ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a`. Releases v152 and v153 remain archived.
 - `stats/arc-beta.json` controls the active release. Match the game version and the complete mod pack; a map name alone is insufficient.
 - A later replay of an older or unrelated mod does not promote that mod to Beta.
 - To promote a release, move the previous hash into `archiveModHashes`, set the new version and hash, and update this document. Do not reset the tester archive.
 
 ## Results and rankings
+
+- Match rows may additionally show the host-recorded scripted ending and wave reached. The local collector matches one log to one exact replay SHA-256, verifies the archived pack, and excludes ambiguous logs, unsupported rosters and impossible endings. Publication also requires engine-verified mods, matching version, a non-cheated replay and an ending within its duration.
+- Labels distinguish **Defeated**, **Left game (loss)** and **Victory**, with **Wave N/60**. An unresolved result is **Result unavailable** (or **Awaiting analysis**), never a guessed defeat. Host labels do not certify engine scores or kills and do not change ranking eligibility.
+- These four scalar host fields survive publication and history refreshes; raw logs, chat, local paths and network payloads stay private. The collector refreshes automatically whenever the local match publication runs.
 
 - A human player who leaves before a verified final result receives a **defeat** when the recorded replay contains that player's departure event or an engine departure timestamp.
 - The timestamp must be positive and within the replay duration. The roster position must identify a human participant, excluding spectators and bots.

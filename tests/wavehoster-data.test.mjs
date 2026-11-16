@@ -8,9 +8,9 @@ test('recent match results distinguish co-op outcomes, opposing players and unco
   assert.deepEqual(matchResults({status: 'confirmed', participants: [player('A', 'winner'), player('B', 'loser')]}).map(row => row.label), ['A: Win', 'B: Lost']);
   assert.equal(matchResults({status: 'confirmed', participants: [player('A', 'contender')]})[0].label, 'Draw');
   for (const status of ['pending', 'unknown', 'incomplete', 'unverified', 'error']) {
-    assert.equal(matchResults({status, participants: [player('A', 'winner')]})[0].label, 'Unknown');
+    assert.equal(matchResults({status, participants: [player('A', 'winner')]})[0].label, status === 'pending' ? 'Awaiting analysis' : 'Result unavailable');
   }
-  assert.equal(matchResults({status: 'confirmed', participants: []})[0].label, 'Unknown');
+  assert.equal(matchResults({status: 'confirmed', participants: []})[0].label, 'Result unavailable');
 });
 
 test('ALL combines the same identity across rulesets without merging equal nicknames', () => {

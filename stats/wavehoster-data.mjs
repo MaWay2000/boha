@@ -40,17 +40,38 @@ export function participantResult(game, player) {
 }
 
 export function matchResults(game) {
+  const wave = waveResult(game);
+  if (wave) return [wave];
   const labels = {winner: 'Win', loser: 'Lost', contender: 'Draw'};
   const players = (game.participants || []).filter(player => participantResult(game, player) !== 'unknown');
-  if (!players.length) return [{label: 'Unknown', result: 'unknown'}];
-  const results = players.map(player => ({name: player.name, result: participantResult(game, player), label: labels[participantResult(game, player)]}));
+  if (!players.length) return [{label: game.status === 'pending' ? 'Awaiting analysis' : 'Result unavailable', result: 'unknown',
+    title: game.modsVerified !== true ? 'The exact mod has not been verified.' : 'No verified final result or matched host ending is available.'}];
+  const results = players.map(player => ({name: player.name, result: participantResult(game, player),
+    label: player.resultReason === 'departure' ? 'Left game (loss)' : labels[participantResult(game, player)]}));
   if (game.status !== 'confirmed') for (const name of game.players || []) {
-    if (!players.some(player => player.name === name)) results.push({name, result: 'unknown', label: 'Unknown'});
+    if (!players.some(player => player.name === name)) results.push({name, result: 'unknown', label: 'Result unavailable'});
   }
   if (results.every(player => player.result === results[0].result)) {
     return [{label: results[0].label, result: results[0].result}];
   }
   return results.map(player => ({...player, label: `${player.name}: ${player.label}`}));
+}
+
+export function waveResult(game) {
+  if (game.modsVerified !== true || !Number.isFinite(game.durationMilliseconds) || !Number.isInteger(game.waveReached) || game.waveReached < 0 || game.waveReached > 60 ||
+      !Number.isFinite(game.waveEndedAtMilliseconds) || game.waveEndedAtMilliseconds <= 0 ||
+      game.waveEndedAtMilliseconds > game.durationMilliseconds ||
+      !['victory', 'defeat'].includes(game.waveOutcome) ||
+      !['wave-clear', 'departure', 'scripted-defeat'].includes(game.waveEndReason) ||
+      (game.waveOutcome === 'victory' && (game.waveReached !== 60 || game.waveEndReason !== 'wave-clear')) ||
+      (game.waveOutcome === 'defeat' && game.waveEndReason === 'wave-clear')) return null;
+  const result = game.waveOutcome === 'victory' ? 'winner' : 'loser';
+  if (game.status === 'confirmed' && (game.participants || []).some(player =>
+      ['winner', 'loser', 'contender'].includes(player.result) && player.result !== result)) return null;
+  const label = game.waveOutcome === 'victory' ? 'Victory' : game.waveEndReason === 'departure' ? 'Left game (loss)' : 'Defeated';
+  return {label: `${label} · Wave ${game.waveReached}/60`, result,
+    title: game.waveEndReason === 'departure' ? 'A player departure was recorded before the scripted ending. Leaving counts as a loss.' :
+      'Ending and wave reached recorded by the host and matched to this exact replay. This does not certify scores or kills.'};
 }
 
 export function replaySource(game) {
@@ -61,3 +82,4 @@ export function replaySource(game) {
     : /^\d{8}_\d{6}_\d+$/.test(id) ? 'https://api.wavehoster.net/v1/replays/' + id : null;
   return replayUrl ? {replayUrl, sourceLabel: 'WaveHoster', sourceUrl: 'https://api.wavehoster.net/v1/replays'} : null;
 }
+

@@ -1,4 +1,4 @@
-import {combineRulesets, replaySource, matchResults, participantResult} from './wavehoster-data.mjs?v=20261115-beta-1';
+import {combineRulesets, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261116-results-1';
 import {betaSnapshot, betaRanking} from './arc-beta.mjs?v=20261115-beta-1';
 
 let data = null;
@@ -251,7 +251,7 @@ function render() {
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
     if (participant) {
       const outcome = participantResult(game, participant);
-      const result = ({winner: 'Win', loser: 'Lost', contender: 'Draw'})[outcome] || 'Unknown';
+      const result = waveResult(game)?.label || (participant.resultReason === 'departure' ? 'Left game (loss)' : ({winner: 'Win', loser: 'Lost', contender: 'Draw'})[outcome]) || 'Result unavailable';
       cell(row, result, 'wave-result-' + outcome);
       cell(row, participant.score === null ? '—' : number(participant.score));
     } else cell(row, game.players.join(', ') || 'No human player recorded');
@@ -263,6 +263,7 @@ function render() {
       for (const result of matchResults(game)) {
         const label = document.createElement('span');
         label.className = 'wave-match-result wave-result-' + result.result;
+        if (result.title) label.title = result.title;
         label.textContent = result.label;
         results.append(label);
       }
@@ -372,3 +373,4 @@ $('waveMore').addEventListener('click', () => { limit += MATCH_PAGE_SIZE; render
 
 load();
 setInterval(() => { if (!document.hidden) load(); }, 30000);
+

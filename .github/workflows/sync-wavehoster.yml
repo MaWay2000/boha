@@ -27,7 +27,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: node --test stats/wavehoster-publication.test.cjs tests/wavehoster-data.test.mjs tests/arc-beta.test.mjs
+      - run: node --test stats/wavehoster-publication.test.cjs stats/wavehoster-results.test.mjs tests/wavehoster-data.test.mjs tests/arc-beta.test.mjs
       - name: Download privacy-filtered Arc Mod results
         run: node stats/wavehoster-publication.cjs
       - name: Check public release

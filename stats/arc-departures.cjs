@@ -116,6 +116,11 @@ function mergeHistory(previous, next) {
     oldGames.delete(game.replaySha256 || game.id);
     if (!old) return game;
     if (old.status === 'confirmed' && game.status !== 'confirmed') return old;
+    // Keep matched host evidence if an upstream export temporarily omits it.
+    if (old.modsVerified === true && game.modsVerified === true && old.group === game.group &&
+        old.durationMilliseconds === game.durationMilliseconds && old.waveOutcome && !game.waveOutcome) {
+      for (const key of ['waveReached', 'waveEndedAtMilliseconds', 'waveOutcome', 'waveEndReason']) game[key] = old[key];
+    }
     if (game.status !== 'confirmed' && old.departureCheckedAt && old.modsVerified === game.modsVerified) {
       return {...game, departureCheckedAt: old.departureCheckedAt,
         participants: [...game.participants, ...old.participants.filter(player => player.resultReason === 'departure' &&
@@ -137,3 +142,4 @@ function mergeHistory(previous, next) {
 }
 
 module.exports = {departureFacts, applyDepartures, rebuildArcRankings, mergeHistory};
+

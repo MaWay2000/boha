@@ -314,11 +314,9 @@ function renderOptions() {
     element.textContent = text;
     $('waveRuleset').append(element);
   }
-  if (selected === 'beta') option('beta', 'Beta');
-  else {
-    option('all', 'All replay history');
-    for (const group of data.groups) option(group.id, rulesetLabel(group));
-  }
+  option('beta', 'Beta');
+  option('all', 'All replay history');
+  for (const group of data.groups) option(group.id, rulesetLabel(group));
   $('waveRuleset').value = selected;
 }
 

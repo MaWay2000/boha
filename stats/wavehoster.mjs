@@ -5,7 +5,7 @@ let data = null;
 let policy = null;
 let credits = null;
 const rulesetNames = new Map();
-let selected = new URLSearchParams(window.location.search).get('ruleset') || 'beta';
+let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
 const MATCH_PAGE_SIZE = 10;
 let limit = MATCH_PAGE_SIZE;
@@ -315,8 +315,8 @@ function renderOptions() {
     element.textContent = text;
     $('waveRuleset').append(element);
   }
+  option('all', 'ALL');
   option('beta', 'Beta');
-  option('all', 'All replay history');
   for (const group of data.groups) option(group.id, rulesetLabel(group));
   $('waveRuleset').value = selected;
 }
@@ -342,7 +342,7 @@ async function load() {
       const map = Object.entries(common).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
       rulesetNames.set(group.id, `${group.mods.length ? map : 'Unmodded'} · ${group.version} · ${group.id.slice(0, 6)}`);
     });
-    selected = previous === 'beta' || previous === 'all' || data.groups.some(group => group.id === previous) ? previous : 'beta';
+    selected = previous === 'beta' || previous === 'all' || data.groups.some(group => group.id === previous) ? previous : 'all';
     renderOptions();
     $('waveError').textContent = '';
     render();

@@ -2,6 +2,17 @@
   "schemaVersion": 1,
   "entries": [
     {
+      "id": "2026-11-17-live-leaderboards-matches",
+      "date": "2026-11-17",
+      "category": "Leaderboards",
+      "title": "Live leaderboards and recent matches",
+      "text": "Main leaderboards, Recent Matches and Arc Mod now check for fresh results every 30 seconds directly from our hosting. Results appear after replay analysis and publication finish, without waiting for a GitHub deployment. Existing rating rules, verified outcomes and player identities are preserved. If live hosting is unavailable, the site automatically shows saved GitHub results. Unchanged data is reused to keep refreshes lighter.",
+      "link": {
+        "label": "Open live leaderboards",
+        "href": "index.html?tab=leaderboards"
+      }
+    },
+    {
       "id": "2026-11-14-low-fps-previews",
       "date": "2026-11-14",
       "category": "Performance",

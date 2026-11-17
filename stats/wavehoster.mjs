@@ -1,9 +1,9 @@
-import {combineRulesets, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261116-results-1';
+import {combineRulesets, combineModNames, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261117-mod-groups-1';
 import {betaSnapshot, betaRanking} from './arc-beta.mjs?v=20261115-beta-1';
 
 let data = null;
+let modData = null;
 let policy = null;
-const rulesetNames = new Map();
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
 const MATCH_PAGE_SIZE = 10;
@@ -11,7 +11,7 @@ let limit = MATCH_PAGE_SIZE;
 
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
-const rulesetLabel = group => rulesetNames.get(group.id) || 'Custom mod';
+const rulesetLabel = group => group.name || 'Custom mod';
 
 function profileUrl(playerId) {
   const url = new URL('index.html', window.location.href);
@@ -137,19 +137,19 @@ function render() {
   if (!data) return;
   const beta = selected === 'beta';
   const all = selected === 'all';
-  const scope = beta ? betaSnapshot(data, policy) : data;
-  const group = beta ? betaRanking(data, policy) : all ? combineRulesets(data) : data.groups.find(item => item.id === selected);
+  const scope = beta ? betaSnapshot(data, policy) : modData;
+  const group = beta ? betaRanking(data, policy) : all ? combineRulesets(data) : scope.groups.find(item => item.id === selected);
   if (!group) return;
   selected = group.id;
   const profile = group.players.find(player => player.id === selectedPlayer);
   if (!profile) selectedPlayer = null;
   $('waveRuleset').value = selected;
   $('waveTotal').textContent = number(scope.games.filter(game => beta || all || game.group === selected).length);
-  $('waveGroups').textContent = number(beta ? scope.groups.length : data.groups.length);
+  $('waveGroups').textContent = number(scope.groups.length);
   $('waveConfirmed').textContent = number(group.confirmed);
   $('waveWaiting').textContent = number(scope.games.filter(game => (beta || all || game.group === selected) && game.status === 'pending').length);
   $('waveRuleSummary').textContent = all
-    ? `All ${number(data.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
+    ? `All ${number(modData.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
     : `${beta ? 'Beta · ' + policy.version : rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
   $('waveRankingNote').textContent = all
     ? 'Archived totals across all mods. Verified results and recorded departures count; only verified final results add scores.'
@@ -242,7 +242,7 @@ function render() {
     cell(row, game.startedAt ? new Date(game.startedAt).toLocaleString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'Unknown date');
     cell(row, game.map);
     if (all) {
-      const ruleset = data.groups.find(group => group.id === game.group);
+      const ruleset = scope.groups.find(group => group.id === game.group);
       cell(row, ruleset ? rulesetLabel(ruleset) : 'Unknown', 'wave-mod-cell');
     }
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
@@ -303,7 +303,7 @@ function renderOptions() {
   }
   option('all', 'ALL');
   option('beta', 'Beta');
-  for (const group of data.groups) option(group.id, rulesetLabel(group));
+  for (const group of modData.groups) option(group.id, rulesetLabel(group));
   $('waveRuleset').value = selected;
 }
 
@@ -318,16 +318,9 @@ async function load() {
     data = next;
     policy = nextPolicy;
     const previous = selected;
-    rulesetNames.clear();
-    data.groups.forEach(group => {
-      const common = data.games.filter(game => game.group === group.id).reduce((counts, game) => {
-        counts[game.map] = (counts[game.map] || 0) + 1;
-        return counts;
-      }, {});
-      const map = Object.entries(common).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
-      rulesetNames.set(group.id, group.mods.length ? map : 'Unmodded');
-    });
-    selected = previous === 'beta' || previous === 'all' || data.groups.some(group => group.id === previous) ? previous : 'all';
+    modData = combineModNames(data);
+    selected = previous === 'beta' || previous === 'all' ? previous
+      : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
     renderOptions();
     $('waveError').textContent = '';
     render();

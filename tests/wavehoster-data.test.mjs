@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {combineRulesets, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+import {combineRulesets, combineModNames, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
 
 test('recent match results distinguish co-op outcomes, opposing players and unconfirmed results', () => {
   const player = (name, result) => ({name, result});
@@ -49,4 +49,39 @@ test('Analyze uses the archived replay and older snapshots retain a safe WaveHos
   assert.equal(replaySource({id: '20261109_083951_7715'}).replayUrl, 'https://api.wavehoster.net/v1/replays/20261109_083951_7715');
   assert.equal(replaySource({id: '../private', replaySha256: 'https://other.invalid/'}), null);
   assert.equal(replaySource({id: 'https://other.invalid/'}), null);
+});
+
+
+test('one mod entry combines versions and hashes, preserves identities and includes every matching replay', () => {
+  const player = {id: 'one', name: 'Tester', identityVerified: true, games: 1, wins: 1, losses: 0, draws: 0,
+    bestScore: 50, kills: 5, names: [{name: 'Tester', games: 1}], publicKeys: ['key']};
+  const snapshot = {groups: [
+    {id: 'old-hash', version: '4.6.3', mods: ['old'], players: [player]},
+    {id: 'tower-hash', version: '4.7.0', mods: ['tower'], players: [{...player, id: 'other'}]},
+    {id: 'new-hash', version: '4.7.0', mods: ['new'], players: [{...player, bestScore: 80}]},
+    {id: 'stock-old', version: '4.6.3', mods: [], players: []},
+    {id: 'stock-new', version: '4.7.0', mods: [], players: []}
+  ], games: [
+    {id: '1', group: 'new-hash', map: 'Wave-Defense', status: 'confirmed'},
+    {id: '2', group: 'old-hash', map: 'Wave-Defense', status: 'confirmed'},
+    {id: '3', group: 'new-hash', map: 'Wave-Defense', status: 'pending'},
+    {id: '4', group: 'tower-hash', map: 'TowerDefense3_v', status: 'confirmed'},
+    {id: '5', group: 'stock-old', map: 'Map A', status: 'unknown'},
+    {id: '6', group: 'stock-new', map: 'Map B', status: 'unknown'}
+  ]};
+  const original = structuredClone(snapshot);
+  const view = combineModNames(snapshot);
+  assert.deepEqual(view.groups.map(group => group.name), ['Wave-Defense', 'TowerDefense3_v', 'Unmodded']);
+  const wave = view.groups.find(group => group.name === 'Wave-Defense');
+  assert.deepEqual(wave.groupIds, ['old-hash', 'new-hash']);
+  assert.deepEqual([wave.matches, wave.confirmed], [3, 2]);
+  assert.deepEqual(view.games.filter(game => game.group === wave.id).map(game => game.id), ['1', '2', '3']);
+  assert.deepEqual(wave.players.map(player => player.id), ['one']);
+  assert.deepEqual([wave.players[0].games, wave.players[0].wins, wave.players[0].bestScore, wave.players[0].kills], [2, 2, 80, 10]);
+  assert.deepEqual(wave.players[0].publicKeys, ['key']);
+  assert.deepEqual(view.games.map(game => game.id), snapshot.games.map(game => game.id));
+  assert.deepEqual(combineRulesets(view), combineRulesets(snapshot));
+  assert.deepEqual(snapshot, original);
+  const reordered = combineModNames({...snapshot, groups: [...snapshot.groups].reverse()});
+  assert.equal(reordered.groups.find(group => group.name === wave.name).id, wave.id);
 });

@@ -83,3 +83,31 @@ export function replaySource(game) {
   return replayUrl ? {replayUrl, sourceLabel: 'WaveHoster', sourceUrl: 'https://api.wavehoster.net/v1/replays'} : null;
 }
 
+
+// Combine the public view by displayed mod name; keep the recorded snapshot intact.
+export function combineModNames(snapshot) {
+  const gamesByGroup = new Map();
+  for (const game of snapshot.games) {
+    if (!gamesByGroup.has(game.group)) gamesByGroup.set(game.group, []);
+    gamesByGroup.get(game.group).push(game);
+  }
+  const families = new Map();
+  const ids = new Map();
+  for (const group of snapshot.groups) {
+    const games = gamesByGroup.get(group.id) || [];
+    const maps = new Map();
+    for (const game of games) maps.set(game.map, (maps.get(game.map) || 0) + 1);
+    const map = [...maps].sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
+    const name = group.mods.length ? map : 'Unmodded';
+    if (!families.has(name)) families.set(name, {name, groups: [], games: []});
+    const family = families.get(name);
+    family.groups.push(group);
+    family.games.push(...games);
+    ids.set(group.id, 'mod:' + name);
+  }
+  const groups = [...families.values()].map(family => ({
+    ...combineRulesets(family), id: 'mod:' + family.name, name: family.name,
+    groupIds: family.groups.map(group => group.id)
+  }));
+  return {...snapshot, groups, games: snapshot.games.map(game => ({...game, group: ids.get(game.group) || game.group}))};
+}

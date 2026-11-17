@@ -4,8 +4,8 @@ These rules preserve the decision to show the newest Arc release as **Beta**, ke
 
 ## Active release
 
-- The main Arc Mod board shows one release: **Beta (Arc-Mw Mod v154, Warzone 4.7.0)**.
-- Its exact mod SHA-256 is `ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a`. Releases v152 and v153 remain archived.
+- The main Arc Mod board shows one release: **Beta (Arc-Mw Mod v155, Warzone 4.7.0)**.
+- Its exact mod SHA-256 is `e4568ef645926c5079bf3a1dd78d55cde55fd78918161a586eab5d6322ce1c70`. Releases v152, v153 and v154 remain archived.
 - `stats/arc-beta.json` controls the active release. Match the game version and the complete mod pack; a map name alone is insufficient.
 - A later replay of an older or unrelated mod does not promote that mod to Beta.
 - To promote a release, move the previous hash into `archiveModHashes`, set the new version and hash, and update this document. Do not reset the tester archive.

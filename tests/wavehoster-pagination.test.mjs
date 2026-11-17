@@ -1,0 +1,142 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import * as dataFunctions from '../stats/wavehoster-data.mjs';
+import * as betaFunctions from '../stats/arc-beta.mjs';
+
+// Exercise the actual page module and event handlers with deterministic row geometry.
+async function page(width = 1400) {
+  const frames = [];
+  const elements = new Map();
+  const listeners = new Map();
+  class Element {
+    children = [];
+    hidden = false;
+    value = '';
+    style = {};
+    dataset = {};
+    events = new Map();
+    classList = {toggle() {}, add() {}};
+    constructor(id = '') { this.id = id; }
+    append(...children) {
+      for (const child of children) { child.parent = this; this.children.push(child); }
+    }
+    replaceChildren(...children) { this.children = []; this.append(...children); }
+    setAttribute(name, value) { this[name] = value; }
+    addEventListener(type, handler) { this.events.set(type, handler); }
+    fire(type) { this.events.get(type)?.({button: 0, preventDefault() {}}); }
+    get clientTop() { return 1; }
+    get offsetHeight() { return this.getBoundingClientRect().height; }
+    get clientHeight() { return this.offsetHeight - 2; }
+    getBoundingClientRect() {
+      if (this.id === 'wavePlayersWrap') {
+        return {top: 0, height: 42 + elements.get('wavePlayers').children.length * 40};
+      }
+      if (this.id === 'waveMatchesWrap') {
+        const count = elements.get('waveMatches').children.filter(row => !row.hidden).length;
+        return {top: 0, height: Math.max(42 + count * 60, parseFloat(this.style.minHeight) || 0)};
+      }
+      if (this.parent?.id === 'waveMatches') {
+        return {bottom: 41 + (this.parent.children.indexOf(this) + 1) * 60};
+      }
+      return {top: 0, height: 0};
+    }
+  }
+  const html = readFileSync(new URL('../wavehoster.html', import.meta.url), 'utf8');
+  for (const [, id] of html.matchAll(/id="([^"]+)"/g)) elements.set(id, new Element(id));
+  const policy = JSON.parse(readFileSync(new URL('../stats/arc-beta.json', import.meta.url)));
+  const players = Array.from({length: 150}, (_, i) => ({id: `p${i}`, name: `Player ${i}`,
+    identityVerified: true, games: 1, wins: 1, losses: 0, draws: 0, bestScore: 150 - i, kills: 1}));
+  const snapshot = {format: 1, generatedAt: '2026-11-17T00:00:00Z', groups: [{id: 'recorded-group',
+    version: policy.gameVersion, mods: [policy.modHash], players}], games: Array.from({length: 260}, (_, i) => ({
+    id: `game${i}`, group: 'recorded-group', map: 'Wave-Defense', status: 'confirmed',
+    startedAt: new Date(Date.UTC(2026, 10, 17, 0, i)).toISOString(), durationMilliseconds: 600000, players: ['Player 0'],
+    participants: [{id: 'p0', name: 'Player 0', result: 'winner', score: 1, kills: 1}]
+  }))};
+  const window = {innerWidth: width, scrollY: 0, location: {href: 'https://example.test/wavehoster.html',
+    search: '', origin: 'https://example.test'}, history: {replaceState() {}}, scrollTo() {},
+    matchMedia: () => ({matches: window.innerWidth >= 1121}),
+    addEventListener: (type, handler) => listeners.set(type, handler)};
+  window.parent = window;
+  const context = vm.createContext({...dataFunctions, ...betaFunctions, window, URL, URLSearchParams,
+    document: {hidden: false, getElementById: id => {
+      assert.ok(elements.has(id), `Missing HTML element ${id}`);
+      return elements.get(id);
+    }, createElement: () => new Element()},
+    requestAnimationFrame: handler => { frames.push(handler); return frames.length; }, setInterval() {},
+    fetch: async path => ({ok: true, json: async () => path.startsWith('stats/arc-beta.json') ? policy : snapshot})});
+  const source = readFileSync(new URL('../stats/wavehoster.mjs', import.meta.url), 'utf8')
+    .replace(/^import .*\r?\n/gm, '').replace(/\nload\(\);/, '\nglobalThis.ready = load();');
+  vm.runInContext(source, context);
+  await context.ready;
+  function flush() {
+    for (let count = 0; frames.length; count++) {
+      assert.ok(count < 10, 'Layout must settle');
+      frames.shift()();
+    }
+  }
+  const get = id => elements.get(id);
+  const games = () => get('waveMatches').children.filter(row => !row.hidden);
+  flush();
+  return {get, games, flush, resize(value) {window.innerWidth = value; listeners.get('resize')(); flush();},
+    async refresh() {await context.load(); flush();}};
+}
+
+test('100 players and fitted whole game rows have independent, gap-free Show more controls', async () => {
+  const ui = await page();
+  assert.equal(ui.get('waveError').textContent, '');
+  assert.equal(ui.get('wavePlayers').children.length, 100);
+  assert.equal(ui.games().length, 66);
+  assert.equal(ui.get('waveMatchesWrap').style.minHeight, '4042px');
+  assert.equal(ui.get('wavePlayersMore').hidden, false);
+  assert.equal(ui.get('waveMore').hidden, false);
+  const nextDate = ui.get('waveMatches').children[66].children[0].textContent;
+  ui.get('waveMore').fire('click'); ui.flush();
+  assert.equal(ui.games().length, 166);
+  assert.equal(ui.games()[66].children[0].textContent, nextDate);
+  assert.equal(new Set(ui.games().map(row => row.children[0].textContent)).size, 166);
+  assert.equal(ui.get('wavePlayers').children.length, 100);
+  ui.get('wavePlayersMore').fire('click'); ui.flush();
+  assert.equal(ui.get('wavePlayers').children.length, 150);
+  assert.equal(ui.get('wavePlayersMore').hidden, true);
+  assert.equal(ui.games().length, 166);
+  ui.get('waveMore').fire('click'); ui.flush();
+  assert.equal(ui.games().length, 260);
+  assert.equal(ui.get('waveMore').hidden, true);
+  await ui.refresh();
+  assert.equal(ui.games().length, 260);
+  assert.equal(ui.get('wavePlayers').children.length, 150);
+});
+
+test('expanding players extends automatic game fitting and preserves a full boundary row', async () => {
+  const ui = await page();
+  ui.get('wavePlayersMore').fire('click'); ui.flush();
+  assert.equal(ui.get('wavePlayers').children.length, 150);
+  assert.equal(ui.games().length, 100);
+  assert.equal(ui.get('waveMatchesWrap').style.minHeight, '6042px');
+  assert.equal(ui.games().at(-1).getBoundingClientRect().bottom, 6041);
+  assert.equal(ui.get('waveMore').hidden, false);
+});
+
+test('filter resets, profile history and narrow layouts retain usable pagination', async () => {
+  const ui = await page(800);
+  assert.equal(ui.games().length, 100);
+  ui.resize(1400);
+  assert.equal(ui.games().length, 66);
+  ui.resize(800);
+  assert.equal(ui.games().length, 100);
+  ui.get('wavePlayers').children[0].children[1].fire('click'); ui.flush();
+  assert.equal(ui.get('waveProfile').hidden, false);
+  assert.equal(ui.games().length, 100);
+  ui.get('waveMore').fire('click'); ui.flush();
+  assert.equal(ui.games().length, 200);
+  ui.get('waveRuleset').value = 'mod:Wave-Defense';
+  ui.get('waveRuleset').fire('change'); ui.flush();
+  assert.equal(ui.get('waveProfile').hidden, true);
+  assert.equal(ui.games().length, 100);
+  ui.get('wavePlayerSearch').value = 'Player 149';
+  ui.get('wavePlayerSearch').fire('input'); ui.flush();
+  assert.equal(ui.get('wavePlayers').children.length, 1);
+  assert.equal(ui.get('wavePlayersMore').hidden, true);
+});

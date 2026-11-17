@@ -125,6 +125,7 @@
 .wave-footnote { margin: 12px 2px 0; color: #7895a6; font-size: 10px; line-height: 1.7; }
 .wave-more { align-self: center; margin: 15px 0; }
 .wave-more[hidden] { display: none; }
+#waveMatches > tr[hidden] { display: none; }
 .wave-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-top: 18px; color: #6f8c9d; font-size: 10px; line-height: 1.6; }
 .wave-footer [role="status"] { color: #efba7c; }
 .wave-controls :focus-visible { outline: 2px solid #8be8fa; outline-offset: 3px; }

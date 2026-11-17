@@ -6,8 +6,13 @@ let modData = null;
 let policy = null;
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
-const MATCH_PAGE_SIZE = 10;
-let limit = MATCH_PAGE_SIZE;
+const PAGE_SIZE = 100;
+let playerLimit = PAGE_SIZE;
+let matchLimit = PAGE_SIZE;
+let fitMatches = true;
+let visibleMatches = 0;
+let totalMatches = 0;
+let fitFrame = 0;
 
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
@@ -32,7 +37,8 @@ function syncSelection() {
 
 function selectPlayer(id) {
   selectedPlayer = selectedPlayer === id ? null : id;
-  limit = MATCH_PAGE_SIZE;
+  matchLimit = selectedPlayer ? PAGE_SIZE : playerLimit;
+  fitMatches = true;
   syncSelection();
   render();
   if (!selectedPlayer) return;
@@ -168,7 +174,7 @@ function render() {
     ? 'Try another nickname or clear the player search.'
     : 'Players join this board after a complete result is verified with the recorded mods loaded.';
 
-  players.forEach(({player, rank}) => {
+  players.slice(0, playerLimit).forEach(({player, rank}) => {
     const row = document.createElement('tr');
     row.classList.toggle('wave-selected', player.id === selectedPlayer);
     const expanded = player.id === selectedPlayer;
@@ -201,6 +207,7 @@ function render() {
     $('wavePlayers').append(row);
     if (expanded) $('wavePlayers').append(identityDetails(player));
   });
+  $('wavePlayersMore').hidden = players.length <= playerLimit;
 
   $('waveProfile').hidden = !profile;
   $('waveProfileMetrics').replaceChildren();
@@ -237,7 +244,7 @@ function render() {
   $('waveMatchesHead').replaceChildren(header);
   const games = scope.games.filter(game => (beta || all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
   $('waveMatches').replaceChildren();
-  games.slice(0, limit).forEach(game => {
+  games.slice(0, matchLimit).forEach(game => {
     const row = document.createElement('tr');
     cell(row, game.startedAt ? new Date(game.startedAt).toLocaleString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'Unknown date');
     cell(row, game.map);
@@ -288,9 +295,36 @@ function render() {
     }
     $('waveMatches').append(row);
   });
-  $('waveMore').hidden = games.length <= limit;
+  totalMatches = games.length;
+  visibleMatches = Math.min(totalMatches, matchLimit);
+  $('waveMore').hidden = totalMatches <= visibleMatches;
   $('waveUpdated').textContent = updatedLabel(data.generatedAt);
   $('waveUpdated').title = new Date(data.generatedAt).toLocaleString();
+  scheduleMatchFit();
+}
+
+function scheduleMatchFit() {
+  if (fitFrame) return;
+  fitFrame = requestAnimationFrame(() => {
+    fitFrame = 0;
+    const wrap = $('waveMatchesWrap');
+    const rows = [...$('waveMatches').children];
+    for (const row of rows) if (row.hidden) row.hidden = false;
+    wrap.style.minHeight = '';
+    visibleMatches = rows.length;
+    if (fitMatches && !selectedPlayer && $('wavePlayers').children.length && window.matchMedia('(min-width: 1121px)').matches) {
+      const height = $('wavePlayersWrap').getBoundingClientRect().height;
+      const top = wrap.getBoundingClientRect().top;
+      const edge = height - (wrap.offsetHeight - wrap.clientHeight) + wrap.clientTop;
+      // Read every row before hiding any, so the cutoff uses the original layout.
+      const bottoms = rows.map(row => row.getBoundingClientRect().bottom - top);
+      const overflow = bottoms.findIndex(bottom => bottom > edge);
+      visibleMatches = overflow < 0 ? rows.length : Math.max(1, overflow);
+      rows.slice(visibleMatches).forEach(row => { row.hidden = true; });
+      if (visibleMatches < totalMatches) wrap.style.minHeight = `${Math.ceil(height)}px`;
+    }
+    $('waveMore').hidden = totalMatches <= visibleMatches;
+  });
 }
 
 function renderOptions() {
@@ -333,13 +367,36 @@ async function load() {
 $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;
   selectedPlayer = null;
-  limit = MATCH_PAGE_SIZE;
+  playerLimit = PAGE_SIZE;
+  matchLimit = PAGE_SIZE;
+  fitMatches = true;
   syncSelection();
   render();
 });
 $('waveClearPlayer').addEventListener('click', () => selectPlayer(null));
-$('wavePlayerSearch').addEventListener('input', render);
-$('waveMore').addEventListener('click', () => { limit += MATCH_PAGE_SIZE; render(); });
+$('wavePlayerSearch').addEventListener('input', () => {
+  playerLimit = PAGE_SIZE;
+  matchLimit = PAGE_SIZE;
+  fitMatches = true;
+  render();
+});
+$('wavePlayersMore').addEventListener('click', () => {
+  playerLimit += PAGE_SIZE;
+  if (fitMatches && !selectedPlayer) matchLimit = playerLimit;
+  render();
+});
+$('waveMore').addEventListener('click', () => {
+  matchLimit = visibleMatches + PAGE_SIZE;
+  fitMatches = false;
+  render();
+});
+let layoutWidth = window.innerWidth;
+window.addEventListener('resize', () => {
+  if (window.innerWidth === layoutWidth) return;
+  layoutWidth = window.innerWidth;
+  scheduleMatchFit();
+});
+document.fonts?.ready.then(scheduleMatchFit);
 
 load();
 setInterval(() => { if (!document.hidden) load(); }, 30000);

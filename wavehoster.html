@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png">
   <link rel="stylesheet" href="styles.css?v=20261022-match-ui-1">
-  <link rel="stylesheet" href="stats/wavehoster.css?v=20261117-compact-1">
+  <link rel="stylesheet" href="stats/wavehoster.css?v=20261117-pagination-1">
 </head>
 <body class="embedded-page wave-embedded">
   <div class="page-shell wave-page">
@@ -37,13 +37,14 @@
         </div>
         <div class="wave-grid">
           <section class="stats-panel wave-panel wave-rank-panel" aria-label="Top players">
-            <div class="stats-table-wrap wave-table-wrap">
+            <div id="wavePlayersWrap" class="stats-table-wrap wave-table-wrap">
               <table class="stats-table wave-ranking-table">
                 <thead><tr><th scope="col">#</th><th scope="col">Top players</th><th scope="col">Best score</th><th scope="col">Games</th><th scope="col" aria-sort="descending">Win ↓</th><th scope="col">Lost</th><th scope="col">Kills</th></tr></thead>
                 <tbody id="wavePlayers"></tbody>
               </table>
               <div id="waveEmpty" class="wave-empty" hidden><h3 id="waveEmptyTitle">Results are being verified</h3><p id="waveEmptyMessage">Players join this board after a complete result is verified with the recorded mods loaded.</p></div>
             </div>
+            <button id="wavePlayersMore" class="stats-filter-button wave-more" type="button" aria-label="Show more players" aria-controls="wavePlayers" hidden>Show more</button>
             <p id="waveRankingNote" class="wave-footnote">Each game version and mod pack has its own rankings. Only verified outcomes add wins and scores.</p>
           </section>
           <section class="stats-panel wave-panel wave-match-panel" aria-label="Matches">
@@ -52,13 +53,13 @@
               <div id="waveProfileMetrics" class="wave-profile-metrics"></div>
               <p id="waveProfileNote" class="wave-footnote">Stats and match history for this mod.</p>
             </section>
-            <div class="stats-table-wrap wave-table-wrap">
+            <div id="waveMatchesWrap" class="stats-table-wrap wave-table-wrap">
               <table class="stats-table wave-matches-table">
                 <thead id="waveMatchesHead"><tr><th scope="col">Date ↓</th><th scope="col">Map</th><th scope="col">Players</th><th scope="col">Time</th><th scope="col">Results</th><th scope="col">Statistics</th></tr></thead>
                 <tbody id="waveMatches"></tbody>
               </table>
             </div>
-            <button id="waveMore" class="stats-filter-button wave-more" type="button" aria-controls="waveMatches" hidden>Show more</button>
+            <button id="waveMore" class="stats-filter-button wave-more" type="button" aria-label="Show more games" aria-controls="waveMatches" hidden>Show more</button>
           </section>
         </div>
         <footer class="wave-footer"><span id="waveRuleSummary">Loading mods…</span><span id="waveError" role="status"></span></footer>
@@ -66,7 +67,7 @@
     </main>
   </div>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/wavehoster.mjs?v=20261117-mod-groups-1"></script>
+  <script type="module" src="stats/wavehoster.mjs?v=20261117-pagination-1"></script>
 </body>
 </html>
 

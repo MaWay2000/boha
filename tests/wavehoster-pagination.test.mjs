@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import * as dataFunctions from '../stats/wavehoster-data.mjs';
+import {refreshWaveHoster} from '../stats/wavehoster-loader.mjs';
 
 // Exercise the actual page module and event handlers with deterministic row geometry.
-async function page(width = 1400, search = '') {
+async function page(width = 1400, search = '', feedFactory = null) {
   const frames = [];
   const elements = new Map();
   const listeners = new Map();
@@ -47,7 +48,7 @@ async function page(width = 1400, search = '') {
   const policy = JSON.parse(readFileSync(new URL('../stats/arc-beta.json', import.meta.url)));
   const players = Array.from({length: 150}, (_, i) => ({id: `p${i}`, name: `Player ${i}`,
     identityVerified: true, games: 1, wins: 1, losses: 0, draws: 0, bestScore: 150 - i, kills: 1}));
-  const snapshot = {format: 1, generatedAt: '2026-11-17T00:00:00Z', groups: [{id: 'recorded-group',
+  const snapshot = {format: 1, source: 'WaveHoster', ranking: 'wins-then-best-score', generatedAt: '2026-11-17T00:00:00Z', groups: [{id: 'recorded-group',
     version: policy.gameVersion, mods: [policy.modHash], players},
     {id: 'older-release', version: '4.6.3', mods: ['old-mod-hash'], players}], games: Array.from({length: 260}, (_, i) => ({
     id: `game${i}`, group: i % 2 ? 'older-release' : 'recorded-group',
@@ -63,13 +64,14 @@ async function page(width = 1400, search = '') {
     matchMedia: () => ({matches: window.innerWidth >= 1121}),
     addEventListener: (type, handler) => listeners.set(type, handler)};
   window.parent = window;
-  const context = vm.createContext({...dataFunctions, window, URL, URLSearchParams,
+  const fetcher = feedFactory ? feedFactory(snapshot) : async () => ({ok: true, text: async () => JSON.stringify(snapshot)});
+  const context = vm.createContext({...dataFunctions, refreshWaveHoster: options => refreshWaveHoster({...options, fetcher}), window, URL, URLSearchParams,
     document: {hidden: false, getElementById: id => {
       assert.ok(elements.has(id), `Missing HTML element ${id}`);
       return elements.get(id);
     }, createElement: () => new Element()},
     requestAnimationFrame: handler => { frames.push(handler); return frames.length; }, setInterval() {},
-    fetch: async () => ({ok: true, json: async () => snapshot})});
+    fetch: fetcher});
   const source = readFileSync(new URL('../stats/wavehoster.mjs', import.meta.url), 'utf8')
     .replace(/^import .*\r?\n/gm, '').replace(/\nload\(\);/, '\nglobalThis.ready = load();');
   vm.runInContext(source, context);
@@ -86,6 +88,17 @@ async function page(width = 1400, search = '') {
   return {get, games, flush, url: () => new URL(window.location.href), resize(value) {window.innerWidth = value; listeners.get('resize')(); flush();},
     async refresh() {await context.load(); flush();}};
 }
+
+test('an older initial backup cannot clear the requested player before live data arrives', async () => {
+  const ui = await page(800, '?ruleset=mod%3AWave-Defense&player=p0', snapshot => async url => {
+    const data = url.startsWith('https:') ? snapshot : {...snapshot,
+      groups: snapshot.groups.map(group => ({...group, players: []})), games: []};
+    return {ok: true, text: async () => JSON.stringify(data)};
+  });
+  assert.equal(ui.get('waveProfile').hidden, false);
+  assert.equal(ui.get('waveProfileName').textContent, 'Player 0');
+  assert.equal(ui.games().length, 100);
+});
 
 for (const legacy of ['beta', 'mod:BOHA-Wave-Defense', 'older-release']) {
 test(`${legacy} links open one combined Wave-Defense entry, including both current and older games`, async () => {

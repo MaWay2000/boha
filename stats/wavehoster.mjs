@@ -1,4 +1,5 @@
 import {combineRulesets, combineModNames, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261117-wave-alias-1';
+import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 
 let data = null;
 let modData = null;
@@ -11,6 +12,8 @@ let fitMatches = true;
 let visibleMatches = 0;
 let totalMatches = 0;
 let fitFrame = 0;
+let currentRecord = null;
+let loading = false;
 
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
@@ -338,25 +341,34 @@ function renderOptions() {
 }
 
 async function load() {
+  if (loading) return;
+  loading = true;
   try {
-    const response = await fetch('stats/published/wavehoster.json?t=' + Date.now(), {cache: 'no-store'});
-    if (!response.ok) throw new Error('The replay collection is temporarily unavailable.');
-    const next = await response.json();
-    if (next.format !== 1 || !Array.isArray(next.groups) || !Array.isArray(next.games)) throw new Error('The replay collection could not be read.');
-    data = next;
-    const legacyWaveDefense = selected === 'beta' || selected === 'mod:BOHA-Wave-Defense';
-    const previous = legacyWaveDefense ? 'mod:Wave-Defense' : selected;
-    modData = combineModNames(data);
-    selected = previous === 'all' ? previous
-      : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
-    renderOptions();
-    $('waveError').textContent = '';
-    render();
-    if (legacyWaveDefense) syncSelection();
+    const waitForSelection = !currentRecord && (selected !== 'all' || selectedPlayer);
+    const showRecord = record => {
+      data = record.snapshot;
+      const legacyWaveDefense = selected === 'beta' || selected === 'mod:BOHA-Wave-Defense';
+      const previous = legacyWaveDefense ? 'mod:Wave-Defense' : selected;
+      modData = combineModNames(data);
+      selected = previous === 'all' ? previous
+        : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
+      renderOptions();
+      render();
+      if (legacyWaveDefense) syncSelection();
+    };
+    const result = await refreshWaveHoster({current: currentRecord, onUpdate(record) {
+      if (!waitForSelection) showRecord(record);
+    }});
+    currentRecord = result.record;
+    if (data !== currentRecord.snapshot) showRecord(currentRecord);
+    const notice = result.liveAvailable ? '' : 'Live updates are temporarily unavailable. Showing the latest saved results.';
+    if ($('waveError').textContent !== notice) $('waveError').textContent = notice;
+    const updated = updatedLabel(data.generatedAt);
+    if ($('waveUpdated').textContent !== updated) $('waveUpdated').textContent = updated;
   } catch (error) {
     $('waveError').textContent = error.message;
-    $('waveUpdated').textContent = 'Unavailable';
-  }
+    if (!data) $('waveUpdated').textContent = 'Unavailable';
+  } finally { loading = false; }
 }
 
 $('waveRuleset').addEventListener('change', () => {

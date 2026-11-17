@@ -1,10 +1,12 @@
 # Arc Mod Beta rules
 
-These rules preserve the decision to show the newest Arc release as **Beta**, keep replay history, and remember the people who test it.
+These rules preserve replay history, verified results, and the people who test Arc releases.
+The website defaults to ALL. Beta and BOHA-Wave-Defense are combined under Wave-Defense;
+the active release below identifies the processing policy, not a separate dropdown view.
 
 ## Active release
 
-- The main Arc Mod board shows one release: **Beta (Arc-Mw Mod v156, Warzone 4.7.0)**.
+- The active processing release is **Arc-Mw Mod v156, Warzone 4.7.0**.
 - Its exact mod SHA-256 is `603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31`. Releases v152, v153, v154 and v155 remain archived.
 - `stats/arc-beta.json` controls the active release. Match the game version and the complete mod pack; a map name alone is insufficient.
 - A later replay of an older or unrelated mod does not promote that mod to Beta.
@@ -27,7 +29,7 @@ These rules preserve the decision to show the newest Arc release as **Beta**, ke
 ## Replay history
 
 - Keep existing replay records and Analyze links. A refresh must not delete an old replay merely because the source omits it.
-- Show old releases and unrelated mods through **Replay archive**, separate from the default Beta selector. Preserve links to specific archived rulesets and players.
+- Keep every release accessible through ALL and the combined mod selector. Preserve links to archived rulesets and players; old Beta and BOHA-Wave-Defense links resolve to Wave-Defense.
 - Historical results can receive evidence-backed corrections. Preserve verified final results when the upstream source temporarily regresses to an unfinished analysis.
 
 ## Tester credits
@@ -42,5 +44,6 @@ These rules preserve the decision to show the newest Arc release as **Beta**, ke
 ## Publication
 
 - The scheduled publisher maintains the replay history and tester archive together. Failed downloads retain the last available data; failed evidence requests leave that replay unresolved for retry.
+- The hosting publisher runs the same processing in the background and serves only the validated public snapshot. The browser checks it every 30 seconds and uses GitHub's processed snapshot as fallback. Preserve all existing evidence during refreshes; never guess a loss to make a live update appear complete.
 - Publish only the public roster, result facts, and credits. Do not add backend configuration, credentials, private worker files, or raw API responses to GitHub.
 - Run the Arc publication, data, and Beta regression tests and the public release check before publishing changes.

@@ -66,11 +66,23 @@ That script refreshes mirrored leaderboard logic, player-key mappings, snapshot 
 
 Running the static site locally does not start these backend or synchronization services. Features that use external APIs still depend on those services being available and allowing the request.
 
-## Arc Mod Beta policy
+## Arc Mod live results
 
-The Arc Mod page shows one active Beta release and keeps older replays in its archive.
-Follow [the Beta rules](docs/ARC-BETA-RULES.md) when changing release selection,
-departure results, rankings, or tester credits. The active pack is pinned in
+The Arc Mod page defaults to ALL and combines versions of each named mod.
+Wave-Defense includes the former Beta and BOHA-Wave-Defense views, preserving old links.
+The page checks the processed public hosting feed every 30 seconds. GitHub's saved
+snapshot loads alongside the initial live request and remains the fallback during
+outages. Older data never replaces a newer snapshot already displayed.
+
+Hosting runs `stats/wavehoster-live-publication.cjs` outside the HTTP request, using
+the existing publication, history, departure-evidence and ranking pipeline. New
+replays are published with retained verified results before bounded evidence
+refreshes; failed checks stay unresolved and are retried. Only the validated public
+snapshot is served, with cross-origin read access. The host supervisor checks for
+source changes every 30 seconds and starts with the hosting service.
+
+Follow [the result rules](docs/ARC-BETA-RULES.md) when changing departure results,
+rankings, or tester credits. The active processing pack is pinned in
 `stats/arc-beta.json`; tester names are retained in `stats/published/arc-beta-testers.json`
 across releases, including defeats and unresolved replays.
 

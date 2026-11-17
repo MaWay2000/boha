@@ -43,12 +43,16 @@ async function sync({fetcher = fetch, destination = path.join(__dirname, 'publis
   return publishBeta(JSON.parse(bytes.toString('utf8')), destination, {fetcher});
 }
 async function publishBeta(input, destination, options = {}) {
-  const policy = JSON.parse(fs.readFileSync(path.join(__dirname, 'arc-beta.json'), 'utf8'));
+  const policy = options.policy || JSON.parse(fs.readFileSync(path.join(__dirname, 'arc-beta.json'), 'utf8'));
   const {collectTesters} = await import('./arc-beta.mjs');
   const {mergeHistory, applyDepartures, rebuildArcRankings} = require('./arc-departures.cjs');
-  const previous = fs.existsSync(destination) ? sanitizeWaveHoster(JSON.parse(fs.readFileSync(destination, 'utf8'))) : null;
+  let previous = fs.existsSync(destination) ? sanitizeWaveHoster(JSON.parse(fs.readFileSync(destination, 'utf8'))) : null;
+  if (options.seedSnapshot) {
+    const seed = sanitizeWaveHoster(options.seedSnapshot);
+    previous = previous ? mergeHistory(seed, previous) : seed;
+  }
   const snapshot = mergeHistory(previous, sanitizeWaveHoster(input));
-  await applyDepartures(snapshot, policy, options);
+  if (options.inspectDepartures !== false) await applyDepartures(snapshot, policy, options);
   await rebuildArcRankings(snapshot, policy);
   const testerPath = path.join(path.dirname(destination), 'arc-beta-testers.json');
   const testers = fs.existsSync(testerPath) ? JSON.parse(fs.readFileSync(testerPath, 'utf8')) : undefined;

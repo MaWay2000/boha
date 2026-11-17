@@ -4,7 +4,7 @@
 })(typeof globalThis === "object" ? globalThis : this, function () {
   "use strict";
   const SCHEMA_VERSION = 1;
-  const types = new Set(["start", "unitBuilt", "structureBuilt", "destroyed", "demolitionStarted",
+  const types = new Set(["start", "unitBuilt", "unitSpawned", "scriptResearchCompleted", "structureBuilt", "destroyed", "demolitionStarted",
     "ownershipTransfer", "researchCompleted", "attackNotice", "sample"]);
   const number = value => typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
   const index = value => number(value) != null && Number.isSafeInteger(value) ? value : null;
@@ -82,6 +82,11 @@
         || new Set(players.map(player => player.player)).size !== players.length) return null;
       return { ...result, players };
     }
+    if (record.type === "scriptResearchCompleted") {
+      if (index(record.player) == null || !label(record.research) || ![1,2,3,4,5].includes(record.slot)
+        || !["upgrades","bodies","random"].includes(record.role) || index(record.speed) == null || record.speed < 70 || record.speed > 99 || record.powerSpent !== 0) return null;
+      return {...result, player:record.player, research:label(record.research), slot:record.slot, role:record.role, speed:record.speed, powerSpent:0};
+    }
     if (record.type === "researchCompleted") {
       if (index(record.player) == null || !label(record.research)) return null;
       return { ...result, player: record.player, research: label(record.research),
@@ -90,7 +95,7 @@
     }
     const observed = object(record.object);
     if (!observed) return null;
-    if (record.type === "unitBuilt" && observed.kind !== "unit") return null;
+    if (["unitBuilt", "unitSpawned"].includes(record.type) && observed.kind !== "unit") return null;
     if (["structureBuilt", "demolitionStarted"].includes(record.type) && observed.kind !== "structure") return null;
     result.object = observed;
     if (record.type === "ownershipTransfer") {
@@ -100,6 +105,7 @@
     }
     if (record.type === "destroyed") result.cause = "unknown";
     if (record.type === "attackNotice") result.attacker = object(record.attacker);
+    if (record.type === "unitSpawned") { if (index(record.wave) == null || record.wave < 1 || record.wave > 60) return null; result.wave = record.wave; }
     if (record.type === "unitBuilt") result.factoryId = index(record.factoryId);
     if (["structureBuilt", "demolitionStarted"].includes(record.type)) result.builderId = index(record.builderId);
     return result;
@@ -161,7 +167,7 @@
     }
     const players = new Map();
     function stats(player) {
-      if (!players.has(player)) players.set(player, { player, completedUnits: 0, completedStructures: 0,
+      if (!players.has(player)) players.set(player, { player, completedUnits: 0, spawnedUnits: 0, completedResearch: 0, scriptCompletedResearch: 0, scriptResearchPowerSpent: 0, completedStructures: 0,
         completedUnitValue: 0, completedStructureValue: 0, observedDestroyedUnits: 0,
         observedDestroyedUnitValue: 0, observedDestroyedStructures: 0,
         locallyCompletedResearch: 0, ownershipTransfersIn: 0, ownershipTransfersOut: 0,
@@ -169,22 +175,31 @@
       return players.get(player);
     }
     function addValue(target, key, value) { target[key] = target[key] == null || value == null ? null : target[key] + value; }
+    const researched = new Set(), spawned = new Set();
     const built = new Set(), destroyed = new Set(), lostSites = new Map(), replaced = new Set();
     const site = item => item.name && item.x != null && item.y != null
       ? JSON.stringify([item.player, item.name, item.x, item.y]) : null;
     for (const event of events) {
       if (event.type === "sample") { event.players.forEach(player => stats(player.player)); continue; }
-      if (event.type === "researchCompleted") {
-        if (event.locallyCompleted) stats(event.player).locallyCompletedResearch++;
+      if (event.type === "scriptResearchCompleted" || event.type === "researchCompleted") {
+        if (event.type === "scriptResearchCompleted" || event.locallyCompleted) {
+          const key = event.player + ":" + event.research;
+          if (!researched.has(key)) {
+            researched.add(key); const target = stats(event.player); target.completedResearch++;
+            if (event.type === "scriptResearchCompleted") target.scriptCompletedResearch++;
+            else target.locallyCompletedResearch++;
+          }
+        }
         continue;
       }
       if (!event.object) continue;
       const item = event.object, target = stats(item.player);
-      if (["unitBuilt", "structureBuilt"].includes(event.type)) {
+      if (event.type === "unitSpawned" && !spawned.has(item.id)) { spawned.add(item.id); target.spawnedUnits++; }
+      if (["unitBuilt", "unitSpawned", "structureBuilt"].includes(event.type)) {
         const identity = `${item.kind}:${item.id}`;
         if (built.has(identity)) continue;
         built.add(identity);
-        if (event.type === "unitBuilt") { target.completedUnits++; addValue(target, "completedUnitValue", item.cost); }
+        if (["unitBuilt", "unitSpawned"].includes(event.type)) { target.completedUnits++; addValue(target, "completedUnitValue", item.cost); }
         else {
           target.completedStructures++; addValue(target, "completedStructureValue", item.cost);
           const location = site(item), previous = location && lostSites.get(location);

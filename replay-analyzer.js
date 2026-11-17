@@ -6195,7 +6195,7 @@
       breakdown.append(table(["Player", "Operation", "Credited", "Debited", "Wasted", "Transactions"], activePlayers.flatMap(player => Object.entries(player.powerOperations || {}).map(([operation, totals]) => [playerName(player.player), operationNames[operation] || operation, powerDisplay(totals.creditFixed), powerDisplay(totals.debitFixed), powerDisplay(totals.wastedFixed), display(totals.transactions)]))));
       nativeSection.append(breakdown);
     }
-    const eventNames = { unitBuilt: "Unit completed", structureBuilt: "Structure completed", destroyed: "Destruction observed",
+    const eventNames = { unitBuilt: "Unit completed", unitSpawned: "Wave unit spawned", scriptResearchCompleted: "Script research completed", structureBuilt: "Structure completed", destroyed: "Destruction observed",
       demolitionStarted: "Demolition started", ownershipTransfer: "Ownership transfer", researchCompleted: "Research completed",
       attackNotice: "Attack notice (not a hit/kill counter)", sample: "Army / power sample", damage: "Exact combat damage",
       combatKill: "Combat death / kill credit", repair: "Repair performed", objectDonation: "Confirmed object gift",
@@ -6212,6 +6212,8 @@
         let details = event.object ? `${event.object.name || event.object.kind} #${event.object.id}; nominal cost ${display(event.object.cost)}` : "";
         if (event.type === "destroyed") details += "; cause and killer unknown";
         if (event.type === "ownershipTransfer") details += `; ${playerName(event.from)} → ${playerName(event.to)}; gift/capture reason unknown`;
+        if (event.type === "unitSpawned") details += `; wave ${event.wave}`;
+        if (event.type === "scriptResearchCompleted") details = `${event.research}; scripted completion; ${event.powerSpent} power spent`;
         if (event.type === "researchCompleted") details = `${event.research}; ${event.locallyCompleted ? "completed in own lab" : "shared or unattributed lab"}`;
         if (event.type === "sample") details = event.players.map(player => `${playerName(player.player)}: army value ${display(player.unitValue)}, power balance ${display(player.powerBalance)}`).join(" · ");
         if (event.type === "damage") details = `${display(event.hitPoints)} HP + ${display(event.shieldPoints)} shield; target ${playerName(event.targetPlayer)}; ${event.allied == null ? "unattributed" : event.allied ? "allied fire" : "enemy fire"}`;

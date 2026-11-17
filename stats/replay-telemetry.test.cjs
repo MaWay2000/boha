@@ -9,6 +9,30 @@ const object = (id = 1, kind = 'unit', cost = 100) => ({ id, player: 0, kind, co
 const event = (type, fields = {}, time = 100) => ({ schemaVersion: 1, type, timeMilliseconds: time, ...fields });
 const compile = records => telemetry.compile([start, ...records], { complete: true, durationMilliseconds: 1000 });
 
+test('Arc spawned units and scripted research retain verified event coverage and distinct accounting', () => {
+  const spawn = event('unitSpawned', {object: object(12), wave: 2});
+  const research = event('scriptResearchCompleted', {player: 0, research: 'R-Script', slot: 2, role: 'upgrades', speed: 90, powerSpent: 0});
+  const result = compile([spawn, spawn, research, research]);
+  assert.equal(result.complete, true);
+  assert.equal(result.rejectedRecords, 0);
+  assert.equal(result.players[0].completedUnits, 1);
+  assert.equal(result.players[0].spawnedUnits, 1);
+  assert.equal(result.players[0].scriptCompletedResearch, 1);
+  assert.equal(result.players[0].locallyCompletedResearch, 0);
+  assert.equal(result.players[0].scriptResearchPowerSpent, 0);
+  const roundTrip = telemetry.compile(JSON.parse(JSON.stringify(result.events)), {complete: true, durationMilliseconds: 1000});
+  assert.deepEqual(roundTrip, result);
+});
+
+test('Arc event support still rejects invalid wave/research evidence', () => {
+  for (const fields of [{wave: 0}, {wave: 61}, {object: object(12, 'structure')}]) {
+    assert.equal(compile([event('unitSpawned', {object: object(12), wave: 2, ...fields})]).complete, false);
+  }
+  for (const fields of [{speed: 69}, {slot: 8}, {role: 'unknown'}, {powerSpent: 1}]) {
+    assert.equal(compile([event('scriptResearchCompleted', {player: 0, research: 'R-Script', slot: 2, role: 'upgrades', speed: 90, powerSpent: 0, ...fields})]).complete, false);
+  }
+});
+
 test('serialized telemetry round-trips through the browser validator', () => {
   const original = compile([event('unitBuilt', { object: object() })]);
   const roundTrip = telemetry.compile(JSON.parse(JSON.stringify(original.events)), {

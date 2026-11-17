@@ -325,7 +325,7 @@ async function load() {
         return counts;
       }, {});
       const map = Object.entries(common).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
-      rulesetNames.set(group.id, `${group.mods.length ? map : 'Unmodded'} · ${group.version} · ${group.id.slice(0, 6)}`);
+      rulesetNames.set(group.id, group.mods.length ? map : 'Unmodded');
     });
     selected = previous === 'beta' || previous === 'all' || data.groups.some(group => group.id === previous) ? previous : 'all';
     renderOptions();

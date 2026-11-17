@@ -5,18 +5,27 @@ const hash = 'a'.repeat(64);
 const wave = {format: 1, source: 'WaveHoster', games: [{id: '20261109_083951_7715', matchId: 42, replaySha256: hash}]};
 const detail = {replay_sha256: hash, telemetry: {engineAnalysis: {status: 'confirmed'}}, players: [
   {position_number: 1, stats_source: 'replay-engine', result: 'loser', score: 475, kills: 12, raw_json: '{}'}]};
-function runner({wavePayload = wave, waveError = false, match = detail} = {}) {
+function runner({wavePayload = wave, livePayload = wavePayload, waveError = false, liveError = waveError,
+  liveHang = false, match = detail, detailStatus = 200} = {}) {
   const calls = [];
-  const context = vm.createContext({URL, document: {baseURI: 'https://example.test/boha/replay-analyzer.html'},
+  const context = vm.createContext({URL, AbortController,
+    setTimeout: (callback, time) => setTimeout(callback, liveHang ? 5 : time), clearTimeout,
+    formatDuration: time => `${Math.floor(time / 60000)}:${String(Math.floor(time / 1000) % 60).padStart(2, '0')}`,
+    document: {baseURI: 'https://example.test/boha/replay-analyzer.html'},
     wzstatsPublishedUrl: 'main-index', expandCompressedEngineAnalysis: async () => {}, normalizeTacticalReplayPlayerOwners() {},
-    fetch: async value => {
+    fetch: async (value, options) => {
       const url = String(value); calls.push(url);
+      if (url.includes('wavehoster-live.json')) {
+        if (liveHang) return new Promise((_, reject) => options.signal.addEventListener('abort', () => reject(Error('live request timed out')), {once: true}));
+        if (liveError) throw Error('live index offline');
+        return {ok: true, json: async () => livePayload};
+      }
       if (url.includes('wavehoster.json')) { if (waveError) throw Error('modded index offline'); return {ok: true, json: async () => wavePayload}; }
       if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, replay_sha256: hash, source_match_id: '1234567890123'}]})};
-      return {ok: true, json: async () => ({match})};
+      return {ok: detailStatus === 200, status: detailStatus, json: async () => ({match})};
     }});
   vm.runInContext(code, context);
-  return {calls, load: context.loadWzstatsResult};
+  return {calls, load: context.loadWzstatsResult, context};
 }
 test('modded Analyze attaches the cached engine result without fetching the main match index', async () => {
   const {calls, load} = runner();
@@ -27,6 +36,101 @@ test('modded Analyze attaches the cached engine result without fetching the main
   assert.equal(calls.length, 2);
   assert.ok(calls[1].endsWith('/matches/42'));
   assert.ok(!calls.includes('main-index'));
+  assert.ok(calls[0].endsWith('/data/wavehoster-live.json'));
+  assert.ok(!calls.some(url => url.includes('stats/published/wavehoster.json')));
+});
+
+test('a new live replay loads hosting analysis even when absent from GitHub', async () => {
+  const {load, calls} = runner({wavePayload: {...wave, games: []}, livePayload: wave});
+  assert.equal((await load(hash, '')).playerData[0].score, 475);
+  assert.equal(calls.length, 2);
+});
+
+test('GitHub remains a fallback when live hosting fails or lacks the replay', async () => {
+  for (const options of [{liveError: true}, {liveHang: true}, {livePayload: {...wave, games: []}}, {livePayload: {format: 2}}]) {
+    const {load, calls} = runner(options);
+    assert.equal((await load(hash, '')).engineAnalysis.status, 'confirmed');
+    assert.ok(calls.some(url => url.includes('stats/published/wavehoster.json')));
+  }
+});
+
+const snapshot = (timeMilliseconds, players) => ({timeMilliseconds, players});
+const sampled = (position, score, extra = {}) => ({position, score, kills: 12, droidsBuilt: 5,
+  droidsLost: 2, droidsAlive: 3, structuresBuilt: 7, structuresLost: 1,
+  structureKills: 0, structuresAlive: 6, ...extra});
+const unknownMatch = snapshots => ({...detail, started_at: '2026-11-17 18:37:41',
+  telemetry: {engineAnalysis: {status: 'unknown', game: {elapsedMilliseconds: 1800000},
+    extended: {snapshots, tacticalReplay: {positionFrames: [{timeMilliseconds: 0}]}, telemetry: {observedRecords: 2778}}}},
+  players: [{position_number: 1, stats_source: 'replay', result: null, score: null}]});
+
+test('unknown outcomes display the newest recorded per-player counters and keep telemetry', async () => {
+  const match = unknownMatch([snapshot(1785000, [sampled(1, -475, {power: 0, recentPowerWon: 100})]),
+    snapshot(15000, [sampled(1, 20)]), snapshot(1786000, []),
+    snapshot(1800001, [sampled(1, 99999)])]);
+  const {load, context} = runner({match});
+  const result = await load(hash, '');
+  const player = result.playerData[0];
+  assert.equal(player.score, -475);
+  assert.equal(player.kills, 12);
+  assert.equal(player.droids, 3);
+  assert.equal(player.structs, 6);
+  assert.equal(player.power, 0);
+  assert.equal(player.structureKills, 0);
+  assert.equal(player.usertype, null, 'sampled contender/winner states never create a final result');
+  assert.equal(player.statsSource, 'replay-snapshot');
+  assert.equal(player.sampledAtMilliseconds, 1785000);
+  assert.equal(player.powerWon, null, 'recent power is not a lifetime total');
+  assert.equal(result.engineAnalysis.extended.tacticalReplay.positionFrames.length, 1);
+  assert.equal(result.engineAnalysis.extended.telemetry.observedRecords, 2778);
+  assert.equal(result.endDate, '2026-11-17T18:37:41Z');
+  const notice = context.recordedSummaryNotice({players: [{summary: player}]});
+  assert.match(notice, /29:45/);
+  assert.match(notice, /may precede the replay end/);
+  assert.match(notice, /Win\/loss remains unknown/);
+});
+
+test('snapshot fields are validated independently and never supplied by another player', async () => {
+  const match = unknownMatch([snapshot(100, [sampled(7, 9999),
+    sampled(1, 10, {kills: null, droidsBuilt: -1, structuresAlive: '6'})])]);
+  const {load} = runner({match});
+  const player = (await load(hash, '')).playerData[0];
+  assert.equal(player.score, 10);
+  assert.equal(player.kills, null);
+  assert.equal(player.droidsBuilt, null);
+  assert.equal(player.structs, null);
+});
+
+test('verified final statistics take precedence over sampled counters', async () => {
+  const match = {...detail, telemetry: unknownMatch([snapshot(100, [sampled(1, 9999)])]).telemetry};
+  const {load} = runner({match});
+  const result = await load(hash, '');
+  assert.equal(result.playerData[0].score, 475);
+  assert.equal(result.playerData[0].usertype, 'loser');
+  assert.equal(result.playerData[0].statsSource, 'replay-engine');
+});
+
+test('no snapshots or an unavailable detail API leave statistics unknown', async () => {
+  for (const options of [{match: unknownMatch([])}, {detailStatus: 503}]) {
+    const {load} = runner(options);
+    const result = await load(hash, '');
+    if (result.playerData.length) assert.equal(result.playerData[0].score, null);
+    else assert.ok(result.detailError);
+  }
+});
+
+test('sampled statistics survive attachment without becoming award-eligible final stats', async () => {
+  const {context, load} = runner({match: unknownMatch([snapshot(15000, [sampled(1, 100)])])});
+  const start = source.indexOf('  function attachPublishedPlayerStats(');
+  const end = source.indexOf('  function decodeGameTime(', start);
+  vm.runInContext(source.slice(start, end), context);
+  const extraction = {players: [{position: 1}]};
+  context.attachPublishedPlayerStats(extraction, await load(hash, ''));
+  assert.equal(extraction.players[0].summary.score, 100);
+  assert.equal(extraction.players[0].summary.partialStats, true);
+  assert.equal(extraction.players[0].summary.statsSource, 'replay-snapshot');
+  assert.equal(extraction.players[0].summary.sampledAtMilliseconds, 15000);
+  assert.equal(extraction.players[0].summary.result, '');
+  assert.equal(extraction.engineAnalysis.status, 'unknown');
 });
 test('a failed modded index leaves main leaderboard analysis working', async () => {
   const {calls, load} = runner({waveError: true});

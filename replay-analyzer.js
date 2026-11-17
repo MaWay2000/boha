@@ -545,20 +545,31 @@
     }
 
     let match = null;
-    try {
-      const response = await fetch(new URL("stats/published/wavehoster.json", document.baseURI), {cache: "no-store"});
-      if (response.ok) {
-        const payload = await response.json();
-        const game = payload.format === 1 && payload.source === "WaveHoster" && (payload.games || []).find(item => (
-          replaySha256 ? item.replaySha256 === replaySha256 : replayId && item.id === String(replayId)
-        ));
-        if (game && Number.isSafeInteger(game.matchId) && game.matchId > 0 && /^[a-f0-9]{64}$/.test(game.replaySha256 || "")) {
-          match = {id: game.matchId, replay_sha256: game.replaySha256,
-            replay_url: `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`, players: []};
+    for (const indexUrl of [
+      "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json",
+      new URL("stats/published/wavehoster.json", document.baseURI)
+    ]) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(indexUrl, {cache: "no-store", signal: controller.signal});
+        if (response.ok) {
+          const payload = await response.json();
+          const game = payload.format === 1 && payload.source === "WaveHoster" && (payload.games || []).find(item => (
+            replaySha256 ? item.replaySha256 === replaySha256 : replayId && item.id === String(replayId)
+          ));
+          if (game && Number.isSafeInteger(game.matchId) && game.matchId > 0 && /^[a-f0-9]{64}$/.test(game.replaySha256 || "")) {
+            match = {id: game.matchId, replay_sha256: game.replaySha256,
+              started_at: game.startedAt,
+              replay_url: `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`, players: []};
+          }
         }
+      } catch (_) {
+        // Saved results remain available when live hosting cannot be reached.
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch (_) {
-      // The independent modded index must never block main-leaderboard analysis.
+      if (match) break;
     }
 
     if (!match) {
@@ -615,17 +626,24 @@
     }
 
     const players = Array.isArray(detailMatch?.players) ? detailMatch.players : (match.players || []);
+    const engineAnalysis = detailMatch?.telemetry?.engineAnalysis || null;
+    const snapshots = latestRecordedPlayerSnapshots(engineAnalysis);
+    const matchDate = detailMatch?.ended_at || match.ended_at || detailMatch?.started_at || match.started_at;
 
     return {
       replayUrl: match.replay_url,
-      endDate: (detailMatch?.ended_at || match.ended_at)
-        ? `${(detailMatch?.ended_at || match.ended_at).replace(" ", "T")}Z`
+      endDate: matchDate
+        ? `${matchDate.replace(" ", "T")}${/Z$|[+-]\d{2}:\d{2}$/.test(matchDate) ? "" : "Z"}`
         : null,
       partialStats: true,
-      engineAnalysis: detailMatch?.telemetry?.engineAnalysis || null,
+      engineAnalysis,
       detailError,
       playerData: players.map((player) => {
         const hasReplayEngineStats = player.stats_source === "replay-engine";
+        const position = player.position ?? player.position_number;
+        if (!hasReplayEngineStats && snapshots.has(Number(position))) {
+          return recordedSnapshotPlayerData(position, snapshots.get(Number(position)));
+        }
         let rawPlayer = {};
         if (hasReplayEngineStats) {
           try {
@@ -677,6 +695,52 @@
     };
   }
 
+  function latestRecordedPlayerSnapshots(engineAnalysis) {
+    const latest = new Map();
+    const duration = engineAnalysis?.game?.elapsedMilliseconds;
+    for (const snapshot of engineAnalysis?.extended?.snapshots || []) {
+      const time = snapshot?.timeMilliseconds;
+      if (!Number.isFinite(time) || time < 0 || (Number.isFinite(duration) && time > duration)
+          || !Array.isArray(snapshot.players)) continue;
+      for (const player of snapshot.players) {
+        const position = player?.position;
+        if (!Number.isSafeInteger(position) || position < 0 || position > 31) continue;
+        if (!latest.has(position) || time > latest.get(position).timeMilliseconds) {
+          latest.set(position, {...player, timeMilliseconds: time});
+        }
+      }
+    }
+    return latest;
+  }
+
+  function recordedSnapshotPlayerData(position, snapshot) {
+    // A sampled counter is useful even without a final outcome. Keep it separate
+    // from final engine results, awards and leaderboard/Elo publication.
+    const stat = key => Number.isFinite(snapshot[key]) && (key === "score" || snapshot[key] >= 0)
+      ? snapshot[key] : null;
+    return {
+      position, usertype: null, statsSource: "replay-snapshot",
+      sampledAtMilliseconds: snapshot.timeMilliseconds,
+      score: stat("score"), kills: stat("kills"),
+      droidsBuilt: stat("droidsBuilt"), droidsLost: stat("droidsLost"), droids: stat("droidsAlive"),
+      structuresBuilt: stat("structuresBuilt"), structuresLost: stat("structuresLost"),
+      structureKills: stat("structureKills"), structs: stat("structuresAlive"),
+      researchComplete: stat("researchComplete"), power: stat("power"), oilRigs: stat("oilRigs"),
+      powerWon: null, powerLost: null,
+      labResearchPerformance: stat("recentResearchPerformance"),
+      labResearchPotential: stat("recentResearchPotential")
+    };
+  }
+
+  function recordedSummaryNotice(extraction) {
+    const sampled = extraction.players.filter(player => player.summary?.statsSource === "replay-snapshot");
+    if (!sampled.length) return "";
+    const times = sampled.map(player => player.summary.sampledAtMilliseconds);
+    const first = Math.min(...times), last = Math.max(...times);
+    const recordedAt = first === last ? formatDuration(last) : `${formatDuration(first)}–${formatDuration(last)}`;
+    return `Statistics use the last recorded snapshots at ${recordedAt}, which may precede the replay end. Win/loss remains unknown unless a final result was verified.`;
+  }
+
   function attachPublishedPlayerStats(extraction, publishedResult) {
     const publishedPlayers = publishedResult && Array.isArray(publishedResult.playerData)
       ? publishedResult.playerData
@@ -714,7 +778,8 @@
         labResearchPerformance: published.labResearchPerformance,
         labResearchPotential: published.labResearchPotential,
         playerLeftGameTime: published.playerLeftGameTime,
-        statsSource: published.statsSource
+        statsSource: published.statsSource,
+        sampledAtMilliseconds: published.sampledAtMilliseconds
       };
     });
 
@@ -2166,6 +2231,9 @@
     }
 
     const stats = player.summary || {};
+    if (stats.statsSource === "replay-snapshot") {
+      return `${player.name}: statistics recorded at ${formatDuration(stats.sampledAtMilliseconds)}. These are sampled counters, not verified final totals. The final outcome is unknown.`;
+    }
     const partialStats = Boolean(stats.partialStats);
     const result = formatPlayerResult(player);
     const score = formatStat(stats.score) || "an unrecorded score";
@@ -6297,6 +6365,9 @@
   }
 
   function renderExtraction(extraction) {
+    const statsNotice = document.getElementById("replayStatsNotice");
+    statsNotice.textContent = recordedSummaryNotice(extraction);
+    statsNotice.hidden = !statsNotice.textContent;
     const playerCount = extraction.players.filter((player) => !player.spectator).length;
     const observerCount = extraction.players.length - playerCount;
     const hostPlayer = extraction.players.find((player) => player.admin);

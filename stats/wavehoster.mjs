@@ -1,4 +1,4 @@
-import {combineRulesets, combineModNames, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261117-mod-groups-1';
+import {combineRulesets, combineModNames, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261117-wave-alias-1';
 
 let data = null;
 let modData = null;
@@ -344,15 +344,15 @@ async function load() {
     const next = await response.json();
     if (next.format !== 1 || !Array.isArray(next.groups) || !Array.isArray(next.games)) throw new Error('The replay collection could not be read.');
     data = next;
-    const legacyBeta = selected === 'beta';
-    const previous = legacyBeta ? 'mod:Wave-Defense' : selected;
+    const legacyWaveDefense = selected === 'beta' || selected === 'mod:BOHA-Wave-Defense';
+    const previous = legacyWaveDefense ? 'mod:Wave-Defense' : selected;
     modData = combineModNames(data);
     selected = previous === 'all' ? previous
       : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
     renderOptions();
     $('waveError').textContent = '';
     render();
-    if (legacyBeta) syncSelection();
+    if (legacyWaveDefense) syncSelection();
   } catch (error) {
     $('waveError').textContent = error.message;
     $('waveUpdated').textContent = 'Unavailable';

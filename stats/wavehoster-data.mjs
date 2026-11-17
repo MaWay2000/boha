@@ -98,7 +98,7 @@ export function combineModNames(snapshot) {
     const maps = new Map();
     for (const game of games) maps.set(game.map, (maps.get(game.map) || 0) + 1);
     const map = [...maps].sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
-    const name = group.mods.length ? map : 'Unmodded';
+    const name = group.mods.length ? (map === 'BOHA-Wave-Defense' ? 'Wave-Defense' : map) : 'Unmodded';
     if (!families.has(name)) families.set(name, {name, groups: [], games: []});
     const family = families.get(name);
     family.groups.push(group);

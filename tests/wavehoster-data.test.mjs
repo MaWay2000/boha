@@ -52,7 +52,7 @@ test('Analyze uses the archived replay and older snapshots retain a safe WaveHos
 });
 
 
-test('one mod entry combines versions and hashes, preserves identities and includes every matching replay', () => {
+test('one mod entry combines versions, hashes and the BOHA alias without losing identities or replays', () => {
   const player = {id: 'one', name: 'Tester', identityVerified: true, games: 1, wins: 1, losses: 0, draws: 0,
     bestScore: 50, kills: 5, names: [{name: 'Tester', games: 1}], publicKeys: ['key']};
   const snapshot = {groups: [
@@ -63,7 +63,7 @@ test('one mod entry combines versions and hashes, preserves identities and inclu
     {id: 'stock-new', version: '4.7.0', mods: [], players: []}
   ], games: [
     {id: '1', group: 'new-hash', map: 'Wave-Defense', status: 'confirmed'},
-    {id: '2', group: 'old-hash', map: 'Wave-Defense', status: 'confirmed'},
+    {id: '2', group: 'old-hash', map: 'BOHA-Wave-Defense', status: 'confirmed'},
     {id: '3', group: 'new-hash', map: 'Wave-Defense', status: 'pending'},
     {id: '4', group: 'tower-hash', map: 'TowerDefense3_v', status: 'confirmed'},
     {id: '5', group: 'stock-old', map: 'Map A', status: 'unknown'},

@@ -50,7 +50,8 @@ async function page(width = 1400, search = '') {
   const snapshot = {format: 1, generatedAt: '2026-11-17T00:00:00Z', groups: [{id: 'recorded-group',
     version: policy.gameVersion, mods: [policy.modHash], players},
     {id: 'older-release', version: '4.6.3', mods: ['old-mod-hash'], players}], games: Array.from({length: 260}, (_, i) => ({
-    id: `game${i}`, group: i % 2 ? 'older-release' : 'recorded-group', map: 'Wave-Defense', status: 'confirmed',
+    id: `game${i}`, group: i % 2 ? 'older-release' : 'recorded-group',
+    map: i % 2 ? 'BOHA-Wave-Defense' : 'Wave-Defense', status: 'confirmed',
     startedAt: new Date(Date.UTC(2026, 10, 17, 0, i)).toISOString(), durationMilliseconds: 600000, players: ['Player 0'],
     participants: [{id: 'p0', name: 'Player 0', result: 'winner', score: 1, kills: 1}]
   }))};
@@ -86,12 +87,13 @@ async function page(width = 1400, search = '') {
     async refresh() {await context.load(); flush();}};
 }
 
-test('Beta links open one combined Wave-Defense entry, including both current and older games', async () => {
-  const ui = await page(800, '?ruleset=beta');
+for (const legacy of ['beta', 'mod:BOHA-Wave-Defense', 'older-release']) {
+test(`${legacy} links open one combined Wave-Defense entry, including both current and older games`, async () => {
+  const ui = await page(800, '?ruleset=' + encodeURIComponent(legacy));
   assert.equal(ui.get('waveError').textContent, '');
   assert.deepEqual(ui.get('waveRuleset').children.map(option => option.textContent), ['ALL', 'Wave-Defense']);
   assert.equal(ui.get('waveRuleset').value, 'mod:Wave-Defense');
-  assert.equal(ui.url().searchParams.get('ruleset'), 'mod:Wave-Defense');
+  if (legacy !== 'older-release') assert.equal(ui.url().searchParams.get('ruleset'), 'mod:Wave-Defense');
   assert.equal(ui.get('waveTotal').textContent, '260');
   assert.equal(ui.get('waveProfile').hidden, true);
   ui.get('waveMore').fire('click'); ui.flush();
@@ -101,6 +103,7 @@ test('Beta links open one combined Wave-Defense entry, including both current an
   assert.equal(ui.get('waveRuleset').value, 'mod:Wave-Defense');
   assert.equal(ui.games().length, 260);
 });
+}
 
 test('100 players and fitted whole game rows have independent, gap-free Show more controls', async () => {
   const ui = await page();

@@ -1,9 +1,7 @@
 import {combineRulesets, combineModNames, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261117-mod-groups-1';
-import {betaSnapshot, betaRanking} from './arc-beta.mjs?v=20261115-beta-1';
 
 let data = null;
 let modData = null;
-let policy = null;
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
 const PAGE_SIZE = 100;
@@ -141,22 +139,21 @@ function updatedLabel(timestamp) {
 
 function render() {
   if (!data) return;
-  const beta = selected === 'beta';
   const all = selected === 'all';
-  const scope = beta ? betaSnapshot(data, policy) : modData;
-  const group = beta ? betaRanking(data, policy) : all ? combineRulesets(data) : scope.groups.find(item => item.id === selected);
+  const scope = modData;
+  const group = all ? combineRulesets(data) : scope.groups.find(item => item.id === selected);
   if (!group) return;
   selected = group.id;
   const profile = group.players.find(player => player.id === selectedPlayer);
   if (!profile) selectedPlayer = null;
   $('waveRuleset').value = selected;
-  $('waveTotal').textContent = number(scope.games.filter(game => beta || all || game.group === selected).length);
+  $('waveTotal').textContent = number(scope.games.filter(game => all || game.group === selected).length);
   $('waveGroups').textContent = number(scope.groups.length);
   $('waveConfirmed').textContent = number(group.confirmed);
-  $('waveWaiting').textContent = number(scope.games.filter(game => (beta || all || game.group === selected) && game.status === 'pending').length);
+  $('waveWaiting').textContent = number(scope.games.filter(game => (all || game.group === selected) && game.status === 'pending').length);
   $('waveRuleSummary').textContent = all
     ? `All ${number(modData.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
-    : `${beta ? 'Beta · ' + policy.version : rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
+    : `${rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
   $('waveRankingNote').textContent = all
     ? 'Archived totals across all mods. Verified results and recorded departures count; only verified final results add scores.'
     : 'Recorded departures count as defeats. Only verified final results add scores and kills.';
@@ -242,7 +239,7 @@ function render() {
     header.append(th);
   }
   $('waveMatchesHead').replaceChildren(header);
-  const games = scope.games.filter(game => (beta || all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
+  const games = scope.games.filter(game => (all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
   $('waveMatches').replaceChildren();
   games.slice(0, matchLimit).forEach(game => {
     const row = document.createElement('tr');
@@ -336,28 +333,26 @@ function renderOptions() {
     $('waveRuleset').append(element);
   }
   option('all', 'ALL');
-  option('beta', 'Beta');
   for (const group of modData.groups) option(group.id, rulesetLabel(group));
   $('waveRuleset').value = selected;
 }
 
 async function load() {
   try {
-    const [next, nextPolicy] = await Promise.all(['stats/published/wavehoster.json', 'stats/arc-beta.json'].map(async path => {
-      const response = await fetch(path + '?t=' + Date.now(), {cache: 'no-store'});
-      if (!response.ok) throw new Error('The replay collection is temporarily unavailable.');
-      return response.json();
-    }));
+    const response = await fetch('stats/published/wavehoster.json?t=' + Date.now(), {cache: 'no-store'});
+    if (!response.ok) throw new Error('The replay collection is temporarily unavailable.');
+    const next = await response.json();
     if (next.format !== 1 || !Array.isArray(next.groups) || !Array.isArray(next.games)) throw new Error('The replay collection could not be read.');
     data = next;
-    policy = nextPolicy;
-    const previous = selected;
+    const legacyBeta = selected === 'beta';
+    const previous = legacyBeta ? 'mod:Wave-Defense' : selected;
     modData = combineModNames(data);
-    selected = previous === 'beta' || previous === 'all' ? previous
+    selected = previous === 'all' ? previous
       : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
     renderOptions();
     $('waveError').textContent = '';
     render();
+    if (legacyBeta) syncSelection();
   } catch (error) {
     $('waveError').textContent = error.message;
     $('waveUpdated').textContent = 'Unavailable';

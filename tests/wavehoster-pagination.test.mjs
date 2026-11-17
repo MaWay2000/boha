@@ -3,10 +3,9 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 import * as dataFunctions from '../stats/wavehoster-data.mjs';
-import * as betaFunctions from '../stats/arc-beta.mjs';
 
 // Exercise the actual page module and event handlers with deterministic row geometry.
-async function page(width = 1400) {
+async function page(width = 1400, search = '') {
   const frames = [];
   const elements = new Map();
   const listeners = new Map();
@@ -49,23 +48,27 @@ async function page(width = 1400) {
   const players = Array.from({length: 150}, (_, i) => ({id: `p${i}`, name: `Player ${i}`,
     identityVerified: true, games: 1, wins: 1, losses: 0, draws: 0, bestScore: 150 - i, kills: 1}));
   const snapshot = {format: 1, generatedAt: '2026-11-17T00:00:00Z', groups: [{id: 'recorded-group',
-    version: policy.gameVersion, mods: [policy.modHash], players}], games: Array.from({length: 260}, (_, i) => ({
-    id: `game${i}`, group: 'recorded-group', map: 'Wave-Defense', status: 'confirmed',
+    version: policy.gameVersion, mods: [policy.modHash], players},
+    {id: 'older-release', version: '4.6.3', mods: ['old-mod-hash'], players}], games: Array.from({length: 260}, (_, i) => ({
+    id: `game${i}`, group: i % 2 ? 'older-release' : 'recorded-group', map: 'Wave-Defense', status: 'confirmed',
     startedAt: new Date(Date.UTC(2026, 10, 17, 0, i)).toISOString(), durationMilliseconds: 600000, players: ['Player 0'],
     participants: [{id: 'p0', name: 'Player 0', result: 'winner', score: 1, kills: 1}]
   }))};
-  const window = {innerWidth: width, scrollY: 0, location: {href: 'https://example.test/wavehoster.html',
-    search: '', origin: 'https://example.test'}, history: {replaceState() {}}, scrollTo() {},
+  const window = {innerWidth: width, scrollY: 0, location: {href: 'https://example.test/wavehoster.html' + search,
+    search, origin: 'https://example.test'}, history: {replaceState(state, title, url) {
+      window.location.href = String(url);
+      window.location.search = new URL(url).search;
+    }}, scrollTo() {},
     matchMedia: () => ({matches: window.innerWidth >= 1121}),
     addEventListener: (type, handler) => listeners.set(type, handler)};
   window.parent = window;
-  const context = vm.createContext({...dataFunctions, ...betaFunctions, window, URL, URLSearchParams,
+  const context = vm.createContext({...dataFunctions, window, URL, URLSearchParams,
     document: {hidden: false, getElementById: id => {
       assert.ok(elements.has(id), `Missing HTML element ${id}`);
       return elements.get(id);
     }, createElement: () => new Element()},
     requestAnimationFrame: handler => { frames.push(handler); return frames.length; }, setInterval() {},
-    fetch: async path => ({ok: true, json: async () => path.startsWith('stats/arc-beta.json') ? policy : snapshot})});
+    fetch: async () => ({ok: true, json: async () => snapshot})});
   const source = readFileSync(new URL('../stats/wavehoster.mjs', import.meta.url), 'utf8')
     .replace(/^import .*\r?\n/gm, '').replace(/\nload\(\);/, '\nglobalThis.ready = load();');
   vm.runInContext(source, context);
@@ -79,9 +82,25 @@ async function page(width = 1400) {
   const get = id => elements.get(id);
   const games = () => get('waveMatches').children.filter(row => !row.hidden);
   flush();
-  return {get, games, flush, resize(value) {window.innerWidth = value; listeners.get('resize')(); flush();},
+  return {get, games, flush, url: () => new URL(window.location.href), resize(value) {window.innerWidth = value; listeners.get('resize')(); flush();},
     async refresh() {await context.load(); flush();}};
 }
+
+test('Beta links open one combined Wave-Defense entry, including both current and older games', async () => {
+  const ui = await page(800, '?ruleset=beta');
+  assert.equal(ui.get('waveError').textContent, '');
+  assert.deepEqual(ui.get('waveRuleset').children.map(option => option.textContent), ['ALL', 'Wave-Defense']);
+  assert.equal(ui.get('waveRuleset').value, 'mod:Wave-Defense');
+  assert.equal(ui.url().searchParams.get('ruleset'), 'mod:Wave-Defense');
+  assert.equal(ui.get('waveTotal').textContent, '260');
+  assert.equal(ui.get('waveProfile').hidden, true);
+  ui.get('waveMore').fire('click'); ui.flush();
+  ui.get('waveMore').fire('click'); ui.flush();
+  assert.equal(ui.games().length, 260);
+  await ui.refresh();
+  assert.equal(ui.get('waveRuleset').value, 'mod:Wave-Defense');
+  assert.equal(ui.games().length, 260);
+});
 
 test('100 players and fitted whole game rows have independent, gap-free Show more controls', async () => {
   const ui = await page();

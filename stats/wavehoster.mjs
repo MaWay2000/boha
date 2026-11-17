@@ -3,7 +3,6 @@ import {betaSnapshot, betaRanking} from './arc-beta.mjs?v=20261115-beta-1';
 
 let data = null;
 let policy = null;
-let credits = null;
 const rulesetNames = new Map();
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
@@ -149,8 +148,6 @@ function render() {
   $('waveGroups').textContent = number(beta ? scope.groups.length : data.groups.length);
   $('waveConfirmed').textContent = number(group.confirmed);
   $('waveWaiting').textContent = number(scope.games.filter(game => (beta || all || game.group === selected) && game.status === 'pending').length);
-  $('waveArchive').textContent = beta ? 'Replay archive' : 'Back to Beta';
-  $('waveRelease').textContent = beta ? `Beta · Arc-Mw Mod ${policy.version}` : 'Replay archive · all releases';
   $('waveRuleSummary').textContent = all
     ? `All ${number(data.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
     : `${beta ? 'Beta · ' + policy.version : rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
@@ -294,17 +291,6 @@ function render() {
   $('waveMore').hidden = games.length <= limit;
   $('waveUpdated').textContent = updatedLabel(data.generatedAt);
   $('waveUpdated').title = new Date(data.generatedAt).toLocaleString();
-  const testers = credits.testers.filter(tester => tester.name.toLocaleLowerCase().includes(query));
-  $('waveTesterCount').textContent = `${number(credits.testers.length)} tester names saved`;
-  $('waveTesterNames').replaceChildren();
-  for (const tester of testers) {
-    const name = document.createElement('span');
-    name.className = 'wave-tester-name';
-    name.textContent = tester.name;
-    name.title = `${tester.replays.length} replay(s) · first seen ${tester.firstSeenAt ? new Date(tester.firstSeenAt).toLocaleDateString() : 'unknown'}`;
-    $('waveTesterNames').append(name);
-  }
-  $('waveTesterEmpty').hidden = testers.length > 0;
 }
 
 function renderOptions() {
@@ -323,7 +309,7 @@ function renderOptions() {
 
 async function load() {
   try {
-    const [next, nextPolicy, nextCredits] = await Promise.all(['stats/published/wavehoster.json', 'stats/arc-beta.json', 'stats/published/arc-beta-testers.json'].map(async path => {
+    const [next, nextPolicy] = await Promise.all(['stats/published/wavehoster.json', 'stats/arc-beta.json'].map(async path => {
       const response = await fetch(path + '?t=' + Date.now(), {cache: 'no-store'});
       if (!response.ok) throw new Error('The replay collection is temporarily unavailable.');
       return response.json();
@@ -331,7 +317,6 @@ async function load() {
     if (next.format !== 1 || !Array.isArray(next.groups) || !Array.isArray(next.games)) throw new Error('The replay collection could not be read.');
     data = next;
     policy = nextPolicy;
-    credits = nextCredits;
     const previous = selected;
     rulesetNames.clear();
     data.groups.forEach(group => {
@@ -356,14 +341,6 @@ $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;
   selectedPlayer = null;
   limit = MATCH_PAGE_SIZE;
-  syncSelection();
-  render();
-});
-$('waveArchive').addEventListener('click', () => {
-  selected = selected === 'beta' ? 'all' : 'beta';
-  selectedPlayer = null;
-  limit = MATCH_PAGE_SIZE;
-  renderOptions();
   syncSelection();
   render();
 });

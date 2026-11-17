@@ -1,4 +1,4 @@
-import {replaySource} from './wavehoster-data.mjs';
+import {replaySource, participantResult} from './wavehoster-data.mjs';
 
 export function arcProfileUrl(group, player = '') {
   const params = new URLSearchParams({tab: 'wavehoster', ruleset: group});
@@ -22,7 +22,8 @@ export function normalizeArcRecentGames(snapshot) {
       ? game.participants : (Array.isArray(game.players) ? game.players : []).map(name => ({name}));
     const players = participants.filter(player => player && typeof player.name === 'string').map((player, position) => {
       const identity = groups.get(game.group).get(player.id);
-      return {position, userType: game.status === 'confirmed' ? player.result : null,
+      const outcome = participantResult(game, player);
+      return {position, userType: outcome === 'unknown' ? null : outcome,
         account: {id: player.id, name: player.name,
           names: new Map((Array.isArray(identity?.names) ? identity.names : [{name: player.name, games: 1}])
             .filter(alias => alias && typeof alias.name === 'string').map(alias => [alias.name, alias.games])),

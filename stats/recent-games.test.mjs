@@ -102,7 +102,7 @@ test('Arc names are escaped and link to Arc profiles without PvP percentages', (
 test('either match feed can fail independently without hiding the available feed', async () => {
   for (const failed of ['main', 'arc']) {
     let renders = 0;
-    const context = vm.createContext({Promise, matchesSourceElement: {}, matchesFeedStatusElement: {},
+    const context = vm.createContext({Promise, pendingFeedRefresh: null, mainLiveAvailable: true, arcLiveAvailable: true, matchesSourceElement: {}, matchesFeedStatusElement: {},
       leaderboardData: failed === 'main' ? null : {games: []}, arcRecentSignature: failed === 'arc' ? null : 'loaded',
       ensureLeaderboardData: async () => {if (failed === 'main') throw Error('offline'); return true;},
       ensureArcRecentData: async () => {if (failed === 'arc') throw Error('offline'); return true;},
@@ -113,4 +113,34 @@ test('either match feed can fail independently without hiding the available feed
     assert.equal(context.matchesFeedStatusElement.hidden, false);
     assert.match(context.matchesFeedStatusElement.textContent, /Showing available results/);
   }
+});
+
+test('processed Arc departures refresh Recent Matches even when the source timestamp and count stay unchanged', async () => {
+  const first = snapshot([game({status: 'unknown', modsVerified: true})]);
+  first.generatedAt = '2026-11-17T10:00:00Z';
+  const second = structuredClone(first);
+  Object.assign(second.games[0].participants[0], {resultReason: 'departure', leftAtMilliseconds: 300000});
+  const records = [first, second, second].map(payload => ({snapshot: payload, text: JSON.stringify(payload), source: 'live'}));
+  let request = 0;
+  const context = vm.createContext({matchesSourceElement: {}, arcRecentRecord: null, arcLiveAvailable: true,
+    arcRecentSignature: null, arcRecentGames: [], normalizeArcRecentGames,
+    refreshWaveHoster: async () => ({record: records[request++], liveAvailable: true})});
+  vm.runInContext(source.slice(source.indexOf('async function ensureArcRecentData('), source.indexOf('function hydratePublishedBoard(')), context);
+  assert.equal(await context.ensureArcRecentData(), true);
+  assert.equal(context.arcRecentGames[0].players[0].userType, null);
+  assert.equal(await context.ensureArcRecentData(), true);
+  assert.equal(context.arcRecentGames[0].players[0].userType, 'loser');
+  assert.equal(await context.ensureArcRecentData(), false);
+});
+
+test('overlapping page refreshes share work and saved data remains visible during live outages', async () => {
+  let mainCalls = 0, arcCalls = 0, renders = 0;
+  const context = vm.createContext({Promise, pendingFeedRefresh: null, mainLiveAvailable: false, arcLiveAvailable: false,
+    matchesSourceElement: {}, matchesFeedStatusElement: {}, leaderboardData: {games: []}, arcRecentSignature: 'saved',
+    ensureLeaderboardData: async () => {mainCalls++; return true;}, ensureArcRecentData: async () => {arcCalls++; return true;},
+    render: () => renders++});
+  vm.runInContext(source.slice(source.indexOf('async function refreshFromMirror('), source.indexOf('function startRefreshLoop(')), context);
+  await Promise.all([context.refreshFromMirror(), context.refreshFromMirror()]);
+  assert.deepEqual([mainCalls, arcCalls, renders], [1, 1, 1]);
+  assert.match(context.matchesFeedStatusElement.textContent, /Showing saved results/);
 });

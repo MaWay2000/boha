@@ -1,16 +1,18 @@
-import {createPublishedLoader} from './published-loader.mjs?v=20261113-efficient-1';
+import {createPublishedLoader} from './published-loader.mjs?v=20261117-main-live-1';
+import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261113-low-fps-1";
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
-import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261111-combined-recent-1';
+import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261117-live-results-1';
 
-const publishedLoader = createPublishedLoader({baseUrl: new URL('./published/', import.meta.url)});
+const publishedLoader = createPublishedLoader({baseUrl: new URL('./published/', import.meta.url),
+  liveBaseUrl: new URL('https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/live/')});
 const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
 const KNOWN_BOT_NAMES = new Set(["wave", "generic", "da_bot", "scavengers"]);
 const MATCH_LIMIT_STEP = 30;
 const PLAYER_GAME_LIMIT = 20;
-const AUTO_REFRESH_MS = 5 * 60_000;
+const AUTO_REFRESH_MS = 30_000;
 const STALE_MIRROR_MS = 20 * 60_000;
 const PLAYER_ACTIVITY_WINDOW_MS = 30 * 24 * 60 * 60_000;
 // Generated from recorded replay-engine lab performance/potential telemetry.
@@ -107,6 +109,10 @@ const sortHeaderElements = [...document.querySelectorAll("[data-sort-table][data
 
 let selectedLeaderboard = "Global";
 let leaderboardData = null;
+let mainLiveAvailable = true;
+let arcLiveAvailable = true;
+let arcRecentRecord = null;
+let pendingFeedRefresh = null;
 let personalRatings = null;
 let arcRecentGames = [];
 let arcRecentSignature = null;
@@ -155,10 +161,6 @@ function cloneSortState(sortState) {
     key: sortState.key,
     direction: sortState.direction
   };
-}
-
-function stripBom(text) {
-  return text.replace(/^\uFEFF/, "");
 }
 
 function getSortState(table) {
@@ -331,29 +333,9 @@ function setupSortHeaders() {
   updateSortIndicators();
 }
 
-function buildVersionedUrl(baseUrl, version, bust = false) {
-  const url = new URL(baseUrl);
-  if (version) {
-    url.searchParams.set("v", version);
-  }
-  if (bust) {
-    url.searchParams.set("t", Date.now().toString());
-  }
-  return url;
-}
-
-async function readJson(baseUrl, version, bust = false) {
-  const response = await fetch(buildVersionedUrl(baseUrl, version, bust), {
-    cache: "no-store"
-  });
-  if (!response.ok) {
-    throw new Error(`Unable to load ${baseUrl.pathname} (${response.status})`);
-  }
-  return JSON.parse(stripBom(await response.text()));
-}
-
 async function ensureLeaderboardData(force = false) {
   const result = await publishedLoader.load();
+  mainLiveAvailable = result.liveAvailable !== false;
   const payload = result.payload;
   if (personalRatings?.requiresPerformance()) await publishedLoader.loadPerformance(payload);
   if (!result.changed && leaderboardData === payload) return false;
@@ -369,8 +351,11 @@ async function ensureLeaderboardData(force = false) {
 
 async function ensureArcRecentData(force = false) {
   if (!matchesSourceElement) return false;
-  const payload = await readJson(new URL('./published/wavehoster.json', import.meta.url), 'arc', force);
-  const signature = `${payload.generatedAt || ''}:${payload.games?.length}`;
+  const result = await refreshWaveHoster({current: arcRecentRecord});
+  arcRecentRecord = result.record;
+  arcLiveAvailable = result.liveAvailable;
+  const payload = result.record.snapshot;
+  const signature = result.record.text;
   if (!force && signature === arcRecentSignature) return false;
   const games = normalizeArcRecentGames(payload);
   arcRecentGames = games;
@@ -3905,11 +3890,15 @@ window.addEventListener("popstate", () => {
 });
 
 async function refreshFromMirror(force = false) {
+  if (pendingFeedRefresh) return pendingFeedRefresh;
+  pendingFeedRefresh = (async () => {
   const [main, arc] = await Promise.allSettled([ensureLeaderboardData(force), ensureArcRecentData(force)]);
   if (matchesFeedStatusElement) {
     const failed = [main.status === 'rejected' ? 'Main' : '', arc.status === 'rejected' ? 'Arc Mod' : ''].filter(Boolean);
-    matchesFeedStatusElement.hidden = failed.length === 0;
-    matchesFeedStatusElement.textContent = failed.length ? `${failed.join(' and ')} matches could not refresh. Showing available results.` : '';
+    const saved = [!mainLiveAvailable ? 'Main' : '', !arcLiveAvailable ? 'Arc Mod' : ''].filter(Boolean);
+    matchesFeedStatusElement.hidden = failed.length === 0 && saved.length === 0;
+    matchesFeedStatusElement.textContent = failed.length ? `${failed.join(' and ')} matches could not refresh. Showing available results.`
+      : saved.length ? `${saved.join(' and ')} live updates are temporarily unavailable. Showing saved results.` : '';
   }
   if (main.status === 'rejected' && !leaderboardData && arcRecentSignature === null) {
     if (matchesSourceElement) renderMatches([]);
@@ -3918,6 +3907,8 @@ async function refreshFromMirror(force = false) {
   if (main.value || arc.value || force) {
     render();
   }
+  })().finally(() => {pendingFeedRefresh = null;});
+  return pendingFeedRefresh;
 }
 
 function startRefreshLoop() {
@@ -3979,7 +3970,7 @@ async function init() {
   } catch (error) {
     console.error(error);
     if (statusElement) {
-      statusElement.textContent = "Unable to load mirrored upstream stats.";
+      statusElement.textContent = "Unable to load live or saved stats.";
     }
     return;
   }

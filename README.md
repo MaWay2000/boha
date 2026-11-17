@@ -66,6 +66,21 @@ That script refreshes mirrored leaderboard logic, player-key mappings, snapshot 
 
 Running the static site locally does not start these backend or synchronization services. Features that use external APIs still depend on those services being available and allowing the request.
 
+
+## Main leaderboards and Recent Matches live results
+
+Both pages check the processed hosting manifest every 30 seconds and use GitHub's
+published data as fallback. Initial requests compare the small manifests before
+downloading one large snapshot. The freshest verified generation wins; unavailable
+or older data cannot replace a newer snapshot already displayed. Recent Matches
+also uses the processed Arc live feed and preserves replay deduplication.
+
+The hosting exporter uses the same privacy/moderation filter as GitHub. It retains
+backend-calculated Elo, rating events, identities and eligibility rules. Files are
+hash-versioned and compressed; large downloads, integrity checks and JSON parsing
+remain in the background worker. Unchanged refreshes fetch only the manifest, and
+custom-rating performance data remains lazy and tied to its exact generation.
+
 ## Arc Mod live results
 
 The Arc Mod page defaults to ALL and combines versions of each named mod.

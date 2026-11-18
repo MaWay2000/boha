@@ -1423,6 +1423,7 @@
     // These replay map identities have byte-identical terrain in the audited
     // Arc-Mw packs. Keep the terrain immutable when gameplay scripts change.
     const knownHashes = new Set([
+      "2e9aac0518ce74632eb55a40ec66f6207142b49e98b48647a3dab62358f6a86a",
       "bafefe8477794d5edf9d9dc5addb7f0a5254f0e9987a6a3e486599e06f9f8f39",
       "d95d5cffff30deefac74e664c798a60554feea15f7828fb45774019a5a379130",
       "fbb11b9ea17a26f961e8129bd40106809b2e6d6c931f0b8e6fda4ca1e3d07e38"

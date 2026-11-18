@@ -1172,6 +1172,7 @@
       match: {
         name: game.name || "",
         map: game.map || "Unknown",
+        mapHash: typeof game.hash === "string" ? game.hash.toLowerCase() : "",
         maxPlayers: game.maxPlayers,
         type: game.type,
         alliance: game.alliance,
@@ -1414,6 +1415,66 @@
         enumerable: false
       });
     }
+  }
+
+  function replayMapArchiveDescriptor(extraction) {
+    const map = String(extraction?.match?.map || "");
+    const hash = String(extraction?.match?.mapHash || "").toLowerCase();
+    // These replay map identities have byte-identical terrain in the audited
+    // Arc-Mw packs. Keep the terrain immutable when gameplay scripts change.
+    const knownHashes = new Set([
+      "bafefe8477794d5edf9d9dc5addb7f0a5254f0e9987a6a3e486599e06f9f8f39",
+      "d95d5cffff30deefac74e664c798a60554feea15f7828fb45774019a5a379130",
+      "fbb11b9ea17a26f961e8129bd40106809b2e6d6c931f0b8e6fda4ca1e3d07e38"
+    ]);
+    return map === "Wave-Defense" && knownHashes.has(hash) ? {
+      path: "stats/maps/wave-defense-terrain-47f0828cc091.wz",
+      sha256: "47f0828cc091cd39d58aaf56ae27418852fe3f53e992b342020ed6f57b992d40"
+    } : null;
+  }
+
+  async function loadRecoveredMapTerrain(extraction) {
+    if (extraction.mapTerrain) return true;
+    const descriptor = replayMapArchiveDescriptor(extraction);
+    if (!descriptor) return false;
+
+    const archiveUrl = new URL(descriptor.path, document.baseURI);
+    if (archiveUrl.origin !== window.location.origin) {
+      throw new Error("The verified map archive must use the analyzer's origin.");
+    }
+    const response = await fetch(archiveUrl, { cache: "force-cache" });
+    if (!response.ok) {
+      throw new Error(`Verified map archive download failed with HTTP ${response.status}.`);
+    }
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > 16 * 1024 * 1024) {
+      throw new Error("The verified map archive is unexpectedly large.");
+    }
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > 16 * 1024 * 1024) {
+      throw new Error("The verified map archive is unexpectedly large.");
+    }
+    const digest = await calculateReplaySha256(buffer);
+    if (digest !== descriptor.sha256) {
+      throw new Error("The verified map archive checksum does not match.");
+    }
+    const entries = await readEmbeddedZipEntries(
+      new Uint8Array(buffer),
+      new Set(["game.map", "ttypes.ttp", "level.json"])
+    );
+    const terrain = parseEmbeddedMapTerrain(entries);
+    if (!terrain) {
+      throw new Error("The verified map archive does not contain usable terrain.");
+    }
+    Object.defineProperty(extraction, "mapTerrain", {
+      value: terrain,
+      enumerable: false
+    });
+    Object.defineProperty(extraction, "mapTerrainSource", {
+      value: "verified archive",
+      enumerable: false
+    });
+    return true;
   }
 
   function formatBytes(value) {
@@ -6091,7 +6152,7 @@
     battlefieldDuration.value = formatDuration(duration);
     if (previewSupported) {
       const modelDefinitionCount = battlefieldDroidDefinitions.size + battlefieldStructureDefinitions.size;
-      battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? " · embedded terrain" : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
+      battlefieldMeta.textContent = `${battlefieldFrames.length.toLocaleString()} frames · exact positions${interval ? ` every ${interval}s` : ""}${battlefieldTerrain ? (extraction.mapTerrainSource === "verified archive" ? " · recovered terrain" : " · embedded terrain") : ""}${modelDefinitionCount ? ` · ${modelDefinitionCount.toLocaleString()} model definitions` : ""}`;
       battlefieldBackground.checked = Boolean(battlefieldTerrain && battlefieldBackground.checked);
       battlefieldBackground.disabled = !battlefieldTerrain;
       battlefieldTiles.checked = Boolean(battlefieldTerrain?.tileIds?.length && battlefieldTiles.checked);
@@ -6575,12 +6636,18 @@
       }
       setStatus("Parsing replay…");
       latestExtraction = parseReplay(arrayBuffer);
-      if (allowPublishedBattlefield && latestExtraction.embeddedMapArchive) {
-        setStatus("Reading embedded map terrain…");
+      if (allowPublishedBattlefield) {
         try {
-          await loadEmbeddedMapTerrain(latestExtraction);
+          if (latestExtraction.embeddedMapArchive?.length) {
+            setStatus("Reading embedded map terrain…");
+            await loadEmbeddedMapTerrain(latestExtraction);
+          }
+          if (!latestExtraction.mapTerrain && replayMapArchiveDescriptor(latestExtraction)) {
+            setStatus("Recovering verified map terrain…");
+            await loadRecoveredMapTerrain(latestExtraction);
+          }
         } catch (error) {
-          latestExtraction.mapTerrainError = error.message || "Embedded map terrain could not be loaded.";
+          latestExtraction.mapTerrainError = error.message || "Map terrain could not be loaded.";
         }
       }
       let publishedResult = null;

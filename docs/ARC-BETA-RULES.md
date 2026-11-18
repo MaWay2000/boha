@@ -6,8 +6,8 @@ the active release below identifies the processing policy, not a separate dropdo
 
 ## Active release
 
-- The active processing release is **Arc-Mw Mod v156, Warzone 4.7.0**.
-- Its exact mod SHA-256 is `603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31`. Releases v152, v153, v154 and v155 remain archived.
+- The active processing release is **Arc-Mw Mod v157, Warzone 4.7.0**.
+- Its exact mod SHA-256 is `1b8d56e83cd276ddd1476efbf1bfbf31195b5e892ef4fc361c3f57455aae4e30`. Releases v152 through v156 remain archived.
 - `stats/arc-beta.json` controls the active release. Match the game version and the complete mod pack; a map name alone is insufficient.
 - A later replay of an older or unrelated mod does not promote that mod to Beta.
 - To promote a release, move the previous hash into `archiveModHashes`, set the new version and hash, and update this document. Do not reset the tester archive.

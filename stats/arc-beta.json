@@ -1,10 +1,11 @@
 {
   "format": 1,
   "label": "Beta",
-  "version": "v156",
+  "version": "v157",
   "gameVersion": "4.7.0",
-  "modHash": "603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31",
+  "modHash": "1b8d56e83cd276ddd1476efbf1bfbf31195b5e892ef4fc361c3f57455aae4e30",
   "archiveModHashes": [
+    "603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31",
     "e4568ef645926c5079bf3a1dd78d55cde55fd78918161a586eab5d6322ce1c70",
     "ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a",
     "a746cff7d52c762f78e46cff93ac4861398e4eca51d4214e57bfd007f18d456b",

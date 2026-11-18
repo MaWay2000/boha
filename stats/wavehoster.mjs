@@ -232,8 +232,7 @@ function render() {
     }
   }
   const header = document.createElement('tr');
-  const headings = profile ? ['Date ↓', 'Map', 'Result', 'Score', 'Time', 'Kills'] : ['Date ↓', 'Map', 'Players', 'Time', 'Results'];
-  if (all) headings.splice(2, 0, 'Mod');
+  const headings = profile ? ['Date ↓', 'Mod', 'Result', 'Score', 'Time', 'Kills'] : ['Date ↓', 'Mod', 'Players', 'Time', 'Results'];
   headings.push('Statistics');
   for (const label of headings) {
     const th = document.createElement('th');
@@ -247,11 +246,8 @@ function render() {
   games.slice(0, matchLimit).forEach(game => {
     const row = document.createElement('tr');
     cell(row, game.startedAt ? new Date(game.startedAt).toLocaleString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'Unknown date');
-    cell(row, game.map);
-    if (all) {
-      const ruleset = scope.groups.find(group => group.id === game.group);
-      cell(row, ruleset ? rulesetLabel(ruleset) : 'Unknown', 'wave-mod-cell');
-    }
+    const ruleset = scope.groups.find(group => group.id === game.group);
+    cell(row, ruleset ? rulesetLabel(ruleset) : 'Unknown', 'wave-mod-cell');
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
     if (participant) {
       const outcome = participantResult(game, participant);

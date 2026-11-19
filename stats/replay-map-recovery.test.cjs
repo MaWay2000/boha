@@ -30,6 +30,8 @@ test('v158 uses its changed terrain while historical replays retain their origin
   const current=context.replayMapArchiveDescriptor({match:{map:'Wave-Defense',mapHash:'2e9aac0518ce74632eb55a40ec66f6207142b49e98b48647a3dab62358f6a86a'}});
   const previous=context.replayMapArchiveDescriptor(waveDefense);
   assert.equal(current.path,'stats/maps/wave-defense-terrain-8c08b592a32d.wz');
+  const v159=context.replayMapArchiveDescriptor({match:{map:'Wave-Defense',mapHash:'e9fcd3b099b9e7833dde4771bfa9c3c39af86b17bb4253c04eebf50136c04a0f'}});
+  assert.equal(v159.path,current.path);assert.equal(v159.sha256,current.sha256);
   assert.notEqual(current.sha256,previous.sha256);
 });
 

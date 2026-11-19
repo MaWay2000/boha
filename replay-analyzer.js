@@ -1424,7 +1424,7 @@
     // Match exact replay identities. v158 changed the terrain; older matches
     // must retain their original layout rather than inherit the newest map.
     if (map !== "Wave-Defense") return null;
-    if (hash === "2e9aac0518ce74632eb55a40ec66f6207142b49e98b48647a3dab62358f6a86a") {
+    if (hash === "2e9aac0518ce74632eb55a40ec66f6207142b49e98b48647a3dab62358f6a86a" || hash === "e9fcd3b099b9e7833dde4771bfa9c3c39af86b17bb4253c04eebf50136c04a0f") {
       return {
         path: "stats/maps/wave-defense-terrain-8c08b592a32d.wz",
         sha256: "8c08b592a32d9920c6035cd3ff0588da4ef6d13bfdc025d540c8ef38ce36a216"
@@ -4129,7 +4129,7 @@
 
   function replayModelAssetDescriptor(extraction) {
     const hashes = extraction?.match?.modHashes || [];
-    const audited = new Set(["a746cff7d52c762f78e46cff93ac4861398e4eca51d4214e57bfd007f18d456b","ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a","e4568ef645926c5079bf3a1dd78d55cde55fd78918161a586eab5d6322ce1c70","603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31","1b8d56e83cd276ddd1476efbf1bfbf31195b5e892ef4fc361c3f57455aae4e30","63b5333af9cd97c5dd8b132733a693727c068c45f08e8f58e91bf3afcf065d97"]);
+    const audited = new Set(["a746cff7d52c762f78e46cff93ac4861398e4eca51d4214e57bfd007f18d456b","ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a","e4568ef645926c5079bf3a1dd78d55cde55fd78918161a586eab5d6322ce1c70","603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31","1b8d56e83cd276ddd1476efbf1bfbf31195b5e892ef4fc361c3f57455aae4e30","63b5333af9cd97c5dd8b132733a693727c068c45f08e8f58e91bf3afcf065d97","d1e67949610119d8964808329c106f8eef789cc3fd4aefce470e2f03e21a289a"]);
     return hashes.length === 1 && audited.has(hashes[0]) ? {
       path: "stats/models/arc-mw-visuals-fccc5ecab427.json",
       sha256: "fccc5ecab427451d6ae718ae756be33f85705698e5f2c68d9fd38265c7b6eaa9"

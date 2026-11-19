@@ -1173,6 +1173,7 @@
         name: game.name || "",
         map: game.map || "Unknown",
         mapHash: typeof game.hash === "string" ? game.hash.toLowerCase() : "",
+        modHashes: Array.isArray(game.modHashes) ? game.modHashes.map((hash) => String(hash).toLowerCase()) : [],
         maxPlayers: game.maxPlayers,
         type: game.type,
         alliance: game.alliance,
@@ -4124,9 +4125,62 @@
     return response.json();
   }
 
+  const battlefieldVisualAssetPromises = new Map();
+
+  function replayModelAssetDescriptor(extraction) {
+    const hashes = extraction?.match?.modHashes || [];
+    const audited = new Set(["a746cff7d52c762f78e46cff93ac4861398e4eca51d4214e57bfd007f18d456b","ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a","e4568ef645926c5079bf3a1dd78d55cde55fd78918161a586eab5d6322ce1c70","603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31","1b8d56e83cd276ddd1476efbf1bfbf31195b5e892ef4fc361c3f57455aae4e30","63b5333af9cd97c5dd8b132733a693727c068c45f08e8f58e91bf3afcf065d97"]);
+    return hashes.length === 1 && audited.has(hashes[0]) ? {
+      path: "stats/models/arc-mw-visuals-fccc5ecab427.json",
+      sha256: "fccc5ecab427451d6ae718ae756be33f85705698e5f2c68d9fd38265c7b6eaa9"
+    } : null;
+  }
+
+  async function loadReplayModelAssets(extraction) {
+    const descriptor = replayModelAssetDescriptor(extraction);
+    if (!descriptor) return false;
+    let pending = battlefieldVisualAssetPromises.get(descriptor.sha256);
+    if (!pending) {
+      pending = (async () => {
+        const url = new URL(descriptor.path, document.baseURI);
+        if (url.origin !== window.location.origin) throw new Error("Model assets must use the analyzer's origin.");
+        const response = await fetch(url, { cache: "force-cache" });
+        if (!response.ok) throw new Error("Custom model download failed (HTTP " + response.status + ").");
+        const bytes = await response.arrayBuffer();
+        if (bytes.byteLength > 8 * 1024 * 1024 || await calculateReplaySha256(bytes) !== descriptor.sha256) {
+          throw new Error("Custom model asset checksum or size does not match.");
+        }
+        const visuals = JSON.parse(textDecoder.decode(bytes));
+        if (visuals.schema !== 1 || !visuals.bodyDefs || !visuals.models) throw new Error("Invalid custom model data.");
+        const assets = new Map([...Object.entries(visuals.models), ...Object.entries(visuals.textures || {})]);
+        const { registerUnitPieModels } = await import("./mapmaker/js/pie.js");
+        registerUnitPieModels(assets);
+        return visuals;
+      })();
+      battlefieldVisualAssetPromises.set(descriptor.sha256, pending);
+      pending.catch(() => battlefieldVisualAssetPromises.delete(descriptor.sha256));
+    }
+    Object.defineProperty(extraction, "battlefieldVisuals", { value: await pending, enumerable: false });
+    return true;
+  }
+
+  function battlefieldReplayModelLibrary(base) {
+    const visuals = battlefieldExtraction?.battlefieldVisuals;
+    if (!visuals) return base;
+    if (!visuals.library) {
+      Object.defineProperty(visuals, "library", { value: {
+        ...base,
+        bodyDefs: { ...base.bodyDefs, ...visuals.bodyDefs },
+        propDefs: { ...base.propDefs, ...visuals.propDefs },
+        weaponDefs: { ...base.weaponDefs, ...visuals.weaponDefs }
+      }, enumerable: false });
+    }
+    return visuals.library;
+  }
+
   async function loadBattlefieldModelLibrary() {
     if (battlefieldModelLibraryPromise) {
-      return battlefieldModelLibraryPromise;
+      return battlefieldReplayModelLibrary(await battlefieldModelLibraryPromise);
     }
     battlefieldModelLibraryPromise = (async () => {
       window.PIES_BASE = new URL("mapmaker/pies/", window.location.href).href;
@@ -4173,7 +4227,7 @@
       };
     })();
     try {
-      return await battlefieldModelLibraryPromise;
+      return battlefieldReplayModelLibrary(await battlefieldModelLibraryPromise);
     } catch (error) {
       battlefieldModelLibraryPromise = null;
       throw error;
@@ -4198,7 +4252,7 @@
     parts.push({
       role: "meta",
       propulsionType: propulsion?.type,
-      droidType: design.type || definition.droidType
+      droidType: design.type || body?.droidType || (body?.class === "Cyborgs" ? "CYBORG" : "DROID")
     });
     if (bodyId) {
       parts.push({ role: "body", path: battlefieldPiePath(body?.model || bodyId, "components/bodies/") });
@@ -4209,14 +4263,18 @@
       const left = typeof propulsionModels === "string" ? propulsionModels : propulsionModels.left;
       if (left) {
         parts.push({ role: "propulsion", path: battlefieldPiePath(left, "components/prop/"), side: "left" });
-        const right = String(left).replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
+        const right = propulsionModels.right || String(left).replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
         if (right !== left && !/^prmvtl/i.test(left)) {
           parts.push({ role: "propulsion", path: battlefieldPiePath(right, "components/prop/"), side: "right" });
         }
         bodySpecificPropulsion = true;
+        const effect = propulsionModels.still || propulsionModels.moving;
+        if (effect) parts.push({ role: "effect", path: battlefieldPiePath(effect, "components/prop/"), effectState: propulsionModels.still ? "still" : "moving" });
       }
     }
-    if (propulsionId && !bodySpecificPropulsion) {
+    // Native cyborg body PIEs already contain the legs. A custom Legged stat
+    // without its own model must not be treated as a PIE filename.
+    if (propulsionId && !bodySpecificPropulsion && !(propulsion?.type === "Legged" && !propulsion.model)) {
       parts.push({
         role: "propulsion",
         path: battlefieldPiePath(propulsion?.model || propulsionId, "components/prop/")
@@ -6655,6 +6713,13 @@
           }
         } catch (error) {
           latestExtraction.mapTerrainError = error.message || "Map terrain could not be loaded.";
+        }
+      }
+      if (allowPublishedBattlefield) {
+        try {
+          await loadReplayModelAssets(latestExtraction);
+        } catch (error) {
+          latestExtraction.modelAssetsError = error.message || "Custom model assets could not be loaded.";
         }
       }
       let publishedResult = null;

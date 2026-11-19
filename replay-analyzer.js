@@ -1420,15 +1420,21 @@
   function replayMapArchiveDescriptor(extraction) {
     const map = String(extraction?.match?.map || "");
     const hash = String(extraction?.match?.mapHash || "").toLowerCase();
-    // These replay map identities have byte-identical terrain in the audited
-    // Arc-Mw packs. Keep the terrain immutable when gameplay scripts change.
-    const knownHashes = new Set([
-      "2e9aac0518ce74632eb55a40ec66f6207142b49e98b48647a3dab62358f6a86a",
+    // Match exact replay identities. v158 changed the terrain; older matches
+    // must retain their original layout rather than inherit the newest map.
+    if (map !== "Wave-Defense") return null;
+    if (hash === "2e9aac0518ce74632eb55a40ec66f6207142b49e98b48647a3dab62358f6a86a") {
+      return {
+        path: "stats/maps/wave-defense-terrain-8c08b592a32d.wz",
+        sha256: "8c08b592a32d9920c6035cd3ff0588da4ef6d13bfdc025d540c8ef38ce36a216"
+      };
+    }
+    const originalTerrainHashes = new Set([
       "bafefe8477794d5edf9d9dc5addb7f0a5254f0e9987a6a3e486599e06f9f8f39",
       "d95d5cffff30deefac74e664c798a60554feea15f7828fb45774019a5a379130",
       "fbb11b9ea17a26f961e8129bd40106809b2e6d6c931f0b8e6fda4ca1e3d07e38"
     ]);
-    return map === "Wave-Defense" && knownHashes.has(hash) ? {
+    return originalTerrainHashes.has(hash) ? {
       path: "stats/maps/wave-defense-terrain-47f0828cc091.wz",
       sha256: "47f0828cc091cd39d58aaf56ae27418852fe3f53e992b342020ed6f57b992d40"
     } : null;

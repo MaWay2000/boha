@@ -1046,14 +1046,18 @@ function getNumericGlobalRank(account) {
   return Number.isFinite(rank) ? rank : null;
 }
 
-function getPlayerPowerLabel(account) {
+function getPlayerPowerPercent(account) {
   const totalRankedPlayers = globalRankMap.size;
   const rank = getNumericGlobalRank(account);
   if (!totalRankedPlayers || !rank) {
-    return "50%";
+    return 50;
   }
 
-  return `${Math.round(((totalRankedPlayers - rank + 1) / totalRankedPlayers) * 100)}%`;
+  return Math.round(((totalRankedPlayers - rank + 1) / totalRankedPlayers) * 100);
+}
+
+function getPlayerPowerLabel(account) {
+  return `${getPlayerPowerPercent(account)}%`;
 }
 
 function getTeamStrengthPercent(team) {
@@ -2821,8 +2825,8 @@ function renderMatchup(game, options = {}) {
     showTeamStrength = true
   } = options;
   const teams = game.teams.filter((team) => team.players.length);
-  const showTeamStrengthLabel = showTeamStrength
-    && !(teams.length === 2 && teams.every((team) => team.players.length === 1));
+  const isDuel = teams.length === 2 && teams.every((team) => team.players.length === 1);
+  const showTeamStrengthLabel = showTeamStrength && !isDuel;
   if (!teams.length) {
     return `<span class="stats-note">Player list unavailable.</span>`;
   }
@@ -2839,9 +2843,10 @@ function renderMatchup(game, options = {}) {
       && Number.isFinite(strengthPercent)
       && strengthPercent === weakestTeamStrength
       && weakestTeamStrength < strongestTeamStrength;
-    return isUpsetWinner
-      ? '<span class="stats-upset-victory" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733; Mega win!</span>'
-      : "";
+    if (!isUpsetWinner) return "";
+    return variant === "inline-power"
+      ? '<span class="stats-mega-win-star" role="img" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span>'
+      : '<span class="stats-upset-victory" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733; Mega win!</span>';
   };
 
   const renderPlayerLabel = (player) => {
@@ -2908,12 +2913,18 @@ function renderMatchup(game, options = {}) {
           .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
           .join("");
         if (variant === "inline-power") {
-          const ratingChance = game.ratingMethod === "maway-v1";
-          const power = Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A";
+          const fillPercent = isDuel
+            ? getPlayerPowerPercent(team.players[0].account)
+            : showTeamStrengthLabel ? strengthPercent : null;
+          const hasPowerFill = Number.isFinite(fillPercent);
+          const barPercent = hasPowerFill ? Math.max(0, Math.min(100, fillPercent)) : 0;
+          const powerFill = hasPowerFill
+            ? ` style="--team-power-fill: ${barPercent}%; --team-power-hue: ${Math.round(barPercent * 1.2)}"`
+            : "";
           return `
-            <div class="stats-team stats-team-inline-power ${teamTone}">
-              <div class="stats-team-roster">${players}${renderUpsetBadge(team, strengthPercent)}</div>
-              ${showTeamStrengthLabel ? `<span class="stats-team-strength" title="${ratingChance ? "Pre-match chance" : "Team power"}">${power} ${ratingChance ? "chance" : "power"}</span>` : ""}
+            <div class="stats-team stats-team-inline-power ${teamTone}${hasPowerFill ? " stats-team-power-fill" : ""}"${powerFill}>
+              ${renderUpsetBadge(team, strengthPercent)}
+              <div class="stats-team-roster">${players}</div>
             </div>
             ${vsLabel}
           `;
@@ -3169,6 +3180,26 @@ function renderSummary(accountList, gameList) {
   renderTrendingPlayers(accountList, gameList);
 }
 
+function renderWinStreakMedals(streak) {
+  const medalTypes = [
+    { wins: 5, name: "gold" },
+    { wins: 3, name: "double" },
+    { wins: 1, name: "green" },
+  ];
+  const medals = [];
+  let remainingWins = streak;
+  for (const { wins, name } of medalTypes) {
+    const count = Math.min(Math.floor(remainingWins / wins), 3 - medals.length);
+    for (let i = 0; i < count; i += 1) {
+      medals.push(`<img src="assets/medals/streak-${name}.png" alt="">`);
+    }
+    remainingWins -= count * wins;
+  }
+  return medals.length
+    ? `<span class="stats-form-streak" aria-hidden="true">${medals.join("")}</span>`
+    : "";
+}
+
 function renderRanks(accountList) {
   if (!ranksElement) {
     return [];
@@ -3207,15 +3238,14 @@ function renderRanks(accountList) {
       const displayStats = getAccountDisplayStats(account);
       const displayGameCount = getAccountDisplayGameCount(account);
       const eloLabel = account.discounted ? "--" : account.elo.toFixed(2);
-      const recentTrend = getRecentPlayerTrend(account);
-      const eloChangeLabel = `${recentTrend.eloGain > 0 ? "+" : ""}${recentTrend.eloGain.toFixed(2)}`;
-      const eloChangeClass = recentTrend.eloGain > 0
+      const { eloGain, games: recentGameCount, streak: winStreak } = getRecentPlayerTrend(account);
+      const eloChangeLabel = `${eloGain > 0 ? "+" : ""}${eloGain.toFixed(2)}`;
+      const eloChangeClass = eloGain > 0
         ? "is-positive"
-        : recentTrend.eloGain < 0
+        : eloGain < 0
           ? "is-negative"
           : "is-neutral";
-      const streakLabel = recentTrend.streak > 0 ? `🔥 ${recentTrend.streak}W` : "0W";
-      const formLabel = `${eloChangeLabel} ELO over the latest ${recentTrend.games} matches; current win streak ${recentTrend.streak}`;
+      const formLabel = `${eloChangeLabel} ELO over the latest ${recentGameCount} matches · Current win streak ${winStreak}`;
       const publicKeys = [...account.publicKeys].sort();
       const accountNames = getSortedAccountNames(account);
       const keyCountLabel = `${publicKeys.length} key(s) tracked`;
@@ -3319,7 +3349,7 @@ function renderRanks(accountList) {
             <span class="stats-elo-value">${eloLabel}</span>
             <span class="stats-form-indicators" aria-label="${escapeHtml(formLabel)}" title="${escapeHtml(formLabel)}">
               <span class="stats-form-change ${eloChangeClass}">${eloChangeLabel}</span>
-              <span class="stats-form-streak${recentTrend.streak > 0 ? " is-active" : ""}">${streakLabel}</span>
+              ${renderWinStreakMedals(winStreak)}
             </span>
           </td>
           <td>${account.games.length}</td>
@@ -3521,7 +3551,6 @@ function renderMatches(gameList) {
           </td>
           <td class="stats-matchup">${renderMatchup(game, {
             variant: "inline-power",
-            includePlayerPower: true,
             linkToLeaderboard: true,
             showTeamStrength: true,
             showVersus: false
@@ -3547,22 +3576,14 @@ function renderRecentRows(games, matchRow, rankTable) {
   const limit = Math.min(games.length, visibleMatchCount);
   matchesElement.innerHTML = games.slice(0, limit).map(matchRow).join("");
 
-  function moveBadges(rows) {
-    for (const row of rows) {
-      row.querySelectorAll(".stats-upset-victory").forEach((badge) => row.cells[1].append(badge));
-    }
-  }
-
-  if (leaderboardRecentMatchesElement) moveBadges(matchesElement.querySelectorAll("tr"));
   if (!rankTable) return limit;
 
-  // Measure real rows because team badges and wrapped player names change their heights.
+  // Measure actual row heights so wrapped rosters never get cut off.
   const bottom = rankTable.getBoundingClientRect().bottom;
   let rendered = limit;
   while (rendered < games.length && matchesElement.lastElementChild.getBoundingClientRect().bottom < bottom) {
     const next = Math.min(rendered + MATCH_LIMIT_STEP, games.length);
     matchesElement.insertAdjacentHTML("beforeend", games.slice(rendered, next).map(matchRow).join(""));
-    moveBadges(Array.from(matchesElement.children).slice(rendered));
     rendered = next;
   }
   const rows = Array.from(matchesElement.children);

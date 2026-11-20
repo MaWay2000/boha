@@ -2181,13 +2181,25 @@ main {
   white-space: nowrap;
 }
 
-.stats-form-change,
-.stats-form-streak {
+.stats-form-change {
   color: var(--muted);
 }
 
-.stats-form-change.is-positive,
-.stats-form-streak.is-active {
+.stats-form-streak {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.stats-form-streak img {
+  display: block;
+  width: auto;
+  height: 15px;
+  image-rendering: pixelated;
+}
+
+.stats-form-change.is-positive {
   color: var(--green);
 }
 
@@ -2688,10 +2700,8 @@ main {
 }
 
 .stats-team-inline-power {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
+  position: relative;
+  display: block;
   width: 100%;
   padding: 4px 7px;
   border-radius: 7px;
@@ -2699,30 +2709,60 @@ main {
 }
 
 .stats-team-inline-power .stats-team-roster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 4px;
   min-width: 0;
 }
 
 .stats-team-inline-power .stats-team-player {
-  display: inline-block;
-}
-
-.stats-team-inline-power .stats-team-strength {
-  min-height: 0;
-  padding: 2px 5px;
-  border: 1px solid currentColor;
+  min-width: 0;
+  padding: 1px 5px;
+  border: 1px solid rgba(197, 232, 241, 0.34);
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.18);
-  color: inherit;
-  font-size: 0.72rem;
-  font-weight: 700;
-  white-space: nowrap;
+  background: rgba(5, 15, 24, 0.64);
+  transition: background-color 1s ease;
 }
 
-.stats-team-inline-power .stats-upset-victory {
-  min-height: 0;
-  margin-left: 6px;
-  padding: 2px 5px;
-  vertical-align: middle;
+.stats-team-inline-power .stats-team-player::before {
+  content: none;
+}
+
+.stats-team-inline-power .stats-team-player:has(> .stats-team-player-link:hover) {
+  background-color: #b9dbe3;
+}
+
+.stats-team-inline-power .stats-team-player:focus-within {
+  border-color: #85e8f9;
+}
+
+.stats-team-inline-power .stats-team-player-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 1s ease;
+}
+
+.stats-team-inline-power .stats-team-player-link:hover {
+  color: #000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-team-inline-power .stats-team-player,
+  .stats-team-inline-power .stats-team-player-link {
+    transition: none;
+  }
+}
+
+.stats-team-inline-power > .stats-mega-win-star {
+  position: absolute;
+  inset-inline-start: 7px;
+  inset-block-start: 8px;
+  margin-left: 0;
+}
+
+.stats-team-inline-power > .stats-mega-win-star + .stats-team-roster {
+  padding-inline-start: 14px;
 }
 
 .stats-team-winner {
@@ -2737,6 +2777,14 @@ main {
   background: rgba(255, 114, 98, 0.12);
 }
 
+.stats-team-inline-power.stats-team-winner .stats-team-player {
+  color: #79f29a;
+}
+
+.stats-team-inline-power.stats-team-loser .stats-team-player {
+  color: #ff8589;
+}
+
 .stats-team-contender {
   color: #fff0c2;
   border-color: rgba(255, 198, 96, 0.24);
@@ -2747,6 +2795,27 @@ main {
   color: var(--steel);
   border-color: rgba(149, 205, 255, 0.16);
   background: rgba(109, 232, 255, 0.08);
+}
+
+.stats-team.stats-team-power-fill {
+  position: relative;
+  isolation: isolate;
+  border-color: transparent;
+  background: none;
+}
+
+.stats-team-power-fill::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 auto 0 0;
+  width: var(--team-power-fill);
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    hsla(var(--team-power-hue), 72%, 30%, 0.34),
+    hsla(var(--team-power-hue), 82%, 48%, 0.58));
+  box-shadow: inset -1px 0 hsla(var(--team-power-hue), 88%, 72%, 0.72);
+  pointer-events: none;
 }
 
 .stats-versus {

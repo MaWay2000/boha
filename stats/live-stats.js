@@ -3480,12 +3480,10 @@ function renderMatches(gameList) {
     .filter((game) => matchesRecentGameSearch(game, searchQuery))
     .filter((game) => leaderboardRecentMatchesElement || matchesAdvancedFilters(game))
     .sort(compareMatches);
-  const rows = filteredGames.slice(0, visibleMatchCount);
-
   renderMapSummary(filteredGames);
-  renderMatchActions(filteredGames.length, rows.length);
 
-  if (!rows.length) {
+  if (!filteredGames.length) {
+    renderMatchActions(0, 0);
     matchesElement.innerHTML = `
       <tr class="stats-empty-row">
         <td colspan="${leaderboardRecentMatchesElement ? 4 : 6}">${searchQuery || activeFilterCount ? "No matches matched the current filters." : "No matches found for this slice."}</td>
@@ -3494,10 +3492,9 @@ function renderMatches(gameList) {
     return;
   }
 
-  matchesElement.innerHTML = rows
-    .map((game) => {
-      const replaySource = getReplaySource(game);
-      return `
+  const matchRow = (game) => {
+    const replaySource = getReplaySource(game);
+    return `
         <tr>
           <td class="stats-date">
             <span class="stats-date-day">${escapeHtml(formatMatchDate(game.endDate))}</span>
@@ -3522,15 +3519,42 @@ function renderMatches(gameList) {
           `}
           <td><a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replaySource.replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replaySource.replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a></td>
         </tr>
-      `;
-    })
-    .join("");
+    `;
+  };
 
-  if (leaderboardRecentMatchesElement) {
-    matchesElement.querySelectorAll("tr").forEach((row) => {
+  const rankTable = leaderboardRecentMatchesElement && visibleMatchCount === INITIAL_MATCH_LIMIT &&
+    window.matchMedia("(min-width: 1081px)").matches ? ranksElement?.closest(".stats-table-wrap") : null;
+  const shown = renderRecentRows(filteredGames, matchRow, rankTable);
+  renderMatchActions(filteredGames.length, shown);
+}
+
+function renderRecentRows(games, matchRow, rankTable) {
+  const limit = Math.min(games.length, visibleMatchCount);
+  matchesElement.innerHTML = games.slice(0, limit).map(matchRow).join("");
+
+  function moveBadges(rows) {
+    for (const row of rows) {
       row.querySelectorAll(".stats-upset-victory").forEach((badge) => row.cells[1].append(badge));
-    });
+    }
   }
+
+  if (leaderboardRecentMatchesElement) moveBadges(matchesElement.querySelectorAll("tr"));
+  if (!rankTable) return limit;
+
+  // Measure real rows because team badges and wrapped player names change their heights.
+  const bottom = rankTable.getBoundingClientRect().bottom;
+  let rendered = limit;
+  while (rendered < games.length && matchesElement.lastElementChild.getBoundingClientRect().bottom < bottom) {
+    const next = Math.min(rendered + MATCH_LIMIT_STEP, games.length);
+    matchesElement.insertAdjacentHTML("beforeend", games.slice(rendered, next).map(matchRow).join(""));
+    moveBadges(Array.from(matchesElement.children).slice(rendered));
+    rendered = next;
+  }
+  const rows = Array.from(matchesElement.children);
+  const overflow = rows.findIndex((row) => row.getBoundingClientRect().bottom > bottom);
+  const shown = overflow === -1 ? rendered : Math.max(1, overflow);
+  rows.slice(shown).forEach((row) => row.remove());
+  return shown;
 }
 
 function getSuccessfulMapPlayers(gameList) {
@@ -3657,7 +3681,7 @@ function renderMatchActions(totalMatches, shownMatches) {
   }
 
   loadMoreButton.addEventListener("click", () => {
-    visibleMatchCount = Math.min(visibleMatchCount + MATCH_LIMIT_STEP, totalMatches);
+    visibleMatchCount = shownMatches + MATCH_LIMIT_STEP;
     render();
   });
 }
@@ -3954,6 +3978,14 @@ document.addEventListener("click", (event) => {
 async function init() {
   applyStateFromUrl();
   setupSortHeaders();
+  const rankTable = leaderboardRecentMatchesElement && ranksElement?.closest(".stats-table-wrap");
+  if (rankTable) {
+    const refit = () => {
+      if (renderedGameList && visibleMatchCount === INITIAL_MATCH_LIMIT) renderMatches(renderedGameList);
+    };
+    if (typeof ResizeObserver === "function") new ResizeObserver(refit).observe(rankTable);
+    window.matchMedia("(min-width: 1081px)").addEventListener("change", refit);
+  }
   const ratingsHost = document.querySelector(".stats-shell");
   if (ratingsHost) {
     let storage;

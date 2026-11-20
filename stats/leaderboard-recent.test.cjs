@@ -52,6 +52,7 @@ function matchFixture(sidebar) {
     matchesRecentGameSearch: (game, query) => !query || game.mapName.includes(query),
     matchesAdvancedFilters: game => game.allowed,
     compareMatches: (a, b) => b.endDate - a.endDate, visibleMatchCount: 2,
+    INITIAL_MATCH_LIMIT: 30, MATCH_LIMIT_STEP: 30,
     renderMapSummary() {}, renderMatchActions: (...values) => actions.push(values),
     getReplaySource: game => ({replayUrl: game.replayUrl, label: 'Replay source', pageUrl: 'https://source.test/'}),
     escapeHtml: value => String(value), formatMatchDate: value => String(value), formatMatchTime: () => 'time',
@@ -61,6 +62,51 @@ function matchFixture(sidebar) {
   vm.runInContext(source.slice(source.indexOf('function renderMatches('), source.indexOf('function getSuccessfulMapPlayers(')), context);
   return {context, actions};
 }
+
+test('desktop sidebar extends past the first batch and stops at the last whole row', () => {
+  const {context, actions} = matchFixture(true);
+  const children = [];
+  let tableBottom = 3049;
+  const insert = (html) => {
+    for (const _ of html.matchAll(/<tr>/g)) {
+      const height = children.length % 2 ? 80 : 60;
+      const bottom = (children.at(-1)?.getBoundingClientRect().bottom ?? 50) + height;
+      const row = {
+        querySelectorAll: () => [],
+        getBoundingClientRect: () => ({bottom}),
+        remove: () => children.splice(children.indexOf(row), 1)
+      };
+      children.push(row);
+    }
+  };
+  context.matchesElement = {
+    children,
+    querySelectorAll: () => children,
+    get lastElementChild() { return children.at(-1); },
+    set innerHTML(html) { children.length = 0; insert(html); },
+    insertAdjacentHTML: (_, html) => insert(html)
+  };
+  context.window = {matchMedia: () => ({matches: true})};
+  context.ranksElement = {closest: () => ({getBoundingClientRect: () => ({bottom: tableBottom})})};
+  context.visibleMatchCount = 30;
+  const games = Array.from({length: 90}, (_, endDate) => ({
+    mapName: 'Map', endDate, duration: 300000, replayUrl: 'https://source.test/replay'
+  }));
+
+  context.renderMatches(games);
+  assert.deepEqual(actions.at(-1), [90, 42]);
+  assert.equal(children.at(-1).getBoundingClientRect().bottom, 2990);
+  tableBottom = 250;
+  context.renderMatches(games);
+  assert.deepEqual(actions.at(-1), [90, 3]);
+  context.visibleMatchCount = 33;
+  context.renderMatches(games);
+  assert.deepEqual(actions.at(-1), [90, 33]);
+  context.visibleMatchCount = 30;
+  context.window.matchMedia = () => ({matches: false});
+  context.renderMatches(games);
+  assert.deepEqual(actions.at(-1), [90, 30]);
+});
 
 test('leaderboard recents use the supplied category, sorting, pagination and working Analyze metadata', () => {
   const {context, actions} = matchFixture(true);

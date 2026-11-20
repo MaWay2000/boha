@@ -4317,8 +4317,9 @@
       const left = typeof propulsionModels === "string" ? propulsionModels : propulsionModels.left;
       if (left) {
         parts.push({ role: "propulsion", path: battlefieldPiePath(left, "components/prop/"), side: "left" });
-        const right = propulsionModels.right || String(left).replace(/^pr([lmh])(whl|trk|htr|vtl)/i, "pr$1r$2");
-        if (right !== left && !/^prmvtl/i.test(left)) {
+        // Modern left meshes contain both sides. Only an explicit right is separate.
+        const right = propulsionModels.right;
+        if (right && right !== left) {
           parts.push({ role: "propulsion", path: battlefieldPiePath(right, "components/prop/"), side: "right" });
         }
         bodySpecificPropulsion = true;

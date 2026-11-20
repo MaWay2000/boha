@@ -4129,6 +4129,11 @@
 
   function replayModelAssetDescriptor(extraction) {
     const hashes = extraction?.match?.modHashes || [];
+    const fortressStack = ["19d58e8d729387e11d431247fb6d5c24965b4814b7018a4bad3be3cc51b6b73b","ffc45b6b9eac5d902262f2c082a0062745d2f5d2165d06e607ea3b7628b7a37f"];
+    if (hashes.length === 2 && fortressStack.every(hash => hashes.includes(hash))) return {
+      path: "stats/models/more-fortress-survival-39b4f34a317b.json",
+      sha256: "39b4f34a317bda574c24559e952a739cd88f6c9538363062362c5bc12e578680"
+    };
     const audited = new Set(["a746cff7d52c762f78e46cff93ac4861398e4eca51d4214e57bfd007f18d456b","ef3d117975df2acdd650596b7b30e96af2fe9424cd8fb3370e8a554d7f22bf7a","e4568ef645926c5079bf3a1dd78d55cde55fd78918161a586eab5d6322ce1c70","603b093ee7bdc8357c569def1fad6a02266c1c7fa91a67aa28563b25f7543f31","1b8d56e83cd276ddd1476efbf1bfbf31195b5e892ef4fc361c3f57455aae4e30","63b5333af9cd97c5dd8b132733a693727c068c45f08e8f58e91bf3afcf065d97","d1e67949610119d8964808329c106f8eef789cc3fd4aefce470e2f03e21a289a","0a192b2209eb541aff24c8789e1fb7108c2e7890454f4b3a46eb02a4844e33ce"]);
     return hashes.length === 1 && audited.has(hashes[0]) ? {
       path: "stats/models/arc-mw-visuals-fccc5ecab427.json",
@@ -4168,11 +4173,19 @@
     const visuals = battlefieldExtraction?.battlefieldVisuals;
     if (!visuals) return base;
     if (!visuals.library) {
+      const structureNames = new Map(base.structureNames || []);
+      Object.values(visuals.structureDefs || {}).forEach(definition => {
+        [definition.id, definition.name].filter(Boolean).forEach(name => {
+          structureNames.set(normalizeBattlefieldModelName(name), definition);
+        });
+      });
       Object.defineProperty(visuals, "library", { value: {
         ...base,
         bodyDefs: { ...base.bodyDefs, ...visuals.bodyDefs },
         propDefs: { ...base.propDefs, ...visuals.propDefs },
-        weaponDefs: { ...base.weaponDefs, ...visuals.weaponDefs }
+        weaponDefs: { ...base.weaponDefs, ...visuals.weaponDefs },
+        structureDefs: { ...base.structureDefs, ...visuals.structureDefs },
+        structureNames
       }, enumerable: false });
     }
     return visuals.library;
@@ -4189,7 +4202,7 @@
         constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs, structureDefs] = await Promise.all([
         import("./mapmaker/js/three.module.js"),
         import("./mapmaker/js/droidGroup.js?v=cloned-animation-connectors"),
-        import("./mapmaker/js/structureGroup.js"),
+        import("./mapmaker/js/structureGroup.js?v=mod-structure-attachments"),
         fetchBattlefieldJson("mapmaker/pies/components/bodies/body.json"),
         fetchBattlefieldJson("mapmaker/pies/components/prop/propulsion.json"),
         fetchBattlefieldJson("mapmaker/pies/components/weapons/weapons.json"),

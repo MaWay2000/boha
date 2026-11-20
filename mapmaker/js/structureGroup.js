@@ -266,7 +266,7 @@ export async function buildStructureGroup(def, rotation, sizeX, sizeY, scaleOver
     minYVal = 0;
   }
 
-  let attachments = STRUCTURE_TURRETS[def.id];
+  let attachments = def.turretModels || STRUCTURE_TURRETS[def.id];
   const ecmModels = STRUCTURE_ECM_MODELS[def.ecmID] || [];
   const sensorModels = getSensorModels(def.sensorID);
   if (!attachments && ecmModels.length) {

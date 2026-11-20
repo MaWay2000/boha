@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {combineRulesets, combineModNames, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+import {combineRulesets, combineModNames, modMedals, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
 
 test('recent match results distinguish co-op outcomes, opposing players and unconfirmed results', () => {
   const player = (name, result) => ({name, result});
@@ -84,4 +84,30 @@ test('one mod entry combines versions, hashes and the BOHA alias without losing 
   assert.deepEqual(snapshot, original);
   const reordered = combineModNames({...snapshot, groups: [...snapshot.groups].reverse()});
   assert.equal(reordered.groups.find(group => group.name === wave.name).id, wave.id);
+  const medals = modMedals(view.groups);
+  assert.deepEqual(medals.get('one').map(m => [m.modName, m.place, m.wins, m.bestScore]), [['Wave-Defense', 1, 2, 80]]);
+  assert.equal(medals.get('other')[0].modName, 'TowerDefense3_v');
+});
+
+test('medals follow each mod ranking by identity, keep missing scores unknown, and refresh with standings', () => {
+  const players = [
+    {id: 'b', name: 'Same nickname', wins: 5, bestScore: 50},
+    {id: 'a', name: 'Same nickname', wins: 4, bestScore: 200},
+    {id: 'c', name: 'Another', wins: 3, bestScore: null},
+    {id: 'd', name: 'Outside podium', wins: 2, bestScore: 900}
+  ];
+  const group = {id: 'mod:TowerDefense', name: 'TowerDefense', players};
+  const other = {id: 'mod:Trident', name: 'Trident', players: [players[1]]};
+  const before = structuredClone([group, other]);
+  const awards = modMedals([group, other]);
+  assert.equal(awards.get('b')[0].metal, 'gold');
+  assert.deepEqual(awards.get('a').map(m => [m.modName, m.metal]), [['TowerDefense', 'silver'], ['Trident', 'gold']]);
+  assert.equal(awards.get('c')[0].bestScore, null);
+  assert.equal(awards.has('d'), false);
+  assert.deepEqual([group, other], before);
+  const refreshed = modMedals([{...group, players: [players[3], ...players.slice(0, 3)]}]);
+  assert.equal(refreshed.get('d')[0].metal, 'gold');
+  assert.equal(refreshed.has('c'), false);
+  assert.equal(awards.has('d'), false, 'Previously displayed medals are not mutated');
+  assert.equal(modMedals([]).size, 0);
 });

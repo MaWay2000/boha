@@ -87,6 +87,16 @@
 .wave-player-cell:hover { background: rgba(35, 154, 154, .12); }
 .wave-player-link:hover, .wave-player-link[aria-current] { color: #82e9ff; text-decoration: underline; text-underline-offset: 4px; }
 .wave-player-link:focus-visible { outline: 2px solid #82e9ff; outline-offset: 4px; }
+.wave-medals { display: inline-flex; flex-wrap: wrap; gap: 2px; max-width: calc(100% - 7px); margin-left: 7px; vertical-align: middle; }
+.wave-medal { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 28px; padding: 2px 3px; border: 0; border-radius: 3px; background: transparent; cursor: help; vertical-align: middle; }
+.wave-medal img { display: block; width: 20px; height: 24px; }
+.wave-medal:hover, .wave-medal[aria-expanded="true"] { background: rgba(99, 223, 245, .12); }
+.wave-medal:focus-visible { outline: 2px solid #82e9ff; outline-offset: 1px; }
+.wave-medal-tip { position: fixed; z-index: 1000; width: max-content; max-width: min(280px, calc(100vw - 16px)); box-sizing: border-box; margin: 0; padding: 12px 14px; border: 1px solid #377c91; border-radius: 4px; background: #071b26; color: #cce7f1; box-shadow: 0 5px 16px #0008; font: 500 12px/1.5 "Oxanium", sans-serif; pointer-events: none; overflow-wrap: anywhere; }
+.wave-medal-tip[hidden] { display: none; }
+.wave-medal-tip strong, .wave-medal-tip span, .wave-medal-tip small { display: block; }
+.wave-medal-tip strong { color: #f0d48e; }
+.wave-medal-tip small { margin-top: 6px; color: #8baab9; font-size: 10px; }
 #leaderboards .wave-ranking-table tr.wave-selected { background: rgba(35, 154, 154, .2); box-shadow: inset 3px 0 #63dff5; }
 .wave-identity-details { display: flex; flex-direction: column; gap: 14px; padding: 4px 0 4px 38px; }
 #leaderboards .wave-table-wrap .wave-identity-row td { padding: 14px 10px; background: rgba(21, 77, 91, .35); }

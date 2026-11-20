@@ -30,6 +30,20 @@ export function combineRulesets(snapshot) {
 
 function compareNames(a, b) { return a.name < b.name ? -1 : a.name > b.name ? 1 : 0; }
 
+// Use each combined mod's existing standings, never the cross-mod ALL ranking.
+export function modMedals(groups) {
+  const medals = new Map();
+  for (const group of groups) {
+    group.players.slice(0, 3).forEach((player, index) => {
+      if (!medals.has(player.id)) medals.set(player.id, []);
+      medals.get(player.id).push({modId: group.id, modName: group.name,
+        place: index + 1, metal: ['gold', 'silver', 'bronze'][index],
+        wins: player.wins, bestScore: player.bestScore});
+    });
+  }
+  return medals;
+}
+
 export function participantResult(game, player) {
   if (game.status === 'confirmed') return ['winner', 'loser', 'contender'].includes(player.result) ? player.result : 'unknown';
   if (game.status === 'unknown' && game.modsVerified === true && player.result === 'loser' && player.resultReason === 'departure' &&

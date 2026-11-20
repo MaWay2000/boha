@@ -1,4 +1,4 @@
-import {combineRulesets, combineModNames, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261117-wave-alias-1';
+import {combineRulesets, combineModNames, modMedals, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261120-medals-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 
 let data = null;
@@ -14,10 +14,86 @@ let totalMatches = 0;
 let fitFrame = 0;
 let currentRecord = null;
 let loading = false;
+let medals = new Map();
+let medalAnchor = null;
+let medalPinned = false;
 
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
 const rulesetLabel = group => group.name || 'Custom mod';
+
+function hideMedal() {
+  if (medalAnchor) medalAnchor.setAttribute('aria-expanded', 'false');
+  medalAnchor = null;
+  medalPinned = false;
+  $('waveMedalTip').hidden = true;
+}
+
+function showMedal(button, medal, pinned = false) {
+  hideMedal();
+  medalAnchor = button;
+  medalPinned = pinned;
+  const tip = $('waveMedalTip');
+  tip.replaceChildren();
+  const place = ['1st', '2nd', '3rd'][medal.place - 1];
+  for (const [tag, text] of [
+    ['strong', `${place} place · ${medal.metal[0].toUpperCase() + medal.metal.slice(1)}`],
+    ['span', medal.modName],
+    ['span', `${number(medal.wins)} win${medal.wins === 1 ? '' : 's'} · Best score: ${medal.bestScore == null ? 'Unavailable' : number(medal.bestScore)}`],
+    ['small', 'Current standings · Wins, then best score']
+  ]) {
+    const line = document.createElement(tag);
+    line.textContent = text;
+    tip.append(line);
+  }
+  tip.hidden = false;
+  const rect = button.getBoundingClientRect();
+  const bounds = tip.getBoundingClientRect();
+  const gap = 8;
+  // The shell grows its iframe to the full table height; clamp to the part of
+  // that iframe actually visible in the parent viewport, not all 100 rows.
+  const frame = window.frameElement?.getBoundingClientRect();
+  const topEdge = frame ? Math.max(gap, gap - frame.top) : gap;
+  const bottomEdge = frame ? Math.min(window.innerHeight, window.parent.innerHeight - frame.top) - gap : window.innerHeight - gap;
+  tip.style.left = `${Math.max(gap, Math.min(rect.left, window.innerWidth - bounds.width - gap))}px`;
+  const below = rect.bottom + gap;
+  tip.style.top = `${Math.max(topEdge, below + bounds.height <= bottomEdge ? below : rect.top - bounds.height - gap)}px`;
+  button.setAttribute('aria-expanded', 'true');
+}
+
+function appendMedals(name, player, all) {
+  const awards = (medals.get(player.id) || []).filter(medal => all || medal.modId === selected);
+  if (!awards.length) return;
+  const list = document.createElement('span');
+  list.className = 'wave-medals';
+  for (const medal of awards) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'wave-medal';
+    button.setAttribute('aria-label', `${medal.modName} · ${['1st', '2nd', '3rd'][medal.place - 1]} place · ${medal.metal} medal`);
+    button.setAttribute('aria-controls', 'waveMedalTip');
+    button.setAttribute('aria-describedby', 'waveMedalTip');
+    button.setAttribute('aria-expanded', 'false');
+    const icon = document.createElement('img');
+    icon.src = `assets/medals/${medal.metal}.svg`;
+    icon.alt = '';
+    icon.width = 20;
+    icon.height = 24;
+    button.append(icon);
+    button.addEventListener('mouseenter', () => { if (!medalPinned) showMedal(button, medal); });
+    button.addEventListener('mouseleave', () => { if (!medalPinned && document.activeElement !== button) hideMedal(); });
+    button.addEventListener('focus', () => { if (!medalPinned) showMedal(button, medal); });
+    button.addEventListener('blur', () => { if (medalAnchor === button) hideMedal(); });
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (medalAnchor === button && medalPinned) hideMedal();
+      else showMedal(button, medal, true);
+    });
+    list.append(button);
+  }
+  name.append(list);
+}
 
 function profileUrl(playerId) {
   const url = new URL('index.html', window.location.href);
@@ -142,6 +218,7 @@ function updatedLabel(timestamp) {
 
 function render() {
   if (!data) return;
+  hideMedal();
   const all = selected === 'all';
   const scope = modData;
   const group = all ? combineRulesets(data) : scope.groups.find(item => item.id === selected);
@@ -195,6 +272,7 @@ function render() {
       selectPlayer(player.id);
     });
     name.append(link);
+    appendMedals(name, player, all);
     if (!player.identityVerified) {
       const note = document.createElement('span');
       note.className = 'wave-name-note';
@@ -346,6 +424,7 @@ async function load() {
       const legacyWaveDefense = selected === 'beta' || selected === 'mod:BOHA-Wave-Defense';
       const previous = legacyWaveDefense ? 'mod:Wave-Defense' : selected;
       modData = combineModNames(data);
+      medals = modMedals(modData.groups);
       selected = previous === 'all' ? previous
         : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
       renderOptions();
@@ -366,6 +445,13 @@ async function load() {
     if (!data) $('waveUpdated').textContent = 'Unavailable';
   } finally { loading = false; }
 }
+
+document.addEventListener('pointerdown', event => {
+  if (medalAnchor && !medalAnchor.contains(event.target)) hideMedal();
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape') hideMedal(); });
+window.addEventListener('scroll', hideMedal, true);
+window.addEventListener('resize', hideMedal);
 
 $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;

@@ -10,6 +10,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
   const frames = [];
   const elements = new Map();
   const listeners = new Map();
+  const documentListeners = new Map();
   class Element {
     children = [];
     hidden = false;
@@ -25,7 +26,8 @@ async function page(width = 1400, search = '', feedFactory = null) {
     replaceChildren(...children) { this.children = []; this.append(...children); }
     setAttribute(name, value) { this[name] = value; }
     addEventListener(type, handler) { this.events.set(type, handler); }
-    fire(type) { this.events.get(type)?.({button: 0, preventDefault() {}}); }
+    fire(type) { const event = {button: 0, target: this, preventDefault() {}, stopPropagation() {this.stopped = true;}}; this.events.get(type)?.(event); return event; }
+    contains(element) { return element === this || this.children.some(child => child.contains(element)); }
     get clientTop() { return 1; }
     get offsetHeight() { return this.getBoundingClientRect().height; }
     get clientHeight() { return this.offsetHeight - 2; }
@@ -40,7 +42,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
       if (this.parent?.id === 'waveMatches') {
         return {bottom: 41 + (this.parent.children.indexOf(this) + 1) * 60};
       }
-      return {top: 0, height: 0};
+      return {top: 0, left: 0, bottom: 0, width: 240, height: 100};
     }
   }
   const html = readFileSync(new URL('../wavehoster.html', import.meta.url), 'utf8');
@@ -56,7 +58,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
     startedAt: new Date(Date.UTC(2026, 10, 17, 0, i)).toISOString(), durationMilliseconds: 600000, players: ['Player 0'],
     participants: [{id: 'p0', name: 'Player 0', result: 'winner', score: 1, kills: 1}]
   }))};
-  const window = {innerWidth: width, scrollY: 0, location: {href: 'https://example.test/wavehoster.html' + search,
+  const window = {innerWidth: width, innerHeight: 900, scrollY: 0, location: {href: 'https://example.test/wavehoster.html' + search,
     search, origin: 'https://example.test'}, history: {replaceState(state, title, url) {
       window.location.href = String(url);
       window.location.search = new URL(url).search;
@@ -66,7 +68,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
   window.parent = window;
   const fetcher = feedFactory ? feedFactory(snapshot) : async () => ({ok: true, text: async () => JSON.stringify(snapshot)});
   const context = vm.createContext({...dataFunctions, refreshWaveHoster: options => refreshWaveHoster({...options, fetcher}), window, URL, URLSearchParams,
-    document: {hidden: false, getElementById: id => {
+    document: {hidden: false, addEventListener: (type, handler) => documentListeners.set(type, handler), getElementById: id => {
       assert.ok(elements.has(id), `Missing HTML element ${id}`);
       return elements.get(id);
     }, createElement: () => new Element()},
@@ -85,9 +87,43 @@ async function page(width = 1400, search = '', feedFactory = null) {
   const get = id => elements.get(id);
   const games = () => get('waveMatches').children.filter(row => !row.hidden);
   flush();
-  return {get, games, flush, url: () => new URL(window.location.href), resize(value) {window.innerWidth = value; listeners.get('resize')(); flush();},
+  return {get, games, flush, documentEvent(type, event) {documentListeners.get(type)?.(event);}, url: () => new URL(window.location.href), resize(value) {window.innerWidth = value; listeners.get('resize')(); flush();},
     async refresh() {await context.load(); flush();}};
 }
+
+test('medals collect across mods, filter with the selected mod, and disclose details without selecting a player', async () => {
+  const ui = await page(800, '', snapshot => {
+    const players = snapshot.groups[0].players;
+    const extra = {...snapshot, groups: [...snapshot.groups, {id: 'trident-pack', version: '4.7.0', mods: ['trident'],
+      players: [{...players[1], wins: 3}, players[0]]}], games: [...snapshot.games,
+      {...snapshot.games[0], id: 'trident-game', group: 'trident-pack', map: 'Trident_mf'}]};
+    return async () => ({ok: true, text: async () => JSON.stringify(extra)});
+  });
+  const playerCell = () => ui.get('wavePlayers').children.find(row => row.children[1].children[0].textContent === 'Player 0').children[1];
+  let medals = playerCell().children.find(child => child.className === 'wave-medals').children;
+  assert.equal(medals.length, 2);
+  const silver = medals.find(button => button['aria-label'].includes('Trident_mf'));
+  assert.match(silver['aria-label'], /2nd place.*silver/);
+  assert.equal(silver.fire('click').stopped, true);
+  assert.equal(ui.get('waveMedalTip').hidden, false);
+  assert.match(ui.get('waveMedalTip').children.map(line => line.textContent).join(' '), /Trident_mf.*1 win.*150/);
+  assert.equal(ui.get('waveProfile').hidden, true);
+  ui.documentEvent('keydown', {key: 'Escape'});
+  assert.equal(ui.get('waveMedalTip').hidden, true);
+  assert.equal(silver['aria-expanded'], 'false');
+  silver.fire('focus');
+  assert.equal(ui.get('waveMedalTip').hidden, false);
+  silver.fire('blur');
+  assert.equal(ui.get('waveMedalTip').hidden, true);
+  ui.get('waveRuleset').value = 'mod:Wave-Defense';
+  ui.get('waveRuleset').fire('change'); ui.flush();
+  medals = playerCell().children.find(child => child.className === 'wave-medals').children;
+  assert.equal(medals.length, 1);
+  assert.match(medals[0]['aria-label'], /Wave-Defense.*1st place.*gold/);
+  medals[0].fire('click');
+  ui.documentEvent('pointerdown', {target: ui.get('wavePlayers')});
+  assert.equal(ui.get('waveMedalTip').hidden, true);
+});
 
 test('an older initial backup cannot clear the requested player before live data arrives', async () => {
   const ui = await page(800, '?ruleset=mod%3AWave-Defense&player=p0', snapshot => async url => {

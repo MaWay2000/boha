@@ -2679,6 +2679,44 @@ main {
   opacity: 0.52;
 }
 
+.stats-team-inline-power {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 7px;
+  border-radius: 7px;
+  line-height: 1.35;
+}
+
+.stats-team-inline-power .stats-team-roster {
+  min-width: 0;
+}
+
+.stats-team-inline-power .stats-team-player {
+  display: inline-block;
+}
+
+.stats-team-inline-power .stats-team-strength {
+  min-height: 0;
+  padding: 2px 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.18);
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.stats-team-inline-power .stats-upset-victory {
+  min-height: 0;
+  margin-left: 6px;
+  padding: 2px 5px;
+  vertical-align: middle;
+}
+
 .stats-team-winner {
   color: #dffae0;
   border-color: rgba(141, 233, 142, 0.24);

@@ -2902,12 +2902,25 @@ function renderMatchup(game, options = {}) {
       ${teams.map((team, index) => {
         const strengthPercent = teamStrengths[index];
         const vsLabel = showVersus && index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
+        const teamTone = getTeamToneClass(getNormalizedTeamUserType(game, team));
+        const players = team.players
+          .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
+          .join("");
+        if (variant === "inline-power") {
+          const ratingChance = game.ratingMethod === "maway-v1";
+          const power = Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A";
+          return `
+            <div class="stats-team stats-team-inline-power ${teamTone}">
+              <div class="stats-team-roster">${players}${renderUpsetBadge(team, strengthPercent)}</div>
+              ${showTeamStrengthLabel ? `<span class="stats-team-strength" title="${ratingChance ? "Pre-match chance" : "Team power"}">${power} ${ratingChance ? "chance" : "power"}</span>` : ""}
+            </div>
+            ${vsLabel}
+          `;
+        }
         return `
           <div class="stats-matchup-team-row">
-            <span class="stats-team ${getTeamToneClass(getNormalizedTeamUserType(game, team))}">
-              ${team.players
-                .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
-                .join("")}
+            <span class="stats-team ${teamTone}">
+              ${players}
             </span>
             ${renderUpsetBadge(team, strengthPercent)}
             ${showTeamStrengthLabel ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
@@ -3506,6 +3519,7 @@ function renderMatches(gameList) {
             ${leaderboardRecentMatchesElement ? `<span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>` : ""}
           </td>
           <td class="stats-matchup">${renderMatchup(game, {
+            variant: "inline-power",
             includePlayerPower: true,
             linkToLeaderboard: true,
             showTeamStrength: true,

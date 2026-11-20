@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {combineRulesets, combineModNames, modMedals, rankAllMods, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+import {combineRulesets, combineModNames, moddedArcSnapshot, modMedals, rankAllMods, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
 
 test('ALL ranks by combined medal points, then games, then kills, ignoring wins and score as tiebreakers', () => {
   const players = [
@@ -104,6 +104,13 @@ test('one mod entry combines versions, hashes and the BOHA alias without losing 
   const medals = modMedals(view.groups);
   assert.deepEqual(medals.get('one').map(m => [m.modName, m.place, m.wins, m.bestScore]), [['Wave-Defense', 1, 2, 80]]);
   assert.equal(medals.get('other')[0].modName, 'TowerDefense3_v');
+  const mapMod = {id: 'embedded', version: '4.7.0', mods: [], isMapMod: true, players: []};
+  const arcOnly = moddedArcSnapshot({...snapshot, groups: [...snapshot.groups, mapMod], games: [
+    ...snapshot.games, {id: '7', group: 'embedded', map: 'Custom rules map', status: 'pending'}
+  ]});
+  assert.deepEqual(arcOnly.games.map(game => game.id), ['1', '2', '3', '4', '7']);
+  assert.deepEqual(combineModNames(arcOnly).groups.map(group => group.name),
+    ['Wave-Defense', 'TowerDefense3_v', 'Custom rules map']);
 });
 
 test('medals follow each mod ranking by identity, keep missing scores unknown, and refresh with standings', () => {

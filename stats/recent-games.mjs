@@ -1,4 +1,4 @@
-import {replaySource, participantResult} from './wavehoster-data.mjs';
+import {moddedArcSnapshot, replaySource, participantResult} from './wavehoster-data.mjs?v=20261120-stock-routing-1';
 
 export function arcProfileUrl(group, player = '') {
   const params = new URLSearchParams({tab: 'wavehoster', ruleset: group});
@@ -9,6 +9,7 @@ export function arcProfileUrl(group, player = '') {
 export function normalizeArcRecentGames(snapshot) {
   if (snapshot?.format !== 1 || snapshot.source !== 'WaveHoster'
       || !Array.isArray(snapshot.groups) || !Array.isArray(snapshot.games)) throw Error('Invalid Arc Mod match list.');
+  snapshot = moddedArcSnapshot(snapshot);
   const groups = new Map(snapshot.groups.filter(group => group && typeof group.id === 'string')
     .map(group => [group.id, new Map((Array.isArray(group.players) ? group.players : [])
       .filter(player => player && typeof player.id === 'string').map(player => [player.id, player]))]));

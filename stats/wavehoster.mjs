@@ -1,4 +1,4 @@
-import {combineModNames, modMedals, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261120-medal-ranking-1';
+import {moddedArcSnapshot, combineModNames, modMedals, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261120-stock-routing-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 
 let data = null;
@@ -431,9 +431,10 @@ async function load() {
       data = record.snapshot;
       const legacyWaveDefense = selected === 'beta' || selected === 'mod:BOHA-Wave-Defense';
       const previous = legacyWaveDefense ? 'mod:Wave-Defense' : selected;
-      modData = combineModNames(data);
+      const arc = moddedArcSnapshot(data);
+      modData = combineModNames(arc);
       medals = modMedals(modData.groups);
-      allRanking = rankAllMods(data, medals);
+      allRanking = rankAllMods(arc, medals);
       selected = previous === 'all' ? previous
         : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
       renderOptions();

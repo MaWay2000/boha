@@ -110,6 +110,13 @@ export function replaySource(game) {
 }
 
 
+export function moddedArcSnapshot(snapshot) {
+  const groups = snapshot.groups.filter(group => group &&
+    (group.isMapMod === true || !Array.isArray(group.mods) || group.mods.length > 0));
+  const ids = new Set(groups.map(group => group.id));
+  return {...snapshot, groups, games: snapshot.games.filter(game => ids.has(game?.group))};
+}
+
 // Combine the public view by displayed mod name; keep the recorded snapshot intact.
 export function combineModNames(snapshot) {
   const gamesByGroup = new Map();
@@ -124,7 +131,7 @@ export function combineModNames(snapshot) {
     const maps = new Map();
     for (const game of games) maps.set(game.map, (maps.get(game.map) || 0) + 1);
     const map = [...maps].sort((a, b) => b[1] - a[1])[0]?.[0] || 'Custom mod';
-    const name = group.mods.length ? (map === 'BOHA-Wave-Defense' ? 'Wave-Defense' : map) : 'Unmodded';
+    const name = group.mods.length || group.isMapMod === true ? (map === 'BOHA-Wave-Defense' ? 'Wave-Defense' : map) : 'Unmodded';
     if (!families.has(name)) families.set(name, {name, groups: [], games: []});
     const family = families.get(name);
     family.groups.push(group);

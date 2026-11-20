@@ -2,7 +2,7 @@ import {createPublishedLoader} from './published-loader.mjs?v=20261117-main-live
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261113-low-fps-1";
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
-import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261117-live-results-1';
+import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261120-stock-routing-1';
 
 const publishedLoader = createPublishedLoader({baseUrl: new URL('./published/', import.meta.url),
   liveBaseUrl: new URL('https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/live/')});

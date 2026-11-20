@@ -39,7 +39,7 @@
           <section class="stats-panel wave-panel wave-rank-panel" aria-label="Top players">
             <div id="wavePlayersWrap" class="stats-table-wrap wave-table-wrap">
               <table class="stats-table wave-ranking-table">
-                <thead><tr><th scope="col">#</th><th scope="col">Top players</th><th scope="col">Best score</th><th scope="col">Games</th><th scope="col" aria-sort="descending">Win ↓</th><th scope="col">Lost</th><th scope="col">Kills</th></tr></thead>
+                <thead><tr><th scope="col">#</th><th scope="col">Top players</th><th id="waveRankingScore" scope="col" aria-sort="descending">Medal pts ↓</th><th scope="col">Games</th><th id="waveRankingWin" scope="col">Win</th><th scope="col">Lost</th><th scope="col">Kills</th></tr></thead>
                 <tbody id="wavePlayers"></tbody>
               </table>
               <div id="waveEmpty" class="wave-empty" hidden><h3 id="waveEmptyTitle">Results are being verified</h3><p id="waveEmptyMessage">Players join this board after a complete result is verified with the recorded mods loaded.</p></div>
@@ -68,7 +68,7 @@
   </div>
   <div id="waveMedalTip" class="wave-medal-tip" role="tooltip" hidden></div>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/wavehoster.mjs?v=20261120-medals-1"></script>
+  <script type="module" src="stats/wavehoster.mjs?v=20261120-medal-ranking-1"></script>
 </body>
 </html>
 

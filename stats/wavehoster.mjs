@@ -1,8 +1,9 @@
-import {combineRulesets, combineModNames, modMedals, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261120-medals-1';
+import {combineModNames, modMedals, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261120-medal-ranking-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 
 let data = null;
 let modData = null;
+let allRanking = null;
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
 const PAGE_SIZE = 100;
@@ -221,7 +222,7 @@ function render() {
   hideMedal();
   const all = selected === 'all';
   const scope = modData;
-  const group = all ? combineRulesets(data) : scope.groups.find(item => item.id === selected);
+  const group = all ? allRanking : scope.groups.find(item => item.id === selected);
   if (!group) return;
   selected = group.id;
   const profile = group.players.find(player => player.id === selectedPlayer);
@@ -235,10 +236,17 @@ function render() {
     ? `All ${number(modData.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
     : `${rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
   $('waveRankingNote').textContent = all
-    ? 'Archived totals across all mods. Verified results and recorded departures count; only verified final results add scores.'
+    ? 'Ranked by medal points (gold 3, silver 2, bronze 1), then games played, then kills.'
     : 'Recorded departures count as defeats. Only verified final results add scores and kills.';
   $('waveProfileNote').textContent = all ? 'Stats and match history across all mods.' : 'Stats and match history for this mod.';
 
+  const scoreHeading = $('waveRankingScore');
+  const winHeading = $('waveRankingWin');
+  scoreHeading.textContent = all ? 'Medal pts ↓' : 'Best score';
+  winHeading.textContent = all ? 'Win' : 'Win ↓';
+  scoreHeading.setAttribute('aria-sort', all ? 'descending' : 'none');
+  winHeading.setAttribute('aria-sort', all ? 'none' : 'descending');
+  const scoreKey = all ? 'medalPoints' : 'bestScore';
   const query = $('wavePlayerSearch').value.trim().toLocaleLowerCase();
   const players = group.players
     .map((player, index) => ({player, rank: index + 1}))
@@ -279,8 +287,8 @@ function render() {
       note.textContent = 'unverified nickname';
       name.append(note);
     }
-    for (const key of ['bestScore', 'games', 'wins', 'losses', 'kills']) {
-      cell(row, player[key] === null ? '—' : number(player[key]), key === 'bestScore' ? 'wave-score' : key === 'wins' ? 'wave-wins' : '');
+    for (const key of [scoreKey, 'games', 'wins', 'losses', 'kills']) {
+      cell(row, player[key] === null ? '—' : number(player[key]), key === scoreKey ? 'wave-score' : key === 'wins' ? 'wave-wins' : '');
     }
     $('wavePlayers').append(row);
     if (expanded) $('wavePlayers').append(identityDetails(player));
@@ -296,7 +304,7 @@ function render() {
       ['Games', number(profile.games)],
       ['Win / Lost / Draw', `${number(profile.wins)} / ${number(profile.losses)} / ${number(profile.draws)}`],
       ['Win rate', `${Math.round(profile.wins / Math.max(1, profile.games) * 100)}%`],
-      ['Best score', profile.bestScore === null ? '—' : number(profile.bestScore)],
+      [all ? 'Medal points' : 'Best score', profile[scoreKey] === null ? '—' : number(profile[scoreKey])],
       ['Total kills', number(profile.kills)]
     ];
     for (const [label, value] of metrics) {
@@ -425,6 +433,7 @@ async function load() {
       const previous = legacyWaveDefense ? 'mod:Wave-Defense' : selected;
       modData = combineModNames(data);
       medals = modMedals(modData.groups);
+      allRanking = rankAllMods(data, medals);
       selected = previous === 'all' ? previous
         : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
       renderOptions();

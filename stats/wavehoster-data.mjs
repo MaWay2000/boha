@@ -44,6 +44,18 @@ export function modMedals(groups) {
   return medals;
 }
 
+const medalPoints = {gold: 3, silver: 2, bronze: 1};
+
+export function rankAllMods(snapshot, medals) {
+  const group = combineRulesets(snapshot);
+  for (const player of group.players) {
+    player.medalPoints = (medals.get(player.id) || []).reduce((total, medal) => total + medalPoints[medal.metal], 0);
+  }
+  group.players.sort((a, b) => b.medalPoints - a.medalPoints || b.games - a.games ||
+    b.kills - a.kills || compareNames(a, b) || a.id.localeCompare(b.id));
+  return group;
+}
+
 export function participantResult(game, player) {
   if (game.status === 'confirmed') return ['winner', 'loser', 'contender'].includes(player.result) ? player.result : 'unknown';
   if (game.status === 'unknown' && game.modsVerified === true && player.result === 'loser' && player.resultReason === 'departure' &&

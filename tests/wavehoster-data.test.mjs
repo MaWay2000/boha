@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {combineRulesets, combineModNames, modMedals, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+import {combineRulesets, combineModNames, modMedals, rankAllMods, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+
+test('ALL ranks by combined medal points, then games, then kills, ignoring wins and score as tiebreakers', () => {
+  const players = [
+    {id: 'gold', games: 2, kills: 900, wins: 2, bestScore: 9000},
+    {id: 'silver-bronze', games: 3, kills: 5, wins: 0, bestScore: 10},
+    {id: 'active', games: 20, kills: 2, wins: 0, bestScore: null},
+    {id: 'high-kills', games: 20, kills: 50, wins: 0, bestScore: 0},
+    {id: 'high-score', games: 20, kills: 2, wins: 19, bestScore: 999999}
+  ].map(player => ({...player, name: player.id, losses: 0, draws: 0}));
+  const medals = new Map([
+    ['gold', [{metal: 'gold'}]],
+    ['silver-bronze', [{metal: 'silver'}, {metal: 'bronze'}]]
+  ]);
+  const all = rankAllMods({groups: [{players}], games: []}, medals);
+  assert.deepEqual(all.players.map(player => [player.id, player.medalPoints]),
+    [['silver-bronze', 3], ['gold', 3], ['high-kills', 0], ['active', 0], ['high-score', 0]]);
+});
 
 test('recent match results distinguish co-op outcomes, opposing players and unconfirmed results', () => {
   const player = (name, result) => ({name, result});

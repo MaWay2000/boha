@@ -100,6 +100,8 @@ test('medals collect across mods, filter with the selected mod, and disclose det
     return async () => ({ok: true, text: async () => JSON.stringify(extra)});
   });
   const playerCell = () => ui.get('wavePlayers').children.find(row => row.children[1].children[0].textContent === 'Player 0').children[1];
+  assert.equal(ui.get('waveRankingScore').textContent, 'Medal pts ↓');
+  assert.equal(playerCell().parent.children[2].textContent, '5');
   let medals = playerCell().children.find(child => child.className === 'wave-medals').children;
   assert.equal(medals.length, 2);
   const silver = medals.find(button => button['aria-label'].includes('Trident_mf'));
@@ -117,6 +119,8 @@ test('medals collect across mods, filter with the selected mod, and disclose det
   assert.equal(ui.get('waveMedalTip').hidden, true);
   ui.get('waveRuleset').value = 'mod:Wave-Defense';
   ui.get('waveRuleset').fire('change'); ui.flush();
+  assert.equal(ui.get('waveRankingScore').textContent, 'Best score');
+  assert.equal(ui.get('waveRankingWin')['aria-sort'], 'descending');
   medals = playerCell().children.find(child => child.className === 'wave-medals').children;
   assert.equal(medals.length, 1);
   assert.match(medals[0]['aria-label'], /Wave-Defense.*1st place.*gold/);

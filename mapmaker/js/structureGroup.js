@@ -2,6 +2,7 @@ import * as THREE from "./three.module.js";
 import { loadPieGeometry } from "./pie.js";
 import { STRUCTURE_TURRETS } from "./structure_turrets.js";
 import { getSensorModels } from "./sensors.js";
+import { getUnitTextureSource } from './unitTextures.js';
 
 function normalizeTexPath(name) {
   let n = String(name || "").replace(/\\/g, "/").toLowerCase();
@@ -74,7 +75,7 @@ const sharedStructureTextures = new Map();
 
 function getSharedStructureTexture(textureName) {
   const base = (typeof window !== 'undefined' && window.TEX_BASE) ? window.TEX_BASE : 'classic/texpages/texpages/';
-  const url = base + normalizeTexPath(textureName);
+  const url = getUnitTextureSource(normalizeTexPath(textureName)) || base + normalizeTexPath(textureName);
   if (sharedStructureTextures.has(url)) return sharedStructureTextures.get(url);
   const texture = new THREE.TextureLoader().load(url, undefined, undefined, () => {
     if (sharedStructureTextures.get(url) === texture) {
@@ -154,6 +155,7 @@ export async function buildStructureGroup(def, rotation, sizeX, sizeY, scaleOver
   const group = new THREE.Group();
 
   let connRel = null;
+  let attachmentConnectors = [];
   let scl = scaleOverride !== null ? scaleOverride : 1;
   let minYVal = 0;
 
@@ -236,6 +238,11 @@ export async function buildStructureGroup(def, rotation, sizeX, sizeY, scaleOver
             z: connector[1] * scl + connectorSource.offsetZ
           }
         : { x: 0, y: bb2.max.y - minYVal, z: 0 };
+      attachmentConnectors = (connectorSource?.geo.userData.connectors || []).map(point => ({
+        x: point[0] * scl + connectorSource.offsetX,
+        y: point[2] * scl + connectorSource.offsetY,
+        z: point[1] * scl + connectorSource.offsetZ
+      }));
     } catch (e) {
       console.warn('Failed to build structure from pies:', e);
     }
@@ -275,14 +282,18 @@ export async function buildStructureGroup(def, rotation, sizeX, sizeY, scaleOver
   if (!attachments && sensorModels.length) {
     attachments = sensorModels;
   }
-  if (attachments && attachments.length) {
+  const slots = def.turretSlots?.length ? def.turretSlots : [attachments || []];
+  for (let slot = 0; slot < slots.length; slot++) {
+    const attachments = slots[slot];
+    const attachmentPoint = attachmentConnectors[slot] || connRel;
+    if (!attachments?.length) continue;
     const sortedFiles = attachments.slice().sort((a, b) => {
       const aTur = a.toLowerCase().startsWith('tr') ? 0 : 1;
       const bTur = b.toLowerCase().startsWith('tr') ? 0 : 1;
       return aTur - bTur;
     });
     const attGeos = await Promise.all(sortedFiles.map(f => loadPieGeometry(f).then(g => g.clone()).catch(() => null)));
-    let gHeightVal = connRel.y;
+    let gHeightVal = attachmentPoint.y;
     let offYVal = gHeightVal / 2;
     attGeos.forEach(attGeo => {
       if (!attGeo) return;
@@ -296,11 +307,11 @@ export async function buildStructureGroup(def, rotation, sizeX, sizeY, scaleOver
         tMat = new THREE.MeshLambertMaterial({ color: 0xff0000, transparent: opacityOverride !== null, opacity: opacityOverride !== null ? opacityOverride : 1 });
       }
       const tMesh = new THREE.Mesh(attGeo, tMat);
-      if (connRel) {
+      if (attachmentPoint) {
         // Structure weapon and sensor PIEs are authored relative to the
         // structure connector. Preserve those local offsets so mounts and
         // barrels remain assembled as intended.
-        tMesh.position.set(connRel.x, connRel.y, connRel.z);
+        tMesh.position.set(attachmentPoint.x, attachmentPoint.y, attachmentPoint.z);
       } else {
         const tcX = (tb.min.x + tb.max.x) / 2;
         const tcZ = (tb.min.z + tb.max.z) / 2;

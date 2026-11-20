@@ -1,4 +1,5 @@
 (function () {
+  const replayVisualApiBaseUrl = new URL("https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/");
   const wzstatsPublishedUrl = new URL("stats/published/matches.json", document.baseURI);
   const replayFile = document.getElementById("replayFile");
   const replayFileName = document.getElementById("replayFileName");
@@ -4141,22 +4142,50 @@
     } : null;
   }
 
+  async function automaticReplayModelDescriptor(extraction) {
+    if (!/^[a-f0-9]{64}$/.test(latestReplaySha256 || "")) return null;
+    const url = new URL(`replays/${latestReplaySha256}/models`, replayVisualApiBaseUrl);
+    let response;
+    try {
+      response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20000) });
+    } catch (error) {
+      response = await fetch(url, { cache: "no-store", targetAddressSpace: "local", signal: AbortSignal.timeout(20000) });
+    }
+    if (!response.ok) throw new Error("Exact replay mod visuals are not available yet (HTTP " + response.status + ").");
+    const descriptor = await response.json();
+    const hashes = extraction?.match?.modHashes || [];
+    if (descriptor.profile !== "replay-visuals-v1" || !/^[a-f0-9]{64}$/.test(descriptor.sha256 || "")
+        || descriptor.path !== "model-assets/" + descriptor.sha256
+        || JSON.stringify(descriptor.modHashes) !== JSON.stringify(hashes)
+        || descriptor.bytes > 32 * 1024 * 1024) throw new Error("Replay visual identity does not match.");
+    return { ...descriptor, automatic: true };
+  }
+
   async function loadReplayModelAssets(extraction) {
-    const descriptor = replayModelAssetDescriptor(extraction);
-    if (!descriptor) return false;
+    let descriptor = null;
+    let automaticError = null;
+    try { descriptor = await automaticReplayModelDescriptor(extraction); }
+    catch (error) { automaticError = error; }
+    descriptor ||= replayModelAssetDescriptor(extraction);
+    if (!descriptor) {
+      if (automaticError && extraction?.match?.modHashes?.length) throw automaticError;
+      return false;
+    }
     let pending = battlefieldVisualAssetPromises.get(descriptor.sha256);
     if (!pending) {
       pending = (async () => {
-        const url = new URL(descriptor.path, document.baseURI);
-        if (url.origin !== window.location.origin) throw new Error("Model assets must use the analyzer's origin.");
+        const source = descriptor.automatic ? replayVisualApiBaseUrl : new URL(document.baseURI);
+        const url = new URL(descriptor.path, source);
+        if (url.origin !== source.origin) throw new Error("Unexpected replay model asset origin.");
         const response = await fetch(url, { cache: "force-cache" });
         if (!response.ok) throw new Error("Custom model download failed (HTTP " + response.status + ").");
         const bytes = await response.arrayBuffer();
-        if (bytes.byteLength > 8 * 1024 * 1024 || await calculateReplaySha256(bytes) !== descriptor.sha256) {
+        if (bytes.byteLength > 32 * 1024 * 1024 || await calculateReplaySha256(bytes) !== descriptor.sha256) {
           throw new Error("Custom model asset checksum or size does not match.");
         }
         const visuals = JSON.parse(textDecoder.decode(bytes));
         if (visuals.schema !== 1 || !visuals.bodyDefs || !visuals.models) throw new Error("Invalid custom model data.");
+        if (descriptor.automatic && JSON.stringify(visuals.modHashes) !== JSON.stringify(extraction?.match?.modHashes || [])) throw new Error("Replay model stack does not match.");
         const assets = new Map([...Object.entries(visuals.models), ...Object.entries(visuals.textures || {})]);
         const { registerUnitPieModels } = await import("./mapmaker/js/pie.js");
         registerUnitPieModels(assets);
@@ -4179,13 +4208,25 @@
           structureNames.set(normalizeBattlefieldModelName(name), definition);
         });
       });
+      const templateNames = new Map(base.templateNames || []);
+      Object.values(visuals.templateDefs || {}).forEach(definition => {
+        [definition.id, definition.name].filter(Boolean).forEach(name => {
+          templateNames.set(normalizeBattlefieldModelName(name), definition);
+        });
+      });
       Object.defineProperty(visuals, "library", { value: {
         ...base,
         bodyDefs: { ...base.bodyDefs, ...visuals.bodyDefs },
         propDefs: { ...base.propDefs, ...visuals.propDefs },
         weaponDefs: { ...base.weaponDefs, ...visuals.weaponDefs },
         structureDefs: { ...base.structureDefs, ...visuals.structureDefs },
-        structureNames
+        structureNames,
+        templateDefs: { ...base.templateDefs, ...visuals.templateDefs }, templateNames,
+        constructionDefs: { ...base.constructionDefs, ...visuals.constructionDefs },
+        repairDefs: { ...base.repairDefs, ...visuals.repairDefs },
+        sensorDefs: { ...base.sensorDefs, ...visuals.sensorDefs },
+        brainDefs: { ...base.brainDefs, ...visuals.brainDefs },
+        ecmDefs: { ...base.ecmDefs, ...visuals.ecmDefs }
       }, enumerable: false });
     }
     return visuals.library;
@@ -4202,7 +4243,7 @@
         constructionDefs, repairDefs, sensorDefs, brainDefs, ecmDefs, structureDefs] = await Promise.all([
         import("./mapmaker/js/three.module.js"),
         import("./mapmaker/js/droidGroup.js?v=cloned-animation-connectors"),
-        import("./mapmaker/js/structureGroup.js?v=mod-structure-attachments"),
+        import("./mapmaker/js/structureGroup.js?v=automatic-replay-visuals"),
         fetchBattlefieldJson("mapmaker/pies/components/bodies/body.json"),
         fetchBattlefieldJson("mapmaker/pies/components/prop/propulsion.json"),
         fetchBattlefieldJson("mapmaker/pies/components/weapons/weapons.json"),
@@ -4287,7 +4328,7 @@
     }
     // Native cyborg body PIEs already contain the legs. A custom Legged stat
     // without its own model must not be treated as a PIE filename.
-    if (propulsionId && !bodySpecificPropulsion && !(propulsion?.type === "Legged" && !propulsion.model)) {
+    if (propulsionId && !bodySpecificPropulsion && (!propulsion || propulsion.model)) {
       parts.push({
         role: "propulsion",
         path: battlefieldPiePath(propulsion?.model || propulsionId, "components/prop/")
@@ -4297,7 +4338,7 @@
       if (!componentId) return;
       const component = definitions[componentId];
       const mount = component?.mountModel;
-      const model = component?.model || component?.sensorModel || componentId;
+      const model = component?.model || component?.sensorModel || (!component ? componentId : null);
       if (mount) parts.push({ role: "mount", path: battlefieldPiePath(mount, "components/weapons/"), kind, slot });
       if (model && model !== mount) {
         parts.push({ role: "weapon", path: battlefieldPiePath(model, "components/weapons/"), kind, slot });
@@ -5510,7 +5551,8 @@
     updateBattlefieldPlayerStats();
     battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
     battlefieldZoomSlider.value = String(Math.round(battlefieldView.scale * 100));
-    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · 3D view`;
+    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · 3D view`
+      + (battlefieldExtraction?.modelAssetsError ? " · Custom models unavailable: the original mod files are needed." : "");
   }
 
   async function setBattlefieldViewMode(mode) {
@@ -5750,7 +5792,8 @@
     updateBattlefieldPlayerStats();
     battlefieldZoom.value = `${Math.round(battlefieldView.scale * 100)}%`;
     battlefieldZoomSlider.value = String(Math.round(battlefieldView.scale * 100));
-    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`;
+    battlefieldStatus.textContent = `${visibleDroids.toLocaleString()} units · ${visibleStructures.toLocaleString()} structures · ${showDetailedModels ? "detailed" : "simplified"} view`
+      + (battlefieldExtraction?.modelAssetsError ? " · Custom models unavailable: the original mod files are needed." : "");
   }
 
   function drawBattlefield() {

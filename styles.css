@@ -2362,6 +2362,14 @@ main {
   text-decoration-color: currentColor;
 }
 
+.stats-recent-map-name {
+  display: block;
+  contain: inline-size;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stats-key-details {
   display: block;
   margin-top: 0;

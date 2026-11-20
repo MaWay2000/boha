@@ -1776,7 +1776,8 @@ function getMapMatchesUrl(mapName) {
 
 function renderMapFilterLink(mapName, label = mapName, className = "") {
   const linkClass = ["stats-map-filter-link", className].filter(Boolean).join(" ");
-  return `<a class="${linkClass}" href="${escapeHtml(getMapMatchesUrl(mapName))}" target="_parent" aria-label="Show recent matches on ${escapeHtml(mapName)}">${escapeHtml(label)}</a>`;
+  const fullName = escapeHtml(mapName);
+  return `<a class="${linkClass}" href="${escapeHtml(getMapMatchesUrl(mapName))}" target="_parent" title="${fullName}" aria-label="Show recent matches on ${fullName}">${escapeHtml(label)}</a>`;
 }
 
 function renderMapProfileLinks(items, emptyLabel) {
@@ -3514,7 +3515,7 @@ function renderMatches(gameList) {
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>
-            ${renderMapFilterLink(game.mapName)}
+            ${renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name")}
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
             ${leaderboardRecentMatchesElement ? `<span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>` : ""}
           </td>

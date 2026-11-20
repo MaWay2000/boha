@@ -11,6 +11,8 @@ test('exact audited mod hashes select checksummed visual data, not unknown mods 
  assert.equal(descriptor.path,assetPath);assert.equal(descriptor.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
  const v159=ctx.replayModelAssetDescriptor({match:{modHashes:['d1e67949610119d8964808329c106f8eef789cc3fd4aefce470e2f03e21a289a']}});
  assert.equal(v159.path,assetPath);assert.equal(v159.sha256,descriptor.sha256);
+ const v160=ctx.replayModelAssetDescriptor({match:{modHashes:['0a192b2209eb541aff24c8789e1fb7108c2e7890454f4b3a46eb02a4844e33ce']}});
+ assert.equal(v160.path,assetPath);assert.equal(v160.sha256,descriptor.sha256);
  assert.equal(ctx.replayModelAssetDescriptor({match:{modHashes:['unknown']}}),null);
  assert.equal(ctx.replayModelAssetDescriptor({match:{modHashes:['63b5333af9cd97c5dd8b132733a693727c068c45f08e8f58e91bf3afcf065d97','another']}}),null);
 });

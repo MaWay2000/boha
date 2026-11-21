@@ -7,11 +7,13 @@ const source = fs.readFileSync(path.join(__dirname, 'live-stats.js'), 'utf8');
 
 test('right panel switches between recent matches, a profile and selected-player no-data state', () => {
   const heading = {textContent: ''};
+  const nicknamePanel = {};
   const context = vm.createContext({
     playerGamesElement: {innerHTML: '', closest: () => null}, playerGamesTitleElement: {innerHTML: ''},
     playerGamesMetaElement: {textContent: ''}, playerGamesActionsElement: {innerHTML: ''},
     playerRecentLabelElement: {}, playerRecentTableElement: {}, leaderboardRecentMatchesElement: {},
-    playerProfileElement: {innerHTML: ''}, document: {querySelector: () => heading},
+    playerProfileElement: {innerHTML: '', querySelector: () => nicknamePanel}, document: {querySelector: () => heading},
+    mountGameNicknames(panel, identity) { context.nicknameHistory = {panel, identity}; },
     activeExpandedAccountKey: null, expandedAccounts: new Set(), selectedLeaderboard: '2v2',
     getAccountExpandKey: account => account.id, escapeHtml: value => String(value),
     resetPlayerGamesView() {}, renderPlayerProfile(account) { context.profile = account; },
@@ -21,7 +23,7 @@ test('right panel switches between recent matches, a profile and selected-player
     renderPlayerGameActions() {}
   });
   vm.runInContext(source.slice(source.indexOf('function renderPlayerGames('), source.indexOf('function setPlayerGameRowExpanded(')), context);
-  const player = {id: 'one', name: 'Player', games: []};
+  const player = {id: 'one', name: 'Player', mainPublicKey: 'player-key', games: []};
   context.renderPlayerGames([player]);
   assert.equal(context.leaderboardRecentMatchesElement.hidden, false);
   assert.equal(context.playerRecentTableElement.hidden, true);
@@ -36,6 +38,8 @@ test('right panel switches between recent matches, a profile and selected-player
   context.renderPlayerGames([], [player]);
   assert.equal(context.leaderboardRecentMatchesElement.hidden, true);
   assert.match(context.playerGamesTitleElement.innerHTML, /No data/);
+  assert.equal(context.nicknameHistory.panel, nicknamePanel);
+  assert.equal(context.nicknameHistory.identity.publicKey, player.mainPublicKey);
   context.activeExpandedAccountKey = null;
   context.renderPlayerGames([player]);
   assert.equal(context.leaderboardRecentMatchesElement.hidden, false);

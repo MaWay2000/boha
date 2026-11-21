@@ -68,6 +68,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
   window.parent = window;
   const fetcher = feedFactory ? feedFactory(snapshot) : async () => ({ok: true, text: async () => JSON.stringify(snapshot)});
   const context = vm.createContext({...dataFunctions, refreshWaveHoster: options => refreshWaveHoster({...options, fetcher}), window, URL, URLSearchParams,
+    mountGameNicknames(panel, {arcId}) { panel.dataset.arcId = arcId; },
     document: {hidden: false, addEventListener: (type, handler) => documentListeners.set(type, handler), getElementById: id => {
       assert.ok(elements.has(id), `Missing HTML element ${id}`);
       return elements.get(id);
@@ -142,6 +143,8 @@ test('an older initial backup cannot clear the requested player before live data
   });
   assert.equal(ui.get('waveProfile').hidden, false);
   assert.equal(ui.get('waveProfileName').textContent, 'Player 0');
+  const identityRow = ui.get('wavePlayers').children.find(row => row.id === 'waveIdentity-p0');
+  assert.ok(identityRow.children[0].children[0].children.some(panel => panel.dataset.arcId === 'p0'));
   assert.equal(ui.games().length, 100);
 });
 

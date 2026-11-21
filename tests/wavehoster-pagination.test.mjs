@@ -140,6 +140,23 @@ test('an older initial backup cannot clear the requested player before live data
   assert.equal(ui.games().length, 100);
 });
 
+test('host sync follows the displayed feed even when an older live snapshot is reachable', async () => {
+  let live = 'older';
+  const ui = await page(800, '', snapshot => async url => {
+    const fromHost = url.startsWith('https:');
+    if (fromHost && live === 'offline') throw Error('offline');
+    const data = fromHost && live === 'older' ? {...snapshot, generatedAt: '2026-11-16T00:00:00Z'} : snapshot;
+    return {ok: true, text: async () => JSON.stringify(data)};
+  });
+  assert.equal(ui.get('waveHostSync').textContent, 'False');
+  live = 'current';
+  await ui.refresh();
+  assert.equal(ui.get('waveHostSync').textContent, 'True');
+  live = 'offline';
+  await ui.refresh();
+  assert.equal(ui.get('waveHostSync').textContent, 'False');
+});
+
 for (const legacy of ['beta', 'mod:BOHA-Wave-Defense', 'older-release']) {
 test(`${legacy} links open one combined Wave-Defense entry, including both current and older games`, async () => {
   const ui = await page(800, '?ruleset=' + encodeURIComponent(legacy));

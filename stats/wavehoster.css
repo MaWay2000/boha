@@ -22,7 +22,8 @@
 .wave-summary .stats-search-label { flex: 0 0 auto; white-space: nowrap; }
 .wave-summary .stats-search-input { width: 100%; min-width: 0; border-radius: 18px; }
 .wave-summary .stats-card { flex: 0 0 auto; padding: 9px 12px; }
-.wave-summary .stats-update-card { flex: 1 0 auto; justify-content: flex-end; }
+.wave-summary .stats-update-card { flex: 1 0 auto; justify-content: flex-end; column-gap: 16px; }
+.wave-update-item { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
 .wave-summary .stats-card-label { font-size: 10px; }
 .wave-summary .stats-card-value { font-size: 15px; }
 
@@ -143,6 +144,7 @@
 @media (min-width: 1600px) { .wave-grid { gap: 45px; } }
 @media (max-width: 1120px) {
   .wave-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .wave-summary { flex-wrap: wrap; }
   .wave-summary .stats-search-field { min-width: 210px; }
   .wave-summary .stats-card { padding-inline: 8px; }
   .wave-summary .stats-card-label { font-size: 9px; }
@@ -151,8 +153,8 @@
   .wave-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .wave-summary .stats-search-field { grid-column: 1 / -1; }
   .wave-summary .wave-ruleset { grid-column: 1 / -1; border-block: 1px solid rgba(179, 125, 255, .18); }
-  .wave-summary .stats-update-card { grid-column: 1 / -1; justify-content: flex-start; border-top: 1px solid rgba(179, 125, 255, .18); }
   .wave-summary .stats-card { width: 100%; flex-wrap: wrap; gap: 4px; }
+  .wave-summary .stats-update-card { grid-column: 1 / -1; justify-content: flex-start; column-gap: 16px; border-top: 1px solid rgba(179, 125, 255, .18); }
   .wave-heading-row { align-items: flex-start; flex-direction: column; gap: 12px; }
   .wave-controls { width: 100%; }
   .wave-ruleset { flex: 0 1 auto; }

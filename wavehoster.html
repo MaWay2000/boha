@@ -17,7 +17,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png">
   <link rel="stylesheet" href="styles.css?v=20261022-match-ui-1">
-  <link rel="stylesheet" href="stats/wavehoster.css?v=20261120-medals-1">
+  <link rel="stylesheet" href="stats/wavehoster.css?v=20261121-host-sync-1">
 </head>
 <body class="embedded-page wave-embedded">
   <div class="page-shell wave-page">
@@ -33,7 +33,10 @@
           <article class="stats-card"><span class="stats-card-label">Verified</span><strong id="waveConfirmed" class="stats-card-value">—</strong></article>
           <article class="stats-card"><span class="stats-card-label">Mods</span><strong id="waveGroups" class="stats-card-value">—</strong></article>
           <article class="stats-card"><span class="stats-card-label">Pending</span><strong id="waveWaiting" class="stats-card-value">—</strong></article>
-          <article class="stats-card stats-update-card"><span class="stats-card-label">Last updated</span><strong id="waveUpdated" class="stats-card-value">Loading…</strong></article>
+          <article class="stats-card stats-update-card">
+            <span class="wave-update-item" role="status"><span class="stats-card-label">Syncing with host</span><strong id="waveHostSync" class="stats-card-value">—</strong></span>
+            <span class="wave-update-item"><span class="stats-card-label">Last updated</span><strong id="waveUpdated" class="stats-card-value">Loading…</strong></span>
+          </article>
         </div>
         <div class="wave-grid">
           <section class="stats-panel wave-panel wave-rank-panel" aria-label="Top players">
@@ -68,7 +71,7 @@
   </div>
   <div id="waveMedalTip" class="wave-medal-tip" role="tooltip" hidden></div>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/wavehoster.mjs?v=20261120-stock-routing-1"></script>
+  <script type="module" src="stats/wavehoster.mjs?v=20261121-host-sync-1"></script>
 </body>
 </html>
 

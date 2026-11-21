@@ -422,6 +422,12 @@ function renderOptions() {
   $('waveRuleset').value = selected;
 }
 
+function updateHostSync(isLive) {
+  const status = $('waveHostSync');
+  const label = isLive ? 'True' : 'False';
+  if (status.textContent !== label) status.textContent = label;
+}
+
 async function load() {
   if (loading) return;
   loading = true;
@@ -442,10 +448,14 @@ async function load() {
       if (legacyWaveDefense) syncSelection();
     };
     const result = await refreshWaveHoster({current: currentRecord, onUpdate(record) {
-      if (!waitForSelection) showRecord(record);
+      if (!waitForSelection) {
+        showRecord(record);
+        updateHostSync(record.source === 'live');
+      }
     }});
     currentRecord = result.record;
     if (data !== currentRecord.snapshot) showRecord(currentRecord);
+    updateHostSync(result.liveAvailable && currentRecord.source === 'live');
     const notice = result.liveAvailable ? '' : 'Live updates are temporarily unavailable. Showing the latest saved results.';
     if ($('waveError').textContent !== notice) $('waveError').textContent = notice;
     const updated = updatedLabel(data.generatedAt);

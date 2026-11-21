@@ -1488,12 +1488,23 @@ main {
 .stats-status.stats-update-card {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 16px;
   max-width: none;
   text-align: left;
 }
 
-.stats-update-value {
+.stats-update-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.stats-update-item .stats-card-label { font-size: 0.72rem; }
+
+.stats-update-item .stats-update-value {
+  margin-top: 0;
   color: #fff;
   font-size: 1rem;
 }

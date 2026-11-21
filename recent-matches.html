@@ -15,7 +15,7 @@
     rel="stylesheet"
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
-  <link rel="stylesheet" href="styles.css?v=20261120-team-star-2">
+  <link rel="stylesheet" href="styles.css?v=20261121-host-sync-1">
   <style>
     .stats-recent-matches-panel {
       margin-top: clamp(32px, 4vw, 56px);
@@ -68,6 +68,10 @@
                 spellcheck="false"
               >
             </label>
+            <p class="stats-status stats-update-card" id="resultsStatus">
+              <span class="stats-update-item" role="status"><span class="stats-card-label">Syncing with host</span><strong id="statsHostSync" class="stats-card-value stats-update-value">—</strong></span>
+              <span class="stats-update-item"><span class="stats-card-label">Last updated</span><strong id="statsLastUpdated" class="stats-card-value stats-update-value">Loading…</strong></span>
+            </p>
           </div>
 
           <details class="stats-match-filters" id="statsMatchFilters">
@@ -178,6 +182,6 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20261120-team-star-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20261121-host-sync-1"></script>
 </body>
 </html>

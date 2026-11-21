@@ -1,4 +1,4 @@
-import {createPublishedLoader} from './published-loader.mjs?v=20261117-main-live-1';
+import {createPublishedLoader} from './published-loader.mjs?v=20261121-host-sync-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261113-low-fps-1";
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
@@ -67,6 +67,8 @@ const PLAYER_GAME_RESULT_ORDER = {
 };
 
 const statusElement = document.getElementById("resultsStatus");
+const hostSyncElement = document.getElementById("statsHostSync");
+const lastUpdatedElement = document.getElementById("statsLastUpdated");
 const summaryElement = document.getElementById("statsSummary");
 const gamesFilterControlElement = document.getElementById("statsGamesFilterControl");
 const gamesFilterMenuElement = document.getElementById("statsGamesFilterMenu");
@@ -335,7 +337,7 @@ function setupSortHeaders() {
 
 async function ensureLeaderboardData(force = false) {
   const result = await publishedLoader.load();
-  mainLiveAvailable = result.liveAvailable !== false;
+  mainLiveAvailable = result.liveAvailable;
   const payload = result.payload;
   if (personalRatings?.requiresPerformance()) await publishedLoader.loadPerformance(payload);
   if (!result.changed && leaderboardData === payload) return false;
@@ -353,7 +355,7 @@ async function ensureArcRecentData(force = false) {
   if (!matchesSourceElement) return false;
   const result = await refreshWaveHoster({current: arcRecentRecord});
   arcRecentRecord = result.record;
-  arcLiveAvailable = result.liveAvailable;
+  arcLiveAvailable = result.liveAvailable && result.record.source === 'live';
   const payload = result.record.snapshot;
   const signature = result.record.text;
   if (!force && signature === arcRecentSignature) return false;
@@ -2947,6 +2949,11 @@ function renderMatchup(game, options = {}) {
 }
 
 function getLastUpdateTime(results) {
+  if (matchesSourceElement) {
+    const mainUpdate = Date.parse(leaderboardData?.generatedAt) || 0;
+    const arcUpdate = Date.parse(arcRecentRecord?.snapshot.generatedAt) || 0;
+    return Math.max(mainUpdate, arcUpdate);
+  }
   if (leaderboardData?.generatedAt) {
     return new Date(leaderboardData.generatedAt).getTime();
   }
@@ -2958,34 +2965,21 @@ function getLastUpdateTime(results) {
 }
 
 function renderStatusText() {
-  if (!statusElement) {
-    return;
-  }
+  if (!lastUpdatedElement) return;
 
   const mirrorStale = isMirrorStale();
   statusElement.classList.toggle("is-stale", mirrorStale);
 
   if (!lastStatsUpdateAt) {
-    statusElement.innerHTML = `
-      <span class="stats-card-label">Last Updated</span>
-      <strong class="stats-card-value stats-update-value">Unavailable</strong>
-    `;
-    statusElement.removeAttribute("title");
+    lastUpdatedElement.textContent = "Unavailable";
+    lastUpdatedElement.removeAttribute("title");
     return;
   }
 
   const absoluteLabel = `Last update: ${formatDate(lastStatsUpdateAt)}`;
   const relativeLabel = formatRelativeTime(lastStatsUpdateAt);
-  const updateLabel = document.createElement("span");
-  updateLabel.className = "stats-card-label";
-  updateLabel.textContent = "Last Updated";
-
-  const updateLine = document.createElement("strong");
-  updateLine.className = "stats-card-value stats-update-value";
-  updateLine.textContent = relativeLabel.replace(/^Updated\s+/i, "");
-
-  statusElement.replaceChildren(updateLabel, updateLine);
-  statusElement.title = `${absoluteLabel} (${relativeLabel})`;
+  lastUpdatedElement.textContent = relativeLabel.replace(/^Updated\s+/i, "");
+  lastUpdatedElement.title = `${absoluteLabel} (${relativeLabel})`;
 }
 
 function updateStatusText(results) {
@@ -3953,6 +3947,12 @@ async function refreshFromMirror(force = false) {
   if (pendingFeedRefresh) return pendingFeedRefresh;
   pendingFeedRefresh = (async () => {
   const [main, arc] = await Promise.allSettled([ensureLeaderboardData(force), ensureArcRecentData(force)]);
+  const mainIsLive = main.status === 'fulfilled' && mainLiveAvailable;
+  const arcIsLive = arc.status === 'fulfilled' && arcLiveAvailable;
+  if (hostSyncElement) {
+    const label = mainIsLive && (!matchesSourceElement || arcIsLive) ? 'True' : 'False';
+    if (hostSyncElement.textContent !== label) hostSyncElement.textContent = label;
+  }
   if (matchesFeedStatusElement) {
     const failed = [main.status === 'rejected' ? 'Main' : '', arc.status === 'rejected' ? 'Arc Mod' : ''].filter(Boolean);
     const saved = [!mainLiveAvailable ? 'Main' : '', !arcLiveAvailable ? 'Arc Mod' : ''].filter(Boolean);
@@ -4037,9 +4037,7 @@ async function init() {
     await refreshFromMirror(true);
   } catch (error) {
     console.error(error);
-    if (statusElement) {
-      statusElement.textContent = "Unable to load live or saved stats.";
-    }
+    if (lastUpdatedElement) lastUpdatedElement.textContent = "Unavailable";
     return;
   }
 

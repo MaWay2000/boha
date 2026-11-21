@@ -102,7 +102,7 @@ test('Arc names are escaped and link to Arc profiles without PvP percentages', (
 test('either match feed can fail independently without hiding the available feed', async () => {
   for (const failed of ['main', 'arc']) {
     let renders = 0;
-    const context = vm.createContext({Promise, pendingFeedRefresh: null, mainLiveAvailable: true, arcLiveAvailable: true, matchesSourceElement: {}, matchesFeedStatusElement: {},
+    const context = vm.createContext({Promise, pendingFeedRefresh: null, mainLiveAvailable: true, arcLiveAvailable: true, matchesSourceElement: {}, matchesFeedStatusElement: {}, hostSyncElement: {},
       leaderboardData: failed === 'main' ? null : {games: []}, arcRecentSignature: failed === 'arc' ? null : 'loaded',
       ensureLeaderboardData: async () => {if (failed === 'main') throw Error('offline'); return true;},
       ensureArcRecentData: async () => {if (failed === 'arc') throw Error('offline'); return true;},
@@ -110,6 +110,7 @@ test('either match feed can fail independently without hiding the available feed
     vm.runInContext(source.slice(source.indexOf('async function refreshFromMirror('), source.indexOf('function startRefreshLoop(')), context);
     await context.refreshFromMirror(true);
     assert.equal(renders, 1);
+    assert.equal(context.hostSyncElement.textContent, 'False');
     assert.equal(context.matchesFeedStatusElement.hidden, false);
     assert.match(context.matchesFeedStatusElement.textContent, /Showing available results/);
   }
@@ -136,11 +137,27 @@ test('processed Arc departures refresh Recent Matches even when the source times
 test('overlapping page refreshes share work and saved data remains visible during live outages', async () => {
   let mainCalls = 0, arcCalls = 0, renders = 0;
   const context = vm.createContext({Promise, pendingFeedRefresh: null, mainLiveAvailable: false, arcLiveAvailable: false,
-    matchesSourceElement: {}, matchesFeedStatusElement: {}, leaderboardData: {games: []}, arcRecentSignature: 'saved',
+    matchesSourceElement: {}, matchesFeedStatusElement: {}, hostSyncElement: {}, leaderboardData: {games: []}, arcRecentSignature: 'saved',
     ensureLeaderboardData: async () => {mainCalls++; return true;}, ensureArcRecentData: async () => {arcCalls++; return true;},
     render: () => renders++});
   vm.runInContext(source.slice(source.indexOf('async function refreshFromMirror('), source.indexOf('function startRefreshLoop(')), context);
   await Promise.all([context.refreshFromMirror(), context.refreshFromMirror()]);
   assert.deepEqual([mainCalls, arcCalls, renders], [1, 1, 1]);
   assert.match(context.matchesFeedStatusElement.textContent, /Showing saved results/);
+});
+
+test('the host indicator updates on unchanged data and Recent Matches checks both feeds', async () => {
+  const context = vm.createContext({Promise, pendingFeedRefresh: null, mainLiveAvailable: true, arcLiveAvailable: false,
+    matchesSourceElement: null, matchesFeedStatusElement: null, hostSyncElement: {},
+    ensureLeaderboardData: async () => false, ensureArcRecentData: async () => false,
+    render: () => {throw Error('An unchanged snapshot should not rerender the tables');}});
+  vm.runInContext(source.slice(source.indexOf('async function refreshFromMirror('), source.indexOf('function startRefreshLoop(')), context);
+  await context.refreshFromMirror();
+  assert.equal(context.hostSyncElement.textContent, 'True');
+  context.matchesSourceElement = {};
+  await context.refreshFromMirror();
+  assert.equal(context.hostSyncElement.textContent, 'False');
+  context.arcLiveAvailable = true;
+  await context.refreshFromMirror();
+  assert.equal(context.hostSyncElement.textContent, 'True');
 });

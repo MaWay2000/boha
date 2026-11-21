@@ -118,10 +118,26 @@ test('newer GitHub data wins over stale hosting data and older manifests cannot 
   const f = liveFixture(); f.state.savedTime = 13;
   const first = await f.loader.load();
   assert.equal(first.payload.games[0].id, 'saved');
+  assert.equal(first.liveAvailable, false);
   f.state.savedTime = 10;
   assert.equal((await f.loader.load()).payload, first.payload);
   f.state.liveTime = 14;
-  assert.equal((await f.loader.load()).payload.games[0].id, 'live');
+  const live = await f.loader.load();
+  assert.equal(live.payload.games[0].id, 'live');
+  assert.equal(live.liveAvailable, true);
+});
+
+test('the host indicator updates when the same snapshot becomes available on the live host', async () => {
+  const f = liveFixture();
+  f.state.liveHash = f.state.savedHash;
+  f.state.liveOnline = false;
+  const first = await f.loader.load();
+  assert.equal(first.liveAvailable, false);
+  f.state.liveOnline = true;
+  const next = await f.loader.load();
+  assert.equal(next.payload, first.payload);
+  assert.equal(next.changed, false);
+  assert.equal(next.liveAvailable, true);
 });
 
 test('live performance stays lazy, retries failed downloads, and updates without mixing generations', async () => {

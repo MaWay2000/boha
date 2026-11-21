@@ -81,9 +81,9 @@ function createLivePublishedLoader({baseUrl, liveBaseUrl, read}) {
     return {base, source, manifest: value, hash, time};
   }
   async function load() {
-    let liveAvailable = false, backupPromise;
+    let backupPromise;
     const backup = () => backupPromise ||= manifest(baseUrl, 'github').catch(() => null);
-    const livePromise = manifest(liveBaseUrl, 'live').then(value => {liveAvailable = true; return value;}).catch(() => null);
+    const livePromise = manifest(liveBaseUrl, 'live').catch(() => null);
     let candidates;
     if (!payload) candidates = await Promise.all([livePromise, backup()]);
     else {
@@ -102,7 +102,7 @@ function createLivePublishedLoader({baseUrl, liveBaseUrl, read}) {
         if (prefer) metadata.set(payload, candidate);
         if (performanceChanged) {performanceLoads.delete(payload); payload.ratingPerformance = {};}
         snapshotTime = Math.max(snapshotTime, candidate.time);
-        return {payload, changed, liveAvailable};
+        return {payload, changed, liveAvailable: candidate.source === 'live'};
       }
       try {
         const url = new URL('leaderboards.json', candidate.base); url.searchParams.set('v', candidate.hash);
@@ -113,10 +113,9 @@ function createLivePublishedLoader({baseUrl, liveBaseUrl, read}) {
         next.ratingPerformance = {};
         payload = next; version = candidate.hash; snapshotTime = candidate.time;
         metadata.set(next, candidate);
-        return {payload, changed: true, liveAvailable};
+        return {payload, changed: true, liveAvailable: candidate.source === 'live'};
       } catch {
         if (candidate.source === 'live') {
-          liveAvailable = false;
           const saved = await backup();
           if (saved && !candidates.some(item => item.source === 'github')) candidates.push(saved);
         }

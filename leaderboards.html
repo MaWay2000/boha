@@ -15,7 +15,7 @@
     rel="stylesheet"
   >
   <link rel="icon" href="assets/warzone2100-gamehub-logo.png" type="image/png">
-  <link rel="stylesheet" href="styles.css?v=20261120-streak-medals-1">
+  <link rel="stylesheet" href="styles.css?v=20261121-host-sync-1">
   <style>
     .stats-reset-filters {
       flex: 0 0 auto;
@@ -194,7 +194,7 @@
 
     .stats-summary {
       position: relative;
-      grid-template-columns: minmax(220px, 420px) max-content max-content max-content max-content minmax(260px, 1fr) 36px max-content;
+      grid-template-columns: minmax(220px, 420px) max-content max-content max-content max-content minmax(0, 1fr) 36px max-content;
       overflow: visible;
     }
 
@@ -556,7 +556,10 @@
     <main id="top">
       <section class="landing-stats stats-shell section-frame" id="leaderboards">
         <div class="stats-toolbar-row">
-          <p class="stats-status" id="resultsStatus" aria-live="polite">Loading mirrored upstream stats...</p>
+          <p class="stats-status stats-update-card" id="resultsStatus">
+            <span class="stats-update-item" role="status"><span class="stats-card-label">Syncing with host</span><strong id="statsHostSync" class="stats-card-value stats-update-value">—</strong></span>
+            <span class="stats-update-item"><span class="stats-card-label">Last updated</span><strong id="statsLastUpdated" class="stats-card-value stats-update-value">Loading…</strong></span>
+          </p>
         </div>
 
         <div class="stats-grid">
@@ -589,10 +592,6 @@
             </details>
             <article class="stats-card">
               <span class="stats-card-label">Latest Match</span>
-              <strong class="stats-card-value"><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></strong>
-            </article>
-            <article class="stats-card">
-              <span class="stats-card-label">Last Updated</span>
               <strong class="stats-card-value"><span class="stats-skeleton stats-skeleton-line stats-skeleton-medium"></span></strong>
             </article>
           </div>
@@ -775,6 +774,6 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20261120-streak-medals-3"></script>
+  <script type="module" src="stats/live-stats.js?v=20261121-host-sync-1"></script>
 </body>
 </html>

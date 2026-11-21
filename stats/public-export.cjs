@@ -9,7 +9,7 @@ const fields = {
   player: 'id mainPublicKey publicKeys name names bot games elo wins losses draws discounted totalKills favoriteUnits invalid',
   unit: 'signature name bodyId propulsionId weaponIds count',
   game: 'id source sourceLabel sourceMatchId resultSource replayUrl startDate endDate duration mapName mods alliancesType timeout cheated crashed slots',
-  slot: 'id name position team userType',
+  slot: 'id name nickname position team userType',
   event: 'elo eloDelta',
   match: 'id source source_label source_match_id started_at ended_at duration_ms map game replay_sha256 replay_filename players replay_url',
   matchPlayer: 'match_id position name team result score kills droids_built droids_lost structures_built structures_lost structures_destroyed research_complete power oil_rigs remaining_droids remaining_structures stats_source'

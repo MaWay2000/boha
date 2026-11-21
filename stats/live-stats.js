@@ -1,5 +1,6 @@
 import {createPublishedLoader} from './published-loader.mjs?v=20261121-host-sync-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
+import {mountGameNicknames} from './player-nicknames.mjs';
 import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker/js/favoriteUnitPreview.js?v=20261113-low-fps-1";
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
 import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261120-stock-routing-1';
@@ -1966,6 +1967,7 @@ function renderPlayerComparison(accounts) {
         <span>${escapeHtml(dataA.elo)}</span><b>Current ELO</b><span>${escapeHtml(dataB.elo)}</span>
         <span>${escapeHtml(dataA.winRate)}</span><b>Win rate</b><span>${escapeHtml(dataB.winRate)}</span>
         <span>${dataA.form}</span><b>Recent form</b><span>${dataB.form}</span>
+        <div data-nicknames="A"></div><b>Last 3 game nicknames</b><div data-nicknames="B"></div>
         <span class="stats-comparison-list">${renderMapProfileLinks(dataA.maps, "No map history")}</span><b>Favorite maps</b><span class="stats-comparison-list">${renderMapProfileLinks(dataB.maps, "No map history")}</span>
         <span class="stats-comparison-list">${renderComparisonOpponentLinks(accountA, dataA.opponents, "A")}</span><b>Top opponents</b><span class="stats-comparison-list">${renderComparisonOpponentLinks(accountB, dataB.opponents, "B")}</span>
       </div>
@@ -2016,6 +2018,13 @@ function renderPlayerComparison(accounts) {
     </div>
     ${comparisonBody}
   `;
+
+  if (accountA && accountB) {
+    mountGameNicknames(playerComparisonElement.querySelector('[data-nicknames="A"]'),
+      {publicKey: accountA.mainPublicKey}, {heading: false});
+    mountGameNicknames(playerComparisonElement.querySelector('[data-nicknames="B"]'),
+      {publicKey: accountB.mainPublicKey}, {heading: false});
+  }
 
   const bindComparisonSearch = (inputId, selectId, suggestionsId, selectedKey, excludedKey) => {
     const input = playerComparisonElement.querySelector(inputId);
@@ -2184,6 +2193,7 @@ function renderPlayerProfile(account) {
         ${renderEloSparkline(eloHistory)}
       </article>
       <div data-favorite-unit-preview style="grid-column: 1 / -1;"></div>
+      ${account.mainPublicKey ? '<article class="stats-detail-group" data-profile-nicknames></article>' : ''}
       <article><span class="stats-detail-label">Favorite maps</span><div>${renderMapProfileLinks(favoriteMaps, "No map history")}</div></article>
       <article><span class="stats-detail-label">Favorite modes</span><div>${renderProfileList(favoriteModes, "No mode history")}</div></article>
       <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileComparisonLinks(account, opponents, "No opponents")}</div></article>
@@ -2191,6 +2201,7 @@ function renderPlayerProfile(account) {
     </div>
   `;
 
+  mountGameNicknames(playerProfileElement.querySelector('[data-profile-nicknames]'), {publicKey: account.mainPublicKey});
   initEloChartTooltip(playerProfileElement);
 
   initFavoriteUnitPreview(
@@ -2494,7 +2505,10 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     renderPlayerProfile(selectedAccount);
     playerProfileElement.innerHTML = `
       <p class="stats-profile-no-data">No data for ${escapeHtml(selectedAccount.name || "this player")} in the ${escapeHtml(selectedLeaderboard)} leaderboard.</p>
+      ${selectedAccount.mainPublicKey ? '<div class="stats-detail-group" data-profile-nicknames></div>' : ''}
     `;
+    mountGameNicknames(playerProfileElement.querySelector('[data-profile-nicknames]'),
+      {publicKey: selectedAccount.mainPublicKey});
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
         <td colspan="5">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>
@@ -3326,6 +3340,8 @@ function renderRanks(accountList) {
                 <div class="stats-detail-panel">
                   <div class="stats-key-panel">
                     ${nameDetails}
+                    ${account.mainPublicKey
+                      ? `<div class="stats-detail-group" data-nickname-key="${escapeHtml(account.mainPublicKey)}"></div>` : ""}
                     ${keyDetails}
                   </div>
                 </div>
@@ -3373,6 +3389,10 @@ function renderRanks(accountList) {
       `;
     })
     .join("");
+
+  for (const container of ranksElement.querySelectorAll('[data-nickname-key]')) {
+    mountGameNicknames(container, {publicKey: container.dataset.nicknameKey});
+  }
 
   function scrollExpandedAccountToTop(expandAccount) {
     requestAnimationFrame(() => {

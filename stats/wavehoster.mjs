@@ -1,5 +1,6 @@
 import {moddedArcSnapshot, combineModNames, modMedals, medalPointValue, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261121-arc-builds-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
+import {mountGameNicknames} from './player-nicknames.mjs';
 
 let data = null;
 let modData = null;
@@ -188,6 +189,12 @@ function identityDetails(player) {
     count.textContent = number(alias.games);
     chip.append(text, count);
     names.append(chip);
+  }
+  if (player.identityVerified === true) {
+    const recent = document.createElement('div');
+    recent.className = 'stats-detail-group';
+    content.append(recent);
+    mountGameNicknames(recent, {arcId: player.id});
   }
   const publicKeys = player.publicKeys || [];
   const keys = group(`${publicKeys.length} key(s) tracked`, 'stats-key-list');

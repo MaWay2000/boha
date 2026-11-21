@@ -11,6 +11,8 @@ on:
       - 'stats/arc-beta.mjs'
       - 'stats/arc-departures.cjs'
       - 'stats/wavehoster-data.mjs'
+      - 'stats/player-nickname-publication.cjs'
+      - 'tests/player-nickname-publication.test.cjs'
       - 'tests/arc-beta.test.mjs'
   schedule:
     - cron: '2,12,22,32,42,52 * * * *'
@@ -27,20 +29,22 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: node --test stats/wavehoster-publication.test.cjs stats/wavehoster-results.test.mjs tests/wavehoster-data.test.mjs tests/arc-beta.test.mjs
+      - run: node --test stats/wavehoster-publication.test.cjs stats/wavehoster-results.test.mjs tests/wavehoster-data.test.mjs tests/arc-beta.test.mjs tests/player-nickname-publication.test.cjs
       - name: Download privacy-filtered Arc Mod results
         run: node stats/wavehoster-publication.cjs
+      - name: Build shared game nickname history
+        run: node stats/player-nickname-publication.cjs stats/published/leaderboards.json stats/published/wavehoster.json stats/published/player-nicknames.json
       - name: Check public release
         run: node stats/check-public-release.cjs
       - name: Publish changed results
         run: |
-          if git diff --quiet -- stats/published/wavehoster.json stats/published/arc-beta-testers.json; then
+          git add stats/published/wavehoster.json stats/published/arc-beta-testers.json stats/published/player-nicknames.json
+          if git diff --cached --quiet; then
             echo 'Arc Mod results unchanged.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add stats/published/wavehoster.json stats/published/arc-beta-testers.json
           git commit -m 'Update Arc Mod leaderboards'
           git pull --rebase origin main
           git push

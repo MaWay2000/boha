@@ -2475,6 +2475,36 @@ main {
   text-transform: uppercase;
 }
 
+.stats-nickname-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.stats-nickname-list li {
+  display: grid;
+  gap: 2px;
+  padding: 5px 9px;
+  border: 1px solid rgba(149, 205, 255, 0.15);
+  border-radius: 7px;
+  background: rgba(109, 232, 255, 0.05);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.stats-nickname-list small {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.stats-comparison-grid .stats-nickname-list {
+  justify-content: center;
+}
+
 .stats-name-list {
   display: flex;
   flex-wrap: wrap;

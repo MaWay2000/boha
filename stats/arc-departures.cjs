@@ -88,7 +88,9 @@ async function rebuildArcRankings(snapshot, policy) {
         if (!finalResults.has(result) || !player.id || counted.has(player.id)) continue;
         counted.add(player.id);
         const identity = identities.get(player.id);
-        const row = rows.get(player.id) || {id: player.id, name: player.name,
+        const mainPublicKey = identity?.identityVerified === true ? identity.mainPublicKey : undefined;
+        const row = rows.get(player.id) || {id: player.id, name: mainPublicKey ? identity.name : player.name,
+          ...(mainPublicKey && {mainPublicKey}),
           identityVerified: identity?.identityVerified === true, publicKeys: identity?.publicKeys || [],
           names: [], games: 0, wins: 0, losses: 0, draws: 0, bestScore: null, kills: 0};
         row.games++;

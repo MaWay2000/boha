@@ -60,6 +60,23 @@ for (const file of files) {
       }
     } catch { failures.push(`Private or invalid Beta tester archive in ${file}; details suppressed.`); }
   }
+  if (file === 'stats/published/player-nicknames.json') {
+    try {
+      const value = JSON.parse(text);
+      assertNoPrivateFields(value);
+      const validId = id => /^[a-f0-9]{20}$/.test(id);
+      if (value.format !== 1 || Object.keys(value).sort().join() !== 'aliases,format,players') throw Error('Invalid history');
+      for (const [id, games] of Object.entries(value.players)) {
+        if (!validId(id) || !Array.isArray(games) || games.length < 1 || games.length > 3) throw Error('Invalid player');
+        if (games.some(game => Object.keys(game).sort().join() !== 'mode,name,time'
+          || typeof game.name !== 'string' || !game.name.trim() || !Number.isSafeInteger(game.time)
+          || !['main', 'arc'].includes(game.mode))) throw Error('Invalid game');
+      }
+      for (const [id, target] of Object.entries(value.aliases)) {
+        if (!validId(id) || !validId(target) || !Object.hasOwn(value.players, target)) throw Error('Invalid alias');
+      }
+    } catch { failures.push(`Private or invalid nickname history in ${file}; details suppressed.`); }
+  }
 }
 try {
   const manifest = JSON.parse(read('stats/published/manifest.json'));

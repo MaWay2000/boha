@@ -19,7 +19,7 @@ function sanitizeWaveHoster(input) {
   if (input.format !== 1 || input.source !== 'WaveHoster' || input.ranking !== 'wins-then-best-score') throw Error('Unsupported WaveHoster snapshot');
   const result = scalars(input, 'format source ranking generatedAt');
   result.groups = list(input.groups).map(group => ({...scalars(group, 'id version modVersion label matches confirmed isMapMod'), mods: strings(group.mods),
-    players: list(group.players).map(player => ({...scalars(player, 'id name identityVerified games wins losses draws bestScore kills'),
+    players: list(group.players).map(player => ({...scalars(player, 'id name mainPublicKey identityVerified games wins losses draws bestScore kills'),
       names: list(player.names || []).map(alias => scalars(alias, 'name games')), publicKeys: strings(player.publicKeys || [])}))}));
   result.games = list(input.games).map(game => ({...scalars(game, 'id matchId replaySha256 group map startedAt durationMilliseconds status modsVerified departureCheckedAt waveReached waveEndedAtMilliseconds waveOutcome waveEndReason'),
     players: strings(game.players), participants: list(game.participants || []).map(player => scalars(player, 'id name result score kills resultReason leftAtMilliseconds'))}));

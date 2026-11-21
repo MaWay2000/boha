@@ -22,6 +22,7 @@ let medalPinned = false;
 const $ = id => document.getElementById(id);
 const number = value => Number(value ?? 0).toLocaleString();
 const rulesetLabel = group => group.name || 'Custom mod';
+const isFactionsMod = group => group?.id === 'mod:FactionsMod';
 
 function hideMedal() {
   if (medalAnchor) medalAnchor.setAttribute('aria-expanded', 'false');
@@ -228,6 +229,7 @@ function render() {
   const profile = group.players.find(player => player.id === selectedPlayer);
   if (!profile) selectedPlayer = null;
   $('waveRuleset').value = selected;
+  $('waveFactionsGuide').hidden = !isFactionsMod(group);
   $('waveTotal').textContent = number(scope.games.filter(game => all || game.group === selected).length);
   $('waveGroups').textContent = number(scope.groups.length);
   $('waveConfirmed').textContent = number(group.confirmed);
@@ -333,7 +335,18 @@ function render() {
     const row = document.createElement('tr');
     cell(row, game.startedAt ? new Date(game.startedAt).toLocaleString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'Unknown date');
     const ruleset = scope.groups.find(group => group.id === game.group);
-    cell(row, ruleset ? rulesetLabel(ruleset) : 'Unknown', 'wave-mod-cell');
+    const modName = ruleset ? rulesetLabel(ruleset) : 'Unknown';
+    const modCell = cell(row, isFactionsMod(ruleset) ? '' : modName, 'wave-mod-cell');
+    if (isFactionsMod(ruleset)) {
+      const link = document.createElement('a');
+      link.className = 'wave-guide-link';
+      link.href = 'factionsmod.html';
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = modName;
+      link.setAttribute('aria-label', 'FactionsMod guide (opens in a new tab)');
+      modCell.append(link);
+    }
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
     if (participant) {
       const outcome = participantResult(game, participant);

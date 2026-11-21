@@ -171,3 +171,9 @@
   .wave-panel-head > span { max-width: 110px; text-align: right; line-height: 1.5; }
 }
 
+
+.wave-guide-link { color: var(--cyan, #8bdce8); text-decoration: underline; text-underline-offset: 0.18em; }
+.wave-guide-link:hover { color: #d3faff; }
+.wave-guide-link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.wave-guide-shortcut { flex: 0 0 auto; align-self: center; padding: 4px 10px; white-space: nowrap; }
+.wave-guide-shortcut[hidden] { display: none; }

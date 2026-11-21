@@ -232,3 +232,21 @@ test('filter resets, profile history and narrow layouts retain usable pagination
   assert.equal(ui.get('wavePlayers').children.length, 1);
   assert.equal(ui.get('wavePlayersMore').hidden, true);
 });
+
+test('FactionsMod match rows link to the guide and selecting the mod shows a shortcut', async () => {
+  const fixture = snapshot => {
+    const factions = {id: 'factions', version: '4.7.0', mods: ['factions-hash'], players: snapshot.groups[0].players};
+    const games = [{...snapshot.games.at(-1), id: 'factions-match', group: factions.id, map: 'FactionsMod'}, ...snapshot.games];
+    return async () => ({ok: true, text: async () => JSON.stringify({...snapshot, groups: [...snapshot.groups, factions], games})});
+  };
+  const all = await page(800, '', fixture);
+  const links = all.get('waveMatches').children.flatMap(row => row.children[1].children);
+  assert.equal(links.length, 1);
+  assert.equal(links[0].textContent, 'FactionsMod');
+  assert.equal(links[0].href, 'factionsmod.html');
+  assert.equal(links[0].target, '_blank');
+  assert.equal(all.get('waveFactionsGuide').hidden, true);
+  const selected = await page(800, '?ruleset=mod%3AFactionsMod', fixture);
+  assert.equal(selected.get('waveFactionsGuide').hidden, false);
+  assert.match(readFileSync(new URL('../factionsmod.html', import.meta.url), 'utf8'), /Compare all three factions/);
+});

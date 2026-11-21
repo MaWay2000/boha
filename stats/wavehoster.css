@@ -50,6 +50,7 @@
 .wave-controls { gap: 10px; }
 .wave-ruleset { gap: 9px; min-width: 0; }
 .wave-summary .wave-ruleset { flex: 0 0 auto; margin: 0; padding: 4px 10px; border-inline: 1px solid rgba(179, 125, 255, .18); }
+.wave-summary .wave-ruleset[hidden] { display: none; }
 .wave-ruleset > span { color: var(--muted); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
 .wave-ruleset select {
   width: 180px;
@@ -91,6 +92,7 @@
 .wave-medals { display: inline-flex; flex-wrap: wrap; gap: 2px; max-width: calc(100% - 7px); margin-left: 7px; vertical-align: middle; }
 .wave-medal { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 28px; padding: 2px 3px; border: 0; border-radius: 3px; background: transparent; cursor: help; vertical-align: middle; }
 .wave-medal img { display: block; width: 20px; height: 24px; }
+.wave-medal-tester img { width: 14px; height: 17px; }
 .wave-medal:hover, .wave-medal[aria-expanded="true"] { background: rgba(99, 223, 245, .12); }
 .wave-medal:focus-visible { outline: 2px solid #82e9ff; outline-offset: 1px; }
 .wave-medal-tip { position: fixed; z-index: 1000; width: max-content; max-width: min(280px, calc(100vw - 16px)); box-sizing: border-box; margin: 0; padding: 12px 14px; border: 1px solid #377c91; border-radius: 4px; background: #071b26; color: #cce7f1; box-shadow: 0 5px 16px #0008; font: 500 12px/1.5 "Oxanium", sans-serif; pointer-events: none; overflow-wrap: anywhere; }
@@ -142,9 +144,9 @@
 .wave-controls :focus-visible { outline: 2px solid #8be8fa; outline-offset: 3px; }
 
 @media (min-width: 1600px) { .wave-grid { gap: 45px; } }
+@media (max-width: 1250px) { .wave-summary { flex-wrap: wrap; } }
 @media (max-width: 1120px) {
   .wave-grid { grid-template-columns: minmax(0, 1fr); gap: 26px; }
-  .wave-summary { flex-wrap: wrap; }
   .wave-summary .stats-search-field { min-width: 210px; }
   .wave-summary .stats-card { padding-inline: 8px; }
   .wave-summary .stats-card-label { font-size: 9px; }

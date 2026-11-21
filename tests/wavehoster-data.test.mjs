@@ -1,6 +1,66 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {combineRulesets, combineModNames, moddedArcSnapshot, modMedals, rankAllMods, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+import {combineRulesets, combineModNames, moddedArcSnapshot, modMedals, medalPointValue, rankAllMods, replaySource, matchResults} from '../stats/wavehoster-data.mjs';
+
+test('Wave-Defense ranks a verified clear on a newer release above all older wins', () => {
+  const player = (id, wins, bestScore) => ({id, name: id, games: 3, wins, bestScore});
+  const clear = (id, score, gameId) => ({id: gameId, map: 'Wave-Defense', group: 'new',
+    status: 'stats-only', modsVerified: true, durationMilliseconds: 6000, waveReached: 60,
+    waveEndedAtMilliseconds: 5990, waveOutcome: 'victory', waveEndReason: 'wave-clear',
+    participants: [{id, name: id, result: null, score}]});
+  const win = clear('new higher winning score', 50, 'one');
+  const view = combineModNames({groups: [
+    {id: 'old', mods: ['old'], modVersion: 159, players: [player('old champion', 30, 999)]},
+    {id: 'new', mods: ['new'], modVersion: 160, players: [player('new higher winning score', 0, 50),
+      player('new higher overall score', 1, 500), player('unverified', 0, 9999)]}
+  ], games: [
+    {id: 'old game', map: 'BOHA-Wave-Defense', group: 'old', status: 'confirmed'},
+    win, {...win}, clear('new higher overall score', 25, 'two'),
+    {...clear('unverified', 9999, 'three'), modsVerified: false}
+  ]});
+  assert.deepEqual(view.groups[0].players.map(({id, wins}) => [id, wins]), [
+    ['new higher winning score', 1], ['new higher overall score', 1], ['old champion', 30], ['unverified', 0]
+  ]);
+  assert.equal(modMedals(view.groups).get('new higher winning score')[0].metal, 'gold');
+  assert.equal(modMedals(view.groups).get('old champion')[0].tester, true);
+});
+
+test('the earlier Wave-Defense podium gets 30% medals without taking current places', () => {
+  const players = (...ids) => ids.map((id, index) => ({id, name: id, wins: 1, games: 1, bestScore: 10 - index}));
+  const view = combineModNames({groups: [
+    {id: 'earlier', mods: ['earlier'], modVersion: 159, players: players('both', 'tester silver', 'tester bronze')},
+    {id: 'current', mods: ['current'], modVersion: 160, players: players('current winner', 'both')}
+  ], games: [
+    {id: 'earlier', group: 'earlier', map: 'Wave-Defense'},
+    ...players('current winner', 'both').map(player => ({id: player.id, group: 'current', map: 'Wave-Defense',
+      status: 'confirmed', participants: [{id: player.id, result: 'winner', score: player.bestScore}]}))
+  ]});
+  const medals = modMedals(view.groups);
+  assert.deepEqual(medals.get('both').map(medal => [medal.metal, medal.tester, medalPointValue(medal)]),
+    [['silver', false, 2], ['gold', true, 0.9]]);
+  assert.equal(medals.get('current winner').length, 1);
+  assert.deepEqual(rankAllMods(view, medals).players.map(({id, medalPoints}) => [id, medalPoints]),
+    [['current winner', 3], ['both', 2.9], ['tester silver', 0.6], ['tester bronze', 0.3]]);
+});
+
+test('the confirmed newer FactionsMod build has its own podium and the earlier podium keeps tester medals', () => {
+  const oldHash = 'a7a599d47d7fb12799aae1dd9db91006bc30beb97ab7ea1b25cdba9403f4f106';
+  const newHash = '4e64e1e29554b5032f8d45f5ed6bea46056ee4ef0c002cafa231383b86b0f3c7';
+  const view = combineModNames({groups: [
+    {id: 'old', mods: [oldHash], players: [{id: 'tester', name: 'Tester', wins: 10, games: 10}]},
+    {id: 'new', mods: [newHash], players: [{id: 'winner', name: 'Winner', wins: 1, games: 1}]}
+  ], games: [
+    {id: 'one', group: 'old', map: 'FactionsMod', startedAt: '2026-11-13T17:29:24Z'},
+    {id: 'two', group: 'new', map: 'FactionsMod', startedAt: '2026-11-21T14:57:13Z'}
+  ]});
+  const [group] = view.groups;
+  assert.deepEqual(group.players.map(player => player.id), ['winner', 'tester']);
+  assert.deepEqual(group.builds.map(build => [build.id, build.matches]), [['new', 1], ['old', 1]]);
+  assert.deepEqual(view.games.map(game => game.build), ['old', 'new']);
+  const medals = modMedals(view.groups);
+  assert.equal(medalPointValue(medals.get('winner')[0]), 3);
+  assert.equal(medalPointValue(medals.get('tester')[0]), 0.9);
+});
 
 test('ALL ranks by combined medal points, then games, then kills, ignoring wins and score as tiebreakers', () => {
   const players = [

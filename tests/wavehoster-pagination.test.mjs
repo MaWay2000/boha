@@ -101,9 +101,9 @@ test('medals collect across mods, filter with the selected mod, and disclose det
   });
   const playerCell = () => ui.get('wavePlayers').children.find(row => row.children[1].children[0].textContent === 'Player 0').children[1];
   assert.equal(ui.get('waveRankingScore').textContent, 'Medal pts ↓');
-  assert.equal(playerCell().parent.children[2].textContent, '5');
+  assert.equal(playerCell().parent.children[2].textContent, (5.9).toLocaleString());
   let medals = playerCell().children.find(child => child.className === 'wave-medals').children;
-  assert.equal(medals.length, 2);
+  assert.equal(medals.length, 3);
   const silver = medals.find(button => button['aria-label'].includes('Trident_mf'));
   assert.match(silver['aria-label'], /2nd place.*silver/);
   assert.equal(silver.fire('click').stopped, true);
@@ -120,10 +120,15 @@ test('medals collect across mods, filter with the selected mod, and disclose det
   ui.get('waveRuleset').value = 'mod:Wave-Defense';
   ui.get('waveRuleset').fire('change'); ui.flush();
   assert.equal(ui.get('waveRankingScore').textContent, 'Best score');
-  assert.equal(ui.get('waveRankingWin')['aria-sort'], 'descending');
+  assert.equal(ui.get('waveRankingWin')['aria-sort'], 'none');
+  assert.match(ui.get('waveRankingNote').textContent, /newest version won/);
   medals = playerCell().children.find(child => child.className === 'wave-medals').children;
-  assert.equal(medals.length, 1);
+  assert.equal(medals.length, 2);
   assert.match(medals[0]['aria-label'], /Wave-Defense.*1st place.*gold/);
+  assert.match(medals[1].className, /wave-medal-tester/);
+  assert.match(medals[1]['aria-label'], /gold tester medal/);
+  medals[1].fire('focus');
+  assert.match(ui.get('waveMedalTip').children.at(-1).textContent, /Tester podium.*30%/);
   medals[0].fire('click');
   ui.documentEvent('pointerdown', {target: ui.get('wavePlayers')});
   assert.equal(ui.get('waveMedalTip').hidden, true);
@@ -155,6 +160,23 @@ test('host sync follows the displayed feed even when an older live snapshot is r
   live = 'offline';
   await ui.refresh();
   assert.equal(ui.get('waveHostSync').textContent, 'False');
+});
+
+test('an older build deep link filters standings and replays and can return to all builds', async () => {
+  const query = '?ruleset=mod%3AWave-Defense&build=older-release';
+  const ui = await page(800, query);
+  assert.equal(ui.get('waveBuildControl').hidden, false);
+  assert.equal(ui.get('waveBuild').value, 'older-release');
+  assert.equal(ui.get('waveTotal').textContent, '130');
+  assert.equal(ui.get('waveRankingWin')['aria-sort'], 'descending');
+  assert.match(ui.get('wavePlayers').children[0].children[1].children[0].href, /build=older-release/);
+  await ui.refresh();
+  assert.equal(ui.get('waveBuild').value, 'older-release');
+  ui.get('waveBuild').value = '';
+  ui.get('waveBuild').fire('change');
+  ui.flush();
+  assert.equal(ui.get('waveTotal').textContent, '260');
+  assert.equal(ui.url().searchParams.has('build'), false);
 });
 
 for (const legacy of ['beta', 'mod:BOHA-Wave-Defense', 'older-release']) {

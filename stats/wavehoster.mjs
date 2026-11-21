@@ -1,10 +1,11 @@
-import {moddedArcSnapshot, combineModNames, modMedals, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261120-stock-routing-1';
+import {moddedArcSnapshot, combineModNames, modMedals, medalPointValue, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261121-arc-builds-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
 
 let data = null;
 let modData = null;
 let allRanking = null;
 let selected = new URLSearchParams(window.location.search).get('ruleset') || 'all';
+let selectedBuild = new URLSearchParams(window.location.search).get('build') || '';
 let selectedPlayer = new URLSearchParams(window.location.search).get('player');
 const PAGE_SIZE = 100;
 let playerLimit = PAGE_SIZE;
@@ -38,11 +39,13 @@ function showMedal(button, medal, pinned = false) {
   const tip = $('waveMedalTip');
   tip.replaceChildren();
   const place = ['1st', '2nd', '3rd'][medal.place - 1];
+  const points = medalPointValue(medal);
   for (const [tag, text] of [
     ['strong', `${place} place · ${medal.metal[0].toUpperCase() + medal.metal.slice(1)}`],
     ['span', medal.modName],
     ['span', `${number(medal.wins)} win${medal.wins === 1 ? '' : 's'} · Best score: ${medal.bestScore == null ? 'Unavailable' : number(medal.bestScore)}`],
-    ['small', 'Current standings · Wins, then best score']
+    ['small', medal.tester ? `Tester podium · ${number(points)} medal points (30%)` :
+      `Current standings · ${number(points)} medal point${points === 1 ? '' : 's'}`]
   ]) {
     const line = document.createElement(tag);
     line.textContent = text;
@@ -71,8 +74,8 @@ function appendMedals(name, player, all) {
   for (const medal of awards) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'wave-medal';
-    button.setAttribute('aria-label', `${medal.modName} · ${['1st', '2nd', '3rd'][medal.place - 1]} place · ${medal.metal} medal`);
+    button.className = medal.tester ? 'wave-medal wave-medal-tester' : 'wave-medal';
+    button.setAttribute('aria-label', `${medal.modName} · ${['1st', '2nd', '3rd'][medal.place - 1]} place · ${medal.metal} ${medal.tester ? 'tester medal' : 'medal'}`);
     button.setAttribute('aria-controls', 'waveMedalTip');
     button.setAttribute('aria-describedby', 'waveMedalTip');
     button.setAttribute('aria-expanded', 'false');
@@ -101,6 +104,7 @@ function profileUrl(playerId) {
   const url = new URL('index.html', window.location.href);
   url.searchParams.set('tab', 'wavehoster');
   url.searchParams.set('ruleset', selected);
+  if (selectedBuild) url.searchParams.set('build', selectedBuild);
   if (playerId) url.searchParams.set('player', playerId);
   return url;
 }
@@ -108,6 +112,8 @@ function profileUrl(playerId) {
 function syncSelection() {
   const url = new URL(window.location.href);
   url.searchParams.set('ruleset', selected);
+  if (selectedBuild) url.searchParams.set('build', selectedBuild);
+  else url.searchParams.delete('build');
   if (selectedPlayer) url.searchParams.set('player', selectedPlayer);
   else url.searchParams.delete('player');
   window.history.replaceState(null, '', url);
@@ -223,31 +229,38 @@ function render() {
   hideMedal();
   const all = selected === 'all';
   const scope = modData;
-  const group = all ? allRanking : scope.groups.find(item => item.id === selected);
-  if (!group) return;
-  selected = group.id;
+  const mod = all ? allRanking : scope.groups.find(item => item.id === selected);
+  if (!mod) return;
+  const build = mod.builds?.find(item => item.id === selectedBuild);
+  const group = build || mod;
+  const versionRanking = !build && !!mod.currentPodium;
+  const groupIds = build ? new Set(build.groupIds) : null;
+  const scopedGames = scope.games.filter(game => (all || game.group === selected) && (!groupIds || groupIds.has(game.build)));
   const profile = group.players.find(player => player.id === selectedPlayer);
   if (!profile) selectedPlayer = null;
   $('waveRuleset').value = selected;
-  $('waveFactionsGuide').hidden = !isFactionsMod(group);
-  $('waveTotal').textContent = number(scope.games.filter(game => all || game.group === selected).length);
+  $('waveFactionsGuide').hidden = !isFactionsMod(mod);
+  $('waveTotal').textContent = number(scopedGames.length);
   $('waveGroups').textContent = number(scope.groups.length);
   $('waveConfirmed').textContent = number(group.confirmed);
-  $('waveWaiting').textContent = number(scope.games.filter(game => (all || game.group === selected) && game.status === 'pending').length);
+  $('waveWaiting').textContent = number(scopedGames.filter(game => game.status === 'pending').length);
   $('waveRuleSummary').textContent = all
     ? `All ${number(modData.groups.length)} mods · ${number(group.confirmed)} verified / ${number(group.matches)} replays`
-    : `${rulesetLabel(group)} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
+    : `${rulesetLabel(mod)}${build ? ` · ${buildLabel(build)}` : ''} · ${number(group.confirmed)} verified / ${number(group.matches)} replays`;
   $('waveRankingNote').textContent = all
-    ? 'Ranked by medal points (gold 3, silver 2, bronze 1), then games played, then kills.'
-    : 'Recorded departures count as defeats. Only verified final results add scores and kills.';
-  $('waveProfileNote').textContent = all ? 'Stats and match history across all mods.' : 'Stats and match history for this mod.';
+    ? 'Ranked by medal points (gold 3, silver 2, bronze 1), then games played, then kills. Tester medals are worth 30%.'
+    : versionRanking
+      ? 'Ranked by newest version won, then wins and best winning score on that version. Smaller medals mark the tester podium.'
+      : 'Recorded departures count as defeats. Only verified final results add scores and kills.';
+  $('waveProfileNote').textContent = all ? 'Stats and match history across all mods.' :
+    build ? 'Stats and match history for this build.' : 'Stats and match history for this mod.';
 
   const scoreHeading = $('waveRankingScore');
   const winHeading = $('waveRankingWin');
   scoreHeading.textContent = all ? 'Medal pts ↓' : 'Best score';
-  winHeading.textContent = all ? 'Win' : 'Win ↓';
+  winHeading.textContent = all || versionRanking ? 'Win' : 'Win ↓';
   scoreHeading.setAttribute('aria-sort', all ? 'descending' : 'none');
-  winHeading.setAttribute('aria-sort', all ? 'none' : 'descending');
+  winHeading.setAttribute('aria-sort', all || versionRanking ? 'none' : 'descending');
   const scoreKey = all ? 'medalPoints' : 'bestScore';
   const query = $('wavePlayerSearch').value.trim().toLocaleLowerCase();
   const players = group.players
@@ -329,7 +342,7 @@ function render() {
     header.append(th);
   }
   $('waveMatchesHead').replaceChildren(header);
-  const games = scope.games.filter(game => (all || game.group === selected) && (!profile || game.participants?.some(player => player.id === profile.id)));
+  const games = scopedGames.filter(game => !profile || game.participants?.some(player => player.id === profile.id));
   $('waveMatches').replaceChildren();
   games.slice(0, matchLimit).forEach(game => {
     const row = document.createElement('tr');
@@ -349,8 +362,9 @@ function render() {
     }
     const participant = profile ? game.participants.find(player => player.id === profile.id) : null;
     if (participant) {
-      const outcome = participantResult(game, participant);
-      const result = waveResult(game)?.label || (participant.resultReason === 'departure' ? 'Left game (loss)' : ({winner: 'Win', loser: 'Lost', contender: 'Draw'})[outcome]) || 'Result unavailable';
+      const wave = waveResult(game);
+      const outcome = wave?.result || participantResult(game, participant);
+      const result = wave?.label || (participant.resultReason === 'departure' ? 'Left game (loss)' : ({winner: 'Win', loser: 'Lost', contender: 'Draw'})[outcome]) || 'Result unavailable';
       cell(row, result, 'wave-result-' + outcome);
       cell(row, participant.score === null ? '—' : number(participant.score));
     } else cell(row, game.players.join(', ') || 'No human player recorded');
@@ -422,6 +436,27 @@ function scheduleMatchFit() {
   });
 }
 
+function buildLabel(build) {
+  if (build.modVersion) return `v${build.modVersion}`;
+  if (!build.firstPlayed) return `Build ${build.id.slice(0, 7)}`;
+  return new Date(build.firstPlayed).toLocaleString(undefined, {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'});
+}
+
+function renderBuildOptions() {
+  const builds = modData.groups.find(group => group.id === selected)?.builds || [];
+  const select = $('waveBuild');
+  select.replaceChildren();
+  $('waveBuildControl').hidden = builds.length < 2;
+  if (builds.length < 2 || !builds.some(build => build.id === selectedBuild)) selectedBuild = '';
+  for (const [id, label] of [['', 'All builds'], ...builds.map(build => [build.id, buildLabel(build)])]) {
+    const option = document.createElement('option');
+    option.value = id;
+    option.textContent = label;
+    select.append(option);
+  }
+  select.value = selectedBuild;
+}
+
 function renderOptions() {
   $('waveRuleset').replaceChildren();
   function option(value, text) {
@@ -433,6 +468,7 @@ function renderOptions() {
   option('all', 'ALL');
   for (const group of modData.groups) option(group.id, rulesetLabel(group));
   $('waveRuleset').value = selected;
+  renderBuildOptions();
 }
 
 function updateHostSync(isLive) {
@@ -453,7 +489,7 @@ async function load() {
       const arc = moddedArcSnapshot(data);
       modData = combineModNames(arc);
       medals = modMedals(modData.groups);
-      allRanking = rankAllMods(arc, medals);
+      allRanking = rankAllMods(modData, medals);
       selected = previous === 'all' ? previous
         : modData.groups.find(group => group.id === previous || group.groupIds.includes(previous))?.id || 'all';
       renderOptions();
@@ -486,14 +522,23 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') hide
 window.addEventListener('scroll', hideMedal, true);
 window.addEventListener('resize', hideMedal);
 
-$('waveRuleset').addEventListener('change', () => {
-  selected = $('waveRuleset').value;
+function applyScopeSelection() {
   selectedPlayer = null;
   playerLimit = PAGE_SIZE;
   matchLimit = PAGE_SIZE;
   fitMatches = true;
   syncSelection();
   render();
+}
+$('waveRuleset').addEventListener('change', () => {
+  selected = $('waveRuleset').value;
+  selectedBuild = '';
+  renderBuildOptions();
+  applyScopeSelection();
+});
+$('waveBuild').addEventListener('change', () => {
+  selectedBuild = $('waveBuild').value;
+  applyScopeSelection();
 });
 $('waveClearPlayer').addEventListener('click', () => selectPlayer(null));
 $('wavePlayerSearch').addEventListener('input', () => {

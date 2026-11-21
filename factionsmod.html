@@ -32,6 +32,14 @@ footer{color:var(--muted);font-size:.87rem;margin-top:1.3rem}a{color:var(--accen
 @media print{body{background:white;color:black}.tools,.hero,.legend,footer{display:none}main{width:100%}.table-scroll{overflow:visible}table{min-width:0}}
 
 .overview{margin:0 0 1.55rem}.overview h2{margin:0;font-size:1.55rem}.overview p{margin:.25rem 0 .75rem;color:var(--muted)}
+.faction-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin:1rem 0}
+.faction-card{min-width:0;border:1px solid var(--line);border-top:2px solid var(--card-accent);border-radius:.65rem;background:var(--panel);padding:.9rem}
+.faction-card h3{margin:0;color:var(--card-accent);font-size:1.15rem}.faction-card dl{display:grid;grid-template-columns:1fr auto;gap:.35rem .65rem;margin:.75rem 0;font-size:.88rem}.faction-card dd{margin:0;text-align:right;font-weight:650}
+.faction-card .model-stage{display:block;width:100%;height:150px;background:#071621;border-radius:.4rem}
+.faction-card .model-controls{display:flex;align-items:center;justify-content:center;gap:.5rem;margin:.45rem 0}.model-controls button{border:1px solid #466176;border-radius:.35rem;background:#132b3b;color:var(--text);font:inherit;font-size:.85rem;padding:.3rem .55rem;cursor:pointer}
+.faction-model{border-top:1px solid var(--line)}.faction-model summary{font-size:.86rem;padding:.55rem 0 0;color:var(--accent)}.faction-card .model-status{font-size:.8rem;margin:.25rem 0;color:var(--muted)}
+.overview .comparison-details{border:1px solid var(--line);border-radius:.65rem;background:var(--panel)}.overview .comparison-details .table-scroll{border:0;border-top:1px solid var(--line);border-radius:0 0 .65rem .65rem}
+@media(max-width:820px){.faction-cards{grid-template-columns:1fr}}
 .overview .table-scroll{background:var(--panel);border:1px solid var(--line);border-radius:.65rem}
 .overview .comparison{min-width:42rem;table-layout:fixed}.overview th:first-child{width:29%}
 .comparison td.positive{color:var(--green)}.comparison td.negative{color:var(--red)}
@@ -50,6 +58,53 @@ footer{color:var(--muted);font-size:.87rem;margin-top:1.3rem}a{color:var(--accen
 <section class="overview" aria-labelledby="overview-title">
   <h2 id="overview-title">Compare all three factions</h2>
   <p>Percentages show changes from vanilla 4.7 multiplayer.</p>
+  <div class="faction-cards">
+    <article class="faction-card" style="--card-accent:#8bdce8">
+      <h3>The Project</h3>
+      <dl>
+        <dt>Power generation at start</dt><dd class="positive">+30%</dd>
+        <dt>Factory output after Manufacturing</dt><dd class="positive">+30%</dd>
+        <dt>Vehicle and cyborg armor</dt><dd>Standard</dd>
+      </dl>
+      <details class="faction-model" data-faction-model="project">
+        <summary>View Power Generator in 3D</summary>
+        <p class="model-status" role="status">Loading model…</p>
+        <canvas class="model-stage" aria-label="3D Power Generator model" role="img" hidden></canvas>
+        <div class="model-controls" hidden><button type="button" data-turn="-1">Rotate left</button><button type="button" data-turn="1">Rotate right</button></div>
+      </details>
+    </article>
+    <article class="faction-card" style="--card-accent:#ffd287">
+      <h3>Collective</h3>
+      <dl>
+        <dt>Vehicle HP / kinetic / thermal</dt><dd class="positive">+30% / +30% / +40%</dd>
+        <dt>Cyborg HP / kinetic / thermal</dt><dd class="negative">−35% / −35% / −45%</dd>
+        <dt>Cyborg factory output</dt><dd class="negative">−30%</dd>
+      </dl>
+      <details class="faction-model" data-faction-model="collective">
+        <summary>View Heavy HVC in 3D</summary>
+        <p class="model-status" role="status">Loading model…</p>
+        <canvas class="model-stage" aria-label="3D Heavy Hyper Velocity Cannon model" role="img" hidden></canvas>
+        <div class="model-controls" hidden><button type="button" data-turn="-1">Rotate left</button><button type="button" data-turn="1">Rotate right</button></div>
+      </details>
+    </article>
+    <article class="faction-card" style="--card-accent:#c1aaff">
+      <h3>NEXUS</h3>
+      <dl>
+        <dt>Cyborg HP / kinetic / thermal</dt><dd class="positive">+35% / +35% / +45%</dd>
+        <dt>Vehicle HP / kinetic / thermal</dt><dd class="negative">−30% / −30% / −40%</dd>
+        <dt>Wall HP / kinetic armor</dt><dd class="positive">+30% / +35%</dd>
+        <dt>Vehicle factory output</dt><dd class="negative">−30%</dd>
+      </dl>
+      <details class="faction-model" data-faction-model="nexus">
+        <summary>View Cyborg Factory in 3D</summary>
+        <p class="model-status" role="status">Loading model…</p>
+        <canvas class="model-stage" aria-label="3D Cyborg Factory model" role="img" hidden></canvas>
+        <div class="model-controls" hidden><button type="button" data-turn="-1">Rotate left</button><button type="button" data-turn="1">Rotate right</button></div>
+      </details>
+    </article>
+  </div>
+  <details class="comparison-details">
+  <summary>Full starting comparison</summary>
   <div class="table-scroll" role="region" tabindex="0" aria-label="Faction comparison">
     <table class="comparison" aria-label="Starting comparison">
       <thead><tr><th scope="col">Change</th><th scope="col">The Project</th><th scope="col">Collective</th><th scope="col">NEXUS</th></tr></thead>
@@ -64,6 +119,7 @@ footer{color:var(--muted);font-size:.87rem;margin-top:1.3rem}a{color:var(--accen
       </tbody>
     </table>
   </div>
+  </details>
 </section>
   <div class="tools">
     <nav aria-label="Faction"><a href="#collective" aria-current="true">Collective</a><a href="#nexus">NEXUS</a><a href="#project">The Project</a></nav>
@@ -151,6 +207,24 @@ const sections = [...document.querySelectorAll('.faction')];
 const links = [...document.querySelectorAll('nav a')];
 const openBeforeSearch = new WeakMap();
 let active;
+
+for (const preview of document.querySelectorAll('[data-faction-model]')) {
+  preview.addEventListener('toggle', async () => {
+    if (!preview.open || preview.dataset.loaded) return;
+    preview.dataset.loaded = 'loading';
+    const status = preview.querySelector('.model-status');
+    status.textContent = 'Loading model…';
+    try {
+      const {mountFactionModel} = await import('./stats/faction-model-preview.mjs?v=20261121-1');
+      await mountFactionModel(preview);
+      preview.dataset.loaded = 'ready';
+    } catch {
+      delete preview.dataset.loaded;
+      status.hidden = false;
+      status.textContent = '3D preview unavailable. Close and reopen to retry.';
+    }
+  });
+}
 
 function filterEntries() {
   const terms = search.value.trim().toLowerCase().split(/\s+/).filter(Boolean);

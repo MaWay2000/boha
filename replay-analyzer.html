@@ -2159,18 +2159,6 @@
       isolation: isolate;
       font-variant-numeric: tabular-nums;
       text-shadow: 0 1px 3px #040a0d;
-      --replay-result-start: rgba(42, 115, 55, 0.48);
-      --replay-result-end: rgba(111, 155, 78, 0.58);
-    }
-
-    .replay-result-meter.is-leading {
-      --replay-result-start: rgba(25, 123, 52, 0.72);
-      --replay-result-end: rgba(50, 190, 65, 0.72);
-    }
-
-    .replay-result-meter.is-loss {
-      --replay-result-start: rgba(124, 54, 40, 0.52);
-      --replay-result-end: rgba(176, 101, 57, 0.62);
     }
 
     .replay-result-meter:hover,
@@ -2185,10 +2173,11 @@
       inset: max(3px, calc(50% - 13px)) 5px;
       border-radius: 4px;
       background:
-        linear-gradient(90deg, var(--replay-result-start), var(--replay-result-end))
+        linear-gradient(90deg, hsl(var(--replay-result-hue) 66% 27% / 0.78),
+          hsl(var(--replay-result-hue) 76% 44% / 0.72))
           left center / var(--replay-result-fill) 100% no-repeat,
-        rgba(5, 18, 27, 0.62);
-      box-shadow: inset 0 0 0 1px rgba(157, 216, 228, 0.13);
+        hsl(var(--replay-result-hue) 48% 18% / 0.32);
+      box-shadow: inset 0 0 0 1px hsl(var(--replay-result-hue) 66% 56% / 0.35);
       pointer-events: none;
     }
 
@@ -3181,7 +3170,7 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="stats/replay-telemetry.js?v=20261117-arc-events-1"></script>
-  <script src="replay-analyzer.js?v=20261124-result-bars-2"></script>
+  <script src="replay-analyzer.js?v=20261124-result-colors-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

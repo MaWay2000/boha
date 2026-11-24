@@ -2814,18 +2814,23 @@
   ];
 
   function replayResultBarScales(players) {
-    return new Map(replayResultColumns.map(({ key, format }) => {
-      if (key === "researchActivity") return [key, { minimum: 0, maximum: 100 }];
+    return new Map(replayResultColumns.map(({ key, format, loss }) => {
       const values = players.map((player) => playerSortValue(player, key))
-        .filter((value) => Number.isFinite(value) && (!format || value !== Number.MAX_SAFE_INTEGER));
-      const minimum = values.length ? Math.min(...values) : 0;
-      const maximum = values.length ? Math.max(...values) : 0;
-      return [key, { minimum, maximum }];
+        .filter(Number.isFinite);
+      const rankedValues = [...new Set(values)].sort((a, b) => loss ? b - a : a - b);
+      const ranks = new Map(rankedValues.map((value, index) => [value,
+        rankedValues.length > 1 ? index / (rankedValues.length - 1) : 0.5]));
+      const finiteScale = format ? values.filter(value => value !== Number.MAX_SAFE_INTEGER) : values;
+      const bounds = key === "researchActivity" ? { minimum: 0, maximum: 100 } : {
+        minimum: finiteScale.length ? Math.min(...finiteScale) : 0,
+        maximum: finiteScale.length ? Math.max(...finiteScale) : 0
+      };
+      return [key, { ...bounds, ranks }];
     }));
   }
 
   function createReplayResultCell(player, column, scale) {
-    const { key, format, loss } = column;
+    const { key, format } = column;
     const value = playerSortValue(player, key);
     const cell = key === "researchActivity" ? createResearchCell(value)
       : createCell(format ? format(player) : formatStat(value));
@@ -2836,10 +2841,12 @@
     const ratio = format && value === Number.MAX_SAFE_INTEGER ? 1
       : range > 0 ? Math.max(0, Math.min(1, (value - scale.minimum) / range))
       : value === 0 ? 0 : 1;
+    const rank = scale.ranks.get(value);
+    // Place the midpoint at amber between the red and green ends of the scale.
+    const hue = rank <= 0.5 ? rank * 90 : 45 + (rank - 0.5) * 150;
     cell.classList.add("replay-result-meter");
-    cell.classList.toggle("is-loss", loss === true || value < 0);
-    cell.classList.toggle("is-leading", ratio >= 0.995);
     cell.style.setProperty("--replay-result-fill", `${ratio * 100}%`);
+    cell.style.setProperty("--replay-result-hue", String(Math.round(hue)));
     return cell;
   }
 

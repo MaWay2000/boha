@@ -341,7 +341,7 @@ function setupSortHeaders() {
 
 async function ensureLeaderboardData(force = false) {
   const result = await publishedLoader.load();
-  mainLiveAvailable = result.liveAvailable;
+  mainLiveAvailable = result.liveAvailable ?? !publishedLoaderOptions.liveBaseUrl;
   const payload = result.payload;
   if (personalRatings?.requiresPerformance()) await publishedLoader.loadPerformance(payload);
   if (!result.changed && leaderboardData === payload) return false;

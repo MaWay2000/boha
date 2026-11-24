@@ -1,6 +1,6 @@
 (function () {
   const replayVisualApiBaseUrl = new URL("https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/");
-  const arcBattlefieldBaseUrl = new URL("/arc-battlefield/", replayVisualApiBaseUrl);
+  const arcBattlefieldRelayUrl = "https://onit.lt/wzstats/arc-battlefield.php";
   const wzstatsPublishedUrl = new URL("stats/published/matches.json", document.baseURI);
   const replayFile = document.getElementById("replayFile");
   const replayFileName = document.getElementById("replayFileName");
@@ -544,7 +544,9 @@
   }
 
   async function loadArcBattlefield(replaySha256) {
-    const response = await fetch(new URL(replaySha256, arcBattlefieldBaseUrl), {
+    const url = new URL(arcBattlefieldRelayUrl);
+    url.searchParams.set("sha", replaySha256);
+    const response = await fetch(url, {
       signal: AbortSignal.timeout(18000)
     });
     if (!response.ok) throw new Error(`Battlefield telemetry is unavailable (HTTP ${response.status}).`);
@@ -567,10 +569,10 @@
     let arcGame = null;
     let hasPublicArcBattlefield = false;
     const publishedArcIndex = new URL("stats/published/wavehoster.json", document.baseURI);
-    for (const indexUrl of [
-      "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json",
-      publishedArcIndex
-    ]) {
+    const liveArcIndex = "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json";
+    const arcIndexes = /^\d{8}_\d{6}_\d+$/.test(replayId)
+      ? [publishedArcIndex, liveArcIndex] : [liveArcIndex, publishedArcIndex];
+    for (const indexUrl of arcIndexes) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
       try {

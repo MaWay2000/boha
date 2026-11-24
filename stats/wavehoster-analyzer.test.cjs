@@ -12,7 +12,7 @@ function runner({wavePayload = wave, livePayload = wavePayload, waveError = fals
     setTimeout: (callback, time) => setTimeout(callback, liveHang ? 5 : time), clearTimeout,
     formatDuration: time => `${Math.floor(time / 60000)}:${String(Math.floor(time / 1000) % 60).padStart(2, '0')}`,
     document: {baseURI: 'https://example.test/boha/replay-analyzer.html'},
-    wzstatsPublishedUrl: 'main-index', arcBattlefieldBaseUrl: 'https://example.test/arc-battlefield/',
+    wzstatsPublishedUrl: 'main-index', arcBattlefieldRelayUrl: 'https://example.test/arc-battlefield.php',
     expandCompressedEngineAnalysis: async () => {}, normalizeTacticalReplayPlayerOwners() {},
     fetch: async (value, options) => {
       const url = String(value); calls.push(url);
@@ -23,7 +23,7 @@ function runner({wavePayload = wave, livePayload = wavePayload, waveError = fals
       }
       if (url.includes('wavehoster.json')) { if (waveError) throw Error('modded index offline'); return {ok: true, json: async () => wavePayload}; }
       if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, replay_sha256: hash, source_match_id: '1234567890123'}]})};
-      if (url.includes('/arc-battlefield/')) return {ok: Boolean(battlefield), status: battlefield ? 200 : 404, json: async () => battlefield};
+      if (url.includes('/arc-battlefield.php?')) return {ok: Boolean(battlefield), status: battlefield ? 200 : 404, json: async () => battlefield};
       return {ok: detailStatus === 200, status: detailStatus, json: async () => ({match})};
     }});
   vm.runInContext(code, context);
@@ -149,7 +149,7 @@ test('published Arc matches load exact positions without requesting private matc
   const result = await load(hash, game.id);
   assert.equal(result.engineAnalysis, engineAnalysis);
   assert.equal(result.playerData[0].score, 475);
-  assert.ok(calls.at(-1).endsWith('/arc-battlefield/' + hash));
+  assert.ok(calls.at(-1).endsWith('/arc-battlefield.php?sha=' + hash));
   assert.ok(!calls.some(url => url.includes('/matches/')));
 
   const mismatched = runner({liveError: true, wavePayload: {...wave, games: [game]},

@@ -223,6 +223,24 @@ test('Bohan power totals still load when the match detail is unavailable', async
   const wrongReplay = runner({waveError: true, detailStatus: 404, research: {...metrics, replaySha256: 'b'.repeat(64)}});
   assert.equal((await wrongReplay.load(hash, '1234567890123')).powerTrades.length, 0);
 });
+test('Bohan battlefield loads through the public match projection', async () => {
+  const engineAnalysis = {extended: {tacticalReplay: {exactObjectPositions: true,
+    positionFrames: [{time: 0, droids: [[12, 1, 128, 256, 100, 0, 0, 0]], structures: []}]}}};
+  const metrics = {replaySha256: hash, researchActivity: [{position: 1, percent: 80}], engineAnalysis};
+  const {load, calls} = runner({waveError: true, detailStatus: 404, research: metrics});
+  const result = await load(hash, '1234567890123', true);
+  assert.equal(result.engineAnalysis, engineAnalysis);
+  assert.equal(result.usesPublicBattlefield, true);
+  assert.equal(result.researchActivity[0].percent, 80);
+  assert.ok(calls.some(url => url.endsWith('&battlefield=1')));
+  assert.ok(!calls.some(url => url.includes('/matches/9')));
+
+  const withoutPreview = runner({waveError: true, detailStatus: 404, research: metrics});
+  const summary = await withoutPreview.load(hash, '1234567890123', false);
+  assert.equal(summary.engineAnalysis, null);
+  assert.equal(summary.researchActivity[0].percent, 80);
+  assert.ok(!withoutPreview.calls.some(url => url.includes('battlefield=1')));
+});
 test('a mismatched detail result cannot attach another replay’s players or analysis', async () => {
   const {load} = runner({match: {...detail, replay_sha256: 'b'.repeat(64)}});
   const result = await load(hash, '');

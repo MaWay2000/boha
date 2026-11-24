@@ -560,15 +560,22 @@
     return engineAnalysis;
   }
 
-  async function loadBohanMatchMetrics(match) {
+  async function loadBohanMatchMetrics(match, includeBattlefield) {
     if (match.source !== "bohan" || !Number.isSafeInteger(match.id) || !/^[a-f0-9]{64}$/.test(match.replay_sha256)) return null;
     const url = new URL(arcBattlefieldRelayUrl);
     url.searchParams.set("research", match.id);
     url.searchParams.set("sha", match.replay_sha256);
+    if (includeBattlefield) url.searchParams.set("battlefield", "1");
     const response = await fetch(url, { signal: AbortSignal.timeout(18000) });
     if (!response.ok) return null;
-    const { replaySha256, researchActivity, powerTrades } = await response.json();
+    const { replaySha256, researchActivity, powerTrades, engineAnalysis } = await response.json();
     if (replaySha256 !== match.replay_sha256) return null;
+    const tacticalReplay = engineAnalysis?.extended?.tacticalReplay;
+    if (includeBattlefield && tacticalReplay?.exactObjectPositions === true) {
+      await expandCompressedEngineAnalysis(engineAnalysis);
+    }
+    const hasBattlefield = includeBattlefield && tacticalReplay?.exactObjectPositions === true
+      && Array.isArray(tacticalReplay.positionFrames) && tacticalReplay.positionFrames.some(frame => !frame.eventsOnly);
     const validSlot = player => Number.isSafeInteger(player?.position) && player.position >= 0;
     const power = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
     return {
@@ -576,11 +583,12 @@
         && Number.isFinite(player.percent) && player.percent >= 0 && player.percent <= 100) : [],
       powerTrades: Array.isArray(powerTrades) ? powerTrades.filter(validSlot).map(player => ({
         position: player.position, powerWon: power(player.powerWon), powerLost: power(player.powerLost)
-      })) : []
+      })) : [],
+      engineAnalysis: hasBattlefield ? engineAnalysis : null
     };
   }
 
-  async function loadWzstatsResult(replaySha256, replayId) {
+  async function loadWzstatsResult(replaySha256, replayId, includeBattlefield = true) {
     if (!replaySha256 && !replayId) {
       return null;
     }
@@ -645,7 +653,7 @@
       }
     }
 
-    const pendingMetrics = loadBohanMatchMetrics(match).catch(() => null);
+    const matchMetrics = await loadBohanMatchMetrics(match, includeBattlefield).catch(() => null);
     let detailMatch = null;
     let detailError = "";
     if (hasPublicArcBattlefield) {
@@ -654,6 +662,8 @@
       } catch (error) {
         detailError = "Live battlefield telemetry is unavailable for this replay.";
       }
+    } else if (matchMetrics?.engineAnalysis) {
+      engineAnalysis = matchMetrics.engineAnalysis;
     } else try {
       const detailUrl = `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`;
       let detailResponse;
@@ -707,14 +717,13 @@
           statsSource: "arc-publication"
         })) : [];
 
-    const matchMetrics = await pendingMetrics;
     return {
       replayUrl: match.replay_url,
       endDate: matchDate
         ? `${matchDate.replace(" ", "T")}${/Z$|[+-]\d{2}:\d{2}$/.test(matchDate) ? "" : "Z"}`
         : null,
       partialStats: true,
-      hasPublicArcBattlefield,
+      usesPublicBattlefield: hasPublicArcBattlefield || Boolean(matchMetrics?.engineAnalysis),
       engineAnalysis,
       detailError,
       researchActivity: matchMetrics?.researchActivity || [],
@@ -6881,7 +6890,7 @@
       if (latestReplaySha256 || latestReplayId) {
         setStatus("Loading replay-engine player summary…");
         try {
-          publishedResult = await loadWzstatsResult(latestReplaySha256, latestReplayId);
+          publishedResult = await loadWzstatsResult(latestReplaySha256, latestReplayId, allowPublishedBattlefield);
         } catch (error) {
           latestExtraction.publishedStatsError = error.message || "Replay-engine player summary could not be loaded.";
         }
@@ -6901,7 +6910,7 @@
           latestExtraction.mapTerrainError = error.message || "Map terrain could not be loaded.";
         }
         try {
-          await loadReplayModelAssets(latestExtraction, !publishedResult.hasPublicArcBattlefield);
+          await loadReplayModelAssets(latestExtraction, !publishedResult.usesPublicBattlefield);
         } catch (error) {
           latestExtraction.modelAssetsError = error.message || "Custom model assets could not be loaded.";
         }

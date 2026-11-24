@@ -15,15 +15,13 @@ function fixture() {
   let fullRenders = 0;
   function makeRow(key) {
     const classes = new Set(['stats-player-game-row']);
-    const glyph = { textContent: '+' };
-    const label = { textContent: 'Open match details' };
     const toggle = {
       expanded: 'false',
-      setAttribute(name, value) { assert.equal(name, 'aria-expanded'); this.expanded = value; },
-      querySelector(selector) { return selector === '[aria-hidden="true"]' ? glyph : label; }
+      textContent: 'Open match details',
+      setAttribute(name, value) { assert.equal(name, 'aria-expanded'); this.expanded = value; }
     };
     const row = {
-      dataset: { playerGameKey: key }, toggle, glyph, label,
+      dataset: { playerGameKey: key }, toggle,
       classList: {
         toggle(name, enabled) { enabled ? classes.add(name) : classes.delete(name); },
         contains(name) { return classes.has(name); }
@@ -89,15 +87,13 @@ test('opening and closing change only the detail row and accessible toggle state
   assert.equal(f.nodes[1].innerHTML, '<td colspan="5">one:Lace</td>');
   assert.equal(f.context.activeExpandedPlayerGameKey, 'one');
   assert.equal(f.rows[0].toggle.expanded, 'true');
-  assert.equal(f.rows[0].glyph.textContent, '-');
-  assert.equal(f.rows[0].label.textContent, 'Close match details');
+  assert.equal(f.rows[0].toggle.textContent, 'Close match details');
   assert.equal(f.copiesBound, 1);
   f.toggle(0);
   assert.deepEqual(f.nodes, f.rows);
   assert.equal(f.context.activeExpandedPlayerGameKey, null);
   assert.equal(f.rows[0].toggle.expanded, 'false');
-  assert.equal(f.rows[0].glyph.textContent, '+');
-  assert.equal(f.rows[0].label.textContent, 'Open match details');
+  assert.equal(f.rows[0].toggle.textContent, 'Open match details');
   assert.equal(f.detailsRendered, 1, 'closing needs no detail rendering');
 });
 

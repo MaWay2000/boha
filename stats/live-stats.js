@@ -2666,10 +2666,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
             ${replayUrl
               ? `<a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a>`
               : `<span class="stats-note">Unavailable</span>`}
-            <button class="stats-expand-toggle stats-player-game-toggle" type="button" aria-expanded="${isExpanded ? "true" : "false"}">
-              <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
-              <span class="visually-hidden">${isExpanded ? "Close match details" : "Open match details"}</span>
-            </button>
+            <button class="stats-player-game-toggle visually-hidden" type="button" aria-expanded="${isExpanded ? "true" : "false"}">${isExpanded ? "Close match details" : "Open match details"}</button>
           </td>
         </tr>
         ${detailRow}
@@ -2703,10 +2700,7 @@ function setPlayerGameRowExpanded(row, expanded) {
   row.classList.toggle("is-expanded", expanded);
   const toggle = row.querySelector(".stats-player-game-toggle");
   toggle.setAttribute("aria-expanded", String(expanded));
-  toggle.querySelector('[aria-hidden="true"]').textContent = expanded ? "-" : "+";
-  toggle.querySelector(".visually-hidden").textContent = expanded
-    ? "Close match details"
-    : "Open match details";
+  toggle.textContent = expanded ? "Close match details" : "Open match details";
 }
 
 function togglePlayerGameDetails(row, game, activeAccount, accounts) {

@@ -252,7 +252,6 @@
   let analysisRunning = false;
   let latestReplayId = "";
   let latestReplaySha256 = "";
-  let playerSortState = { key: "position", direction: "asc" };
   let battlefieldFrames = [];
   let battlefieldExtraction = null;
   let battlefieldCurrentTime = 0;
@@ -1820,8 +1819,8 @@
     if (!playerAwardsGuideDialog.open) playerAwardsGuideDialog.showModal();
   }
 
-  function createPlayerAwardsHeader(onSort) {
-    const header = createPlayerSortHeader("Awards", "awards", { rowSpan: 2 }, onSort);
+  function createPlayerAwardsHeader() {
+    const header = createHeaderCell("Awards", { rowSpan: 2 });
     const help = document.createElement("button");
     help.className = "replay-awards-help";
     help.type = "button";
@@ -2710,16 +2709,7 @@
     return won / lost;
   }
 
-  function playerSortValue(player, key, awardsByPlayer) {
-    if (key === "position") {
-      return Number(player.position);
-    }
-    if (key === "name") {
-      return String(player.name || "").toLocaleLowerCase();
-    }
-    if (key === "awards") {
-      return (awardsByPlayer.get(player) || []).length;
-    }
+  function replayResultValue(player, key) {
     if (key === "kd") {
       return playerKdValue(player);
     }
@@ -2736,71 +2726,6 @@
       return player.researchActivity;
     }
     return playerStat(player, key);
-  }
-
-  function sortPlayers(players, awardsByPlayer) {
-    return [...players].sort((left, right) => {
-      if (left.spectator !== right.spectator) {
-        return left.spectator ? 1 : -1;
-      }
-
-      const leftValue = playerSortValue(left, playerSortState.key, awardsByPlayer);
-      const rightValue = playerSortValue(right, playerSortState.key, awardsByPlayer);
-      const leftMissing = leftValue == null || (typeof leftValue === "number" && !Number.isFinite(leftValue));
-      const rightMissing = rightValue == null || (typeof rightValue === "number" && !Number.isFinite(rightValue));
-      if (leftMissing !== rightMissing) {
-        return leftMissing ? 1 : -1;
-      }
-
-      let comparison = 0;
-      if (typeof leftValue === "string" || typeof rightValue === "string") {
-        comparison = String(leftValue).localeCompare(String(rightValue), undefined, { sensitivity: "base" });
-      } else {
-        comparison = Number(leftValue) - Number(rightValue);
-      }
-      if (comparison !== 0) {
-        return playerSortState.direction === "asc" ? comparison : -comparison;
-      }
-      return Number(left.position) - Number(right.position);
-    });
-  }
-
-  function updatePlayerSortIndicators() {
-    playersTables.querySelectorAll(".stats-sort-button[data-player-sort-key]").forEach((button) => {
-      const active = button.dataset.playerSortKey === playerSortState.key;
-      button.dataset.direction = active ? playerSortState.direction : "";
-      button.classList.toggle("is-active", active);
-      button.closest("th").setAttribute(
-        "aria-sort",
-        active ? (playerSortState.direction === "asc" ? "ascending" : "descending") : "none"
-      );
-    });
-  }
-
-  function createPlayerSortHeader(label, key, options, renderRows) {
-    const cell = createHeaderCell("", options);
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "stats-sort-button stats-sort-button-compact";
-    button.dataset.playerSortKey = key;
-    button.textContent = label;
-    const sortLabel = `Sort players by ${options.accessibleLabel || label}`;
-    if (options.accessibleLabel) button.setAttribute("aria-label", sortLabel);
-    setFixedTooltip(button, sortLabel);
-    button.addEventListener("click", () => {
-      if (playerSortState.key === key) {
-        playerSortState.direction = playerSortState.direction === "asc" ? "desc" : "asc";
-      } else {
-        playerSortState = {
-          key,
-          direction: key === "position" || key === "name" ? "asc" : "desc"
-        };
-      }
-      updatePlayerSortIndicators();
-      renderRows();
-    });
-    cell.append(button);
-    return cell;
   }
 
   const expandedPlayerStatGroups = new Set();
@@ -2837,7 +2762,7 @@
     }
   }
 
-  function createReplayStatGroupHeader(label, group, renderRows) {
+  function createReplayStatGroupHeader(label, group) {
     const columns = replayResultColumns.filter(column => column.group === group);
     const header = createHeaderCell("", { scope: "colgroup", className: "replay-stat-group" });
     const toggle = document.createElement("button");
@@ -2864,22 +2789,13 @@
       playersTables.querySelectorAll(`[data-player-stat-detail="${group}"]`).forEach(cell => {
         cell.hidden = !expanded;
       });
-
-      if (!expanded && columns.some(column => !column.summary && column.key === playerSortState.key)) {
-        playerSortState = {
-          key: columns.find(column => column.summary).key,
-          direction: playerSortState.direction
-        };
-        updatePlayerSortIndicators();
-        renderRows();
-      }
     });
     return header;
   }
 
   function replayResultBarScales(players) {
     return new Map(replayResultColumns.map(({ key, format, loss }) => {
-      const values = players.map((player) => playerSortValue(player, key))
+      const values = players.map((player) => replayResultValue(player, key))
         .filter(Number.isFinite);
       const rankedValues = [...new Set(values)].sort((a, b) => loss ? b - a : a - b);
       const ranks = new Map(rankedValues.map((value, index) => [value,
@@ -2903,7 +2819,7 @@
 
   function createReplayResultCell(player, column, scale) {
     const { key, format } = column;
-    const value = playerSortValue(player, key);
+    const value = replayResultValue(player, key);
     const cell = key === "researchActivity" ? createResearchCell(value)
       : createCell(format ? format(player) : formatStat(value));
     setReplayStatDetail(cell, column);
@@ -2928,7 +2844,7 @@
     }
 
     const ranks = replayResultColumns.filter(column => column.includeInOverall !== false)
-      .map(({ key }) => barScales.get(key).ranks.get(playerSortValue(player, key)))
+      .map(({ key }) => barScales.get(key).ranks.get(replayResultValue(player, key)))
       .filter(Number.isFinite);
     const overall = ranks.length ? ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length : null;
     const story = createPlayerStory(player, players, events, researchActivity);
@@ -6811,70 +6727,51 @@
     });
     renderCompactMatchSummary(extraction);
     renderExtendedAnalysis(extraction);
-    const competitors = extraction.players.filter((player) => !player.spectator);
+    const competitors = extraction.players.filter((player) => !player.spectator)
+      .sort((left, right) => Number(left.position) - Number(right.position));
     const barScales = replayResultBarScales(competitors);
     const teamOrder = [...new Set(competitors.map((player) => Number(player.team)))].sort((left, right) => left - right);
     const firstTeam = teamOrder[0];
     const firstTeamPlayers = competitors.filter((player) => Number(player.team) === firstTeam);
     const secondTeamPlayers = competitors.filter((player) => Number(player.team) !== firstTeam);
-    const renderPlayerRows = () => {
-      replaceChildren(
-        playersBody,
-        sortPlayers(firstTeamPlayers, awardsByPlayer).map((player) => (
-          createPlayerRow(
-            player,
-            extraction.players,
-            extraction.events.records,
-            awardsByPlayer.get(player),
-            researchActivityByPlayer.get(player),
-            "A",
-            barScales
-          )
-        ))
-      );
-      replaceChildren(
-        playersBodyB,
-        sortPlayers(secondTeamPlayers, awardsByPlayer).map((player) => (
-          createPlayerRow(
-            player,
-            extraction.players,
-            extraction.events.records,
-            awardsByPlayer.get(player),
-            researchActivityByPlayer.get(player),
-            "B",
-            barScales
-          )
-        ))
-      );
-    };
+    const createTeamRows = (players, teamLabel) => players.map(player => createPlayerRow(
+      player,
+      extraction.players,
+      extraction.events.records,
+      awardsByPlayer.get(player),
+      player.researchActivity,
+      teamLabel,
+      barScales
+    ));
+    replaceChildren(playersBody, createTeamRows(firstTeamPlayers, "A"));
+    replaceChildren(playersBodyB, createTeamRows(secondTeamPlayers, "B"));
 
     const createPlayerHeaders = () => {
       const playerHeaderGroups = document.createElement("tr");
       playerHeaderGroups.append(
-        createPlayerSortHeader("Slot", "position", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
-        createReplayStatGroupHeader("Units", "units", renderPlayerRows),
-        createReplayStatGroupHeader("Structures", "structures", renderPlayerRows),
-        createReplayStatGroupHeader("Power", "power", renderPlayerRows),
-        createPlayerAwardsHeader(renderPlayerRows)
+        createHeaderCell("Slot", { rowSpan: 2 }),
+        createHeaderCell("Nick", { rowSpan: 2 }),
+        createHeaderCell("Score", { rowSpan: 2 }),
+        createHeaderCell("Res", { rowSpan: 2 }),
+        createHeaderCell("KD", { rowSpan: 2 }),
+        createReplayStatGroupHeader("Units", "units"),
+        createReplayStatGroupHeader("Structures", "structures"),
+        createReplayStatGroupHeader("Power", "power"),
+        createPlayerAwardsHeader()
       );
 
       const playerHeaderDetails = document.createElement("tr");
       playerHeaderDetails.className = "replay-stat-details";
       playerHeaderDetails.append(...replayResultColumns.filter(column => column.group).map(column => {
-        const { label, key, accessibleLabel } = column;
-        const header = createPlayerSortHeader(label, key, { accessibleLabel }, renderPlayerRows);
+        const { label, accessibleLabel } = column;
+        const header = createHeaderCell(label);
+        if (accessibleLabel) header.setAttribute("aria-label", accessibleLabel);
         setReplayStatDetail(header, column);
         return header;
       }));
       return [playerHeaderGroups, playerHeaderDetails];
     };
     replaceChildren(playersHead, createPlayerHeaders());
-    updatePlayerSortIndicators();
-    renderPlayerRows();
 
     replaceChildren(messagesBody, extraction.messages.types.map((message) => {
       const row = document.createElement("tr");

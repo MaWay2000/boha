@@ -2806,13 +2806,6 @@
   const expandedPlayerStatGroups = new Set();
   const replayResultColumns = [
     { key: "score" },
-    { key: "powerWon", label: "W", accessibleLabel: "power won", group: "power" },
-    { key: "powerLost", label: "L", accessibleLabel: "power lost", group: "power", loss: true },
-    {
-      key: "powerRatio", label: "Ratio", accessibleLabel: "power won divided by power lost",
-      group: "power", summary: true, format: player => formatReplayRatio(powerRatioValue(player)),
-      includeInOverall: false
-    },
     { key: "researchActivity" },
     { key: "totalKd", format: formatTotalKd },
     { key: "droidsBuilt", label: "Built", group: "units" },
@@ -2827,6 +2820,13 @@
     {
       key: "structureKd", label: "KD", accessibleLabel: "structure K/D", group: "structures",
       summary: true, format: formatStructureKd
+    },
+    { key: "powerWon", label: "W", accessibleLabel: "power won", group: "power" },
+    { key: "powerLost", label: "L", accessibleLabel: "power lost", group: "power", loss: true },
+    {
+      key: "powerRatio", label: "Ratio", accessibleLabel: "power won divided by power lost",
+      group: "power", summary: true, format: player => formatReplayRatio(powerRatioValue(player)),
+      includeInOverall: false
     }
   ];
 
@@ -6854,11 +6854,11 @@
         createPlayerSortHeader("Slot", "position", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
-        createReplayStatGroupHeader("Power", "power", renderPlayerRows),
         createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
         createReplayStatGroupHeader("Units", "units", renderPlayerRows),
         createReplayStatGroupHeader("Structures", "structures", renderPlayerRows),
+        createReplayStatGroupHeader("Power", "power", renderPlayerRows),
         createPlayerAwardsHeader(renderPlayerRows)
       );
 

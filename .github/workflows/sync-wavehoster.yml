@@ -14,6 +14,8 @@ on:
       - 'stats/player-nickname-publication.cjs'
       - 'tests/player-nickname-publication.test.cjs'
       - 'tests/arc-beta.test.mjs'
+  schedule:
+    - cron: '2,12,22,32,42,52 * * * *'
 permissions:
   contents: write
 concurrency:

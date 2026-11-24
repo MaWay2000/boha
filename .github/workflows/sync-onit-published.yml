@@ -2,6 +2,8 @@ name: Sync MaWay2000 Published Stats
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "25,55 * * * *"
 
 permissions:
   contents: write

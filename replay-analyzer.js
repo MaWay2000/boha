@@ -2778,7 +2778,9 @@
     button.className = "stats-sort-button stats-sort-button-compact";
     button.dataset.playerSortKey = key;
     button.textContent = label;
-    setFixedTooltip(button, `Sort players by ${label}`);
+    const sortLabel = `Sort players by ${options.accessibleLabel || label}`;
+    if (options.accessibleLabel) button.setAttribute("aria-label", sortLabel);
+    setFixedTooltip(button, sortLabel);
     button.addEventListener("click", () => {
       if (playerSortState.key === key) {
         playerSortState.direction = playerSortState.direction === "asc" ? "desc" : "asc";
@@ -6789,8 +6791,11 @@
         createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("Power won", "powerWon", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("Power lost", "powerLost", { rowSpan: 2 }, renderPlayerRows),
+        createHeaderCell("Power", {
+          colSpan: 2,
+          scope: "colgroup",
+          className: "replay-stat-group"
+        }),
         createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
         createHeaderCell("Units", {
           colSpan: 5,
@@ -6808,6 +6813,8 @@
       const playerHeaderDetails = document.createElement("tr");
       playerHeaderDetails.className = "replay-stat-details";
       playerHeaderDetails.append(
+        createPlayerSortHeader("W", "powerWon", { accessibleLabel: "power won" }, renderPlayerRows),
+        createPlayerSortHeader("L", "powerLost", { accessibleLabel: "power lost" }, renderPlayerRows),
         createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
         createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
         createPlayerSortHeader("Kills", "kills", {}, renderPlayerRows),

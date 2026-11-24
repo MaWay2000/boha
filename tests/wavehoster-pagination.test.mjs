@@ -148,7 +148,7 @@ test('an older initial backup cannot clear the requested player before live data
   assert.equal(ui.games().length, 100);
 });
 
-test('host sync follows the displayed feed even when an older live snapshot is reachable', async () => {
+test('stats source follows the displayed feed when live data is older or unavailable', async () => {
   let live = 'older';
   const ui = await page(800, '', snapshot => async url => {
     const fromHost = url.startsWith('https:');
@@ -156,13 +156,13 @@ test('host sync follows the displayed feed even when an older live snapshot is r
     const data = fromHost && live === 'older' ? {...snapshot, generatedAt: '2026-11-16T00:00:00Z'} : snapshot;
     return {ok: true, text: async () => JSON.stringify(data)};
   });
-  assert.equal(ui.get('waveHostSync').textContent, 'False');
+  assert.equal(ui.get('waveHostSync').textContent, 'GitHub');
   live = 'current';
   await ui.refresh();
-  assert.equal(ui.get('waveHostSync').textContent, 'True');
+  assert.equal(ui.get('waveHostSync').textContent, 'Live host');
   live = 'offline';
   await ui.refresh();
-  assert.equal(ui.get('waveHostSync').textContent, 'False');
+  assert.equal(ui.get('waveHostSync').textContent, 'Saved host');
 });
 
 test('an older build deep link filters standings and replays and can return to all builds', async () => {

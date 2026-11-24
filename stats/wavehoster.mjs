@@ -480,7 +480,8 @@ function renderOptions() {
 
 function updateStatsSource(source) {
   const status = $('waveHostSync');
-  const label = source === 'live' ? 'Live host' : 'GitHub';
+  const labels = {live: 'Live host', 'saved-host': 'Saved host', github: 'GitHub'};
+  const label = labels[source] || '—';
   if (status.textContent !== label) status.textContent = label;
 }
 
@@ -511,7 +512,7 @@ async function load() {
     }});
     currentRecord = result.record;
     if (data !== currentRecord.snapshot) showRecord(currentRecord);
-    updateStatsSource(currentRecord.source);
+    updateStatsSource(currentRecord.source === 'live' && !result.liveAvailable ? 'saved-host' : currentRecord.source);
     $('waveError').textContent = '';
     const updated = updatedLabel(data.generatedAt);
     if ($('waveUpdated').textContent !== updated) $('waveUpdated').textContent = updated;

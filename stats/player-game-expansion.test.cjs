@@ -86,7 +86,7 @@ test('opening and closing change only the detail row and accessible toggle state
   const f = fixture();
   f.toggle(0);
   assert.equal(f.nodes.length, 3);
-  assert.equal(f.nodes[1].innerHTML, '<td colspan="6">one:Lace</td>');
+  assert.equal(f.nodes[1].innerHTML, '<td colspan="4">one:Lace</td>');
   assert.equal(f.context.activeExpandedPlayerGameKey, 'one');
   assert.equal(f.rows[0].toggle.expanded, 'true');
   assert.equal(f.rows[0].glyph.textContent, '-');

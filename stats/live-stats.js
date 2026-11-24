@@ -2483,19 +2483,6 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     return;
   }
 
-  const playerGamesHeader = playerGamesElement.closest("table")?.querySelector("thead tr");
-  if (playerGamesHeader && !playerGamesHeader.querySelector("[data-player-games-elo-header]")) {
-    const eloHeader = document.createElement("th");
-    eloHeader.dataset.playerGamesEloHeader = "";
-    eloHeader.dataset.sortTable = "player-games";
-    eloHeader.dataset.sortKey = "elo";
-    eloHeader.className = "stats-player-game-elo";
-    eloHeader.setAttribute("aria-sort", "none");
-    eloHeader.innerHTML = '<button class="stats-sort-button" type="button">Elo</button>';
-    const durationHeader = playerGamesHeader.querySelector('[data-sort-key="duration"]');
-    playerGamesHeader.insertBefore(eloHeader, durationHeader);
-  }
-
   const profileHeadingLabel = document.querySelector(".stats-player-profile-heading-line .panel-kicker");
   const activeAccount = accounts.find((account) => !isBannedAccount(account) && getAccountExpandKey(account) === activeExpandedAccountKey);
   const selectedAccount = globalAccounts.find((account) => !isBannedAccount(account) && getAccountExpandKey(account) === activeExpandedAccountKey);
@@ -2532,7 +2519,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       {publicKey: selectedAccount.mainPublicKey});
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>
+        <td colspan="4">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>
       </tr>
     `;
     return;
@@ -2556,7 +2543,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     renderPlayerProfile(null);
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="5">Use + on a player to show their latest games here.</td>
+        <td colspan="4">Use + on a player to show their latest games here.</td>
       </tr>
     `;
     return;
@@ -2602,7 +2589,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   if (!latestGames.length) {
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="6">No recent games found for this player in the selected slice.</td>
+        <td colspan="4">No recent games found for this player in the selected slice.</td>
       </tr>
     `;
     return;
@@ -2629,7 +2616,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       const detailRow = isExpanded
         ? `
           <tr class="stats-player-game-detail-row">
-            <td colspan="6">
+            <td colspan="4">
               ${renderPlayerGameDetails(game, activeAccount)}
             </td>
           </tr>
@@ -2641,18 +2628,10 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
           <td class="stats-date">
             <span class="stats-date-day">${escapeHtml(formatMatchDate(game.endDate))}</span>
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
-            <button
-              class="stats-expand-toggle stats-player-game-toggle"
-              type="button"
-              aria-expanded="${isExpanded ? "true" : "false"}"
-            >
-              <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
-              <span class="visually-hidden">${isExpanded ? "Close match details" : "Open match details"}</span>
-            </button>
           </td>
           <td>
             <span class="stats-player-game-map">
-              ${renderMapFilterLink(game.mapName)}
+              ${renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name")}
               ${game.mods
                 ? `
                   <button
@@ -2668,18 +2647,29 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
                 `
                 : ""}
             </span>
+            <span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>
           </td>
-          <td><span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}${isUpsetMatch(game)
-            ? '<span class="stats-mega-win-star" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span>'
-            : ""}</span></td>
-          <td class="stats-player-game-elo">${hasEloDelta
-            ? `<span class="stats-player-game-elo-change ${eloDelta >= 0 ? "is-positive" : "is-negative"}" title="Match Elo change">${escapeHtml(eloDeltaLabel)}</span>`
-            : ""}</td>
-          <td class="stats-duration">${escapeHtml(formatDuration(game.duration))}</td>
+          <td class="stats-matchup">${renderMatchup(game, {
+            variant: "inline-power",
+            showVersus: false,
+            highlightedAccountKey: getAccountExpandKey(activeAccount),
+            clickablePlayerTiles: true,
+            currentGameKey: gameKey
+          })}</td>
           <td>
             ${replayUrl
               ? `<a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a>`
               : `<span class="stats-note">Unavailable</span>`}
+            <div class="stats-player-match-summary">
+              <span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span>
+              ${hasEloDelta
+                ? `<span class="stats-player-game-elo-change ${eloDelta >= 0 ? "is-positive" : "is-negative"}" title="Match Elo change">${escapeHtml(eloDeltaLabel)}</span>`
+                : ""}
+              <button class="stats-expand-toggle stats-player-game-toggle" type="button" aria-expanded="${isExpanded ? "true" : "false"}">
+                <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
+                <span class="visually-hidden">${isExpanded ? "Close match details" : "Open match details"}</span>
+              </button>
+            </div>
           </td>
         </tr>
         ${detailRow}
@@ -2740,14 +2730,14 @@ function togglePlayerGameDetails(row, game, activeAccount, accounts) {
   setPlayerGameRowExpanded(row, true);
   const detailRow = document.createElement("tr");
   detailRow.className = "stats-player-game-detail-row";
-  detailRow.innerHTML = `<td colspan="6">${renderPlayerGameDetails(game, activeAccount)}</td>`;
+  detailRow.innerHTML = `<td colspan="4">${renderPlayerGameDetails(game, activeAccount)}</td>`;
   row.after(detailRow);
   bindCopyButtons(detailRow);
   bindPlayerGameJumpLinks(detailRow, accounts);
 }
 
 function bindPlayerGameJumpLinks(scope, accounts) {
-  scope.querySelectorAll(".stats-team-tile[data-jump-account]").forEach((tile) => {
+  scope.querySelectorAll("[data-jump-account]").forEach((tile) => {
     tile.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -2947,7 +2937,17 @@ function renderMatchup(game, options = {}) {
         const vsLabel = showVersus && index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
         const teamTone = getTeamToneClass(getNormalizedTeamUserType(game, team));
         const players = team.players
-          .map((player) => `<span class="stats-team-player">${renderPlayerLabel(player)}</span>`)
+          .map((player) => {
+            const accountKey = clickablePlayerTiles && player.account && !isBannedAccount(player.account)
+              ? getAccountExpandKey(player.account)
+              : "";
+            const isHighlighted = accountKey && accountKey === highlightedAccountKey;
+            const label = renderPlayerLabel(player);
+            const chip = accountKey
+              ? `<button class="stats-team-player-link" type="button" data-jump-account="${escapeHtml(accountKey)}" data-jump-game="${escapeHtml(currentGameKey)}">${label}</button>`
+              : label;
+            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}">${chip}</span>`;
+          })
           .join("");
         if (variant === "inline-power") {
           const fillPercent = isDuel

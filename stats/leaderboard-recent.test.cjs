@@ -20,7 +20,15 @@ test('right panel switches between recent matches, a profile and selected-player
     renderPlayerRankMenu: () => '', bindPlayerRankMenu() {}, filterVisibleAccounts: accounts => accounts,
     showingAllPlayerGames: false, PLAYER_GAME_LIMIT: 10, activeExpandedPlayerGameKey: null,
     getPlayerGameKey: game => game.id,
-    renderPlayerGameActions() {}
+    renderPlayerGameActions() {},
+    comparePlayerGames: (left, right) => right.endDate - left.endDate,
+    getPlayerGameOutcome: () => ({label: 'Won', className: 'stats-win'}),
+    getReplaySource: () => ({replayUrl: 'https://replay.test/game.wzrp', label: 'Bohan', pageUrl: ''}),
+    getReplayAnalyzerUrl: () => 'replay-analyzer.html',
+    renderMatchup(game, options) { context.matchupOptions = options; return '<div class="stats-team-inline-power">Team roster</div>'; },
+    renderMapFilterLink: name => name, formatMatchDate: () => '2026.11.24',
+    formatMatchTime: () => '2:53 AM', formatDuration: () => '26:00',
+    bindCopyButtons() {}, bindPlayerGameJumpLinks() {}
   });
   const banStart = source.indexOf('function isBannedAccount(');
   vm.runInContext(source.slice(banStart, source.indexOf('function filterVisibleAccounts(', banStart)), context);
@@ -37,6 +45,18 @@ test('right panel switches between recent matches, a profile and selected-player
   assert.equal(context.leaderboardRecentMatchesElement.hidden, true);
   assert.equal(context.playerRecentTableElement.hidden, false);
   assert.equal(context.profile, player);
+  player.games.push({id: 'game', endDate: 1, mapName: 'NTW', duration: 1560,
+    teams: [{players: [{account: player, eloDelta: 1.65}]}]});
+  context.playerGamesElement.querySelectorAll = () => [];
+  context.renderPlayerGames([player]);
+  assert.equal(context.matchupOptions.variant, 'inline-power');
+  assert.equal(context.matchupOptions.highlightedAccountKey, 'one');
+  assert.equal(context.matchupOptions.clickablePlayerTiles, true);
+  assert.match(context.playerGamesElement.innerHTML, /stats-matchup"><div class="stats-team-inline-power">Team roster/);
+  assert.match(context.playerGamesElement.innerHTML, /stats-recent-map-duration">26:00/);
+  assert.match(context.playerGamesElement.innerHTML, />\+1\.65</);
+  assert.match(context.playerGamesElement.innerHTML, />Analyze</);
+  assert.doesNotMatch(context.playerGamesElement.innerHTML, /stats-player-game-detail-row/);
   context.renderPlayerGames([], [player]);
   assert.equal(context.leaderboardRecentMatchesElement.hidden, true);
   assert.match(context.playerGamesTitleElement.innerHTML, /No data/);

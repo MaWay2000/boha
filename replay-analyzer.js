@@ -2762,14 +2762,19 @@
     }
   }
 
-  function createReplayStatGroupHeader(label, group) {
-    const columns = replayResultColumns.filter(column => column.group === group);
-    const header = createHeaderCell("", { scope: "colgroup", className: "replay-stat-group" });
+  function createReplayStatToggle(label, accessibleLabel) {
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "replay-stat-group-toggle";
     toggle.textContent = label;
-    toggle.setAttribute("aria-label", `${label} details`);
+    toggle.setAttribute("aria-label", accessibleLabel);
+    return toggle;
+  }
+
+  function createReplayStatGroupHeader(label, group, onToggle) {
+    const columns = replayResultColumns.filter(column => column.group === group);
+    const header = createHeaderCell("", { scope: "colgroup", className: "replay-stat-group" });
+    const toggle = createReplayStatToggle(label, `${label} details`);
     header.append(toggle);
 
     const updateHeader = (expanded) => {
@@ -2778,8 +2783,8 @@
     };
     updateHeader(expandedPlayerStatGroups.has(group));
 
-    toggle.addEventListener("click", () => {
-      const expanded = !expandedPlayerStatGroups.has(group);
+    const setExpanded = (expanded) => {
+      if (expanded === expandedPlayerStatGroups.has(group)) return;
       if (expanded) {
         expandedPlayerStatGroups.add(group);
       } else {
@@ -2789,8 +2794,13 @@
       playersTables.querySelectorAll(`[data-player-stat-detail="${group}"]`).forEach(cell => {
         cell.hidden = !expanded;
       });
+    };
+
+    toggle.addEventListener("click", () => {
+      setExpanded(!expandedPlayerStatGroups.has(group));
+      onToggle?.();
     });
-    return header;
+    return { header, setExpanded };
   }
 
   function replayResultBarScales(players) {
@@ -6747,16 +6757,31 @@
     replaceChildren(playersBodyB, createTeamRows(secondTeamPlayers, "B"));
 
     const createPlayerHeaders = () => {
+      const kdHeader = createHeaderCell("", { rowSpan: 2 });
+      const kdToggle = createReplayStatToggle("KD", "K/D details for Units and Structures");
+      kdHeader.append(kdToggle);
+      const bothExpanded = () => expandedPlayerStatGroups.has("units") && expandedPlayerStatGroups.has("structures");
+      const updateKdToggle = () => kdToggle.setAttribute("aria-expanded", String(bothExpanded()));
+      const units = createReplayStatGroupHeader("Units", "units", updateKdToggle);
+      const structures = createReplayStatGroupHeader("Structures", "structures", updateKdToggle);
+      updateKdToggle();
+      kdToggle.addEventListener("click", () => {
+        const expand = !bothExpanded();
+        units.setExpanded(expand);
+        structures.setExpanded(expand);
+        updateKdToggle();
+      });
+
       const playerHeaderGroups = document.createElement("tr");
       playerHeaderGroups.append(
         createHeaderCell("Slot", { rowSpan: 2 }),
         createHeaderCell("Nick", { rowSpan: 2 }),
         createHeaderCell("Score", { rowSpan: 2 }),
         createHeaderCell("Res", { rowSpan: 2 }),
-        createHeaderCell("KD", { rowSpan: 2 }),
-        createReplayStatGroupHeader("Units", "units"),
-        createReplayStatGroupHeader("Structures", "structures"),
-        createReplayStatGroupHeader("Power", "power"),
+        kdHeader,
+        units.header,
+        structures.header,
+        createReplayStatGroupHeader("Power", "power").header,
         createPlayerAwardsHeader()
       );
 

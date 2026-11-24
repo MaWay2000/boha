@@ -2079,18 +2079,17 @@
       padding-left: 8px;
     }
 
-    .replay-table thead tr:first-child th:last-child,
-    .replay-players-panel .replay-table tbody td:last-child {
+    .replay-table thead tr:first-child th:last-child {
       width: 100%;
+    }
+
+    .replay-players-panel .replay-table thead tr:first-child th:last-child,
+    .replay-players-panel .replay-table tbody td:last-child {
+      width: 1%;
     }
 
     .replay-players-panel .replay-table thead tr:first-child th:last-child {
       text-align: center;
-    }
-
-    .replay-table thead tr:first-child th:nth-child(n + 3):not(:last-child),
-    .replay-table tbody td:nth-child(n + 3):nth-child(-n + 18) {
-      width: 1%;
     }
 
     .replay-players-panel [data-player-stat-detail][hidden] {
@@ -2399,9 +2398,10 @@
     }
 
     .replay-player-awards {
-      display: inline-grid;
-      width: 100%;
-      grid-template-columns: repeat(auto-fit, 26px);
+      display: inline-flex;
+      flex-wrap: wrap;
+      width: max-content;
+      max-width: clamp(119px, 25vw, 305px);
       gap: 5px;
     }
 
@@ -3199,7 +3199,7 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="stats/replay-telemetry.js?v=20261117-arc-events-1"></script>
-  <script src="replay-analyzer.js?v=20261124-replay-static-headers-1"></script>
+  <script src="replay-analyzer.js?v=20261124-replay-kd-details-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

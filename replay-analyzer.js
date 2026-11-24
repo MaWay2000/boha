@@ -2815,11 +2815,12 @@
 
   function replayResultBarScales(players) {
     return new Map(replayResultColumns.map(({ key, format }) => {
+      if (key === "researchActivity") return [key, { minimum: 0, maximum: 100 }];
       const values = players.map((player) => playerSortValue(player, key))
-        .filter((value) => Number.isFinite(value) && (!format || value !== Number.MAX_SAFE_INTEGER))
-        .map(Math.abs);
-      const maximum = key === "researchActivity" ? 100 : Math.max(0, ...values);
-      return [key, { maximum, mean: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0 }];
+        .filter((value) => Number.isFinite(value) && (!format || value !== Number.MAX_SAFE_INTEGER));
+      const minimum = values.length ? Math.min(...values) : 0;
+      const maximum = values.length ? Math.max(...values) : 0;
+      return [key, { minimum, maximum }];
     }));
   }
 
@@ -2831,16 +2832,14 @@
     if (!Number.isFinite(value)) return cell;
 
     // Unlimited K/D fills its own bar without flattening the finite ratios in that column.
+    const range = scale.maximum - scale.minimum;
     const ratio = format && value === Number.MAX_SAFE_INTEGER ? 1
-      : scale.maximum > 0 ? Math.min(1, Math.abs(value) / scale.maximum) : 0;
+      : range > 0 ? Math.max(0, Math.min(1, (value - scale.minimum) / range))
+      : value === 0 ? 0 : 1;
     cell.classList.add("replay-result-meter");
     cell.classList.toggle("is-loss", loss === true || value < 0);
     cell.classList.toggle("is-leading", ratio >= 0.995);
     cell.style.setProperty("--replay-result-fill", `${ratio * 100}%`);
-    if (scale.mean > 0 && scale.mean < scale.maximum) {
-      cell.classList.add("has-average");
-      cell.style.setProperty("--replay-result-average", String(scale.mean / scale.maximum));
-    }
     return cell;
   }
 

@@ -2619,9 +2619,9 @@
     content.className = "replay-research-stat";
     const activity = document.createElement("span");
     activity.className = "replay-research-idle replay-tooltip";
-    activity.textContent = `${researchActivity.toFixed(2)}%`;
+    activity.textContent = researchActivity.toFixed(2);
     activity.dataset.tooltip = "Recorded research-lab activity for this player.";
-    activity.setAttribute("aria-label", activity.dataset.tooltip);
+    activity.setAttribute("aria-label", `${activity.textContent} percent. ${activity.dataset.tooltip}`);
     activity.tabIndex = 0;
     content.append(activity);
 
@@ -6779,7 +6779,7 @@
         createHeaderCell("Slot", { rowSpan: 2 }),
         createHeaderCell("Nick", { rowSpan: 2 }),
         createHeaderCell("Score", { rowSpan: 2 }),
-        createHeaderCell("Res", { rowSpan: 2 }),
+        createHeaderCell("Res %", { rowSpan: 2 }),
         kdHeader,
         createReplayStatGroupHeader("Units", "units"),
         createReplayStatGroupHeader("Structures", "structures"),

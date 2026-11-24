@@ -2951,14 +2951,18 @@
     heading.className = "replay-match-summary-heading";
     const title = document.createElement("h3");
     title.textContent = "Match summary";
-    heading.append(title);
     if (upsetVictory) {
-      const badge = document.createElement("span");
-      badge.className = "replay-upset-badge";
-      badge.textContent = "Upset victory";
-      setFixedTooltip(badge, "The winning team finished with a lower combined replay score than the strongest opposing team.");
-      heading.append(badge);
+      const star = document.createElement("span");
+      const description = "Upset victory. The winning team finished with a lower combined replay score than the strongest opposing team.";
+      star.className = "replay-upset-star";
+      star.textContent = "★";
+      star.tabIndex = 0;
+      star.setAttribute("role", "img");
+      star.setAttribute("aria-label", description);
+      setFixedTooltip(star, description);
+      heading.append(star);
     }
+    heading.append(title);
 
     const grid = document.createElement("div");
     grid.className = "replay-match-summary-grid";

@@ -247,10 +247,8 @@
     .replay-match-summary-heading {
       display: flex;
       min-width: 150px;
-      align-items: flex-start;
-      justify-content: flex-start;
-      flex-direction: column;
-      gap: 12px;
+      align-items: center;
+      gap: 6px;
       padding: 10px 0;
     }
 
@@ -262,15 +260,16 @@
       text-transform: uppercase;
     }
 
-    .replay-upset-badge {
-      padding: 5px 10px;
-      color: #fff0c2;
-      border: 1px solid rgba(255, 198, 96, 0.32);
-      border-radius: 999px;
-      background: rgba(255, 198, 96, 0.12);
-      font: 700 0.72rem "Oxanium", sans-serif;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
+    .replay-upset-star {
+      flex: none;
+      color: #ffcb69;
+      font: 1rem/1 system-ui, sans-serif;
+      cursor: help;
+    }
+
+    .replay-upset-star:focus-visible {
+      outline: 1px solid currentColor;
+      outline-offset: 3px;
     }
 
     .replay-match-summary-grid {
@@ -3209,7 +3208,7 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="stats/replay-telemetry.js?v=20261117-arc-events-1"></script>
-  <script src="replay-analyzer.js?v=20261124-replay-power-ratio-visibility-1"></script>
+  <script src="replay-analyzer.js?v=20261124-replay-upset-star-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

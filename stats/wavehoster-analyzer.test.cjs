@@ -1,18 +1,19 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '../replay-analyzer.js'), 'utf8');
-const code = source.slice(source.indexOf('  async function loadWzstatsResult('), source.indexOf('  function attachPublishedPlayerStats('));
+const code = source.slice(source.indexOf('  async function loadArcBattlefield('), source.indexOf('  function attachPublishedPlayerStats('));
 const hash = 'a'.repeat(64);
 const wave = {format: 1, source: 'WaveHoster', games: [{id: '20261109_083951_7715', matchId: 42, replaySha256: hash}]};
 const detail = {replay_sha256: hash, telemetry: {engineAnalysis: {status: 'confirmed'}}, players: [
   {position_number: 1, stats_source: 'replay-engine', result: 'loser', score: 475, kills: 12, raw_json: '{}'}]};
 function runner({wavePayload = wave, livePayload = wavePayload, waveError = false, liveError = waveError,
-  liveHang = false, match = detail, detailStatus = 200} = {}) {
+  liveHang = false, match = detail, detailStatus = 200, battlefield = null} = {}) {
   const calls = [];
   const context = vm.createContext({URL, AbortController, AbortSignal,
     setTimeout: (callback, time) => setTimeout(callback, liveHang ? 5 : time), clearTimeout,
     formatDuration: time => `${Math.floor(time / 60000)}:${String(Math.floor(time / 1000) % 60).padStart(2, '0')}`,
     document: {baseURI: 'https://example.test/boha/replay-analyzer.html'},
-    wzstatsPublishedUrl: 'main-index', expandCompressedEngineAnalysis: async () => {}, normalizeTacticalReplayPlayerOwners() {},
+    wzstatsPublishedUrl: 'main-index', arcBattlefieldBaseUrl: 'https://example.test/arc-battlefield/',
+    expandCompressedEngineAnalysis: async () => {}, normalizeTacticalReplayPlayerOwners() {},
     fetch: async (value, options) => {
       const url = String(value); calls.push(url);
       if (url.includes('wavehoster-live.json')) {
@@ -22,6 +23,7 @@ function runner({wavePayload = wave, livePayload = wavePayload, waveError = fals
       }
       if (url.includes('wavehoster.json')) { if (waveError) throw Error('modded index offline'); return {ok: true, json: async () => wavePayload}; }
       if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, replay_sha256: hash, source_match_id: '1234567890123'}]})};
+      if (url.includes('/arc-battlefield/')) return {ok: Boolean(battlefield), status: battlefield ? 200 : 404, json: async () => battlefield};
       return {ok: detailStatus === 200, status: detailStatus, json: async () => ({match})};
     }});
   vm.runInContext(code, context);
@@ -135,6 +137,26 @@ test('saved Arc results match a unique human name when the detail API is unavail
   extraction.players[1].ai = -1;
   context.attachPublishedPlayerStats(extraction, result);
   assert.ok(extraction.players.every(player => player.summary === null));
+});
+
+test('published Arc matches load exact positions without requesting private match details', async () => {
+  const game = {...wave.games[0], status: 'confirmed', modsVerified: true,
+    participants: [{name: 'Arc player', result: 'loser', score: 475, kills: 12}]};
+  const engineAnalysis = {extended: {tacticalReplay: {exactObjectPositions: true,
+    positionFrames: [{time: 0, droids: [[12, 1, 128, 256, 100, 0, 0, 0]], structures: []}]}}};
+  const {load, calls} = runner({liveError: true, wavePayload: {...wave, games: [game]},
+    battlefield: {replaySha256: hash, engineAnalysis}});
+  const result = await load(hash, game.id);
+  assert.equal(result.engineAnalysis, engineAnalysis);
+  assert.equal(result.playerData[0].score, 475);
+  assert.ok(calls.at(-1).endsWith('/arc-battlefield/' + hash));
+  assert.ok(!calls.some(url => url.includes('/matches/')));
+
+  const mismatched = runner({liveError: true, wavePayload: {...wave, games: [game]},
+    battlefield: {replaySha256: 'b'.repeat(64), engineAnalysis}});
+  const fallback = await mismatched.load(hash, game.id);
+  assert.equal(fallback.engineAnalysis, null);
+  assert.equal(fallback.playerData[0].score, 475);
 });
 
 test('sampled statistics survive attachment without becoming award-eligible final stats', async () => {

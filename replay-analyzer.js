@@ -1,5 +1,6 @@
 (function () {
   const replayVisualApiBaseUrl = new URL("https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/");
+  const arcBattlefieldBaseUrl = new URL("/arc-battlefield/", replayVisualApiBaseUrl);
   const wzstatsPublishedUrl = new URL("stats/published/matches.json", document.baseURI);
   const replayFile = document.getElementById("replayFile");
   const replayFileName = document.getElementById("replayFileName");
@@ -542,6 +543,21 @@
     tacticalReplay.ownersAreLobbyPositions = true;
   }
 
+  async function loadArcBattlefield(replaySha256) {
+    const response = await fetch(new URL(replaySha256, arcBattlefieldBaseUrl), {
+      signal: AbortSignal.timeout(18000)
+    });
+    if (!response.ok) throw new Error(`Battlefield telemetry is unavailable (HTTP ${response.status}).`);
+    const { replaySha256: reportedSha, engineAnalysis } = await response.json();
+    if (reportedSha !== replaySha256) throw new Error("Replay battlefield identity mismatch.");
+    await expandCompressedEngineAnalysis(engineAnalysis);
+    const tacticalReplay = engineAnalysis?.extended?.tacticalReplay;
+    if (tacticalReplay?.exactObjectPositions !== true || !tacticalReplay.positionFrames?.length) {
+      throw new Error("No recorded battlefield positions are available.");
+    }
+    return engineAnalysis;
+  }
+
   async function loadWzstatsResult(replaySha256, replayId) {
     if (!replaySha256 && !replayId) {
       return null;
@@ -549,9 +565,11 @@
 
     let match = null;
     let arcGame = null;
+    let hasPublicArcBattlefield = false;
+    const publishedArcIndex = new URL("stats/published/wavehoster.json", document.baseURI);
     for (const indexUrl of [
       "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json",
-      new URL("stats/published/wavehoster.json", document.baseURI)
+      publishedArcIndex
     ]) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
@@ -567,6 +585,8 @@
             const directUrl = /^\d{8}_\d{6}_\d+$/.test(game.id)
               ? `https://api.wavehoster.net/v1/replays/${game.id}`
               : `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`;
+            hasPublicArcBattlefield = indexUrl === publishedArcIndex && game.modsVerified === true
+              && ["confirmed", "stats-only"].includes(game.status) && directUrl.startsWith("https://api.wavehoster.net/");
             match = {id: game.matchId, replay_sha256: game.replaySha256,
               started_at: game.startedAt, replay_url: directUrl, players: []};
           }
@@ -596,8 +616,15 @@
     }
 
     let detailMatch = null;
+    let engineAnalysis = null;
     let detailError = "";
-    try {
+    if (hasPublicArcBattlefield) {
+      try {
+        engineAnalysis = await loadArcBattlefield(match.replay_sha256);
+      } catch (error) {
+        detailError = "Live battlefield telemetry is unavailable for this replay.";
+      }
+    } else try {
       const detailUrl = `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`;
       let detailResponse;
       try {
@@ -626,6 +653,7 @@
           detailMatch?.telemetry?.engineAnalysis,
           detailMatch?.players
         );
+        engineAnalysis = detailMatch?.telemetry?.engineAnalysis || null;
       } else {
         detailError = `Battlefield telemetry is temporarily unavailable (HTTP ${detailResponse.status}).`;
       }
@@ -636,7 +664,6 @@
     }
 
     const players = Array.isArray(detailMatch?.players) ? detailMatch.players : (match.players || []);
-    const engineAnalysis = detailMatch?.telemetry?.engineAnalysis || null;
     const snapshots = latestRecordedPlayerSnapshots(engineAnalysis);
     const matchDate = detailMatch?.ended_at || match.ended_at || detailMatch?.started_at || match.started_at;
     const arcPlayers = !detailMatch && arcGame?.modsVerified === true && Array.isArray(arcGame.participants)
@@ -656,6 +683,7 @@
         ? `${matchDate.replace(" ", "T")}${/Z$|[+-]\d{2}:\d{2}$/.test(matchDate) ? "" : "Z"}`
         : null,
       partialStats: true,
+      hasPublicArcBattlefield,
       engineAnalysis,
       detailError,
       playerData: arcPlayers.length ? arcPlayers : players.map((player) => {
@@ -4198,11 +4226,13 @@
     return { ...descriptor, automatic: true };
   }
 
-  async function loadReplayModelAssets(extraction) {
+  async function loadReplayModelAssets(extraction, allowAutomatic = true) {
     let descriptor = null;
     let automaticError = null;
-    try { descriptor = await automaticReplayModelDescriptor(extraction); }
-    catch (error) { automaticError = error; }
+    if (allowAutomatic) {
+      try { descriptor = await automaticReplayModelDescriptor(extraction); }
+      catch (error) { automaticError = error; }
+    }
     descriptor ||= replayModelAssetDescriptor(extraction);
     if (!descriptor) {
       if (automaticError && extraction?.match?.modHashes?.length) throw automaticError;
@@ -6835,7 +6865,7 @@
           latestExtraction.mapTerrainError = error.message || "Map terrain could not be loaded.";
         }
         try {
-          await loadReplayModelAssets(latestExtraction);
+          await loadReplayModelAssets(latestExtraction, !publishedResult.hasPublicArcBattlefield);
         } catch (error) {
           latestExtraction.modelAssetsError = error.message || "Custom model assets could not be loaded.";
         }

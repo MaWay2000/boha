@@ -2829,6 +2829,14 @@
     }));
   }
 
+  function applyReplayResultMeter(cell, ratio, rank) {
+    // Place the midpoint at amber between the red and green ends of the scale.
+    const hue = rank <= 0.5 ? rank * 90 : 45 + (rank - 0.5) * 150;
+    cell.classList.add("replay-result-meter");
+    cell.style.setProperty("--replay-result-fill", `${ratio * 100}%`);
+    cell.style.setProperty("--replay-result-hue", String(Math.round(hue)));
+  }
+
   function createReplayResultCell(player, column, scale) {
     const { key, format } = column;
     const value = playerSortValue(player, key);
@@ -2841,12 +2849,7 @@
     const ratio = format && value === Number.MAX_SAFE_INTEGER ? 1
       : range > 0 ? Math.max(0, Math.min(1, (value - scale.minimum) / range))
       : value === 0 ? 0 : 1;
-    const rank = scale.ranks.get(value);
-    // Place the midpoint at amber between the red and green ends of the scale.
-    const hue = rank <= 0.5 ? rank * 90 : 45 + (rank - 0.5) * 150;
-    cell.classList.add("replay-result-meter");
-    cell.style.setProperty("--replay-result-fill", `${ratio * 100}%`);
-    cell.style.setProperty("--replay-result-hue", String(Math.round(hue)));
+    applyReplayResultMeter(cell, ratio, scale.ranks.get(value));
     return cell;
   }
 
@@ -2859,9 +2862,17 @@
       row.className = "replay-player-lost";
     }
 
+    const ranks = replayResultColumns.map(({ key }) => barScales.get(key).ranks.get(playerSortValue(player, key)))
+      .filter(Number.isFinite);
+    const overall = ranks.length ? ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length : null;
+    const story = createPlayerStory(player, players, events, researchActivity);
+    const gameplay = overall === null ? "" : `${Math.round(overall * 100)}% overall gameplay based on ${ranks.length} recorded ${ranks.length === 1 ? "stat" : "stats"}.`;
+    const nickname = createPlayerNameCell(player, [gameplay, story].filter(Boolean).join(" "));
+    if (overall !== null) applyReplayResultMeter(nickname, overall, overall);
+
     row.append(
       createPlayerSlotCell(player, teamLabel),
-      createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
+      nickname,
       ...replayResultColumns.map(column => createReplayResultCell(player, column, barScales.get(column.key))),
       createPlayerAwardsCell(awards)
     );

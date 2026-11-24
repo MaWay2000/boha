@@ -17,6 +17,7 @@ function declaration(name) {
 function fixture(extra = {}, functions = []) {
   const context = vm.createContext({
     bannedAccountIds: new Set(), leaderboardData: null, personalRatings: null,
+    publishedLoaderOptions: {},
     runtime: {}, ensureSelectedLeaderboard() {}, renderButtons() {},
     getAccountExpandKey: account => account.id,
     getCompactAccountKey: key => `p${key}`,
@@ -72,6 +73,7 @@ test('Global bans and rating exclusions propagate to every board identity', asyn
     ['ensureLeaderboardData', 'hydratePublishedBoard', 'isKnownBotName', 'isCrashedPublishedGame']);
   f.KNOWN_BOT_NAMES = new Set();
   await f.ensureLeaderboardData();
+  assert.equal(f.mainLiveAvailable, true, 'Same-origin local data is an available host source');
   assert.deepEqual(Array.from(f.bannedAccountIds), ['flag', 'rating', 'category-only']);
   const board = f.hydratePublishedBoard('2v2');
   assert.deepEqual(Array.from(board.accounts.keys()), ['safe']);

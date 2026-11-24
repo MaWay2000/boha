@@ -1,4 +1,4 @@
-import {moddedArcSnapshot, replaySource, participantResult} from './wavehoster-data.mjs?v=20261120-stock-routing-1';
+import {moddedArcSnapshot, replaySource, participantResult} from './wavehoster-data.mjs?v=20261124-arc-replay-1';
 
 export function arcProfileUrl(group, player = '') {
   const params = new URLSearchParams({tab: 'wavehoster', ruleset: group});

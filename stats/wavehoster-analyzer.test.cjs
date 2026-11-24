@@ -8,7 +8,7 @@ const detail = {replay_sha256: hash, telemetry: {engineAnalysis: {status: 'confi
 function runner({wavePayload = wave, livePayload = wavePayload, waveError = false, liveError = waveError,
   liveHang = false, match = detail, detailStatus = 200} = {}) {
   const calls = [];
-  const context = vm.createContext({URL, AbortController,
+  const context = vm.createContext({URL, AbortController, AbortSignal,
     setTimeout: (callback, time) => setTimeout(callback, liveHang ? 5 : time), clearTimeout,
     formatDuration: time => `${Math.floor(time / 60000)}:${String(Math.floor(time / 1000) % 60).padStart(2, '0')}`,
     document: {baseURI: 'https://example.test/boha/replay-analyzer.html'},
@@ -116,6 +116,25 @@ test('no snapshots or an unavailable detail API leave statistics unknown', async
     if (result.playerData.length) assert.equal(result.playerData[0].score, null);
     else assert.ok(result.detailError);
   }
+});
+
+test('saved Arc results match a unique human name when the detail API is unavailable', async () => {
+  const game = {...wave.games[0], status: 'confirmed', modsVerified: true,
+    participants: [{name: 'Arc player', result: 'loser', score: 475, kills: 12}]};
+  const {load, context} = runner({liveError: true, detailStatus: 404, wavePayload: {...wave, games: [game]}});
+  const result = await load(hash, game.id);
+  assert.equal(result.replayUrl, 'https://api.wavehoster.net/v1/replays/' + game.id);
+  assert.equal(result.engineAnalysis, null);
+  const start = source.indexOf('  function attachPublishedPlayerStats(');
+  vm.runInContext(source.slice(start, source.indexOf('  function decodeGameTime(', start)), context);
+  const extraction = {players: [{name: 'Arc player', position: 7, ai: -1}, {name: 'Arc player', position: 1, ai: 0}]};
+  context.attachPublishedPlayerStats(extraction, result);
+  assert.equal(extraction.players[0].summary.result, 'loser');
+  assert.equal(extraction.players[0].summary.kills, 12);
+  assert.equal(extraction.players[1].summary, null);
+  extraction.players[1].ai = -1;
+  context.attachPublishedPlayerStats(extraction, result);
+  assert.ok(extraction.players.every(player => player.summary === null));
 });
 
 test('sampled statistics survive attachment without becoming award-eligible final stats', async () => {

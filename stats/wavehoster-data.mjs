@@ -198,9 +198,9 @@ export function waveResult(game) {
 export function replaySource(game) {
   const hash = String(game.replaySha256 || '');
   const id = String(game.id || '');
-  const replayUrl = /^[a-f0-9]{64}$/.test(hash)
-    ? 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/' + hash
-    : /^\d{8}_\d{6}_\d+$/.test(id) ? 'https://api.wavehoster.net/v1/replays/' + id : null;
+  const replayUrl = /^\d{8}_\d{6}_\d+$/.test(id)
+    ? 'https://api.wavehoster.net/v1/replays/' + id
+    : /^[a-f0-9]{64}$/.test(hash) ? 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/' + hash : null;
   return replayUrl ? {replayUrl, sourceLabel: 'WaveHoster', sourceUrl: 'https://api.wavehoster.net/v1/replays'} : null;
 }
 

@@ -120,10 +120,10 @@ test('ALL keeps missing scores distinct from zero and ranks tied wins by best sc
   assert.deepEqual(combineRulesets({groups: [], games: []}).players, []);
 });
 
-test('Analyze uses the archived replay and older snapshots retain a safe WaveHoster fallback', () => {
+test('Analyze prefers an upstream WaveHoster ID and retains archive links for older replays', () => {
   const hash = 'a'.repeat(64);
   assert.equal(replaySource({replaySha256: hash}).replayUrl, 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/' + hash);
-  assert.equal(replaySource({id: '20261109_083951_7715'}).replayUrl, 'https://api.wavehoster.net/v1/replays/20261109_083951_7715');
+  assert.equal(replaySource({id: '20261109_083951_7715', replaySha256: hash}).replayUrl, 'https://api.wavehoster.net/v1/replays/20261109_083951_7715');
   assert.equal(replaySource({id: '../private', replaySha256: 'https://other.invalid/'}), null);
   assert.equal(replaySource({id: 'https://other.invalid/'}), null);
 });

@@ -12,7 +12,7 @@ const snapshot = (games = [game()]) => ({format: 1, source: 'WaveHoster', groups
   {id: 'p', name: 'Player', names: [{name: 'Older name', games: 2}], publicKeys: ['saved-key']}
 ]}], games});
 
-test('Arc records preserve dates, results, saved identities and archive Analyze URLs', () => {
+test('Arc records preserve dates, results, saved identities and direct Analyze URLs', () => {
   const input = snapshot(), before = JSON.stringify(input);
   const [row] = normalizeArcRecentGames(input);
   assert.equal(row.endDate, Date.parse(input.games[0].startedAt) + 600000);
@@ -20,7 +20,8 @@ test('Arc records preserve dates, results, saved identities and archive Analyze 
   assert.equal(row.players[0].account.names.get('Older name'), 2);
   assert.ok(row.players[0].account.publicKeys.has('saved-key'));
   assert.match(row.players[0].account.arcProfileUrl, /tab=wavehoster&ruleset=td&player=p/);
-  assert.match(row.replayUrl, new RegExp('/replays/' + hash + '$'));
+  assert.equal(row.replayUrl, 'https://api.wavehoster.net/v1/replays/' + input.games[0].id);
+  assert.equal(row.replaySha256, hash);
   assert.equal(JSON.stringify(input), before);
 });
 

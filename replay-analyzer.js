@@ -428,7 +428,9 @@
   }
 
   function extractReplayId(value) {
-    const match = String(value || "").match(/(\d{10,})(?:\.wzrp)?(?:[?#].*)?$/i);
+    const input = String(value || "");
+    const match = input.match(/(?:^|\/)(\d{8}_\d{6}_\d+)(?:\.wzrp)?(?:[?#].*)?$/i)
+      || input.match(/(\d{10,})(?:\.wzrp)?(?:[?#].*)?$/i);
     return match ? match[1] : "";
   }
 
@@ -546,6 +548,7 @@
     }
 
     let match = null;
+    let arcGame = null;
     for (const indexUrl of [
       "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json",
       new URL("stats/published/wavehoster.json", document.baseURI)
@@ -560,9 +563,12 @@
             replaySha256 ? item.replaySha256 === replaySha256 : replayId && item.id === String(replayId)
           ));
           if (game && Number.isSafeInteger(game.matchId) && game.matchId > 0 && /^[a-f0-9]{64}$/.test(game.replaySha256 || "")) {
+            arcGame = game;
+            const directUrl = /^\d{8}_\d{6}_\d+$/.test(game.id)
+              ? `https://api.wavehoster.net/v1/replays/${game.id}`
+              : `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`;
             match = {id: game.matchId, replay_sha256: game.replaySha256,
-              started_at: game.startedAt,
-              replay_url: `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`, players: []};
+              started_at: game.startedAt, replay_url: directUrl, players: []};
           }
         }
       } catch (_) {
@@ -574,7 +580,7 @@
     }
 
     if (!match) {
-      const matchesResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
+      const matchesResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
       if (!matchesResponse.ok) {
         throw new Error(`Unable to load the published match index (${matchesResponse.status}).`);
       }
@@ -595,15 +601,17 @@
       const detailUrl = `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/matches/${encodeURIComponent(match.id)}`;
       let detailResponse;
       try {
-        detailResponse = await fetch(detailUrl, { cache: "no-store" });
+        detailResponse = await fetch(detailUrl, { cache: "no-store", signal: AbortSignal.timeout(8000) });
       } catch (error) {
+        if (arcGame) throw error;
         // On the Tailscale host, MagicDNS resolves the public Funnel hostname to
         // its local 100.x address. Retry explicitly so Firefox can show its
         // Local Network Access permission prompt. Public Funnel clients keep
         // using the normal request above because their address is public.
         detailResponse = await fetch(detailUrl, {
           cache: "no-store",
-          targetAddressSpace: "local"
+          targetAddressSpace: "local",
+          signal: AbortSignal.timeout(8000)
         });
       }
       if (detailResponse.ok) {
@@ -623,13 +631,24 @@
       }
     } catch (error) {
       detailMatch = null;
-      detailError = "Battlefield telemetry could not be loaded. If your browser asks for local network access, choose Allow, then reopen this analyzer.";
+      detailError = arcGame ? "Live battlefield telemetry is unavailable for this replay."
+        : "Battlefield telemetry could not be loaded. If your browser asks for local network access, choose Allow, then reopen this analyzer.";
     }
 
     const players = Array.isArray(detailMatch?.players) ? detailMatch.players : (match.players || []);
     const engineAnalysis = detailMatch?.telemetry?.engineAnalysis || null;
     const snapshots = latestRecordedPlayerSnapshots(engineAnalysis);
     const matchDate = detailMatch?.ended_at || match.ended_at || detailMatch?.started_at || match.started_at;
+    const arcPlayers = !detailMatch && arcGame?.modsVerified === true && Array.isArray(arcGame.participants)
+      && ["confirmed", "stats-only"].includes(arcGame.status)
+      ? arcGame.participants.filter(player => typeof player?.name === "string").map((player) => ({
+          name: player.name,
+          usertype: arcGame.status === "confirmed" && ["winner", "loser", "contender"].includes(player.result)
+            ? player.result : null,
+          score: Number.isSafeInteger(player.score) ? player.score : null,
+          kills: Number.isSafeInteger(player.kills) && player.kills >= 0 ? player.kills : null,
+          statsSource: "arc-publication"
+        })) : [];
 
     return {
       replayUrl: match.replay_url,
@@ -639,7 +658,7 @@
       partialStats: true,
       engineAnalysis,
       detailError,
-      playerData: players.map((player) => {
+      playerData: arcPlayers.length ? arcPlayers : players.map((player) => {
         const hasReplayEngineStats = player.stats_source === "replay-engine";
         const position = player.position ?? player.position_number;
         if (!hasReplayEngineStats && snapshots.has(Number(position))) {
@@ -747,12 +766,24 @@
       ? publishedResult.playerData
       : [];
     const playersByPosition = new Map(
-      publishedPlayers.map((player) => [Number(player.position), player])
+      publishedPlayers.filter((player) => player.position != null).map((player) => [Number(player.position), player])
     );
+    const humanNameCounts = new Map();
+    for (const player of extraction.players) {
+      if (!player.spectator && player.ai < 0) humanNameCounts.set(player.name, (humanNameCounts.get(player.name) || 0) + 1);
+    }
+    const summaryNames = new Map();
+    for (const player of publishedPlayers) {
+      if (player.statsSource === "arc-publication") {
+        summaryNames.set(player.name, summaryNames.has(player.name) ? null : player);
+      }
+    }
 
     let playersMatched = 0;
     extraction.players.forEach((player) => {
-      const published = playersByPosition.get(Number(player.position));
+      const uniqueHuman = !player.spectator && player.ai < 0 && humanNameCounts.get(player.name) === 1;
+      const published = playersByPosition.get(Number(player.position))
+        || (uniqueHuman ? summaryNames.get(player.name) : null);
       if (!published) {
         player.summary = null;
         return;
@@ -2303,6 +2334,12 @@
     const stats = player.summary || {};
     if (stats.statsSource === "replay-snapshot") {
       return `${player.name}: statistics recorded at ${formatDuration(stats.sampledAtMilliseconds)}. These are sampled counters, not verified final totals. The final outcome is unknown.`;
+    }
+    if (stats.statsSource === "arc-publication") {
+      const facts = [stats.result ? formatPlayerResult(player) : "Result unavailable"];
+      if (stats.score != null) facts.push(`Score: ${formatStat(stats.score)}`);
+      if (stats.kills != null) facts.push(`Kills: ${formatStat(stats.kills)}`);
+      return `${facts.join(" · ")}. From the published Arc Mod summary.`;
     }
     const partialStats = Boolean(stats.partialStats);
     const result = formatPlayerResult(player);
@@ -6714,28 +6751,44 @@
     latestReplayId = extractReplayId(url.href);
     latestReplaySha256 = extractReplaySha256(url.href);
     setStatus("Downloading replay…");
-    let response;
+    const download = async (href) => {
+      const response = await fetch(href, {signal: AbortSignal.timeout(30000)});
+      if (!response.ok) throw new Error(`Replay download failed with HTTP ${response.status}.`);
+      return response.arrayBuffer();
+    };
     try {
-      response = await fetch(url.href);
+      return await download(url.href);
     } catch (downloadError) {
+      if (latestReplaySha256 && url.origin === "https://desktop-0467j9q.tail41fd3a.ts.net"
+          && /^\/wzstats\/api\/v1\/replays\/[a-f0-9]{64}$/.test(url.pathname)) {
+        const response = await fetch(new URL("stats/published/wavehoster.json", document.baseURI),
+          {cache: "no-store", signal: AbortSignal.timeout(8000)});
+        if (!response.ok) throw downloadError;
+        const index = await response.json();
+        const game = index.format === 1 && index.source === "WaveHoster" && index.games?.find(item =>
+          item.replaySha256 === latestReplaySha256 && /^\d{8}_\d{6}_\d+$/.test(item.id));
+        if (!game) throw downloadError;
+        setStatus("Downloading replay from WaveHoster…");
+        const bytes = await download(`https://api.wavehoster.net/v1/replays/${game.id}`);
+        if (await calculateReplaySha256(bytes) !== latestReplaySha256) {
+          throw new Error("The downloaded replay does not match the saved replay checksum.");
+        }
+        latestReplayId = game.id;
+        return bytes;
+      }
       // Some upstream files are plain WZrp despite Content-Encoding: br.
       // Browsers cannot ignore that header; use our verified stored copy.
       if (url.origin !== "https://warzone2100.retropaganda.info" || !latestReplayId) {
         throw downloadError;
       }
-      const indexResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store" });
+      const indexResponse = await fetch(wzstatsPublishedUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
       if (!indexResponse.ok) throw downloadError;
       const index = await indexResponse.json();
       const match = (index.matches || []).find(item => String(item.source_match_id) === latestReplayId);
       if (!match || !/^[a-f0-9]{64}$/.test(match.replay_sha256 || "")) throw downloadError;
       setStatus("Downloading stored replay copy…");
-      response = await fetch(`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${match.replay_sha256}`);
+      return download(`https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${match.replay_sha256}`);
     }
-    if (!response.ok) {
-      throw new Error(`Replay download failed with HTTP ${response.status}.`);
-    }
-
-    return response.arrayBuffer();
   }
 
   async function analyzeReplay(allowPublishedBattlefield = false) {
@@ -6758,7 +6811,17 @@
       }
       setStatus("Parsing replay…");
       latestExtraction = parseReplay(arrayBuffer);
-      if (allowPublishedBattlefield) {
+      let publishedResult = null;
+      if (latestReplaySha256 || latestReplayId) {
+        setStatus("Loading replay-engine player summary…");
+        try {
+          publishedResult = await loadWzstatsResult(latestReplaySha256, latestReplayId);
+        } catch (error) {
+          latestExtraction.publishedStatsError = error.message || "Replay-engine player summary could not be loaded.";
+        }
+      }
+      const frames = publishedResult?.engineAnalysis?.extended?.tacticalReplay?.positionFrames;
+      if (allowPublishedBattlefield && frames?.some(frame => !frame.eventsOnly)) {
         try {
           if (latestExtraction.embeddedMapArchive?.length) {
             setStatus("Reading embedded map terrain…");
@@ -6771,21 +6834,10 @@
         } catch (error) {
           latestExtraction.mapTerrainError = error.message || "Map terrain could not be loaded.";
         }
-      }
-      if (allowPublishedBattlefield) {
         try {
           await loadReplayModelAssets(latestExtraction);
         } catch (error) {
           latestExtraction.modelAssetsError = error.message || "Custom model assets could not be loaded.";
-        }
-      }
-      let publishedResult = null;
-      if (latestReplaySha256 || latestReplayId) {
-        setStatus("Loading replay-engine player summary…");
-        try {
-          publishedResult = await loadWzstatsResult(latestReplaySha256, latestReplayId);
-        } catch (error) {
-          latestExtraction.publishedStatsError = error.message || "Replay-engine player summary could not be loaded.";
         }
       }
       attachPublishedPlayerStats(latestExtraction, publishedResult);

@@ -2080,7 +2080,7 @@
     }
 
     .replay-table thead tr:first-child th:last-child,
-    .replay-table tbody td:nth-child(19) {
+    .replay-players-panel .replay-table tbody td:last-child {
       width: 100%;
     }
 
@@ -2093,10 +2093,56 @@
       width: 1%;
     }
 
+    .replay-players-panel [data-player-stat-detail][hidden] {
+      display: none;
+    }
+
     .replay-table th.replay-stat-group {
       text-align: center;
       border-left: 1px solid rgba(109, 232, 255, 0.16);
       border-right: 1px solid rgba(109, 232, 255, 0.16);
+    }
+
+    .replay-stat-group-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 2px 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      text-shadow: inherit;
+      cursor: pointer;
+    }
+
+    .replay-stat-group-toggle::after {
+      content: "+";
+      display: inline-grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      border: 1px solid rgba(109, 232, 255, 0.45);
+      border-radius: 3px;
+      color: #9cefff;
+      font: 14px/1 sans-serif;
+      text-shadow: none;
+    }
+
+    .replay-stat-group-toggle[aria-expanded="true"]::after {
+      content: "−";
+    }
+
+    .replay-stat-group-toggle:hover::after {
+      background: rgba(109, 232, 255, 0.18);
+    }
+
+    .replay-stat-group-toggle:focus-visible {
+      outline: 1px solid #9cefff;
+      outline-offset: 2px;
     }
 
     .replay-table .replay-stat-details th {
@@ -3153,7 +3199,7 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="stats/replay-telemetry.js?v=20261117-arc-events-1"></script>
-  <script src="replay-analyzer.js?v=20261124-thin-strength-bars-1"></script>
+  <script src="replay-analyzer.js?v=20261124-expand-replay-stats-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

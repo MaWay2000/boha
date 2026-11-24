@@ -2803,24 +2803,79 @@
     return cell;
   }
 
+  const expandedPlayerStatGroups = new Set();
   const replayResultColumns = [
     { key: "score" },
     { key: "totalKd", format: formatTotalKd },
-    { key: "powerWon" },
-    { key: "powerLost", loss: true },
-    { key: "powerRatio", format: player => formatReplayRatio(powerRatioValue(player)), includeInOverall: false },
+    { key: "powerWon", label: "W", accessibleLabel: "power won", group: "power" },
+    { key: "powerLost", label: "L", accessibleLabel: "power lost", group: "power", loss: true },
+    {
+      key: "powerRatio", label: "Ratio", accessibleLabel: "power won divided by power lost",
+      group: "power", summary: true, format: player => formatReplayRatio(powerRatioValue(player)),
+      includeInOverall: false
+    },
     { key: "researchActivity" },
-    { key: "droidsBuilt" },
-    { key: "droidsLost", loss: true },
-    { key: "kills" },
-    { key: "remainingDroids" },
-    { key: "kd", format: formatPlayerKd },
-    { key: "structuresBuilt" },
-    { key: "structuresLost", loss: true },
-    { key: "structuresDestroyed" },
-    { key: "remainingStructures" },
-    { key: "structureKd", format: formatStructureKd }
+    { key: "droidsBuilt", label: "Built", group: "units" },
+    { key: "droidsLost", label: "Lost", group: "units", loss: true },
+    { key: "kills", label: "Kills", group: "units" },
+    { key: "remainingDroids", label: "Alive", group: "units" },
+    { key: "kd", label: "KD", accessibleLabel: "unit K/D", group: "units", summary: true, format: formatPlayerKd },
+    { key: "structuresBuilt", label: "Built", group: "structures" },
+    { key: "structuresLost", label: "Lost", group: "structures", loss: true },
+    { key: "structuresDestroyed", label: "Kills", group: "structures" },
+    { key: "remainingStructures", label: "Alive", group: "structures" },
+    {
+      key: "structureKd", label: "KD", accessibleLabel: "structure K/D", group: "structures",
+      summary: true, format: formatStructureKd
+    }
   ];
+
+  function setReplayStatDetail(cell, { group, summary }) {
+    if (group && !summary) {
+      cell.dataset.playerStatDetail = group;
+      cell.hidden = !expandedPlayerStatGroups.has(group);
+    }
+  }
+
+  function createReplayStatGroupHeader(label, group, renderRows) {
+    const columns = replayResultColumns.filter(column => column.group === group);
+    const header = createHeaderCell("", { scope: "colgroup", className: "replay-stat-group" });
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "replay-stat-group-toggle";
+    toggle.textContent = label;
+    toggle.setAttribute("aria-label", `${label} details`);
+    header.append(toggle);
+
+    const updateHeader = (expanded) => {
+      toggle.setAttribute("aria-expanded", String(expanded));
+      header.colSpan = expanded ? columns.length : 1;
+    };
+    updateHeader(expandedPlayerStatGroups.has(group));
+
+    toggle.addEventListener("click", () => {
+      const expanded = !expandedPlayerStatGroups.has(group);
+      if (expanded) {
+        expandedPlayerStatGroups.add(group);
+      } else {
+        expandedPlayerStatGroups.delete(group);
+      }
+      updateHeader(expanded);
+      playersTables.querySelectorAll(`[data-player-stat-detail="${group}"]`).forEach(cell => {
+        cell.hidden = !expanded;
+      });
+
+      if (!expanded && columns.some(column => !column.summary && column.key === playerSortState.key)) {
+        playerSortState = {
+          key: columns.find(column => column.summary).key,
+          direction: playerSortState.direction
+        };
+        updatePlayerSortIndicators();
+        renderRows();
+      }
+    });
+    return header;
+  }
 
   function replayResultBarScales(players) {
     return new Map(replayResultColumns.map(({ key, format, loss }) => {
@@ -2851,6 +2906,7 @@
     const value = playerSortValue(player, key);
     const cell = key === "researchActivity" ? createResearchCell(value)
       : createCell(format ? format(player) : formatStat(value));
+    setReplayStatDetail(cell, column);
     if (!Number.isFinite(value)) return cell;
 
     // Infinite ratios fill their own bars without flattening the finite ratios in that column.
@@ -6799,42 +6855,21 @@
         createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
-        createHeaderCell("Power", {
-          colSpan: 3,
-          scope: "colgroup",
-          className: "replay-stat-group"
-        }),
+        createReplayStatGroupHeader("Power", "power", renderPlayerRows),
         createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
-        createHeaderCell("Units", {
-          colSpan: 5,
-          scope: "colgroup",
-          className: "replay-stat-group"
-        }),
-        createHeaderCell("Structures", {
-          colSpan: 5,
-          scope: "colgroup",
-          className: "replay-stat-group"
-        }),
+        createReplayStatGroupHeader("Units", "units", renderPlayerRows),
+        createReplayStatGroupHeader("Structures", "structures", renderPlayerRows),
         createPlayerAwardsHeader(renderPlayerRows)
       );
 
       const playerHeaderDetails = document.createElement("tr");
       playerHeaderDetails.className = "replay-stat-details";
-      playerHeaderDetails.append(
-        createPlayerSortHeader("W", "powerWon", { accessibleLabel: "power won" }, renderPlayerRows),
-        createPlayerSortHeader("L", "powerLost", { accessibleLabel: "power lost" }, renderPlayerRows),
-        createPlayerSortHeader("Ratio", "powerRatio", { accessibleLabel: "power won divided by power lost" }, renderPlayerRows),
-        createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
-        createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
-        createPlayerSortHeader("Kills", "kills", {}, renderPlayerRows),
-        createPlayerSortHeader("Alive", "remainingDroids", {}, renderPlayerRows),
-        createPlayerSortHeader("KD", "kd", {}, renderPlayerRows),
-        createPlayerSortHeader("Built", "structuresBuilt", {}, renderPlayerRows),
-        createPlayerSortHeader("Lost", "structuresLost", {}, renderPlayerRows),
-        createPlayerSortHeader("Kills", "structuresDestroyed", {}, renderPlayerRows),
-        createPlayerSortHeader("Alive", "remainingStructures", {}, renderPlayerRows),
-        createPlayerSortHeader("KD", "structureKd", {}, renderPlayerRows)
-      );
+      playerHeaderDetails.append(...replayResultColumns.filter(column => column.group).map(column => {
+        const { label, key, accessibleLabel } = column;
+        const header = createPlayerSortHeader(label, key, { accessibleLabel }, renderPlayerRows);
+        setReplayStatDetail(header, column);
+        return header;
+      }));
       return [playerHeaderGroups, playerHeaderDetails];
     };
     replaceChildren(playersHead, createPlayerHeaders());

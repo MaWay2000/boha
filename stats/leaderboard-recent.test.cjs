@@ -22,6 +22,8 @@ test('right panel switches between recent matches, a profile and selected-player
     getPlayerGameKey: game => game.id,
     renderPlayerGameActions() {}
   });
+  const banStart = source.indexOf('function isBannedAccount(');
+  vm.runInContext(source.slice(banStart, source.indexOf('function filterVisibleAccounts(', banStart)), context);
   vm.runInContext(source.slice(source.indexOf('function renderPlayerGames('), source.indexOf('function setPlayerGameRowExpanded(')), context);
   const player = {id: 'one', name: 'Player', mainPublicKey: 'player-key', games: []};
   context.renderPlayerGames([player]);
@@ -158,3 +160,4 @@ test('only the standalone list includes Arc games; the main rankings sidebar sta
     if (!sidebar) assert.match(context.matchesElement.innerHTML, /tab=wavehoster.*Arc Mod/);
   }
 });
+

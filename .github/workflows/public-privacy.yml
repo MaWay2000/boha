@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - run: node --test stats/public-export.test.cjs stats/main-live-publication.test.cjs
+      - run: node --test stats/ban-visibility.test.cjs stats/public-export.test.cjs stats/main-live-publication.test.cjs
       - run: node --test stats/wavehoster-publication.test.cjs stats/wavehoster-live-publication.test.cjs tests/wavehoster-loader.test.mjs stats/wavehoster-analyzer.test.cjs tests/wavehoster-data.test.mjs tests/wavehoster-pagination.test.mjs stats/recent-games.test.mjs
       - run: node --test stats/player-game-expansion.test.cjs stats/leaderboard-recent.test.cjs stats/matchup-labels.test.cjs stats/replay-awards.test.cjs stats/replay-telemetry.test.cjs
       - run: node --test stats/site-news.test.cjs stats/site-news-model.test.mjs

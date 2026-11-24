@@ -1,5 +1,5 @@
 import {moddedArcSnapshot, combineModNames, modMedals, medalPointValue, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261124-arc-replay-1';
-import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261117-live-1';
+import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261124-arc-live-1';
 import {mountGameNicknames} from './player-nicknames.mjs';
 
 let data = null;

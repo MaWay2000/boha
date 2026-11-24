@@ -1,4 +1,4 @@
-export const LIVE_URL = 'https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json';
+export const LIVE_URL = 'https://onit.lt/wzstats/arc-battlefield.php?feed=1';
 const BACKUP_URL = 'stats/published/wavehoster.json';
 
 function validSnapshot(data) {

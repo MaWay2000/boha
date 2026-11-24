@@ -569,10 +569,9 @@
     let arcGame = null;
     let hasPublicArcBattlefield = false;
     const publishedArcIndex = new URL("stats/published/wavehoster.json", document.baseURI);
-    const liveArcIndex = "https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/data/wavehoster-live.json";
-    const arcIndexes = /^\d{8}_\d{6}_\d+$/.test(replayId)
-      ? [publishedArcIndex, liveArcIndex] : [liveArcIndex, publishedArcIndex];
-    for (const indexUrl of arcIndexes) {
+    const liveArcIndex = new URL(arcBattlefieldRelayUrl);
+    liveArcIndex.searchParams.set("feed", "1");
+    for (const indexUrl of [liveArcIndex, publishedArcIndex]) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
       try {
@@ -587,8 +586,8 @@
             const directUrl = /^\d{8}_\d{6}_\d+$/.test(game.id)
               ? `https://api.wavehoster.net/v1/replays/${game.id}`
               : `https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/api/v1/replays/${game.replaySha256}`;
-            hasPublicArcBattlefield = indexUrl === publishedArcIndex && game.modsVerified === true
-              && ["confirmed", "stats-only"].includes(game.status) && directUrl.startsWith("https://api.wavehoster.net/");
+            hasPublicArcBattlefield = directUrl.startsWith("https://api.wavehoster.net/")
+              && (Boolean(game.modsVerified) || game.id === replayId);
             match = {id: game.matchId, replay_sha256: game.replaySha256,
               started_at: game.startedAt, replay_url: directUrl, players: []};
           }
@@ -599,6 +598,15 @@
         clearTimeout(timeout);
       }
       if (match) break;
+    }
+
+    let engineAnalysis = null;
+    if (!match && /^\d{8}_\d{6}_\d+$/.test(replayId) && /^[a-f0-9]{64}$/.test(replaySha256)) {
+      engineAnalysis = await loadArcBattlefield(replaySha256).catch(() => null);
+      if (engineAnalysis) {
+        hasPublicArcBattlefield = true;
+        match = { replay_url: `https://api.wavehoster.net/v1/replays/${replayId}`, players: [] };
+      }
     }
 
     if (!match) {
@@ -618,11 +626,10 @@
     }
 
     let detailMatch = null;
-    let engineAnalysis = null;
     let detailError = "";
     if (hasPublicArcBattlefield) {
       try {
-        engineAnalysis = await loadArcBattlefield(match.replay_sha256);
+        engineAnalysis ||= await loadArcBattlefield(match.replay_sha256);
       } catch (error) {
         detailError = "Live battlefield telemetry is unavailable for this replay.";
       }

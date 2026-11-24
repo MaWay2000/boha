@@ -16,7 +16,7 @@ function runner({wavePayload = wave, livePayload = wavePayload, waveError = fals
     expandCompressedEngineAnalysis: async () => {}, normalizeTacticalReplayPlayerOwners() {},
     fetch: async (value, options) => {
       const url = String(value); calls.push(url);
-      if (url.includes('wavehoster-live.json')) {
+      if (url.endsWith('?feed=1')) {
         if (liveHang) return new Promise((_, reject) => options.signal.addEventListener('abort', () => reject(Error('live request timed out')), {once: true}));
         if (liveError) throw Error('live index offline');
         return {ok: true, json: async () => livePayload};
@@ -38,7 +38,7 @@ test('modded Analyze attaches the cached engine result without fetching the main
   assert.equal(calls.length, 2);
   assert.ok(calls[1].endsWith('/matches/42'));
   assert.ok(!calls.includes('main-index'));
-  assert.ok(calls[0].endsWith('/data/wavehoster-live.json'));
+  assert.ok(calls[0].endsWith('/arc-battlefield.php?feed=1'));
   assert.ok(!calls.some(url => url.includes('stats/published/wavehoster.json')));
 });
 
@@ -157,6 +157,17 @@ test('published Arc matches load exact positions without requesting private matc
   const fallback = await mismatched.load(hash, game.id);
   assert.equal(fallback.engineAnalysis, null);
   assert.equal(fallback.playerData[0].score, 475);
+
+  const pending = {...game, status: 'pending', modsVerified: false, participants: []};
+  const beforePublish = runner({wavePayload: {...wave, games: [pending]}, livePayload: {...wave, games: [game]},
+    battlefield: {replaySha256: hash, engineAnalysis}});
+  assert.equal((await beforePublish.load(hash, game.id)).engineAnalysis, engineAnalysis);
+  assert.equal(beforePublish.calls.some(url => url.includes('stats/published/wavehoster.json')), false);
+
+  const missing = runner({wavePayload: {...wave, games: []}, livePayload: {...wave, games: []},
+    battlefield: {replaySha256: hash, engineAnalysis}});
+  assert.equal((await missing.load(hash, game.id)).engineAnalysis, engineAnalysis);
+  assert.ok(!missing.calls.includes('main-index'));
 });
 
 test('sampled statistics survive attachment without becoming award-eligible final stats', async () => {

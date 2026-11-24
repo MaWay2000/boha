@@ -2839,8 +2839,7 @@ main {
 }
 
 .stats-team.stats-team-power-fill {
-  position: relative;
-  isolation: isolate;
+  padding-bottom: 9px;
   border-color: transparent;
   background: none;
 }
@@ -2848,14 +2847,13 @@ main {
 .stats-team-power-fill::before {
   content: "";
   position: absolute;
-  z-index: -1;
-  inset: 0 auto 0 0;
-  width: var(--team-power-fill);
-  border-radius: inherit;
-  background: linear-gradient(90deg,
-    hsla(var(--team-power-hue), 72%, 30%, 0.34),
-    hsla(var(--team-power-hue), 82%, 48%, 0.58));
-  box-shadow: inset -1px 0 hsla(var(--team-power-hue), 88%, 72%, 0.72);
+  inset: auto 7px 4px;
+  height: 3px;
+  border-radius: 2px;
+  background:
+    linear-gradient(hsl(var(--team-power-hue) 68% 52% / 0.86) 0 0)
+      left center / max(3px, var(--team-power-fill)) 100% no-repeat,
+    rgba(150, 197, 211, 0.14);
   pointer-events: none;
 }
 

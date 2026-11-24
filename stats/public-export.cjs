@@ -28,12 +28,31 @@ function assertNoPrivateFields(value, location = '$', allowModerationFlag = fals
 function pick(value, schema) {
   return Object.fromEntries(fields[schema].split(' ').filter(key => Object.hasOwn(value, key)).map(key => [key, value[key]]));
 }
+function excludedPlayer(player) {
+  const value = player?.elo;
+  const elo = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '') ? Number(value) : NaN;
+  return Boolean(player?.banned) || (Number.isFinite(elo) && elo <= -2000);
+}
+function publicReplayUrl(value) {
+  if (typeof value !== 'string' || !value) return value;
+  let url;
+  try { url = new URL(value); } catch { throw new Error('Invalid replay URL in publication.'); }
+  if (url.username || url.password) throw new Error('Authenticated replay URL must not be published.');
+  if (['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) {
+    if (!/^\/wzstats\/api\/v1\/replays\/[a-f0-9]{64}$/.test(url.pathname) || url.search || url.hash) throw new Error('Unexpected local replay URL.');
+    // Preserve the public replay address used before the local server recovery.
+    return 'https://desktop-0467j9q.tail41fd3a.ts.net' + url.pathname;
+  }
+  if (/^(?:127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.)/.test(url.hostname)
+      || /(?:^|\.)local$/i.test(url.hostname) || !['http:', 'https:'].includes(url.protocol)) throw new Error('Private replay URL must not be published.');
+  return value;
+}
 function sanitizeLeaderboards(input) {
   assertNoPrivateFields(input, '$', true);
   if (input.format !== 1 || !input.leaderboards?.Global || !Array.isArray(input.games)) throw new Error('Unsupported leaderboard export.');
-  const excluded = new Set(Object.values(input.leaderboards).flatMap(board => (board.players || []).filter(player => player.banned).map(player => String(player.id))));
+  const excluded = new Set(Object.values(input.leaderboards).flatMap(board => (board.players || []).filter(excludedPlayer).map(player => String(player.id))));
   const output = pick(input, 'root');
-  output.games = input.games.map(game => ({...pick(game, 'game'), slots: (game.slots || []).map(slot => pick(slot, 'slot'))}));
+  output.games = input.games.map(game => ({...pick(game, 'game'), ...(Object.hasOwn(game, 'replayUrl') ? {replayUrl: publicReplayUrl(game.replayUrl)} : {}), slots: (game.slots || []).map(slot => pick(slot, 'slot'))}));
   output.leaderboards = Object.fromEntries(Object.entries(input.leaderboards).map(([name, board]) => {
     const next = pick(board, 'board');
     next.players = (board.players || []).filter(player => !excluded.has(String(player.id))).map(player => ({
@@ -50,7 +69,7 @@ function sanitizeLeaderboards(input) {
 function sanitizeMatches(input) {
   assertNoPrivateFields(input);
   if (input.format !== 1 || !Array.isArray(input.matches)) throw new Error('Unsupported match export.');
-  return {format: 1, matches: input.matches.map(match => ({...pick(match, 'match'), players: (match.players || []).map(player => pick(player, 'matchPlayer'))}))};
+  return {format: 1, matches: input.matches.map(match => ({...pick(match, 'match'), ...(Object.hasOwn(match, 'replay_url') ? {replay_url: publicReplayUrl(match.replay_url)} : {}), players: (match.players || []).map(player => pick(player, 'matchPlayer'))}))};
 }
 const encode = value => Buffer.from(JSON.stringify(value) + '\n');
 const digest = buffer => crypto.createHash('sha256').update(buffer).digest('hex');

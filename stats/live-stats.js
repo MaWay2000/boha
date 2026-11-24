@@ -5,8 +5,11 @@ import { destroyFavoriteUnitPreview, initFavoriteUnitPreview } from "../mapmaker
 import { mountPersonalRatings } from "./personal-ratings.mjs?v=20261113-lazy-performance-1";
 import {normalizeArcRecentGames, mergeRecentGames} from './recent-games.mjs?v=20261120-stock-routing-1';
 
-const publishedLoader = createPublishedLoader({baseUrl: new URL('./published/', import.meta.url),
-  liveBaseUrl: new URL('https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/live/')});
+const publishedLoaderOptions = {baseUrl: new URL('./published/', import.meta.url)};
+if (!["localhost", "127.0.0.1", "[::1]", "::1"].includes(window.location.hostname)) {
+  publishedLoaderOptions.liveBaseUrl = new URL('https://desktop-0467j9q.tail41fd3a.ts.net/wzstats/live/');
+}
+const publishedLoader = createPublishedLoader(publishedLoaderOptions);
 const INITIAL_PLAYER_LIMIT = 100;
 const PLAYER_LIMIT_STEP = 100;
 const INITIAL_MATCH_LIMIT = 30;
@@ -343,8 +346,8 @@ async function ensureLeaderboardData(force = false) {
   if (personalRatings?.requiresPerformance()) await publishedLoader.loadPerformance(payload);
   if (!result.changed && leaderboardData === payload) return false;
   leaderboardData = payload;
-  bannedAccountIds = new Set((payload.leaderboards.Global?.players || [])
-    .filter((player) => player.banned)
+  bannedAccountIds = new Set(Object.values(payload.leaderboards).flatMap((board) => board.players || [])
+    .filter(isBannedAccount)
     .map((player) => String(player.id)));
   runtime.leaderboards = Object.keys(payload.leaderboards);
   ensureSelectedLeaderboard();
@@ -372,8 +375,16 @@ function hydratePublishedBoard(name) {
     return { accounts: new Map(), games: [] };
   }
 
-  const listedAccountIds = new Set((board.players || []).map(player => String(player.id)));
-  const accounts = new Map((board.players || []).map((player) => [String(player.id), {
+  // Public exports omit banned profiles but retain their historical match slots.
+  // Global is the authoritative identity list; slots must not recreate omitted profiles.
+  const globalPlayers = leaderboardData?.leaderboards?.Global?.players;
+  const visibleGlobalIds = Array.isArray(globalPlayers)
+    ? new Set(globalPlayers.filter((player) => !isBannedAccount(player) && !bannedAccountIds.has(String(player.id))).map((player) => String(player.id)))
+    : null;
+  const isPublishedAccount = (id) => visibleGlobalIds === null || visibleGlobalIds.has(String(id));
+  const listedPlayers = (board.players || []).filter((player) => isPublishedAccount(player.id));
+  const listedAccountIds = new Set(listedPlayers.map((player) => String(player.id)));
+  const accounts = new Map(listedPlayers.map((player) => [String(player.id), {
     mainPublicKey: player.mainPublicKey || null,
     publicKeys: new Set(player.publicKeys || []),
     name: player.name || "Unknown",
@@ -387,7 +398,7 @@ function hydratePublishedBoard(name) {
     totalKills: Number(player.totalKills || 0),
     favoriteUnits: Array.isArray(player.favoriteUnits) ? player.favoriteUnits : [],
     discounted: Boolean(player.discounted),
-    banned: Boolean(player.banned) || bannedAccountIds.has(String(player.id))
+    banned: isBannedAccount(player) || bannedAccountIds.has(String(player.id))
   }]));
   const gameIds = new Set(board.gameIds || []);
   const ratingEvents = board.ratingEvents || {};
@@ -401,7 +412,7 @@ function hydratePublishedBoard(name) {
             mainPublicKey: null, publicKeys: new Set(), name: slot.name || "Unknown",
             names: new Map([[slot.name || "Unknown", 1]]), bot: isKnownBotName(slot.name), games: [],
             elo: 1500, winCount: 0, loseCount: 0, drawCount: 0, totalKills: 0, discounted: true,
-            banned: bannedAccountIds.has(String(slot.id))
+            banned: bannedAccountIds.has(String(slot.id)) || !isPublishedAccount(slot.id)
           };
           accounts.set(String(slot.id), account);
         }
@@ -439,8 +450,11 @@ function hydratePublishedBoard(name) {
       slots.forEach((slot) => slot.account.games.push(game));
       return game;
     });
-  // Preserve historical slots without republishing omitted player profiles.
-  for (const id of accounts.keys()) if (!listedAccountIds.has(id)) accounts.delete(id);
+  // Known Global identities may have provisional results in another board.
+  // Unknown/omitted identities remain in historical slots, outside public profile maps.
+  for (const id of accounts.keys()) {
+    if (!listedAccountIds.has(id) && (visibleGlobalIds === null || !visibleGlobalIds.has(id))) accounts.delete(id);
+  }
   return { accounts, games };
 }
 
@@ -531,8 +545,15 @@ function sortAccounts(accounts) {
   return [...accounts].sort((left, right) => accountSortKey(right) - accountSortKey(left));
 }
 
+function isBannedAccount(account) {
+  const score = account?.elo;
+  const elo = typeof score === "number" || (typeof score === "string" && score.trim() !== "")
+    ? Number(score) : NaN;
+  return Boolean(account?.banned) || (Number.isFinite(elo) && elo <= -2000);
+}
+
 function filterVisibleAccounts(accountList) {
-  return accountList.filter((account) => !account.banned && !account.bot && (!account.discounted || account.games.length >= 2));
+  return accountList.filter((account) => !isBannedAccount(account) && !account.bot && (!account.discounted || account.games.length >= 2));
 }
 
 function isCrashedPublishedGame(game) {
@@ -547,7 +568,7 @@ function isCrashedPublishedGame(game) {
 }
 
 function filterRankedAccounts(accountList) {
-  return accountList.filter((account) => !account.banned && !account.discounted && !account.bot);
+  return accountList.filter((account) => !isBannedAccount(account) && !account.discounted && !account.bot);
 }
 
 function isKnownBotName(name) {
@@ -899,7 +920,7 @@ function getTeamToneClass(userType) {
 }
 
 function matchesPlayerSearch(account, searchQuery) {
-  if (account?.banned) return false;
+  if (isBannedAccount(account)) return false;
   if (!searchQuery) {
     return true;
   }
@@ -941,7 +962,7 @@ function matchesRecentGameSearch(game, searchQuery) {
 
   return game.players.some((slot) => {
     const account = slot.account;
-    if (!account || account.banned) {
+    if (!account || isBannedAccount(account)) {
       return false;
     }
 
@@ -999,7 +1020,7 @@ function resolveActivePlayerShareKey(accountList) {
   }
 
   const matches = accountList.filter((account) => (
-    getCompactAccountKey(getAccountExpandKey(account)) === activeExpandedAccountKey
+    !isBannedAccount(account) && getCompactAccountKey(getAccountExpandKey(account)) === activeExpandedAccountKey
   ));
   if (matches.length !== 1) {
     return;
@@ -2476,8 +2497,8 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   }
 
   const profileHeadingLabel = document.querySelector(".stats-player-profile-heading-line .panel-kicker");
-  const activeAccount = accounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
-  const selectedAccount = globalAccounts.find((account) => getAccountExpandKey(account) === activeExpandedAccountKey);
+  const activeAccount = accounts.find((account) => !isBannedAccount(account) && getAccountExpandKey(account) === activeExpandedAccountKey);
+  const selectedAccount = globalAccounts.find((account) => !isBannedAccount(account) && getAccountExpandKey(account) === activeExpandedAccountKey);
   const hasSelectedPlayer = Boolean(activeAccount || selectedAccount);
   if (leaderboardRecentMatchesElement) {
     leaderboardRecentMatchesElement.hidden = hasSelectedPlayer;
@@ -3765,7 +3786,7 @@ function render() {
 
   const { accounts: globalAccounts, games: globalGames } = getRatingBoard("Global");
 
-  const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !account.banned);
+  const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !isBannedAccount(account));
   resolveActivePlayerShareKey(globalAccountList);
   globalRankMap = buildGlobalRankMap(globalAccountList);
 
@@ -3774,7 +3795,7 @@ function render() {
 
   const { accounts, games } = getRatingBoard(selectedLeaderboard);
 
-  const accountList = sortAccounts(accounts.values()).filter((account) => !account.banned);
+  const accountList = sortAccounts(accounts.values()).filter((account) => !isBannedAccount(account));
   renderedAccountList = accountList;
   const gameList = [...games].sort((left, right) => right.endDate - left.endDate);
   renderedGameList = gameList;

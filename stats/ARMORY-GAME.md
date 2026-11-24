@@ -45,12 +45,9 @@ The table is shared online through the existing public API at
   timestamps come from the server, not from the submitted score body.
 
 Viewing the table also reads `stats/published/armory-scores.json`, a validated
-public Top 10 snapshot. A dedicated GitHub workflow checks the API about every
-ten minutes and commits only changed rankings. Browser reads use the public
-GitHub raw URL (bot commits do not trigger Pages builds), with the site copy
-as a fallback. GitHub scheduling/CDN delays can add time. Live responses take
-priority; slower snapshots cannot overwrite them. Failed publication retains
-the last good snapshot, including its original publication date.
+public Top 10 snapshot. The published table stays at its last saved rankings
+until it is refreshed manually. The browser reads the GitHub raw URL with
+the site copy as a fallback. Live scores take priority over older snapshots.
 
 This lets visitors read the shared table when the PC-hosted API is unreachable
 or browser network rules block it. The lobby labels the publication date and

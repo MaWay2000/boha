@@ -2647,7 +2647,10 @@
   }
 
   function formatPlayerKd(player) {
-    const value = playerKdValue(player);
+    return formatReplayRatio(playerKdValue(player));
+  }
+
+  function formatReplayRatio(value) {
     if (value == null) {
       return "\u2014";
     }
@@ -2676,11 +2679,7 @@
   }
 
   function formatTotalKd(player) {
-    const value = totalKdValue(player);
-    if (value == null) {
-      return "\u2014";
-    }
-    return value === Number.MAX_SAFE_INTEGER ? "\u221e" : value.toFixed(2);
+    return formatReplayRatio(totalKdValue(player));
   }
 
   function structureKdValue(player) {
@@ -2700,11 +2699,15 @@
   }
 
   function formatStructureKd(player) {
-    const value = structureKdValue(player);
-    if (value == null) {
-      return "\u2014";
-    }
-    return value === Number.MAX_SAFE_INTEGER ? "\u221e" : value.toFixed(2);
+    return formatReplayRatio(structureKdValue(player));
+  }
+
+  function powerRatioValue(player) {
+    const won = playerStat(player, "powerWon");
+    const lost = playerStat(player, "powerLost");
+    if (player.spectator || won == null || lost == null || won < 0 || lost < 0) return null;
+    if (lost === 0) return won > 0 ? Number.MAX_SAFE_INTEGER : null;
+    return won / lost;
   }
 
   function playerSortValue(player, key, awardsByPlayer) {
@@ -2725,6 +2728,9 @@
     }
     if (key === "structureKd") {
       return structureKdValue(player);
+    }
+    if (key === "powerRatio") {
+      return powerRatioValue(player);
     }
     if (key === "researchActivity") {
       return player.researchActivity;
@@ -2802,6 +2808,7 @@
     { key: "totalKd", format: formatTotalKd },
     { key: "powerWon" },
     { key: "powerLost", loss: true },
+    { key: "powerRatio", format: player => formatReplayRatio(powerRatioValue(player)), includeInOverall: false },
     { key: "researchActivity" },
     { key: "droidsBuilt" },
     { key: "droidsLost", loss: true },
@@ -2846,7 +2853,7 @@
       : createCell(format ? format(player) : formatStat(value));
     if (!Number.isFinite(value)) return cell;
 
-    // Unlimited K/D fills its own bar without flattening the finite ratios in that column.
+    // Infinite ratios fill their own bars without flattening the finite ratios in that column.
     const range = scale.maximum - scale.minimum;
     const ratio = format && value === Number.MAX_SAFE_INTEGER ? 1
       : range > 0 ? Math.max(0, Math.min(1, (value - scale.minimum) / range))
@@ -2864,7 +2871,8 @@
       row.className = "replay-player-lost";
     }
 
-    const ranks = replayResultColumns.map(({ key }) => barScales.get(key).ranks.get(playerSortValue(player, key)))
+    const ranks = replayResultColumns.filter(column => column.includeInOverall !== false)
+      .map(({ key }) => barScales.get(key).ranks.get(playerSortValue(player, key)))
       .filter(Number.isFinite);
     const overall = ranks.length ? ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length : null;
     const story = createPlayerStory(player, players, events, researchActivity);
@@ -6792,7 +6800,7 @@
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
         createHeaderCell("Power", {
-          colSpan: 2,
+          colSpan: 3,
           scope: "colgroup",
           className: "replay-stat-group"
         }),
@@ -6815,6 +6823,7 @@
       playerHeaderDetails.append(
         createPlayerSortHeader("W", "powerWon", { accessibleLabel: "power won" }, renderPlayerRows),
         createPlayerSortHeader("L", "powerLost", { accessibleLabel: "power lost" }, renderPlayerRows),
+        createPlayerSortHeader("Ratio", "powerRatio", { accessibleLabel: "power won divided by power lost" }, renderPlayerRows),
         createPlayerSortHeader("Built", "droidsBuilt", {}, renderPlayerRows),
         createPlayerSortHeader("Lost", "droidsLost", {}, renderPlayerRows),
         createPlayerSortHeader("Kills", "kills", {}, renderPlayerRows),

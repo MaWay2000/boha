@@ -6,7 +6,7 @@ const wave = {format: 1, source: 'WaveHoster', games: [{id: '20261109_083951_771
 const detail = {replay_sha256: hash, telemetry: {engineAnalysis: {status: 'confirmed'}}, players: [
   {position_number: 1, stats_source: 'replay-engine', result: 'loser', score: 475, kills: 12, raw_json: '{}'}]};
 function runner({wavePayload = wave, livePayload = wavePayload, waveError = false, liveError = waveError,
-  liveHang = false, match = detail, detailStatus = 200, battlefield = null} = {}) {
+  liveHang = false, match = detail, detailStatus = 200, battlefield = null, research = null} = {}) {
   const calls = [];
   const context = vm.createContext({URL, AbortController, AbortSignal,
     setTimeout: (callback, time) => setTimeout(callback, liveHang ? 5 : time), clearTimeout,
@@ -22,7 +22,8 @@ function runner({wavePayload = wave, livePayload = wavePayload, waveError = fals
         return {ok: true, json: async () => livePayload};
       }
       if (url.includes('wavehoster.json')) { if (waveError) throw Error('modded index offline'); return {ok: true, json: async () => wavePayload}; }
-      if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, replay_sha256: hash, source_match_id: '1234567890123'}]})};
+      if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, source: 'bohan', replay_sha256: hash, source_match_id: '1234567890123'}]})};
+      if (url.includes('?research=')) return {ok: Boolean(research), json: async () => research};
       if (url.includes('/arc-battlefield.php?')) return {ok: Boolean(battlefield), status: battlefield ? 200 : 404, json: async () => battlefield};
       return {ok: detailStatus === 200, status: detailStatus, json: async () => ({match})};
     }});
@@ -190,6 +191,21 @@ test('a failed modded index leaves main leaderboard analysis working', async () 
   assert.equal(result.playerData[0].kills, 12);
   assert.ok(calls.includes('main-index'));
   assert.ok(calls.at(-1).endsWith('/matches/9'));
+});
+test('Bohan research percentages work without match detail and stay attached to the correct slots', async () => {
+  const research = {replaySha256: hash, researchActivity: [
+    {position: 1, percent: 91.68}, {position: 2, percent: 0}, {position: 3, percent: 105}, {position: 4, percent: 85}
+  ]};
+  const {load, context} = runner({waveError: true, detailStatus: 404, research});
+  const start = source.indexOf('  function attachPublishedPlayerStats(');
+  const metric = source.indexOf('  function calculateResearchActivity(');
+  vm.runInContext(source.slice(start, source.indexOf('  function decodeGameTime(', start))
+    + source.slice(metric, source.indexOf('  function createResearchCell(', metric)), context);
+  const extraction = {players: [{position: 1}, {position: 2}, {position: 3}, {position: 4, spectator: true}]};
+  context.attachPublishedPlayerStats(extraction, await load(hash, '1234567890123'));
+  assert.deepEqual(Array.from(context.calculateResearchActivity(extraction.players).values()), [91.68, 0, null, null]);
+  const wrongReplay = runner({waveError: true, detailStatus: 404, research: {...research, replaySha256: 'b'.repeat(64)}});
+  assert.equal((await wrongReplay.load(hash, '1234567890123')).researchActivity.length, 0);
 });
 test('a mismatched detail result cannot attach another replay’s players or analysis', async () => {
   const {load} = runner({match: {...detail, replay_sha256: 'b'.repeat(64)}});

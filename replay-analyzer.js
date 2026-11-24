@@ -560,6 +560,19 @@
     return engineAnalysis;
   }
 
+  async function loadBohanResearchActivity(match) {
+    if (match.source !== "bohan" || !Number.isSafeInteger(match.id) || !/^[a-f0-9]{64}$/.test(match.replay_sha256)) return [];
+    const url = new URL(arcBattlefieldRelayUrl);
+    url.searchParams.set("research", match.id);
+    url.searchParams.set("sha", match.replay_sha256);
+    const response = await fetch(url, { signal: AbortSignal.timeout(18000) });
+    if (!response.ok) return [];
+    const { replaySha256, researchActivity } = await response.json();
+    if (replaySha256 !== match.replay_sha256 || !Array.isArray(researchActivity)) return [];
+    return researchActivity.filter(player => Number.isSafeInteger(player?.position) && player.position >= 0
+      && Number.isFinite(player.percent) && player.percent >= 0 && player.percent <= 100);
+  }
+
   async function loadWzstatsResult(replaySha256, replayId) {
     if (!replaySha256 && !replayId) {
       return null;
@@ -625,6 +638,7 @@
       }
     }
 
+    const researchActivity = loadBohanResearchActivity(match).catch(() => []);
     let detailMatch = null;
     let detailError = "";
     if (hasPublicArcBattlefield) {
@@ -695,6 +709,7 @@
       hasPublicArcBattlefield,
       engineAnalysis,
       detailError,
+      researchActivity: await researchActivity,
       playerData: arcPlayers.length ? arcPlayers : players.map((player) => {
         const hasReplayEngineStats = player.stats_source === "replay-engine";
         const position = player.position ?? player.position_number;
@@ -805,6 +820,7 @@
     const playersByPosition = new Map(
       publishedPlayers.filter((player) => player.position != null).map((player) => [Number(player.position), player])
     );
+    const researchByPosition = new Map((publishedResult?.researchActivity || []).map(player => [player.position, player.percent]));
     const humanNameCounts = new Map();
     for (const player of extraction.players) {
       if (!player.spectator && player.ai < 0) humanNameCounts.set(player.name, (humanNameCounts.get(player.name) || 0) + 1);
@@ -818,6 +834,7 @@
 
     let playersMatched = 0;
     extraction.players.forEach((player) => {
+      player.recordedResearchPercent = player.spectator ? null : (researchByPosition.get(Number(player.position)) ?? null);
       const uniqueHuman = !player.spectator && player.ai < 0 && humanNameCounts.get(player.name) === 1;
       const published = playersByPosition.get(Number(player.position))
         || (uniqueHuman ? summaryNames.get(player.name) : null);
@@ -2551,25 +2568,24 @@
 
   function calculateResearchActivity(players, events, matchDuration) {
     return new Map(players.map((player) => {
+      if (player.spectator) return [player, null];
+      const recorded = player.recordedResearchPercent ?? null;
       if (player.summary?.statsSource !== "replay-engine") {
-        return [player, null];
+        return [player, recorded];
       }
       const hasRecordedValue = (key) => {
         const raw = player.summary[key];
         return (typeof raw === "number" || typeof raw === "string") && String(raw).trim() !== "";
       };
       if (!hasRecordedValue("labResearchPerformance") || !hasRecordedValue("labResearchPotential")) {
-        return [player, null];
+        return [player, recorded];
       }
       const performance = playerStat(player, "labResearchPerformance");
       const potential = playerStat(player, "labResearchPotential");
-      if (player.spectator) {
-        return [player, null];
-      }
       if (performance != null && performance >= 0 && potential != null && potential > 0) {
         return [player, Math.max(0, Math.min(1, performance / potential)) * 100];
       }
-      return [player, null];
+      return [player, recorded];
     }));
   }
 
@@ -2585,7 +2601,7 @@
     const activity = document.createElement("span");
     activity.className = "replay-research-idle replay-tooltip";
     activity.textContent = `${researchActivity.toFixed(2)}%`;
-    activity.dataset.tooltip = "Research-lab activity based only on recorded lab performance and busy time; it is not compared with other players.";
+    activity.dataset.tooltip = "Recorded research-lab activity for this player.";
     activity.setAttribute("aria-label", activity.dataset.tooltip);
     activity.tabIndex = 0;
     content.append(activity);

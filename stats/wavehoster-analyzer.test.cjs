@@ -6,7 +6,7 @@ const wave = {format: 1, source: 'WaveHoster', games: [{id: '20261109_083951_771
 const detail = {replay_sha256: hash, telemetry: {engineAnalysis: {status: 'confirmed'}}, players: [
   {position_number: 1, stats_source: 'replay-engine', result: 'loser', score: 475, kills: 12, raw_json: '{}'}]};
 function runner({wavePayload = wave, livePayload = wavePayload, waveError = false, liveError = waveError,
-  liveHang = false, match = detail, detailStatus = 200, battlefield = null, research = null} = {}) {
+  liveHang = false, match = detail, detailStatus = 200, battlefield = null, research = null, publicPlayers = []} = {}) {
   const calls = [];
   const context = vm.createContext({URL, AbortController, AbortSignal,
     setTimeout: (callback, time) => setTimeout(callback, liveHang ? 5 : time), clearTimeout,
@@ -22,7 +22,7 @@ function runner({wavePayload = wave, livePayload = wavePayload, waveError = fals
         return {ok: true, json: async () => livePayload};
       }
       if (url.includes('wavehoster.json')) { if (waveError) throw Error('modded index offline'); return {ok: true, json: async () => wavePayload}; }
-      if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, source: 'bohan', replay_sha256: hash, source_match_id: '1234567890123'}]})};
+      if (url === 'main-index') return {ok: true, json: async () => ({matches: [{id: 9, source: 'bohan', replay_sha256: hash, source_match_id: '1234567890123', players: publicPlayers}]})};
       if (url.includes('?research=')) return {ok: Boolean(research), json: async () => research};
       if (url.includes('/arc-battlefield.php?')) return {ok: Boolean(battlefield), status: battlefield ? 200 : 404, json: async () => battlefield};
       return {ok: detailStatus === 200, status: detailStatus, json: async () => ({match})};
@@ -82,7 +82,7 @@ test('unknown outcomes display the newest recorded per-player counters and keep 
   assert.equal(player.usertype, null, 'sampled contender/winner states never create a final result');
   assert.equal(player.statsSource, 'replay-snapshot');
   assert.equal(player.sampledAtMilliseconds, 1785000);
-  assert.equal(player.powerWon, null, 'recent power is not a lifetime total');
+  assert.equal(player.powerWon, null, 'a mid-match sample is not a final total');
   assert.equal(result.engineAnalysis.extended.tacticalReplay.positionFrames.length, 1);
   assert.equal(result.engineAnalysis.extended.telemetry.observedRecords, 2778);
   assert.equal(result.endDate, '2026-11-17T18:37:41Z');
@@ -206,6 +206,22 @@ test('Bohan research percentages work without match detail and stay attached to 
   assert.deepEqual(Array.from(context.calculateResearchActivity(extraction.players).values()), [91.68, 0, null, null]);
   const wrongReplay = runner({waveError: true, detailStatus: 404, research: {...research, replaySha256: 'b'.repeat(64)}});
   assert.equal((await wrongReplay.load(hash, '1234567890123')).researchActivity.length, 0);
+});
+test('Bohan power totals still load when the match detail is unavailable', async () => {
+  const metrics = {replaySha256: hash, researchActivity: [], powerTrades: [
+    {position: 1, powerWon: 0, powerLost: 230}, {position: 2, powerWon: 120, powerLost: -1},
+    {position: 3, powerWon: 700, powerLost: 600}
+  ]};
+  const publicPlayers = [1, 2, 3, 4].map(position => ({position, stats_source: 'replay-engine'}));
+  const {load, context} = runner({waveError: true, detailStatus: 404, research: metrics, publicPlayers});
+  const start = source.indexOf('  function attachPublishedPlayerStats(');
+  vm.runInContext(source.slice(start, source.indexOf('  function decodeGameTime(', start)), context);
+  const extraction = {players: [{position: 2}, {position: 1}, {position: 3, spectator: true}, {position: 4}]};
+  context.attachPublishedPlayerStats(extraction, await load(hash, '1234567890123'));
+  assert.deepEqual(extraction.players.map(p => [p.summary.powerWon, p.summary.powerLost]),
+    [[120, null], [0, 230], [null, null], [null, null]]);
+  const wrongReplay = runner({waveError: true, detailStatus: 404, research: {...metrics, replaySha256: 'b'.repeat(64)}});
+  assert.equal((await wrongReplay.load(hash, '1234567890123')).powerTrades.length, 0);
 });
 test('a mismatched detail result cannot attach another replay’s players or analysis', async () => {
   const {load} = runner({match: {...detail, replay_sha256: 'b'.repeat(64)}});

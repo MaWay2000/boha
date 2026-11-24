@@ -560,17 +560,24 @@
     return engineAnalysis;
   }
 
-  async function loadBohanResearchActivity(match) {
-    if (match.source !== "bohan" || !Number.isSafeInteger(match.id) || !/^[a-f0-9]{64}$/.test(match.replay_sha256)) return [];
+  async function loadBohanMatchMetrics(match) {
+    if (match.source !== "bohan" || !Number.isSafeInteger(match.id) || !/^[a-f0-9]{64}$/.test(match.replay_sha256)) return null;
     const url = new URL(arcBattlefieldRelayUrl);
     url.searchParams.set("research", match.id);
     url.searchParams.set("sha", match.replay_sha256);
     const response = await fetch(url, { signal: AbortSignal.timeout(18000) });
-    if (!response.ok) return [];
-    const { replaySha256, researchActivity } = await response.json();
-    if (replaySha256 !== match.replay_sha256 || !Array.isArray(researchActivity)) return [];
-    return researchActivity.filter(player => Number.isSafeInteger(player?.position) && player.position >= 0
-      && Number.isFinite(player.percent) && player.percent >= 0 && player.percent <= 100);
+    if (!response.ok) return null;
+    const { replaySha256, researchActivity, powerTrades } = await response.json();
+    if (replaySha256 !== match.replay_sha256) return null;
+    const validSlot = player => Number.isSafeInteger(player?.position) && player.position >= 0;
+    const power = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+    return {
+      researchActivity: Array.isArray(researchActivity) ? researchActivity.filter(player => validSlot(player)
+        && Number.isFinite(player.percent) && player.percent >= 0 && player.percent <= 100) : [],
+      powerTrades: Array.isArray(powerTrades) ? powerTrades.filter(validSlot).map(player => ({
+        position: player.position, powerWon: power(player.powerWon), powerLost: power(player.powerLost)
+      })) : []
+    };
   }
 
   async function loadWzstatsResult(replaySha256, replayId) {
@@ -638,7 +645,7 @@
       }
     }
 
-    const researchActivity = loadBohanResearchActivity(match).catch(() => []);
+    const pendingMetrics = loadBohanMatchMetrics(match).catch(() => null);
     let detailMatch = null;
     let detailError = "";
     if (hasPublicArcBattlefield) {
@@ -700,6 +707,7 @@
           statsSource: "arc-publication"
         })) : [];
 
+    const matchMetrics = await pendingMetrics;
     return {
       replayUrl: match.replay_url,
       endDate: matchDate
@@ -709,7 +717,8 @@
       hasPublicArcBattlefield,
       engineAnalysis,
       detailError,
-      researchActivity: await researchActivity,
+      researchActivity: matchMetrics?.researchActivity || [],
+      powerTrades: matchMetrics?.powerTrades || [],
       playerData: arcPlayers.length ? arcPlayers : players.map((player) => {
         const hasReplayEngineStats = player.stats_source === "replay-engine";
         const position = player.position ?? player.position_number;
@@ -821,6 +830,7 @@
       publishedPlayers.filter((player) => player.position != null).map((player) => [Number(player.position), player])
     );
     const researchByPosition = new Map((publishedResult?.researchActivity || []).map(player => [player.position, player.percent]));
+    const powerByPosition = new Map((publishedResult?.powerTrades || []).map(player => [player.position, player]));
     const humanNameCounts = new Map();
     for (const player of extraction.players) {
       if (!player.spectator && player.ai < 0) humanNameCounts.set(player.name, (humanNameCounts.get(player.name) || 0) + 1);
@@ -835,6 +845,7 @@
     let playersMatched = 0;
     extraction.players.forEach((player) => {
       player.recordedResearchPercent = player.spectator ? null : (researchByPosition.get(Number(player.position)) ?? null);
+      const recordedPower = player.spectator ? null : powerByPosition.get(Number(player.position));
       const uniqueHuman = !player.spectator && player.ai < 0 && humanNameCounts.get(player.name) === 1;
       const published = playersByPosition.get(Number(player.position))
         || (uniqueHuman ? summaryNames.get(player.name) : null);
@@ -855,8 +866,8 @@
         structuresDestroyed: published.structureKills,
         researchComplete: published.researchComplete,
         score: published.score,
-        powerWon: published.powerWon,
-        powerLost: published.powerLost,
+        powerWon: published.powerWon ?? recordedPower?.powerWon ?? null,
+        powerLost: published.powerLost ?? recordedPower?.powerLost ?? null,
         power: published.power,
         oilRigs: published.oilRigs,
         remainingDroids: published.droids,

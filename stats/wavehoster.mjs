@@ -478,9 +478,9 @@ function renderOptions() {
   renderBuildOptions();
 }
 
-function updateHostSync(isLive) {
+function updateStatsSource(source) {
   const status = $('waveHostSync');
-  const label = isLive ? 'True' : 'False';
+  const label = source === 'live' ? 'Live host' : 'GitHub';
   if (status.textContent !== label) status.textContent = label;
 }
 
@@ -506,14 +506,13 @@ async function load() {
     const result = await refreshWaveHoster({current: currentRecord, onUpdate(record) {
       if (!waitForSelection) {
         showRecord(record);
-        updateHostSync(record.source === 'live');
+        updateStatsSource(record.source);
       }
     }});
     currentRecord = result.record;
     if (data !== currentRecord.snapshot) showRecord(currentRecord);
-    updateHostSync(result.liveAvailable && currentRecord.source === 'live');
-    const notice = result.liveAvailable ? '' : 'Live updates are temporarily unavailable. Showing the latest saved results.';
-    if ($('waveError').textContent !== notice) $('waveError').textContent = notice;
+    updateStatsSource(currentRecord.source);
+    $('waveError').textContent = '';
     const updated = updatedLabel(data.generatedAt);
     if ($('waveUpdated').textContent !== updated) $('waveUpdated').textContent = updated;
   } catch (error) {

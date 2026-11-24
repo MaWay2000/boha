@@ -2806,7 +2806,6 @@
   const expandedPlayerStatGroups = new Set();
   const replayResultColumns = [
     { key: "score" },
-    { key: "totalKd", format: formatTotalKd },
     { key: "powerWon", label: "W", accessibleLabel: "power won", group: "power" },
     { key: "powerLost", label: "L", accessibleLabel: "power lost", group: "power", loss: true },
     {
@@ -2815,6 +2814,7 @@
       includeInOverall: false
     },
     { key: "researchActivity" },
+    { key: "totalKd", format: formatTotalKd },
     { key: "droidsBuilt", label: "Built", group: "units" },
     { key: "droidsLost", label: "Lost", group: "units", loss: true },
     { key: "kills", label: "Kills", group: "units" },
@@ -6854,9 +6854,9 @@
         createPlayerSortHeader("Slot", "position", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Nick", "name", { rowSpan: 2 }, renderPlayerRows),
         createPlayerSortHeader("Score", "score", { rowSpan: 2 }, renderPlayerRows),
-        createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
         createReplayStatGroupHeader("Power", "power", renderPlayerRows),
         createPlayerSortHeader("Res", "researchActivity", { rowSpan: 2 }, renderPlayerRows),
+        createPlayerSortHeader("KD", "totalKd", { rowSpan: 2 }, renderPlayerRows),
         createReplayStatGroupHeader("Units", "units", renderPlayerRows),
         createReplayStatGroupHeader("Structures", "structures", renderPlayerRows),
         createPlayerAwardsHeader(renderPlayerRows)

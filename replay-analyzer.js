@@ -2758,7 +2758,9 @@
   function configureReplayStatCell(cell, { group, summary }) {
     if (!group) return;
     cell.dataset.playerStatGroup = group;
-    if (!summary) {
+    if (summary) {
+      cell.dataset.playerStatSummary = group;
+    } else {
       cell.dataset.playerStatDetail = group;
       cell.hidden = !expandedPlayerStatGroups.has(group);
     }
@@ -2783,6 +2785,10 @@
     const updateHeader = (expanded) => {
       toggle.setAttribute("aria-expanded", String(expanded));
       header.colSpan = expanded ? columns.length : 1;
+      if (group === "power") {
+        header.rowSpan = expanded ? 1 : 2;
+        playersTables.classList.toggle("replay-show-power-details", expanded);
+      }
     };
     updateHeader(expandedPlayerStatGroups.has(group));
 

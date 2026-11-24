@@ -2098,6 +2098,14 @@
       display: none;
     }
 
+    .replay-player-team-tables:not(.replay-show-power-details) th[data-player-stat-summary="power"] {
+      display: none;
+    }
+
+    .replay-player-team-tables:not(.replay-show-power-details) td[data-player-stat-summary="power"] {
+      visibility: hidden;
+    }
+
     .replay-table th.replay-stat-group {
       text-align: center;
       border-left: 1px solid rgba(109, 232, 255, 0.16);
@@ -3201,7 +3209,7 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="stats/replay-telemetry.js?v=20261117-arc-events-1"></script>
-  <script src="replay-analyzer.js?v=20261124-replay-kd-reveal-1"></script>
+  <script src="replay-analyzer.js?v=20261124-replay-power-ratio-visibility-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

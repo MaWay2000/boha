@@ -2755,8 +2755,10 @@
     }
   ];
 
-  function setReplayStatDetail(cell, { group, summary }) {
-    if (group && !summary) {
+  function configureReplayStatCell(cell, { group, summary }) {
+    if (!group) return;
+    cell.dataset.playerStatGroup = group;
+    if (!summary) {
       cell.dataset.playerStatDetail = group;
       cell.hidden = !expandedPlayerStatGroups.has(group);
     }
@@ -2771,9 +2773,10 @@
     return toggle;
   }
 
-  function createReplayStatGroupHeader(label, group, onToggle) {
+  function createReplayStatGroupHeader(label, group) {
     const columns = replayResultColumns.filter(column => column.group === group);
     const header = createHeaderCell("", { scope: "colgroup", className: "replay-stat-group" });
+    header.dataset.playerStatGroup = group;
     const toggle = createReplayStatToggle(label, `${label} details`);
     header.append(toggle);
 
@@ -2783,8 +2786,8 @@
     };
     updateHeader(expandedPlayerStatGroups.has(group));
 
-    const setExpanded = (expanded) => {
-      if (expanded === expandedPlayerStatGroups.has(group)) return;
+    toggle.addEventListener("click", () => {
+      const expanded = !expandedPlayerStatGroups.has(group);
       if (expanded) {
         expandedPlayerStatGroups.add(group);
       } else {
@@ -2794,13 +2797,8 @@
       playersTables.querySelectorAll(`[data-player-stat-detail="${group}"]`).forEach(cell => {
         cell.hidden = !expanded;
       });
-    };
-
-    toggle.addEventListener("click", () => {
-      setExpanded(!expandedPlayerStatGroups.has(group));
-      onToggle?.();
     });
-    return { header, setExpanded };
+    return header;
   }
 
   function replayResultBarScales(players) {
@@ -2832,7 +2830,7 @@
     const value = replayResultValue(player, key);
     const cell = key === "researchActivity" ? createResearchCell(value)
       : createCell(format ? format(player) : formatStat(value));
-    setReplayStatDetail(cell, column);
+    configureReplayStatCell(cell, column);
     if (!Number.isFinite(value)) return cell;
 
     // Infinite ratios fill their own bars without flattening the finite ratios in that column.
@@ -6758,18 +6756,12 @@
 
     const createPlayerHeaders = () => {
       const kdHeader = createHeaderCell("", { rowSpan: 2 });
-      const kdToggle = createReplayStatToggle("KD", "K/D details for Units and Structures");
+      const kdToggle = createReplayStatToggle("KD", "Show or hide Units and Structures");
       kdHeader.append(kdToggle);
-      const bothExpanded = () => expandedPlayerStatGroups.has("units") && expandedPlayerStatGroups.has("structures");
-      const updateKdToggle = () => kdToggle.setAttribute("aria-expanded", String(bothExpanded()));
-      const units = createReplayStatGroupHeader("Units", "units", updateKdToggle);
-      const structures = createReplayStatGroupHeader("Structures", "structures", updateKdToggle);
-      updateKdToggle();
+      kdToggle.setAttribute("aria-expanded", String(playersTables.classList.contains("replay-show-kd-groups")));
       kdToggle.addEventListener("click", () => {
-        const expand = !bothExpanded();
-        units.setExpanded(expand);
-        structures.setExpanded(expand);
-        updateKdToggle();
+        const expanded = playersTables.classList.toggle("replay-show-kd-groups");
+        kdToggle.setAttribute("aria-expanded", String(expanded));
       });
 
       const playerHeaderGroups = document.createElement("tr");
@@ -6779,9 +6771,9 @@
         createHeaderCell("Score", { rowSpan: 2 }),
         createHeaderCell("Res", { rowSpan: 2 }),
         kdHeader,
-        units.header,
-        structures.header,
-        createReplayStatGroupHeader("Power", "power").header,
+        createReplayStatGroupHeader("Units", "units"),
+        createReplayStatGroupHeader("Structures", "structures"),
+        createReplayStatGroupHeader("Power", "power"),
         createPlayerAwardsHeader()
       );
 
@@ -6791,7 +6783,7 @@
         const { label, accessibleLabel } = column;
         const header = createHeaderCell(label);
         if (accessibleLabel) header.setAttribute("aria-label", accessibleLabel);
-        setReplayStatDetail(header, column);
+        configureReplayStatCell(header, column);
         return header;
       }));
       return [playerHeaderGroups, playerHeaderDetails];

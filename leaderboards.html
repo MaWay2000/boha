@@ -546,7 +546,8 @@
     }
 
     #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) :is(th, td):nth-child(2) { width: 140px; }
-    #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) :is(th, td):nth-child(4) { width: 90px; }
+    #leaderboards #statsPlayerRecentTable :is(th, td):nth-child(3) { width: 76px; }
+    #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) :is(th, td):last-child:not([colspan]) { width: 90px; }
     #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) .stats-date-time { display: block; margin-left: 0; }
     :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) .stats-recent-map-duration {
       display: block;
@@ -555,11 +556,9 @@
       font-variant-numeric: tabular-nums;
     }
     #statsPlayerRecentTable .stats-player-match-summary {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 4px 7px;
-      margin-top: 6px;
+      display: grid;
+      justify-items: start;
+      gap: 4px;
     }
     #statsPlayerRecentTable .stats-team-player-link:is(button) {
       padding: 0;
@@ -742,6 +741,7 @@
                   <tr>
                     <th data-sort-table="player-games" data-sort-key="date" aria-sort="descending"><button class="stats-sort-button" type="button">Date</button></th>
                     <th>Map</th>
+                    <th>Result</th>
                     <th>Players</th>
                     <th>Statistics</th>
                   </tr>
@@ -752,16 +752,19 @@
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                   </tr>
                   <tr class="stats-skeleton-row" aria-hidden="true">
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                   </tr>
                   <tr class="stats-skeleton-row" aria-hidden="true">
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line"></span></td>
+                    <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                     <td><span class="stats-skeleton stats-skeleton-line stats-skeleton-short"></span></td>
                   </tr>
@@ -793,6 +796,6 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
-  <script type="module" src="stats/live-stats.js?v=20261124-player-match-preview-1"></script>
+  <script type="module" src="stats/live-stats.js?v=20261124-player-match-result-1"></script>
 </body>
 </html>

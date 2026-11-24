@@ -26,7 +26,8 @@ test('right panel switches between recent matches, a profile and selected-player
     getReplaySource: () => ({replayUrl: 'https://replay.test/game.wzrp', label: 'Bohan', pageUrl: ''}),
     getReplayAnalyzerUrl: () => 'replay-analyzer.html',
     renderMatchup(game, options) { context.matchupOptions = options; return '<div class="stats-team-inline-power">Team roster</div>'; },
-    renderMapFilterLink: name => name, formatMatchDate: () => '2026.11.24',
+    renderMapFilterLink: (name, label, className) => `<a class="${className}" href="#${name}">${label}</a>`,
+    formatMatchDate: () => '2026.11.24',
     formatMatchTime: () => '2:53 AM', formatDuration: () => '26:00',
     bindCopyButtons() {}, bindPlayerGameJumpLinks() {}
   });
@@ -53,8 +54,8 @@ test('right panel switches between recent matches, a profile and selected-player
   assert.equal(context.matchupOptions.highlightedAccountKey, 'one');
   assert.equal(context.matchupOptions.clickablePlayerTiles, true);
   assert.match(context.playerGamesElement.innerHTML, /stats-matchup"><div class="stats-team-inline-power">Team roster/);
-  assert.match(context.playerGamesElement.innerHTML, /stats-recent-map-duration">26:00/);
-  assert.match(context.playerGamesElement.innerHTML, />\+1\.65</);
+  assert.match(context.playerGamesElement.innerHTML, /<td>\s*<a class="stats-recent-map-name" href="#NTW">NTW<\/a>\s*<span class="stats-recent-map-duration">26:00/);
+  assert.match(context.playerGamesElement.innerHTML, /stats-player-match-summary">[\s\S]*?>Won<\/span>[\s\S]*?>\+1\.65<\/span>\s*<\/div>\s*<\/td>\s*<td class="stats-matchup">/);
   assert.match(context.playerGamesElement.innerHTML, />Analyze</);
   assert.doesNotMatch(context.playerGamesElement.innerHTML, /stats-player-game-detail-row/);
   context.renderPlayerGames([], [player]);

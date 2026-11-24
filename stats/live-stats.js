@@ -2519,7 +2519,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       {publicKey: selectedAccount.mainPublicKey});
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="4">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>
+        <td colspan="5">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>
       </tr>
     `;
     return;
@@ -2543,7 +2543,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     renderPlayerProfile(null);
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="4">Use + on a player to show their latest games here.</td>
+        <td colspan="5">Use + on a player to show their latest games here.</td>
       </tr>
     `;
     return;
@@ -2589,7 +2589,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
   if (!latestGames.length) {
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
-        <td colspan="4">No recent games found for this player in the selected slice.</td>
+        <td colspan="5">No recent games found for this player in the selected slice.</td>
       </tr>
     `;
     return;
@@ -2616,7 +2616,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
       const detailRow = isExpanded
         ? `
           <tr class="stats-player-game-detail-row">
-            <td colspan="4">
+            <td colspan="5">
               ${renderPlayerGameDetails(game, activeAccount)}
             </td>
           </tr>
@@ -2630,24 +2630,30 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>
-            <span class="stats-player-game-map">
-              ${renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name")}
-              ${game.mods
-                ? `
-                  <button
-                    class="stats-map-mod stats-copy-chip"
-                    type="button"
-                    data-copy-value="${escapeHtml(game.mods)}"
-                    data-copy-default="Click to copy"
-                    aria-label="Copy mod data"
-                  >
-                    mod
-                    <span class="stats-copy-hint" aria-hidden="true">Click to copy</span>
-                  </button>
-                `
-                : ""}
-            </span>
+            ${renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name")}
             <span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>
+            ${game.mods
+              ? `
+                <button
+                  class="stats-map-mod stats-copy-chip"
+                  type="button"
+                  data-copy-value="${escapeHtml(game.mods)}"
+                  data-copy-default="Click to copy"
+                  aria-label="Copy mod data"
+                >
+                  mod
+                  <span class="stats-copy-hint" aria-hidden="true">Click to copy</span>
+                </button>
+              `
+              : ""}
+          </td>
+          <td>
+            <div class="stats-player-match-summary">
+              <span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span>
+              ${hasEloDelta
+                ? `<span class="stats-player-game-elo-change ${eloDelta >= 0 ? "is-positive" : "is-negative"}" title="Match Elo change">${escapeHtml(eloDeltaLabel)}</span>`
+                : ""}
+            </div>
           </td>
           <td class="stats-matchup">${renderMatchup(game, {
             variant: "inline-power",
@@ -2660,16 +2666,10 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
             ${replayUrl
               ? `<a class="stats-replay-link" href="${escapeHtml(getReplayAnalyzerUrl(replayUrl))}" target="_top" data-replay-analyzer-url="${escapeHtml(replayUrl)}" data-replay-source-label="${escapeHtml(replaySource.label)}" data-replay-source-url="${escapeHtml(replaySource.pageUrl)}">Analyze</a>`
               : `<span class="stats-note">Unavailable</span>`}
-            <div class="stats-player-match-summary">
-              <span class="stats-tag stats-player-game-result ${outcome.className}">${escapeHtml(outcome.label)}</span>
-              ${hasEloDelta
-                ? `<span class="stats-player-game-elo-change ${eloDelta >= 0 ? "is-positive" : "is-negative"}" title="Match Elo change">${escapeHtml(eloDeltaLabel)}</span>`
-                : ""}
-              <button class="stats-expand-toggle stats-player-game-toggle" type="button" aria-expanded="${isExpanded ? "true" : "false"}">
-                <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
-                <span class="visually-hidden">${isExpanded ? "Close match details" : "Open match details"}</span>
-              </button>
-            </div>
+            <button class="stats-expand-toggle stats-player-game-toggle" type="button" aria-expanded="${isExpanded ? "true" : "false"}">
+              <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
+              <span class="visually-hidden">${isExpanded ? "Close match details" : "Open match details"}</span>
+            </button>
           </td>
         </tr>
         ${detailRow}
@@ -2730,7 +2730,7 @@ function togglePlayerGameDetails(row, game, activeAccount, accounts) {
   setPlayerGameRowExpanded(row, true);
   const detailRow = document.createElement("tr");
   detailRow.className = "stats-player-game-detail-row";
-  detailRow.innerHTML = `<td colspan="4">${renderPlayerGameDetails(game, activeAccount)}</td>`;
+  detailRow.innerHTML = `<td colspan="5">${renderPlayerGameDetails(game, activeAccount)}</td>`;
   row.after(detailRow);
   bindCopyButtons(detailRow);
   bindPlayerGameJumpLinks(detailRow, accounts);

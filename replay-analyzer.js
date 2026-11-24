@@ -2795,7 +2795,56 @@
     return cell;
   }
 
-  function createPlayerRow(player, players, events, awards, researchActivity, teamLabel) {
+  const replayResultColumns = [
+    { key: "score" },
+    { key: "totalKd", format: formatTotalKd },
+    { key: "powerWon" },
+    { key: "powerLost", loss: true },
+    { key: "researchActivity" },
+    { key: "droidsBuilt" },
+    { key: "droidsLost", loss: true },
+    { key: "kills" },
+    { key: "remainingDroids" },
+    { key: "kd", format: formatPlayerKd },
+    { key: "structuresBuilt" },
+    { key: "structuresLost", loss: true },
+    { key: "structuresDestroyed" },
+    { key: "remainingStructures" },
+    { key: "structureKd", format: formatStructureKd }
+  ];
+
+  function replayResultBarScales(players) {
+    return new Map(replayResultColumns.map(({ key, format }) => {
+      const values = players.map((player) => playerSortValue(player, key))
+        .filter((value) => Number.isFinite(value) && (!format || value !== Number.MAX_SAFE_INTEGER))
+        .map(Math.abs);
+      const maximum = key === "researchActivity" ? 100 : Math.max(0, ...values);
+      return [key, { maximum, mean: values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0 }];
+    }));
+  }
+
+  function createReplayResultCell(player, column, scale) {
+    const { key, format, loss } = column;
+    const value = playerSortValue(player, key);
+    const cell = key === "researchActivity" ? createResearchCell(value)
+      : createCell(format ? format(player) : formatStat(value));
+    if (!Number.isFinite(value)) return cell;
+
+    // Unlimited K/D fills its own bar without flattening the finite ratios in that column.
+    const ratio = format && value === Number.MAX_SAFE_INTEGER ? 1
+      : scale.maximum > 0 ? Math.min(1, Math.abs(value) / scale.maximum) : 0;
+    cell.classList.add("replay-result-meter");
+    cell.classList.toggle("is-loss", loss === true || value < 0);
+    cell.classList.toggle("is-leading", ratio >= 0.995);
+    cell.style.setProperty("--replay-result-fill", `${ratio * 100}%`);
+    if (scale.mean > 0 && scale.mean < scale.maximum) {
+      cell.classList.add("has-average");
+      cell.style.setProperty("--replay-result-average", String(scale.mean / scale.maximum));
+    }
+    return cell;
+  }
+
+  function createPlayerRow(player, players, events, awards, researchActivity, teamLabel, barScales) {
     const row = document.createElement("tr");
     const result = formatPlayerResult(player);
     if (result === "Won") {
@@ -2804,25 +2853,10 @@
       row.className = "replay-player-lost";
     }
 
-    const stats = player.summary || {};
     row.append(
       createPlayerSlotCell(player, teamLabel),
       createPlayerNameCell(player, createPlayerStory(player, players, events, researchActivity)),
-      createCell(formatStat(stats.score)),
-      createCell(formatTotalKd(player)),
-      createCell(formatStat(stats.powerWon)),
-      createCell(formatStat(stats.powerLost)),
-      createResearchCell(researchActivity),
-      createCell(formatStat(stats.droidsBuilt)),
-      createCell(formatStat(stats.droidsLost)),
-      createCell(formatStat(stats.kills)),
-      createCell(formatStat(stats.remainingDroids)),
-      createCell(formatPlayerKd(player)),
-      createCell(formatStat(stats.structuresBuilt)),
-      createCell(formatStat(stats.structuresLost)),
-      createCell(formatStat(stats.structuresDestroyed)),
-      createCell(formatStat(stats.remainingStructures)),
-      createCell(formatStructureKd(player)),
+      ...replayResultColumns.map(column => createReplayResultCell(player, column, barScales.get(column.key))),
       createPlayerAwardsCell(awards)
     );
     return row;
@@ -6695,6 +6729,7 @@
     renderCompactMatchSummary(extraction);
     renderExtendedAnalysis(extraction);
     const competitors = extraction.players.filter((player) => !player.spectator);
+    const barScales = replayResultBarScales(competitors);
     const teamOrder = [...new Set(competitors.map((player) => Number(player.team)))].sort((left, right) => left - right);
     const firstTeam = teamOrder[0];
     const firstTeamPlayers = competitors.filter((player) => Number(player.team) === firstTeam);
@@ -6709,7 +6744,8 @@
             extraction.events.records,
             awardsByPlayer.get(player),
             researchActivityByPlayer.get(player),
-            "A"
+            "A",
+            barScales
           )
         ))
       );
@@ -6722,7 +6758,8 @@
             extraction.events.records,
             awardsByPlayer.get(player),
             researchActivityByPlayer.get(player),
-            "B"
+            "B",
+            barScales
           )
         ))
       );

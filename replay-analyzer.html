@@ -2154,6 +2154,54 @@
       background: rgba(205, 67, 72, 0.12);
     }
 
+    .replay-result-meter {
+      position: relative;
+      isolation: isolate;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 3px #040a0d;
+      --replay-result-start: rgba(42, 115, 55, 0.48);
+      --replay-result-end: rgba(111, 155, 78, 0.58);
+    }
+
+    .replay-result-meter.is-leading {
+      --replay-result-start: rgba(25, 123, 52, 0.72);
+      --replay-result-end: rgba(50, 190, 65, 0.72);
+    }
+
+    .replay-result-meter.is-loss {
+      --replay-result-start: rgba(124, 54, 40, 0.52);
+      --replay-result-end: rgba(176, 101, 57, 0.62);
+    }
+
+    .replay-result-meter:hover,
+    .replay-result-meter:focus-within {
+      z-index: 1;
+    }
+
+    .replay-result-meter::before {
+      content: "";
+      position: absolute;
+      z-index: -2;
+      inset: max(3px, calc(50% - 13px)) 3px;
+      border-radius: 4px;
+      background:
+        linear-gradient(90deg, var(--replay-result-start), var(--replay-result-end))
+          left center / var(--replay-result-fill) 100% no-repeat,
+        rgba(5, 18, 27, 0.62);
+      pointer-events: none;
+    }
+
+    .replay-result-meter.has-average::after {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset-block: max(6px, calc(50% - 9px));
+      left: calc(3px + (100% - 6px) * var(--replay-result-average));
+      width: 1px;
+      background: rgba(210, 233, 220, 0.37);
+      pointer-events: none;
+    }
+
     .replay-player-team-tables {
       min-width: 0;
     }
@@ -3143,7 +3191,7 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="stats/replay-telemetry.js?v=20261117-arc-events-1"></script>
-  <script src="replay-analyzer.js?v=20261124-bohan-battlefield-1"></script>
+  <script src="replay-analyzer.js?v=20261124-result-bars-1"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
 </body>
 </html>

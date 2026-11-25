@@ -2989,17 +2989,35 @@ main {
   padding-bottom: 20.5px;
 }
 
-.stats-team-power-fill::before {
-  content: "";
+.stats-team-power-fill::before,
+.stats-team-power-trigger {
   position: absolute;
   inset: auto 7px 4px;
   height: 10.5px;
   border-radius: 5.25px;
+}
+
+.stats-team-power-fill::before {
+  content: "";
   background:
     linear-gradient(hsl(var(--team-power-hue) 68% 52% / 0.86) 0 0)
       left center / max(3px, var(--team-power-fill)) 100% no-repeat,
     rgba(150, 197, 211, 0.14);
   pointer-events: none;
+}
+
+.stats-team-power-trigger:focus-visible {
+  outline: 1px solid #85e8f9;
+  outline-offset: 2px;
+}
+
+.stats-team-power-trigger:is(:hover, :focus-visible) {
+  z-index: 9;
+}
+
+.stats-team-power-trigger:is(:hover, :focus-visible) .stats-sort-hint {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .stats-versus {

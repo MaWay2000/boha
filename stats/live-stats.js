@@ -2266,6 +2266,21 @@ function getMatchTeamStrengths(game) {
     }));
 }
 
+function getUpsetWinningTeams(teams) {
+  const rated = teams.filter(({ strength }) => Number.isFinite(strength));
+  const strengths = rated.map(({ strength }) => strength);
+  const weakest = Math.min(...strengths);
+  if (weakest >= Math.max(...strengths)) return [];
+  return rated.filter(({ userType, strength }) => userType === "winner" && strength === weakest)
+    .map(({ team }) => team);
+}
+
+function renderRecentMatchMap(game) {
+  const link = renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name");
+  if (game.arcMatch || !getUpsetWinningTeams(getMatchTeamStrengths(game)).length) return link;
+  return `<div class="stats-recent-map-line">${link}<span class="stats-mega-win-star" role="img" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span></div>`;
+}
+
 function getMatchTeamPowerDifference(game) {
   if (game.arcMatch) return null;
   const strengths = getMatchTeamStrengths(game)
@@ -2630,7 +2645,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>
-            ${renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name")}
+            ${renderRecentMatchMap(game)}
             <span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>
             ${game.mods
               ? `
@@ -2845,30 +2860,18 @@ function renderMatchup(game, options = {}) {
     currentGameKey = "",
     showTeamStrength = true
   } = options;
-  const teams = game.teams.filter((team) => team.players.length);
+  const entries = getMatchTeamStrengths(game);
+  const teams = entries.map(({ team }) => team);
   const isDuel = teams.length === 2 && teams.every((team) => team.players.length === 1);
   const showTeamStrengthLabel = showTeamStrength && !isDuel;
   if (!teams.length) {
     return `<span class="stats-note">Player list unavailable.</span>`;
   }
-  const teamStrengths = teams.map((team) => getTeamStrengthPercent(team));
-  const validTeamStrengths = teamStrengths.filter((value) => Number.isFinite(value));
-  const weakestTeamStrength = validTeamStrengths.length ? Math.min(...validTeamStrengths) : null;
-  const strongestTeamStrength = validTeamStrengths.length ? Math.max(...validTeamStrengths) : null;
-
-  const renderUpsetBadge = (team, strengthPercent) => {
-    if (!showTeamStrength) {
-      return "";
-    }
-    const isUpsetWinner = getNormalizedTeamUserType(game, team) === "winner"
-      && Number.isFinite(strengthPercent)
-      && strengthPercent === weakestTeamStrength
-      && weakestTeamStrength < strongestTeamStrength;
-    if (!isUpsetWinner) return "";
-    return variant === "inline-power"
-      ? '<span class="stats-mega-win-star" role="img" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733;</span>'
-      : '<span class="stats-upset-victory" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733; Mega win!</span>';
-  };
+  const teamStrengths = entries.map(({ strength }) => strength);
+  const upsetWinners = showTeamStrength && variant !== "inline-power" ? getUpsetWinningTeams(entries) : [];
+  const renderUpsetBadge = (team) => upsetWinners.includes(team)
+    ? '<span class="stats-upset-victory" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733; Mega win!</span>'
+    : "";
 
   const renderPlayerLabel = (player) => {
     const playerName = player.account?.name || "Unknown";
@@ -2906,7 +2909,7 @@ function renderMatchup(game, options = {}) {
                     ? `type="button" data-jump-account="${escapeHtml(jumpAccount)}" data-jump-game="${escapeHtml(currentGameKey)}"`
                     : "";
                   return `
-                  <${tileTag} class="stats-team-tile ${getTeamToneClass(getNormalizedTeamUserType(game, team))}${isHighlighted ? " is-current-player" : ""}${jumpAccount ? " is-clickable-player" : ""}" ${tileAttrs}>
+                  <${tileTag} class="stats-team-tile ${getTeamToneClass(entries[index].userType)}${isHighlighted ? " is-current-player" : ""}${jumpAccount ? " is-clickable-player" : ""}" ${tileAttrs}>
                     ${renderPlayerLabel(player)}
                   </${tileTag}>
                 `;
@@ -2916,7 +2919,7 @@ function renderMatchup(game, options = {}) {
             ${showTeamStrengthLabel ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               ${game.ratingMethod === 'maway-v1' ? 'Pre-match chance' : 'Team power'}: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
-            ${renderUpsetBadge(team, strengthPercent)}
+            ${renderUpsetBadge(team)}
           </div>
         `;
         }).join("")}
@@ -2929,7 +2932,7 @@ function renderMatchup(game, options = {}) {
       ${teams.map((team, index) => {
         const strengthPercent = teamStrengths[index];
         const vsLabel = showVersus && index < teams.length - 1 ? `<span class="stats-versus">vs</span>` : "";
-        const teamTone = getTeamToneClass(getNormalizedTeamUserType(game, team));
+        const teamTone = getTeamToneClass(entries[index].userType);
         const players = team.players
           .map((player) => {
             const accountKey = clickablePlayerTiles && player.account && !isBannedAccount(player.account)
@@ -2961,7 +2964,6 @@ function renderMatchup(game, options = {}) {
             : "";
           return `
             <div class="stats-team stats-team-inline-power ${teamTone}${hasPowerFill ? " stats-team-power-fill" : ""}"${powerFill}>
-              ${renderUpsetBadge(team, strengthPercent)}
               <div class="stats-team-roster">${players}</div>
             </div>
             ${vsLabel}
@@ -2972,7 +2974,7 @@ function renderMatchup(game, options = {}) {
             <span class="stats-team ${teamTone}">
               ${players}
             </span>
-            ${renderUpsetBadge(team, strengthPercent)}
+            ${renderUpsetBadge(team)}
             ${showTeamStrengthLabel ? `<span class="stats-team-strength ${getTeamStrengthToneClass(strengthPercent, teamStrengths)}">
               ${game.ratingMethod === 'maway-v1' ? 'Pre-match chance' : 'Team power'}: ${escapeHtml(Number.isFinite(strengthPercent) ? `${strengthPercent}%` : "N/A")}
             </span>` : ""}
@@ -3581,7 +3583,7 @@ function renderMatches(gameList) {
             <span class="stats-date-time">${escapeHtml(formatMatchTime(game.endDate))}</span>
           </td>
           <td>
-            ${renderMapFilterLink(game.mapName, game.mapName, "stats-recent-map-name")}
+            ${renderRecentMatchMap(game)}
             ${game.mods ? `<span class="stats-note">${escapeHtml(game.mods)}</span>` : ""}
             ${leaderboardRecentMatchesElement ? `<span class="stats-recent-map-duration">${escapeHtml(formatDuration(game.duration))}</span>` : ""}
           </td>

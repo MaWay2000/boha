@@ -2393,6 +2393,18 @@ main {
   white-space: nowrap;
 }
 
+.stats-recent-map-line {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  contain: inline-size;
+}
+
+.stats-recent-map-line .stats-recent-map-name {
+  contain: none;
+  min-width: 0;
+}
+
 .stats-key-details {
   display: block;
   margin-top: 0;
@@ -2806,17 +2818,6 @@ main {
   .stats-team-inline-power .stats-team-player-link {
     transition: none;
   }
-}
-
-.stats-team-inline-power > .stats-mega-win-star {
-  position: absolute;
-  inset-inline-start: 7px;
-  inset-block-start: 12px;
-  margin-left: 0;
-}
-
-.stats-team-inline-power > .stats-mega-win-star + .stats-team-roster {
-  padding-inline-start: 14px;
 }
 
 .stats-team-winner {
@@ -3735,7 +3736,7 @@ main {
 }
 
 .stats-mega-win-star {
-  margin-left: 6px;
+  flex: none;
   color: #ffd56a;
   font-size: 0.82em;
   line-height: 1;

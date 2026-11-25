@@ -26,7 +26,7 @@ test('right panel switches between recent matches, a profile and selected-player
     getReplaySource: () => ({replayUrl: 'https://replay.test/game.wzrp', label: 'Bohan', pageUrl: ''}),
     getReplayAnalyzerUrl: () => 'replay-analyzer.html',
     renderMatchup(game, options) { context.matchupOptions = options; return '<div class="stats-team-inline-power">Team roster</div>'; },
-    renderMapFilterLink: (name, label, className) => `<a class="${className}" href="#${name}">${label}</a>`,
+    renderRecentMatchMap: game => `<a class="stats-recent-map-name" href="#${game.mapName}">${game.mapName}</a>`,
     formatMatchDate: () => '2026.11.24',
     formatMatchTime: () => '2:53 AM', formatDuration: () => '26:00',
     bindCopyButtons() {}, bindPlayerGameJumpLinks() {}
@@ -83,7 +83,7 @@ function matchFixture(sidebar) {
     renderMapSummary() {}, renderMatchActions: (...values) => actions.push(values),
     getReplaySource: game => ({replayUrl: game.replayUrl, label: 'Replay source', pageUrl: 'https://source.test/'}),
     escapeHtml: value => String(value), formatMatchDate: value => String(value), formatMatchTime: () => 'time',
-    renderMapFilterLink: name => name, formatDuration: value => String(value), renderMatchup: () => 'players',
+    renderRecentMatchMap: game => game.mapName, formatDuration: value => String(value), renderMatchup: () => 'players',
     getReplayAnalyzerUrl: url => 'analyzer?replay=' + url
   });
   vm.runInContext(source.slice(source.indexOf('function renderMatches('), source.indexOf('function getSuccessfulMapPlayers(')), context);

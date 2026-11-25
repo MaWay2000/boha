@@ -96,7 +96,7 @@ test('integration is shell-only with a native accessible dialog and safe text re
 
 function browserFixture({ popup = false, reduced = false, blockedStorage = false, read = null, motion = null, url = null, records = NEWS, fetch = null } = {}) {
   class Element {
-    constructor(id) { this.id = id; this.listeners = {}; this.dataset = {}; this.style = {}; this.attributes = {}; this.children = []; this.hidden = false; this.open = false; this.offsetWidth = 132; this.offsetHeight = 184; }
+    constructor(id) { this.id = id; this.classList = new Set(); this.textContent = ''; this.listeners = {}; this.dataset = {}; this.style = {}; this.attributes = {}; this.children = []; this.hidden = false; this.open = false; this.offsetWidth = 132; this.offsetHeight = 184; }
     addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
     emit(type, details = {}) { for (const fn of this.listeners[type] || []) fn({ target: this, ...details }); }
     append(...children) { this.children.push(...children); }
@@ -109,6 +109,7 @@ function browserFixture({ popup = false, reduced = false, blockedStorage = false
   }
   const ids = ['siteNewsButton', 'siteNewsBalloon', 'siteNewsDialog', 'siteNewsClose', 'siteNewsUnread', 'siteNewsList', 'siteNewsMotion', 'siteNewsArchiveStatus', 'siteNewsOlder'];
   const elements = Object.fromEntries(ids.map(id => [id, new Element(id)]));
+  elements.siteNewsButton.textContent = 'News';
   const bodyClasses = new Set();
   const doc = new Element('document');
   doc.documentElement = { clientWidth: 1200 }; doc.hidden = false;
@@ -399,6 +400,8 @@ test('static News loads its complete archive only on demand, paginates and resto
   let calls = 0;
   const f = browserFixture({ popup: true, records: [], fetch: async () => { calls++; return { ok: true, json: async () => ({schemaVersion: 1, entries: NEWS}) }; } });
   const {siteNewsButton: button, siteNewsDialog: dialog, siteNewsList: list, siteNewsOlder: older} = f.elements;
+  assert.ok(button.classList.has('community-link'));
+  assert.equal(button.children[0].textContent, 'News');
   assert.equal(calls, 0);
   assert.equal(f.frames.size, 0);
   button.emit('click'); await f.controller.ready;

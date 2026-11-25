@@ -1627,11 +1627,11 @@ main {
 
 .stats-trending-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
   grid-template-areas:
-    "label nickname"
-    "value nickname"
-    "detail nickname";
+    "label nickname ."
+    "value nickname ."
+    "detail nickname .";
   align-items: center;
   gap: 4px 10px;
   min-width: 0;
@@ -1658,24 +1658,25 @@ main {
 
 .stats-trending-card > a {
   grid-area: nickname;
-  justify-self: end;
+  justify-self: center;
   min-width: 0;
-  margin-inline-end: 4px;
   color: var(--cyan);
   font-size: 1.125rem;
   font-weight: 700;
   line-height: 1.2;
   overflow-wrap: anywhere;
-  text-align: right;
-  text-decoration: underline;
-  text-decoration-color: rgba(109, 232, 255, 0.32);
-  text-underline-offset: 3px;
+  text-align: center;
+  text-decoration: none;
 }
 
 .stats-trending-card > a:hover,
 .stats-trending-card > a:focus-visible {
   color: #b8f7ff;
-  text-decoration-color: currentColor;
+}
+
+.stats-trending-card > a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
 }
 
 .stats-trending-card > small {

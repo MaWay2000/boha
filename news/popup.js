@@ -41,6 +41,10 @@
     const dialog = doc.getElementById("siteNewsDialog");
     if (!button || !dialog || button.dataset.mounted) return;
     button.dataset.mounted = "true";
+    button.classList.add("community-link");
+    const label = doc.createElement("span");
+    label.textContent = button.textContent.trim();
+    button.replaceChildren(label);
     const close = doc.getElementById("siteNewsClose");
     const list = doc.getElementById("siteNewsList");
     const archiveStatus = doc.getElementById("siteNewsArchiveStatus");

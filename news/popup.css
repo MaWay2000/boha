@@ -78,8 +78,18 @@ body.site-news-open { overflow: hidden; }
 }
 .site-news-button:hover { background: #19526a; }
 .site-news-button:focus-visible { outline: 2px solid #81eaff; outline-offset: 3px; }
+.site-app-shell .topbar > .topnav > .topnav-actions > .site-news-button.community-link {
+  flex-grow: 0.66;
+}
+
 @media (max-width: 680px) {
-  .site-app-shell .topnav-actions > .site-news-button { grid-column: 1 / -1; justify-self: end; margin: 0; }
+  .site-app-shell .topbar > .topnav > .topnav-actions > .site-news-button.community-link {
+    --community-shape: polygon(var(--community-notch) 0, calc(100% - var(--community-notch)) 0, 100% 50%, calc(100% - var(--community-notch)) 100%, var(--community-notch) 100%, 0 50%);
+    grid-column: 1 / -1;
+    justify-self: end;
+    width: min(100%, 150px);
+    margin: 0;
+  }
 }
 
 @media (min-width: 681px) {

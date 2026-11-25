@@ -2214,7 +2214,6 @@ function renderPlayerProfile(account) {
         ${renderEloSparkline(eloHistory)}
       </article>
       <div data-favorite-unit-preview style="grid-column: 1 / -1;"></div>
-      ${account.mainPublicKey ? '<article class="stats-detail-group" data-profile-nicknames></article>' : ''}
       <article><span class="stats-detail-label">Favorite maps</span><div>${renderMapProfileLinks(favoriteMaps, "No map history")}</div></article>
       <article><span class="stats-detail-label">Favorite modes</span><div>${renderProfileList(favoriteModes, "No mode history")}</div></article>
       <article><span class="stats-detail-label">Most-played opponents</span><div>${renderProfileComparisonLinks(account, opponents, "No opponents")}</div></article>
@@ -2222,7 +2221,6 @@ function renderPlayerProfile(account) {
     </div>
   `;
 
-  mountGameNicknames(playerProfileElement.querySelector('[data-profile-nicknames]'), {publicKey: account.mainPublicKey});
   initEloChartTooltip(playerProfileElement);
 
   initFavoriteUnitPreview(
@@ -2528,10 +2526,7 @@ function renderPlayerGames(accounts, globalAccounts = accounts) {
     renderPlayerProfile(selectedAccount);
     playerProfileElement.innerHTML = `
       <p class="stats-profile-no-data">No data for ${escapeHtml(selectedAccount.name || "this player")} in the ${escapeHtml(selectedLeaderboard)} leaderboard.</p>
-      ${selectedAccount.mainPublicKey ? '<div class="stats-detail-group" data-profile-nicknames></div>' : ''}
     `;
-    mountGameNicknames(playerProfileElement.querySelector('[data-profile-nicknames]'),
-      {publicKey: selectedAccount.mainPublicKey});
     playerGamesElement.innerHTML = `
       <tr class="stats-empty-row">
         <td colspan="5">No match data for this player in the ${escapeHtml(selectedLeaderboard)} leaderboard.</td>

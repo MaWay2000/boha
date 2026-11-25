@@ -2836,7 +2836,7 @@ main {
   line-height: 1.35;
 }
 
-.stats-team-inline-power:has(.stats-player-power-line) {
+.stats-team-inline-power:has(.stats-team-player) {
   padding-block: 4px 8px;
 }
 
@@ -2862,16 +2862,28 @@ main {
   content: none;
 }
 
-.stats-player-power-line {
+.stats-player-power-line,
+.stats-team-inline-power .stats-team-player::before {
   position: absolute;
   inset: auto 0 -4px;
   height: 2px;
   border-radius: 2px;
+  pointer-events: none;
+}
+
+.stats-team-inline-power .stats-team-player:not(:has(> .stats-player-power-line))::before {
+  content: "";
+  right: auto;
+  width: 3px;
+  background: var(--muted);
+  opacity: 1;
+}
+
+.stats-player-power-line {
   background:
     linear-gradient(hsl(var(--player-power-hue) 68% 52% / 0.86) 0 0)
       left center / max(2px, var(--player-power-fill)) 100% no-repeat,
     rgba(150, 197, 211, 0.14);
-  pointer-events: none;
 }
 
 .stats-team-inline-power .stats-team-player:has(> .stats-team-player-link:hover) {
@@ -2937,7 +2949,7 @@ main {
   background: none;
 }
 
-.stats-team.stats-team-power-fill:has(.stats-player-power-line) {
+.stats-team.stats-team-power-fill:has(.stats-team-player) {
   padding-bottom: 13px;
 }
 

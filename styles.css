@@ -1661,7 +1661,7 @@ main {
   justify-self: center;
   min-width: 0;
   color: var(--cyan);
-  font-size: 1.125rem;
+  font-size: clamp(1.25rem, 2vw, 1.5rem);
   font-weight: 700;
   line-height: 1.2;
   overflow-wrap: anywhere;

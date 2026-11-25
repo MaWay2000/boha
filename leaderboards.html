@@ -300,19 +300,30 @@
     }
 
     .stats-games-filter-popup {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-content: start;
+      gap: 8px;
       box-sizing: border-box;
       width: 100%;
       min-height: 286px;
     }
 
-    .stats-games-filter-popup .stats-toolbar {
+    .stats-games-filter-popup > .stats-toolbar {
+      display: contents;
+    }
+
+    .stats-games-filter-wavehoster {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      align-content: start;
-      gap: 8px;
+      grid-column: span 2;
+      place-items: center;
+      text-align: center;
+    }
+
+    .stats-games-filter-popup > .stats-games-filter-close {
+      grid-column: 1 / -1;
+      justify-self: center;
+      margin-top: 4px;
     }
 
     .stats-games-filter-popup .stats-filter-button {
@@ -383,14 +394,18 @@
     }
 
     @media (max-width: 720px) {
-      .stats-games-filter-popup .stats-toolbar {
+      .stats-games-filter-popup {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (max-width: 460px) {
-      .stats-games-filter-popup .stats-toolbar {
+      .stats-games-filter-popup {
         grid-template-columns: 1fr;
+      }
+
+      .stats-games-filter-wavehoster {
+        grid-column: 1 / -1;
       }
 
       .stats-trending-filter-menu .stats-trending-grid {
@@ -608,7 +623,7 @@
                 <summary class="stats-filter-button">Games filter</summary>
                 <div class="stats-leaderboard-filter-popup stats-games-filter-popup">
                   <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
-                  <a class="stats-filter-button" href="index.html?tab=wavehoster" target="_top">WaveHoster · Modded leaderboards</a>
+                  <a class="stats-filter-button stats-games-filter-wavehoster" href="index.html?tab=wavehoster" target="_top">WaveHoster · Modded leaderboards</a>
                   <button class="stats-filter-button stats-games-filter-close" id="statsGamesFilterClose" type="button">Close</button>
                 </div>
               </details>

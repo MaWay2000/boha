@@ -2875,7 +2875,7 @@ main {
   content: "";
   right: auto;
   width: 3px;
-  background: var(--muted);
+  background: #ff2424;
   opacity: 1;
 }
 

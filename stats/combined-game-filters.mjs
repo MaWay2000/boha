@@ -1,3 +1,4 @@
+import {withLoading} from './loading-screen.mjs';
 import {createPublishedLoader as createBaseLoader} from './published-loader.mjs?v=20261121-host-sync-1#base';
 import {
   calculatePersonalRatings, CURRENT_SETTINGS, mountPersonalRatings as mountBaseRatings
@@ -69,7 +70,9 @@ export function createPublishedLoader(options) {
   return {
     ...loader,
     async load() {
-      const result = await loader.load();
+      const result = await (publication
+        ? loader.load()
+        : withLoading('Loading stats…', () => loader.load()));
       if (publication !== result.payload) {
         publication = result.payload;
         boardKey = null;
@@ -140,17 +143,19 @@ buttons?.addEventListener('click', (event) => {
   if (name === 'Global' && selection[0] === 'Global') return;
 
   const restoreFocus = document.activeElement === button;
-  selection = toggleLeaderboardSelection(selection, name);
-  refreshCombinedBoard();
-  const url = new URL(window.location.href);
-  writeSelection(url);
-  for (const param of ['players', 'game', 'playerGames']) url.searchParams.delete(param);
-  window.history.replaceState(window.history.state, '', url);
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  void withLoading('Filtering games…', () => {
+    selection = toggleLeaderboardSelection(selection, name);
+    refreshCombinedBoard();
+    const url = new URL(window.location.href);
+    writeSelection(url);
+    for (const param of ['players', 'game', 'playerGames']) url.searchParams.delete(param);
+    window.history.replaceState(window.history.state, '', url);
+    window.dispatchEvent(new PopStateEvent('popstate'));
 
-  if (restoreFocus) {
-    [...buttons.children].find(candidate => candidate.dataset.leaderboard === name)?.focus({preventScroll: true});
-  }
+    if (restoreFocus) {
+      [...buttons.children].find(candidate => candidate.dataset.leaderboard === name)?.focus({preventScroll: true});
+    }
+  }, {paint: true});
 }, true);
 
 restoreSelection();

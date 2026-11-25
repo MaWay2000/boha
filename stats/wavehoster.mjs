@@ -1,3 +1,4 @@
+import {withLoading} from './loading-screen.mjs';
 import {moddedArcSnapshot, combineModNames, modMedals, medalPointValue, rankAllMods, replaySource, matchResults, participantResult, waveResult} from './wavehoster-data.mjs?v=20261124-arc-replay-1';
 import {refreshWaveHoster} from './wavehoster-loader.mjs?v=20261124-arc-live-1';
 import {mountGameNicknames} from './player-nicknames.mjs';
@@ -541,11 +542,11 @@ $('waveRuleset').addEventListener('change', () => {
   selected = $('waveRuleset').value;
   selectedBuild = '';
   renderBuildOptions();
-  applyScopeSelection();
+  void withLoading('Filtering Arc Mod games…', applyScopeSelection, {paint: true});
 });
 $('waveBuild').addEventListener('change', () => {
   selectedBuild = $('waveBuild').value;
-  applyScopeSelection();
+  void withLoading('Filtering Arc Mod games…', applyScopeSelection, {paint: true});
 });
 $('waveClearPlayer').addEventListener('click', () => selectPlayer(null));
 $('wavePlayerSearch').addEventListener('input', () => {
@@ -572,6 +573,6 @@ window.addEventListener('resize', () => {
 });
 document.fonts?.ready.then(scheduleMatchFit);
 
-load();
+void withLoading('Loading Arc Mod stats…', load);
 setInterval(() => { if (!document.hidden) load(); }, 30000);
 

@@ -68,6 +68,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
   window.parent = window;
   const fetcher = feedFactory ? feedFactory(snapshot) : async () => ({ok: true, text: async () => JSON.stringify(snapshot)});
   const context = vm.createContext({...dataFunctions, refreshWaveHoster: options => refreshWaveHoster({...options, fetcher}), window, URL, URLSearchParams,
+    withLoading(_message, action) { return action(); },
     mountGameNicknames(panel, {arcId}) { panel.dataset.arcId = arcId; },
     document: {hidden: false, addEventListener: (type, handler) => documentListeners.set(type, handler), getElementById: id => {
       assert.ok(elements.has(id), `Missing HTML element ${id}`);
@@ -76,7 +77,7 @@ async function page(width = 1400, search = '', feedFactory = null) {
     requestAnimationFrame: handler => { frames.push(handler); return frames.length; }, setInterval() {},
     fetch: fetcher});
   const source = readFileSync(new URL('../stats/wavehoster.mjs', import.meta.url), 'utf8')
-    .replace(/^import .*\r?\n/gm, '').replace(/\nload\(\);/, '\nglobalThis.ready = load();');
+    .replace(/^import .*\r?\n/gm, '').replace(/\nvoid withLoading\('Loading Arc Mod stats…', load\);/, '\nglobalThis.ready = load();');
   vm.runInContext(source, context);
   await context.ready;
   function flush() {

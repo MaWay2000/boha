@@ -1,4 +1,18 @@
 const contentFrame = document.getElementById("contentFrame");
+const loadingModule = import("./stats/loading-screen.mjs");
+let endTabLoading;
+
+function beginTabLoading() {
+  let cancelled = false;
+  let end;
+  loadingModule.then(({ beginLoading }) => {
+    if (!cancelled) end = beginLoading("Loading tab…");
+  }).catch(error => console.warn("Loading screen unavailable.", error));
+  return () => {
+    cancelled = true;
+    end?.();
+  };
+}
 const arcModLink = document.querySelector(".topnav-actions > .arc-mod-link");
 const primaryNavigation = document.querySelector(".topnav > .topnav-primary");
 if (arcModLink && primaryNavigation) {
@@ -157,6 +171,8 @@ function loadTab(tab, { updateHistory = false, replaceHistory = false, resetSear
   const currentSrc = contentFrame.getAttribute("src") || "";
   if (forceReload || contentFrame.dataset.currentTab !== normalizedTab || currentSrc !== nextSrc) {
     frameIsLoading = true;
+    endTabLoading?.();
+    endTabLoading = beginTabLoading();
     contentFrame.style.height = "480px";
     contentFrame.dataset.currentTab = normalizedTab;
     contentFrame.src = nextSrc;
@@ -188,6 +204,8 @@ tabControls.forEach((control) => {
 
 contentFrame.addEventListener("load", () => {
   frameIsLoading = false;
+  endTabLoading?.();
+  endTabLoading = undefined;
   syncFrameHeightFromDocument();
   observeFrameTitle();
 });

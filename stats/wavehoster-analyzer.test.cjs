@@ -248,3 +248,44 @@ test('a mismatched detail result cannot attach another replay’s players or ana
   assert.equal(result.playerData.length, 0);
   assert.ok(result.detailError);
 });
+
+
+test('public Arc replay restores final research, power trades, and per-slot Battlefield snapshots', async () => {
+  const game = {...wave.games[0], status: 'confirmed', modsVerified: true,
+    participants: [{name: 'Arc player', result: 'winner', score: 800, kills: 12}]};
+  const frames = [{time: 0, droids: [[12, 1, 128, 256, 100, 0, 0, 0]], structures: []}];
+  const snapshots = [snapshot(15000, [sampled(1, 100), sampled(0, 10)])];
+  const engineAnalysis = {game: {elapsedMilliseconds: 20000}, extended: {snapshots,
+    tacticalReplay: {exactObjectPositions: true, positionFrames: frames}},
+    players: [sampled(1, 800, {state: 'winner', powerWon: 400, powerLost: 100,
+      recentResearchPerformance: 95, recentResearchPotential: 100}),
+      sampled(0, -10, {state: 'unknown', recentResearchPerformance: 0, recentResearchPotential: 0})]};
+  const {load, context, calls} = runner({wavePayload: {...wave, games: [game]},
+    battlefield: {replaySha256: hash, engineAnalysis}});
+  const attachStart = source.indexOf('  function attachPublishedPlayerStats(');
+  const researchStart = source.indexOf('  function calculateResearchActivity(');
+  vm.runInContext(source.slice(attachStart, source.indexOf('  function decodeGameTime(', attachStart)) +
+    source.slice(researchStart, source.indexOf('  function createResearchCell(', researchStart)), context);
+  context.playerStat = (player, key) => player.summary[key] ?? null;
+  const extraction = {players: [{position: 0, name: 'AI', ai: 0}, {position: 1, name: 'Arc player', ai: -1}]};
+  const result = await load(hash, game.id);
+  context.attachPublishedPlayerStats(extraction, result);
+  assert.equal(result.engineAnalysis.extended.snapshots, snapshots);
+  assert.equal(extraction.players[0].summary.score, -10);
+  assert.equal(extraction.players[0].summary.result, '');
+  assert.equal(extraction.players[1].summary.score, 800);
+  assert.equal(extraction.players[1].summary.result, 'winner');
+  assert.equal(extraction.players[1].summary.powerWon, 400);
+  assert.equal(extraction.players[1].summary.powerLost, 100);
+  assert.deepEqual(Array.from(context.calculateResearchActivity(extraction.players).values()), [null, 95]);
+  assert.ok(!calls.some(url => url.includes('/matches/')));
+
+  delete engineAnalysis.players;
+  const snapshotResult = await load(hash, game.id);
+  context.attachPublishedPlayerStats(extraction, snapshotResult);
+  assert.equal(extraction.players[1].summary.statsSource, 'replay-snapshot');
+  assert.equal(extraction.players[1].summary.score, 800);
+  assert.equal(extraction.players[1].summary.result, 'winner');
+  assert.equal(extraction.players[1].summary.powerWon, null);
+});
+

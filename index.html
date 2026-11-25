@@ -186,7 +186,7 @@
             <a href="leaderboards.html?v=20261125-recent-player-strength-lines-1" target="contentFrame" data-tab="leaderboards" aria-current="page">Leaderboards</a>
             <a href="recent-matches.html?v=20261125-recent-player-strength-lines-1" target="contentFrame" data-tab="recent-matches">Recent Matches</a>
             <a href="compare.html" target="contentFrame" data-tab="compare">Compare Players</a>
-            <a href="replay-analyzer.html?v=20261124-replay-res-percent-header-1" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
+            <a href="replay-analyzer.html?v=20261125-arc-replay-stats-1" target="contentFrame" data-tab="replay-analyzer">Replay Analyzer</a>
           </span>
         </nav>
 
@@ -594,7 +594,7 @@
         modalFrame.classList.remove("is-ready");
         modal.hidden = false;
         document.body.classList.add("replay-analyzer-modal-open");
-        modalFrame.src = `replay-analyzer.html?v=20261124-replay-res-percent-header-1&replay=${encodeURIComponent(pendingReplayUrl)}`;
+        modalFrame.src = `replay-analyzer.html?v=20261125-arc-replay-stats-1&replay=${encodeURIComponent(pendingReplayUrl)}`;
         modalFrame.focus();
       }
 

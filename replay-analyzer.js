@@ -727,7 +727,9 @@
       detailError,
       researchActivity: matchMetrics?.researchActivity || [],
       powerTrades: matchMetrics?.powerTrades || [],
-      playerData: arcPlayers.length ? arcPlayers : players.map((player) => {
+      playerData: hasPublicArcBattlefield || arcPlayers.length
+        ? [...(hasPublicArcBattlefield ? arcRecordedPlayers(engineAnalysis, snapshots) : []), ...arcPlayers]
+        : players.map((player) => {
         const hasReplayEngineStats = player.stats_source === "replay-engine";
         const position = player.position ?? player.position_number;
         if (!hasReplayEngineStats && snapshots.has(Number(position))) {
@@ -782,6 +784,26 @@
         };
       })
     };
+  }
+
+  function arcRecordedPlayers(engineAnalysis, snapshots) {
+    const players = new Map([...snapshots].map(([position, snapshot]) => [
+      position, recordedSnapshotPlayerData(position, snapshot)
+    ]));
+    const finals = Array.isArray(engineAnalysis?.players) ? engineAnalysis.players : [];
+    for (const player of finals) {
+      const position = player?.position;
+      if (!Number.isSafeInteger(position) || position < 0 || position > 31) continue;
+      const counter = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+      players.set(position, {
+        ...recordedSnapshotPlayerData(position, player),
+        statsSource: "replay-engine",
+        usertype: ["winner", "loser", "contender"].includes(player.state) ? player.state : null,
+        powerWon: counter(player.powerWon),
+        powerLost: counter(player.powerLost)
+      });
+    }
+    return [...players.values()];
   }
 
   function latestRecordedPlayerSnapshots(engineAnalysis) {
@@ -855,8 +877,11 @@
       player.recordedResearchPercent = player.spectator ? null : (researchByPosition.get(Number(player.position)) ?? null);
       const recordedPower = player.spectator ? null : powerByPosition.get(Number(player.position));
       const uniqueHuman = !player.spectator && player.ai < 0 && humanNameCounts.get(player.name) === 1;
-      const published = playersByPosition.get(Number(player.position))
-        || (uniqueHuman ? summaryNames.get(player.name) : null);
+      const positioned = playersByPosition.get(Number(player.position));
+      const named = uniqueHuman ? summaryNames.get(player.name) : null;
+      const published = positioned?.statsSource === "replay-snapshot" && named
+        ? { ...positioned, usertype: named.usertype, score: named.score ?? positioned.score, kills: named.kills ?? positioned.kills }
+        : positioned || named;
       if (!published) {
         player.summary = null;
         return;
@@ -2589,7 +2614,7 @@
     return new Map(players.map((player) => {
       if (player.spectator) return [player, null];
       const recorded = player.recordedResearchPercent ?? null;
-      if (player.summary?.statsSource !== "replay-engine") {
+      if (!["replay-engine", "replay-snapshot"].includes(player.summary?.statsSource)) {
         return [player, recorded];
       }
       const hasRecordedValue = (key) => {
@@ -6471,7 +6496,8 @@
     document.getElementById("replayTelemetryStatus").textContent = native
       ? (data.complete ? "Verified engine and event coverage" : "Verified engine coverage · partial event logs")
       : data.complete ? "Verified event coverage · v1"
-      : data.observedRecords == null ? "Reanalysis needed" : "Partial / unverified coverage";
+      : data.observedRecords != null ? "Partial / unverified coverage"
+      : extraction.engineAnalysis?.extended?.snapshots?.length ? "Battlefield snapshots recorded · extended events unavailable" : "Reanalysis needed";
     document.getElementById("replayTelemetryNote").textContent = native
       ? "Engine records include confirmed kill credit, actual damage, repairs, applied gifts and exact power changes. Uncredited deaths and script health edits stay separate. Unit value uses nominal build cost."
       : "Unavailable is not zero. Observed destructions are not confirmed enemy kills; ownership transfers are not necessarily donations. Completed-asset value is nominal build value, not exact power spent.";
@@ -6511,7 +6537,11 @@
       return row;
     });
     if (!playerRows.length) {
-      const row = document.createElement("tr"), cell = createCell("No verified extended player totals. Reanalyse this replay with telemetry v1.");
+      const row = document.createElement("tr");
+      const hasBattlefieldSnapshots = extraction.engineAnalysis?.extended?.snapshots?.length;
+      const cell = createCell(hasBattlefieldSnapshots
+        ? "Battlefield snapshots are available. Extended event totals are unavailable."
+        : "No verified extended player totals. Reanalyse this replay with telemetry v1.");
       cell.colSpan = 8; row.append(cell); playerRows.push(row);
     }
     replaceChildren(document.getElementById("replayTelemetryPlayers"), playerRows);

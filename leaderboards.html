@@ -711,6 +711,26 @@
       justify-items: start;
       gap: 4px;
     }
+
+    #leaderboards .stats-mega-win-star {
+      position: relative;
+    }
+
+    #leaderboards .stats-mega-win-star .stats-sort-hint {
+      bottom: calc(100% + 8px);
+      text-shadow: none;
+      visibility: hidden;
+    }
+
+    #leaderboards .stats-mega-win-star:is(:hover, :focus-visible) {
+      z-index: 8;
+    }
+
+    #leaderboards .stats-mega-win-star:is(:hover, :focus-visible) .stats-sort-hint {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+    }
     #statsPlayerRecentTable .stats-player-game-toggle:focus-visible {
       position: static;
       display: block;
@@ -982,6 +1002,6 @@
   </script>
   <script type="module" src="stats/live-stats.js?v=20261125-recent-map-star-1"></script>
   <script type="module" src="stats/player-rank-menu.js?v=20261125-multi-select-1"></script>
-  <script type="module" src="stats/match-map-star.js?v=20261125-map-star-duration-1"></script>
+  <script type="module" src="stats/match-map-star.js?v=20261125-mega-win-tooltip-1"></script>
 </body>
 </html>

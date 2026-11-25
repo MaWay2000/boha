@@ -2841,13 +2841,13 @@ function getPlayerTooltipLines(account, rank, strength) {
   const globalAccount = globalTooltipAccounts.get(getAccountExpandKey(account));
   if (!globalAccount) return [];
 
-  const lines = [`Global rank: ${rank ? `#${rank}` : "Unranked"}`];
+  const lines = [`Rank: ${rank ? `#${rank}` : "Unranked"}`];
   if (strength !== null) lines.push(`Player strength: ${strength}%`);
-  if (rank && Number.isFinite(globalAccount.elo)) lines.push(`Global ELO: ${globalAccount.elo.toFixed(2)}`);
+  if (rank && Number.isFinite(globalAccount.elo)) lines.push(`ELO: ${globalAccount.elo.toFixed(2)}`);
   const games = globalAccount.games.length;
   if (games) {
-    lines.push(`Global games: ${games.toLocaleString()}`);
-    lines.push(`Global win rate: ${formatRecordPercentage(getAccountDisplayStats(globalAccount).wins, games)}`);
+    lines.push(`Games: ${games.toLocaleString()}`);
+    lines.push(`Win rate: ${formatRecordPercentage(getAccountDisplayStats(globalAccount).wins, games)}`);
   }
   return lines;
 }
@@ -2961,13 +2961,15 @@ function renderMatchup(game, options = {}) {
               ? `<button class="stats-team-player-link" type="button" data-jump-account="${escapeHtml(accountKey)}" data-jump-game="${escapeHtml(currentGameKey)}"${descriptionAttr}>${label}</button>`
               : label;
             const powerLabel = playerPower === null ? "" : `Player strength: ${playerPower}%`;
+            const powerHue = Math.round(playerPower * 1.2);
             const playerPowerLine = powerLabel
-              ? `<span class="stats-player-power-line" role="img" aria-label="${powerLabel}" style="--player-power-fill: ${playerPower}%; --player-power-hue: ${Math.round(playerPower * 1.2)}"></span>`
+              ? `<span class="stats-player-power-line" role="img" aria-label="${powerLabel}" style="--player-power-fill: ${playerPower}%; --player-power-hue: ${powerHue}"></span>`
               : "";
             const tooltipAttr = tooltipLines.length ? ` data-player-stats="${escapeHtml(tooltipLines.join("\n"))}"` : "";
+            const tooltipHueAttr = tooltipAttr && powerLabel ? ` data-player-strength-hue="${powerHue}"` : "";
             const hasInteractiveChip = accountKey || (linkToLeaderboard && player.account);
             const focusAttr = tooltipAttr && !hasInteractiveChip ? ` tabindex="0"${descriptionAttr}` : "";
-            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}"${tooltipAttr}${focusAttr}>${playerPowerLine}${chip}</span>`;
+            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}"${tooltipAttr}${tooltipHueAttr}${focusAttr}>${playerPowerLine}${chip}</span>`;
           })
           .join("");
         if (variant === "inline-power") {
@@ -4092,7 +4094,22 @@ function setupPlayerStatsTooltip() {
     const chip = event.target.closest(selector);
     if (!chip || chip.contains(event.relatedTarget)) return;
 
-    tooltip.textContent = chip.dataset.playerStats;
+    const hue = chip.dataset.playerStrengthHue;
+    tooltip.style.setProperty("--player-tooltip-strength-hue", hue ?? "");
+    tooltip.replaceChildren(...chip.dataset.playerStats.split("\n").map((line, index) => {
+      const row = document.createElement("div");
+      if (hue === undefined || index >= 2) {
+        row.textContent = line;
+        return row;
+      }
+
+      const valueStart = line.indexOf(":") + 2;
+      const value = document.createElement("strong");
+      value.className = "stats-player-stat-strength";
+      value.textContent = line.slice(valueStart);
+      row.append(line.slice(0, valueStart), value);
+      return row;
+    }));
     tooltip.hidden = false;
     const anchor = chip.getBoundingClientRect();
     const { width, height } = tooltip.getBoundingClientRect();

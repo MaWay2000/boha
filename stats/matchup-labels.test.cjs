@@ -45,7 +45,8 @@ test('1v1 matchup layouts keep personal percentages and hide duplicate team-powe
       assert.doesNotMatch(html, /class="stats-mega-win-star"/);
       const playerPower = Array.from(html.matchAll(/--player-power-fill: (\d+)%/g), match => Number(match[1]));
       assert.deepEqual(playerPower, [78, 25]);
-      assert.match(html, /data-player-stats="Global rank: #1\s+Player strength: 78%\s+Global ELO: 1824\.52\s+Global games: 10\s+Global win rate: 70%"/);
+      assert.match(html, /data-player-stats="Rank: #1\s+Player strength: 78%\s+ELO: 1824\.52\s+Games: 10\s+Win rate: 70%"/);
+      assert.deepEqual([...html.matchAll(/data-player-strength-hue="(\d+)"/g)].map(match => Number(match[1])), [94]);
       assert.doesNotMatch(html, /title="Player strength/);
       assert.doesNotMatch(html, /Mega win!|class="stats-upset-victory"/);
     } else {

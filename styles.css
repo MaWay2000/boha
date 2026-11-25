@@ -1377,18 +1377,65 @@ main {
 }
 
 .stats-player-rank-chevron {
-  width: 7px;
-  height: 7px;
-  margin: 0 2px 4px 3px;
-  border-right: 1px solid var(--cyan);
-  border-bottom: 1px solid var(--cyan);
-  transform: rotate(45deg);
-  transition: transform 160ms ease;
+  position: relative;
+  flex: 0 0 24px;
+  height: 30px;
+  color: #8ee8fb;
 }
 
-.stats-player-rank-menu.is-open .stats-player-rank-chevron {
-  margin-bottom: -2px;
-  transform: rotate(225deg);
+.stats-player-rank-chevron::before,
+.stats-player-rank-chevron::after {
+  content: "";
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-bottom-right-radius: 1px;
+  animation: stats-player-rank-cascade 1440ms linear -562ms infinite;
+}
+
+.stats-player-rank-chevron::after {
+  animation-delay: -1195ms;
+}
+
+@keyframes stats-player-rank-cascade {
+  0% {
+    transform: translate(-50%, calc(-50% - 10px)) rotate(45deg);
+    opacity: 0.15;
+  }
+  21% { opacity: 0.65; }
+  50% { opacity: 1; }
+  75% { opacity: 0.65; }
+  100% {
+    transform: translate(-50%, calc(-50% + 9px)) rotate(45deg);
+    opacity: 0.15;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-player-rank-chevron::before,
+  .stats-player-rank-chevron::after {
+    animation: none;
+    transform: translate(-50%, calc(-50% - 4px)) rotate(45deg);
+  }
+
+  .stats-player-rank-chevron::after {
+    transform: translate(-50%, calc(-50% + 3px)) rotate(45deg);
+    opacity: 0.65;
+  }
+}
+
+.stats-player-rank-menu.is-open .stats-player-rank-chevron::before {
+  animation: none;
+  transform: translate(-50%, -25%) rotate(225deg);
+  opacity: 1;
+}
+
+.stats-player-rank-menu.is-open .stats-player-rank-chevron::after {
+  content: none;
 }
 
 .stats-player-rank-popup {

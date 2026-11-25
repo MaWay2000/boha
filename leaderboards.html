@@ -565,7 +565,10 @@
     #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) :is(th, td):last-child:not([colspan]) { width: 90px; }
     #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) .stats-date-time { display: block; margin-left: 0; }
     :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) .stats-recent-map-duration {
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
       margin-top: 6px;
       color: var(--steel);
       font-variant-numeric: tabular-nums;
@@ -825,5 +828,6 @@
   <script src="embedded-page.js?v=20260720-1"></script>
   <script type="module" src="stats/live-stats.js?v=20261125-recent-map-star-1"></script>
   <script type="module" src="stats/player-rank-menu.js?v=20261125-rank-menu-space-1"></script>
+  <script type="module" src="stats/match-map-star.js?v=20261125-map-star-duration-1"></script>
 </body>
 </html>

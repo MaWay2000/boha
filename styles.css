@@ -2836,6 +2836,10 @@ main {
   line-height: 1.35;
 }
 
+.stats-team-inline-power:has(.stats-player-power-line) {
+  padding-block: 4px 8px;
+}
+
 .stats-team-inline-power .stats-team-roster {
   display: flex;
   flex-wrap: wrap;
@@ -2860,7 +2864,7 @@ main {
 
 .stats-player-power-line {
   position: absolute;
-  inset: -4px 0 auto;
+  inset: auto 0 -4px;
   height: 2px;
   border-radius: 2px;
   background:
@@ -2931,6 +2935,10 @@ main {
   padding-bottom: 9px;
   border-color: transparent;
   background: none;
+}
+
+.stats-team.stats-team-power-fill:has(.stats-player-power-line) {
+  padding-bottom: 13px;
 }
 
 .stats-team-power-fill::before {

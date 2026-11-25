@@ -1299,11 +1299,9 @@ main {
   gap: 0;
   width: 100%;
   overflow: visible;
-  padding: 0 150px 0 0;
   border: 1px solid rgba(149, 205, 255, 0.14);
   border-radius: var(--radius-md);
   background: rgba(7, 14, 23, 0.86);
-  padding-right: 150px;
   white-space: nowrap;
 }
 
@@ -1317,9 +1315,11 @@ main {
 }
 
 .stats-player-profile-heading-line .panel-kicker {
+  align-self: stretch;
   display: flex;
   min-width: 0;
   align-items: center;
+  justify-content: center;
   margin: 0;
   padding: 9px 12px;
 }
@@ -1328,9 +1328,10 @@ main {
   min-width: 0;
   overflow: hidden;
   color: inherit;
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: 0.08em;
+  line-height: 1.2;
   text-overflow: ellipsis;
   text-transform: none;
 }
@@ -1526,10 +1527,21 @@ main {
 }
 
 .stats-player-profile-heading-line .stats-profile-share {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
+  align-self: center;
+  margin-inline: auto 8px;
+}
+
+@container (max-width: 460px) {
+  .stats-player-profile-heading-line {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) max-content 1fr;
+  }
+
+  .stats-player-profile-heading-line .stats-profile-share {
+    grid-column: 1 / -1;
+    justify-self: end;
+    margin-block-end: 8px;
+  }
 }
 
 .stats-summary .stats-card-value {
@@ -2951,6 +2963,7 @@ main {
 
 .stats-player-games-panel .stats-panel-head {
   align-items: start;
+  container-type: inline-size;
 }
 
 .stats-player-games-panel .stats-date {

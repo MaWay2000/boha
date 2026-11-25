@@ -1318,13 +1318,20 @@ main {
 
 .stats-player-profile-heading-line .panel-kicker {
   display: flex;
+  min-width: 0;
   align-items: center;
   margin: 0;
   padding: 9px 12px;
 }
 
 .stats-player-profile-heading-name {
+  min-width: 0;
+  overflow: hidden;
   color: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
   text-transform: none;
 }
 
@@ -1345,6 +1352,8 @@ main {
 
 .stats-player-profile-rank {
   position: relative;
+  flex: 0 0 auto;
+  padding-inline-end: 16px;
   gap: 6px;
   border-left: 0;
   border-right: 1px solid rgba(149, 205, 255, 0.12);
@@ -1378,7 +1387,8 @@ main {
 
 .stats-player-rank-chevron {
   position: relative;
-  flex: 0 0 24px;
+  flex: none;
+  width: 24px;
   height: 30px;
   color: #8ee8fb;
 }

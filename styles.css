@@ -2744,7 +2744,7 @@ main {
   position: relative;
   display: block;
   width: 100%;
-  padding: 4px 7px;
+  padding: 8px 7px 4px;
   border-radius: 7px;
   line-height: 1.35;
 }
@@ -2753,11 +2753,12 @@ main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px 4px;
+  gap: 7px 4px;
   min-width: 0;
 }
 
 .stats-team-inline-power .stats-team-player {
+  position: relative;
   min-width: 0;
   padding: 1px 5px;
   border: 1px solid rgba(197, 232, 241, 0.34);
@@ -2768,6 +2769,18 @@ main {
 
 .stats-team-inline-power .stats-team-player::before {
   content: none;
+}
+
+.stats-player-power-line {
+  position: absolute;
+  inset: -4px 0 auto;
+  height: 2px;
+  border-radius: 2px;
+  background:
+    linear-gradient(hsl(var(--player-power-hue) 68% 52% / 0.86) 0 0)
+      left center / max(2px, var(--player-power-fill)) 100% no-repeat,
+    rgba(150, 197, 211, 0.14);
+  pointer-events: none;
 }
 
 .stats-team-inline-power .stats-team-player:has(> .stats-team-player-link:hover) {
@@ -2798,7 +2811,7 @@ main {
 .stats-team-inline-power > .stats-mega-win-star {
   position: absolute;
   inset-inline-start: 7px;
-  inset-block-start: 8px;
+  inset-block-start: 12px;
   margin-left: 0;
 }
 

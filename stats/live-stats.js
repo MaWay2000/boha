@@ -2940,7 +2940,14 @@ function renderMatchup(game, options = {}) {
             const chip = accountKey
               ? `<button class="stats-team-player-link" type="button" data-jump-account="${escapeHtml(accountKey)}" data-jump-game="${escapeHtml(currentGameKey)}">${label}</button>`
               : label;
-            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}">${chip}</span>`;
+            const playerPower = variant === "inline-power" && getNumericGlobalRank(player.account) > 0
+              ? getPlayerPowerPercent(player.account)
+              : null;
+            const powerLabel = playerPower === null ? "" : `Player strength: ${playerPower}%`;
+            const playerPowerLine = powerLabel
+              ? `<span class="stats-player-power-line" role="img" aria-label="${powerLabel}" style="--player-power-fill: ${playerPower}%; --player-power-hue: ${Math.round(playerPower * 1.2)}"></span>`
+              : "";
+            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}"${powerLabel ? ` title="${powerLabel}"` : ""}>${playerPowerLine}${chip}</span>`;
           })
           .join("");
         if (variant === "inline-power") {

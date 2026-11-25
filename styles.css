@@ -2980,21 +2980,21 @@ main {
 }
 
 .stats-team.stats-team-power-fill {
-  padding-bottom: 9px;
+  padding-bottom: 12px;
   border-color: transparent;
   background: none;
 }
 
 .stats-team.stats-team-power-fill:has(.stats-team-player) {
-  padding-bottom: 13px;
+  padding-bottom: 16px;
 }
 
 .stats-team-power-fill::before {
   content: "";
   position: absolute;
   inset: auto 7px 4px;
-  height: 3px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   background:
     linear-gradient(hsl(var(--team-power-hue) 68% 52% / 0.86) 0 0)
       left center / max(3px, var(--team-power-fill)) 100% no-repeat,

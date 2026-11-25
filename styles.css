@@ -3986,6 +3986,11 @@ main {
 }
 
 .site-app-shell .topbar > .topnav > .topnav-actions > .discord-link { flex-grow: 1.5; }
+
+.site-app-shell .topbar > .topnav > .topnav-actions > .discord-link::after {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
 .site-app-shell .topbar > .topnav > .topnav-actions > .bohan-hub-link { flex-grow: 1.2; }
 .site-app-shell .topbar > .topnav > .topnav-actions > .site-chat-button { flex-grow: 1.08; }
 
@@ -4679,15 +4684,16 @@ main {
   }
 
   .site-app-shell .topnav > .topnav-primary.topnav-row > a.arc-mod-link {
-    --arc-nav-shape: polygon(0 0, 87% 0, 100% 50%, 87% 100%, 0 100%, 13% 50%);
+    --arc-nav-shape: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%);
     display: grid;
     place-items: center;
-    margin-top: 3px;
-    height: calc(100% - 6px);
+    width: calc(100% + 18px);
+    height: 100%;
+    margin-inline-start: -18px;
     padding: 0 12px;
     clip-path: var(--arc-nav-shape);
-    color: #f0e9ff;
-    background: linear-gradient(155deg, #edfaff 4%, #315472 28%, #bfc6ff 47%, #72b9e6 60%, #203955 82%, #a3c6f8);
+    color: #e4f7ff;
+    background: #02070c;
     font: 400 clamp(18px, 1.4vw, 25px)/1 Impact, "Arial Narrow", "Oxanium", sans-serif;
     letter-spacing: .025em;
     text-transform: uppercase;
@@ -4696,21 +4702,30 @@ main {
   }
 
   .site-app-shell .topnav > .topnav-primary.topnav-row > a.arc-mod-link::before {
-    inset: 4px;
+    inset: 2px;
     opacity: 1;
     border: 0;
     clip-path: var(--arc-nav-shape);
-    background: linear-gradient(130deg, #1e2e51e6, #281833d4 54%, #071420e8),
-      url("assets/community-metal.svg") center / cover;
-    box-shadow: inset 0 0 0 2px #091421;
+    background: linear-gradient(155deg, #f1faff 8%, #77c4ed 27%, #294c70 43%, #d3f3ff 58%, #74bde5 75%, #203c59 94%);
+    box-shadow: none;
   }
 
   .site-app-shell .topnav > .topnav-primary.topnav-row > a.arc-mod-link::after {
-    content: none;
+    inset: 6px;
+    width: auto;
+    opacity: 1;
+    clip-path: var(--arc-nav-shape);
+    background: linear-gradient(#05101f50, #13375210 46%, #010a1690),
+      url("assets/community-metal.svg") center / 100% 100% no-repeat;
+    box-shadow: inset 0 0 0 2px #020914, inset 0 0 10px 3px #010813;
+    transform: none;
   }
 
   .site-app-shell .topnav > .topnav-primary.topnav-row > a.arc-mod-link > span {
     position: relative;
+    z-index: 1;
+    color: #e4f7ff;
+    text-shadow: 1px 1px #000, 0 0 3px #071827;
   }
 
   .site-app-shell .topnav > .topnav-primary.topnav-row > a.arc-mod-link:is(:hover, :focus-visible, [aria-current="page"]) {

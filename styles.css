@@ -3988,7 +3988,7 @@ main {
 .site-app-shell .topbar > .topnav > .topnav-actions > .discord-link { flex-grow: 1.5; }
 
 .site-app-shell .topbar > .topnav > .topnav-actions > .discord-link::after {
-  background-size: 100% 100%;
+  background-size: auto, cover;
   background-repeat: no-repeat;
 }
 .site-app-shell .topbar > .topnav > .topnav-actions > .bohan-hub-link { flex-grow: 1.2; }

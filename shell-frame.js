@@ -6,6 +6,9 @@ if (arcModLink && primaryNavigation) {
   primaryNavigation.append(arcModLink);
 }
 
+const discordLabel = document.querySelector(".topnav-actions > .discord-link > span");
+if (discordLabel) discordLabel.textContent = "Discord";
+
 const navLinks = [...document.querySelectorAll(".topnav a[data-tab]")];
 const tabControls = [...document.querySelectorAll("[data-tab]")];
 let frameIsLoading = false;

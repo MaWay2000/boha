@@ -132,6 +132,10 @@
       position: absolute;
       right: 10px;
       top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .stats-clear-button {
       display: inline-grid;
       width: 32px;
       height: 28px;
@@ -146,7 +150,6 @@
         0 0 10px rgba(255, 213, 106, 0.12);
       cursor: pointer;
       font: 700 0.9rem/1 "Oxanium", sans-serif;
-      transform: translateY(-50%);
       transition:
         color 140ms ease,
         border-color 140ms ease,
@@ -154,8 +157,8 @@
         box-shadow 140ms ease;
     }
 
-    .stats-player-search-clear:hover,
-    .stats-player-search-clear:focus-visible {
+    .stats-clear-button:hover,
+    .stats-clear-button:focus-visible {
       color: #fff4cf;
       border-color: #ffd56a;
       outline: none;
@@ -322,21 +325,21 @@
       width: min(760px, calc(100vw - 40px));
     }
 
-    .stats-summary .stats-games-filter-clear {
-      position: relative;
-      min-width: 42px;
-      min-height: 100%;
-      padding: 0 12px;
-      border: 0;
-      border-left: 1px solid rgba(109, 232, 255, 0.16);
-      border-radius: 0;
-      color: var(--steel);
-      font-size: 1rem;
+    #leaderboards .stats-games-filter-control:has(> .stats-games-filter-clear:not([hidden])) .stats-menu-hint-face {
+      border-radius: 6px 0 0 6px;
     }
 
-    .stats-summary .stats-games-filter-clear:hover,
-    .stats-summary .stats-games-filter-clear:focus-visible {
-      color: var(--text);
+    .stats-games-filter-clear {
+      position: relative;
+      align-self: center;
+      flex: 0 0 auto;
+      height: 29px;
+      margin-inline-start: -1px;
+      border-radius: 0 14px 14px 0;
+    }
+
+    .stats-games-filter-clear[hidden] {
+      display: none;
     }
 
     .stats-summary .stats-trending-filter-menu {
@@ -790,7 +793,7 @@
                   <button class="stats-filter-button stats-games-filter-close" id="statsGamesFilterClose" type="button">Close</button>
                 </div>
               </details>
-              <button class="stats-filter-button stats-games-filter-clear stats-clear-button" id="statsGamesFilterClear" type="button" aria-label="Clear games filter" hidden>&times;<span class="stats-sort-hint" aria-hidden="true">Clear games filter</span></button>
+              <button class="stats-games-filter-clear stats-clear-button" id="statsGamesFilterClear" type="button" aria-label="Clear games filter" hidden>&times;<span class="stats-sort-hint" aria-hidden="true">Clear games filter</span></button>
             </div>
             <article class="stats-card">
               <span class="stats-card-label">Ranked Players</span>

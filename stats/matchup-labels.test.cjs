@@ -18,11 +18,11 @@ const context = vm.createContext({
   formatRecordPercentage: (wins, games) => `${Math.round(100 * wins / games)}%`,
   isBannedAccount: account => Boolean(account?.banned),
   renderMapFilterLink: (name, label, className) => `<a class="${className}" href="#map">${label}</a>`,
-  escapeHtml: value => String(value)
+  escapeHtml: value => String(value).replaceAll('"', '&quot;')
 });
 vm.runInContext(
   source.slice(source.indexOf('function getMatchTeamStrengths('), source.indexOf('function getMatchTeamPowerDifference('))
-  + source.slice(source.indexOf('function getPlayerTooltipLines('), source.indexOf('function getLastUpdateTime(')),
+  + source.slice(source.indexOf('function getPlayerTooltipStats('), source.indexOf('function getLastUpdateTime(')),
   context
 );
 function team(size, strength, result) {
@@ -45,8 +45,14 @@ test('1v1 matchup layouts keep personal percentages and hide duplicate team-powe
       assert.doesNotMatch(html, /class="stats-mega-win-star"/);
       const playerPower = Array.from(html.matchAll(/--player-power-fill: (\d+)%/g), match => Number(match[1]));
       assert.deepEqual(playerPower, [78, 25]);
-      assert.match(html, /data-player-stats="Rank: #1\s+Player strength: 78%\s+ELO: 1824\.52\s+Games: 10\s+Win rate: 70%"/);
-      assert.deepEqual([...html.matchAll(/data-player-strength-hue="(\d+)"/g)].map(match => Number(match[1])), [94]);
+      const [, encodedStats] = html.match(/data-player-stats="([^"]+)"/);
+      assert.deepEqual(JSON.parse(encodedStats.replaceAll('&quot;', '"')), [
+        ['Rank', '#1', 94],
+        ['Player strength', '78%', 94],
+        ['ELO', '1824.52', 120],
+        ['Games', '10', 'activity'],
+        ['Win rate', '70%', 84]
+      ]);
       assert.doesNotMatch(html, /title="Player strength/);
       assert.doesNotMatch(html, /Mega win!|class="stats-upset-victory"/);
     } else {

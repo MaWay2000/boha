@@ -2187,8 +2187,12 @@ main {
   transition: none;
 }
 
-.stats-player-stat-strength {
-  color: hsl(var(--player-tooltip-strength-hue) 90% 72%);
+.stats-player-stat-value {
+  color: var(--player-stat-color, inherit);
+}
+
+.stats-player-stat-value.is-activity {
+  --player-stat-color: var(--cyan);
 }
 
 .stats-table-wrap-ranks .stats-sort-hint {

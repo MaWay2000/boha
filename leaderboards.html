@@ -564,15 +564,35 @@
     #leaderboards #statsPlayerRecentTable :is(th, td):nth-child(3) { width: 76px; }
     #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) :is(th, td):last-child:not([colspan]) { width: 90px; }
     #leaderboards :is(#statsLeaderboardRecentMatches, #statsPlayerRecentTable) .stats-date-time { display: block; margin-left: 0; }
-    .stats-recent-leaderboard-picker {
+    .stats-recent-leaderboard-cell {
+      position: relative;
+      display: flex;
       align-self: stretch;
-      justify-self: start;
+    }
+
+    .stats-recent-leaderboard-picker {
+      position: static;
       padding-inline: 10px 16px;
       border-inline-end: 1px solid rgba(149, 205, 255, 0.12);
     }
 
     .stats-recent-leaderboard-picker[hidden] {
       display: none;
+    }
+
+    .stats-recent-leaderboard-picker .stats-player-rank-trigger:not(:disabled)::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+    }
+
+    .stats-recent-leaderboard-picker .stats-player-rank-trigger:focus-visible {
+      outline: none;
+    }
+
+    .stats-recent-leaderboard-picker .stats-player-rank-trigger:focus-visible::after {
+      outline: 2px solid var(--cyan);
+      outline-offset: -2px;
     }
 
     .stats-recent-leaderboard-picker .stats-player-rank-popup {
@@ -771,12 +791,14 @@
             <div class="stats-panel-head">
               <div class="stats-player-profile-heading-line">
                 <p class="panel-kicker">Recent matches</p>
-                <h4 id="statsPlayerGamesTitle">Global</h4>
-                <div class="stats-player-rank-menu stats-recent-leaderboard-picker" id="statsRecentLeaderboardPicker">
-                  <button class="stats-player-rank-trigger" type="button" aria-label="Choose leaderboard" aria-expanded="false" aria-controls="statsRecentLeaderboardOptions" disabled>
-                    <span class="stats-player-rank-chevron" aria-hidden="true"></span>
-                  </button>
-                  <div class="stats-player-rank-popup" id="statsRecentLeaderboardOptions" role="group" aria-label="Leaderboards" hidden></div>
+                <div class="stats-recent-leaderboard-cell">
+                  <h4 id="statsPlayerGamesTitle">Global</h4>
+                  <div class="stats-player-rank-menu stats-recent-leaderboard-picker" id="statsRecentLeaderboardPicker">
+                    <button class="stats-player-rank-trigger" type="button" aria-label="Choose leaderboard" aria-expanded="false" aria-controls="statsRecentLeaderboardOptions" disabled>
+                      <span class="stats-player-rank-chevron" aria-hidden="true"></span>
+                    </button>
+                    <div class="stats-player-rank-popup" id="statsRecentLeaderboardOptions" role="group" aria-label="Leaderboards" hidden></div>
+                  </div>
                 </div>
                 <button class="stats-profile-share" id="statsProfileShare" type="button" hidden>Copy profile link</button>
               </div>
@@ -848,7 +870,7 @@
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
   <script type="module" src="stats/live-stats.js?v=20261125-recent-map-star-1"></script>
-  <script type="module" src="stats/player-rank-menu.js?v=20261125-recent-leaderboard-picker-1"></script>
+  <script type="module" src="stats/player-rank-menu.js?v=20261125-recent-leaderboard-cell-1"></script>
   <script type="module" src="stats/match-map-star.js?v=20261125-map-star-duration-1"></script>
 </body>
 </html>

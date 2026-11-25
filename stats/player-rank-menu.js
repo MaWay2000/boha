@@ -40,7 +40,7 @@ function fitLeaderboardPopup(popup) {
 
 function fitRecentPopup() {
   fitLeaderboardPopup(recentPopup);
-  const anchor = recentPicker.getBoundingClientRect();
+  const anchor = recentPopup.offsetParent.getBoundingClientRect();
   const popupWidth = recentPopup.offsetWidth;
   const naturalLeft = (anchor.left + anchor.right - popupWidth) / 2;
   const rightLimit = document.documentElement.clientWidth - popupWidth - 8;

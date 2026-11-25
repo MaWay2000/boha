@@ -169,16 +169,17 @@
       pointer-events: none;
     }
 
-    .stats-player-search-clear .stats-sort-hint {
+    .stats-clear-button .stats-sort-hint {
       top: calc(100% + 8px);
       bottom: auto;
       left: calc(50% - 12px);
+      font-family: "Oxanium", sans-serif;
       letter-spacing: 0.12em;
       text-transform: uppercase;
       transform: translateY(4px);
     }
 
-    .stats-player-search-clear .stats-sort-hint::before {
+    .stats-clear-button .stats-sort-hint::before {
       top: -5px;
       bottom: auto;
       left: 8px;
@@ -187,7 +188,7 @@
       transform: rotate(45deg);
     }
 
-    .stats-player-search-clear:not([hidden]):is(:hover, :focus-visible) .stats-sort-hint {
+    .stats-clear-button:not([hidden]):is(:hover, :focus-visible) .stats-sort-hint {
       opacity: 1;
       transform: translateY(0);
     }
@@ -273,6 +274,7 @@
     }
 
     .stats-summary .stats-games-filter-clear {
+      position: relative;
       min-width: 42px;
       min-height: 100%;
       padding: 0 12px;
@@ -700,7 +702,7 @@
                   <button class="stats-filter-button stats-games-filter-close" id="statsGamesFilterClose" type="button">Close</button>
                 </div>
               </details>
-              <button class="stats-filter-button stats-games-filter-clear" id="statsGamesFilterClear" type="button" aria-label="Clear games filter" title="Clear games filter" hidden>&times;</button>
+              <button class="stats-filter-button stats-games-filter-clear stats-clear-button" id="statsGamesFilterClear" type="button" aria-label="Clear games filter" hidden>&times;<span class="stats-sort-hint" aria-hidden="true">Clear games filter</span></button>
             </div>
             <article class="stats-card">
               <span class="stats-card-label">Ranked Players</span>
@@ -732,7 +734,7 @@
                 spellcheck="false"
               >
               <button
-                class="stats-player-search-clear"
+                class="stats-player-search-clear stats-clear-button"
                 id="statsPlayerSearchClear"
                 type="button"
                 aria-label="Clear player search"

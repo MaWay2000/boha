@@ -1,5 +1,9 @@
 const rankHeading = document.getElementById("statsPlayerGamesTitle");
 const filterButtons = document.getElementById("statsLeaderboardButtons");
+const recentMatches = document.getElementById("statsLeaderboardRecentMatches");
+const recentPicker = document.getElementById("statsRecentLeaderboardPicker");
+const recentTrigger = recentPicker?.querySelector(".stats-player-rank-trigger");
+const recentPopup = document.getElementById("statsRecentLeaderboardOptions");
 const openPopupSelector = ".stats-player-rank-popup:not([hidden])";
 
 function orderRankOptions(popup) {
@@ -12,7 +16,7 @@ function orderRankOptions(popup) {
   popup.append(...options);
 }
 
-function fitRankPopup(popup) {
+function fitLeaderboardPopup(popup) {
   const anchor = popup.parentElement.getBoundingClientRect();
   let viewportTop = 0;
   let viewportBottom = document.documentElement.clientHeight;
@@ -34,9 +38,32 @@ function fitRankPopup(popup) {
   popup.style.maxHeight = `${Math.max(0, Math.floor(openAbove ? spaceAbove : spaceBelow))}px`;
 }
 
-function fitOpenRankPopup() {
-  const popup = rankHeading.querySelector(openPopupSelector);
-  if (popup) fitRankPopup(popup);
+function fitRecentPopup() {
+  fitLeaderboardPopup(recentPopup);
+  const anchor = recentPicker.getBoundingClientRect();
+  const popupWidth = recentPopup.offsetWidth;
+  const naturalLeft = (anchor.left + anchor.right - popupWidth) / 2;
+  const rightLimit = document.documentElement.clientWidth - popupWidth - 8;
+  const left = Math.max(8, Math.min(naturalLeft, rightLimit));
+  recentPopup.style.marginLeft = `${left - naturalLeft}px`;
+}
+
+function fitOpenLeaderboardPopups() {
+  const rankPopup = rankHeading.querySelector(openPopupSelector);
+  if (rankPopup) fitLeaderboardPopup(rankPopup);
+  if (recentPopup && !recentPopup.hidden) fitRecentPopup();
+}
+
+function setRecentPickerOpen(open) {
+  recentPopup.hidden = !open;
+  recentTrigger.setAttribute("aria-expanded", String(open));
+  recentPicker.classList.toggle("is-open", open);
+}
+
+function syncRecentPicker() {
+  recentPicker.hidden = recentMatches.hidden;
+  recentTrigger.disabled = !filterButtons.querySelector("button[data-leaderboard]");
+  setRecentPickerOpen(false);
 }
 
 rankHeading.addEventListener("click", (event) => {
@@ -45,15 +72,61 @@ rankHeading.addEventListener("click", (event) => {
   if (!popup) return;
 
   orderRankOptions(popup);
-  fitRankPopup(popup);
+  fitLeaderboardPopup(popup);
 });
 
-window.addEventListener("resize", fitOpenRankPopup);
-window.addEventListener("scroll", fitOpenRankPopup, { passive: true });
+recentTrigger?.addEventListener("click", () => {
+  if (!recentPopup.hidden) {
+    setRecentPickerOpen(false);
+    return;
+  }
+
+  const options = Array.from(filterButtons.querySelectorAll("button[data-leaderboard]"), (source) => {
+    const option = document.createElement("button");
+    const active = source.classList.contains("is-active");
+    option.type = "button";
+    option.className = "stats-player-rank-option";
+    option.classList.toggle("is-active", active);
+    option.setAttribute("aria-pressed", String(active));
+    option.textContent = source.textContent;
+    option.addEventListener("click", () => {
+      setRecentPickerOpen(false);
+      if (!active) source.click();
+      recentTrigger.focus();
+    });
+    return option;
+  });
+  recentPopup.replaceChildren(...options);
+  document.querySelector('details[name="player-header-menu"][open]')?.removeAttribute("open");
+  setRecentPickerOpen(true);
+  fitRecentPopup();
+});
+
+recentPicker?.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !recentPopup.hidden) {
+    setRecentPickerOpen(false);
+    recentTrigger.focus();
+  }
+});
+recentPicker?.addEventListener("focusout", (event) => {
+  if (!recentPicker.contains(event.relatedTarget)) setRecentPickerOpen(false);
+});
+if (recentPicker) {
+  document.addEventListener("click", (event) => {
+    if (!recentPopup.hidden && !recentPicker.contains(event.target)) setRecentPickerOpen(false);
+  });
+  const pickerObserver = new MutationObserver(syncRecentPicker);
+  pickerObserver.observe(recentMatches, { attributeFilter: ["hidden"] });
+  pickerObserver.observe(filterButtons, { childList: true });
+  syncRecentPicker();
+}
+
+window.addEventListener("resize", fitOpenLeaderboardPopups);
+window.addEventListener("scroll", fitOpenLeaderboardPopups, { passive: true });
 if (window.frameElement) {
   const viewportEvents = new AbortController();
-  window.parent.addEventListener("resize", fitOpenRankPopup, { signal: viewportEvents.signal });
-  window.parent.addEventListener("scroll", fitOpenRankPopup, { passive: true, signal: viewportEvents.signal });
+  window.parent.addEventListener("resize", fitOpenLeaderboardPopups, { signal: viewportEvents.signal });
+  window.parent.addEventListener("scroll", fitOpenLeaderboardPopups, { passive: true, signal: viewportEvents.signal });
   window.addEventListener("pagehide", (event) => {
     if (!event.persisted) viewportEvents.abort();
   });

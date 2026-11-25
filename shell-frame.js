@@ -1,4 +1,11 @@
 const contentFrame = document.getElementById("contentFrame");
+const arcModLink = document.querySelector(".topnav-actions > .arc-mod-link");
+const primaryNavigation = document.querySelector(".topnav > .topnav-primary");
+if (arcModLink && primaryNavigation) {
+  arcModLink.classList.remove("community-link");
+  primaryNavigation.append(arcModLink);
+}
+
 const navLinks = [...document.querySelectorAll(".topnav a[data-tab]")];
 const tabControls = [...document.querySelectorAll("[data-tab]")];
 let frameIsLoading = false;

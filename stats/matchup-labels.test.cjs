@@ -11,9 +11,15 @@ const context = vm.createContext({
   getTeamToneClass: () => 'tone', getTeamStrengthToneClass: () => 'tone',
   getPlayerPowerLabel: account => `${account.power}%`,
   getPlayerPowerPercent: account => account.power,
+  getNumericGlobalRank: account => Number.isFinite(account?.power) ? 1 : null,
+  renderMapFilterLink: (name, label, className) => `<a class="${className}" href="#map">${label}</a>`,
   escapeHtml: value => String(value)
 });
-vm.runInContext(source.slice(source.indexOf('function renderMatchup('), source.indexOf('function getLastUpdateTime(')), context);
+vm.runInContext(
+  source.slice(source.indexOf('function getMatchTeamStrengths('), source.indexOf('function getMatchTeamPowerDifference('))
+  + source.slice(source.indexOf('function renderMatchup('), source.indexOf('function getLastUpdateTime(')),
+  context
+);
 function team(size, strength, result) {
   return {strength, result, players: Array.from({length:size}, (_,i)=>({account:{name:result+i,power:strength}}))};
 }
@@ -21,14 +27,19 @@ test('1v1 matchup layouts keep personal percentages and hide duplicate team-powe
   const winner = team(1, 43, 'winner'), loser = team(1, 57, 'loser');
   winner.players[0].account.power = 78;
   loser.players[0].account.power = 25;
-  const game = {ratingMethod: 'maway-v1', teams: [winner, loser, {players: []}]};
+  const game = {mapName: 'RO_1v1Full', ratingMethod: 'maway-v1', teams: [winner, loser, {players: []}]};
+  const map = context.renderRecentMatchMap(game);
+  assert.match(map, /RO_1v1Full<\/a><span class="stats-mega-win-star"[^>]*aria-label="Mega win"[^>]*>&#9733;<\/span>/);
+  assert.equal((map.match(/class="stats-mega-win-star"/g) || []).length, 1);
+  assert.doesNotMatch(context.renderRecentMatchMap({...game, teams: [team(1, 60, 'winner'), team(1, 40, 'loser')]}), /stats-mega-win-star/);
   for (const variant of ['chips','tiles','inline-power']) {
     const html = context.renderMatchup(game,{variant,includePlayerPower:variant !== 'inline-power'});
     assert.doesNotMatch(html,/Team power|class="stats-team-strength/);
     if (variant === 'inline-power') {
       assert.doesNotMatch(html, /\[\d+%\]/);
-      assert.match(html, /class="stats-mega-win-star"[^>]*aria-label="Mega win"[^>]*>&#9733;<\/span>\s*<div class="stats-team-roster"><span class="stats-team-player">winner0/);
-      assert.equal((html.match(/class="stats-mega-win-star"/g) || []).length, 1);
+      assert.doesNotMatch(html, /class="stats-mega-win-star"/);
+      const playerPower = Array.from(html.matchAll(/--player-power-fill: (\d+)%/g), match => Number(match[1]));
+      assert.deepEqual(playerPower, [78, 25]);
       assert.doesNotMatch(html, /Mega win!|class="stats-upset-victory"/);
     } else {
       assert.match(html,/winner0\s*\[78%\]/);
@@ -45,7 +56,7 @@ test('inline power keeps full rosters and colored bars without numeric badges', 
   const options = {variant: 'inline-power', showVersus: false};
   const html = context.renderMatchup({teams}, options);
   assert.doesNotMatch(html, /class="stats-team-strength"/);
-  const pills = Array.from(html.matchAll(/class="stats-team stats-team-inline-power tone stats-team-power-fill" style="--team-power-fill: (\d+)%; --team-power-hue: (\d+)">\s*(?:<span class="stats-mega-win-star"[^>]*>&#9733;<\/span>\s*)?<div class="stats-team-roster">([\s\S]*?)<\/div>/g));
+  const pills = Array.from(html.matchAll(/class="stats-team stats-team-inline-power tone stats-team-power-fill" style="--team-power-fill: (\d+)%; --team-power-hue: (\d+)">\s*<div class="stats-team-roster">([\s\S]*?)<\/div>/g));
   assert.equal(pills.length, 2);
   for (const [index, [_, fill, hue, roster]] of pills.entries()) {
     assert.equal(Number(fill), teams[index].strength);

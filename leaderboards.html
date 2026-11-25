@@ -169,6 +169,41 @@
       pointer-events: none;
     }
 
+    .stats-player-search-clear .stats-sort-hint {
+      top: calc(100% + 8px);
+      bottom: auto;
+      left: calc(50% - 12px);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transform: translateY(4px);
+    }
+
+    .stats-player-search-clear .stats-sort-hint::before {
+      top: -5px;
+      bottom: auto;
+      left: 8px;
+      border: solid rgba(149, 205, 255, 0.22);
+      border-width: 1px 0 0 1px;
+      transform: rotate(45deg);
+    }
+
+    .stats-player-search-clear:not([hidden]):is(:hover, :focus-visible) .stats-sort-hint {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 560px) {
+      .stats-player-search-clear .stats-sort-hint {
+        right: 0;
+        left: auto;
+      }
+
+      .stats-player-search-clear .stats-sort-hint::before {
+        right: 12px;
+        left: auto;
+      }
+    }
+
     .stats-panel-head-ranks .stats-panel-copy {
       position: relative;
       isolation: isolate;
@@ -701,9 +736,8 @@
                 id="statsPlayerSearchClear"
                 type="button"
                 aria-label="Clear player search"
-                title="Clear player search"
                 hidden
-              >&times;</button>
+              >&times;<span class="stats-sort-hint" aria-hidden="true">Clear player search</span></button>
             </label>
 
             <div class="stats-table-wrap stats-table-wrap-ranks">

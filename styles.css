@@ -2174,6 +2174,19 @@ main {
   transform: translateX(-50%) translateY(4px);
 }
 
+.stats-player-stat-tooltip {
+  position: fixed;
+  inset: auto;
+  z-index: 50;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  opacity: 1;
+  line-height: 1.5;
+  white-space: pre-line;
+  transform: none;
+  transition: none;
+}
+
 .stats-table-wrap-ranks .stats-sort-hint {
   right: 0;
   left: auto;

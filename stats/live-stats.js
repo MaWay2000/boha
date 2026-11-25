@@ -150,6 +150,7 @@ let comparisonShareKeyByAccountKey = new Map();
 let matchMapOptionsSignature = "";
 let leaderboardGameCounts = new Map();
 let globalRankMap = new Map();
+let globalTooltipAccounts = new Map();
 let statusRefreshTimer = null;
 let lastStatsUpdateAt = 0;
 let expandedAccounts = new Set();
@@ -2834,6 +2835,23 @@ function renderPlayerGameActions(totalGames) {
   });
 }
 
+function getPlayerTooltipLines(account, rank, strength) {
+  if (!account || account.bot || isBannedAccount(account)) return [];
+
+  const globalAccount = globalTooltipAccounts.get(getAccountExpandKey(account));
+  if (!globalAccount) return [];
+
+  const lines = [`Global rank: ${rank ? `#${rank}` : "Unranked"}`];
+  if (strength !== null) lines.push(`Player strength: ${strength}%`);
+  if (rank && Number.isFinite(globalAccount.elo)) lines.push(`Global ELO: ${globalAccount.elo.toFixed(2)}`);
+  const games = globalAccount.games.length;
+  if (games) {
+    lines.push(`Global games: ${games.toLocaleString()}`);
+    lines.push(`Global win rate: ${formatRecordPercentage(getAccountDisplayStats(globalAccount).wins, games)}`);
+  }
+  return lines;
+}
+
 function renderMatchup(game, options = {}) {
   if (game.arcMatch) {
     const labels = {winner: 'Win', loser: 'Lost', contender: 'Draw'};
@@ -2868,7 +2886,7 @@ function renderMatchup(game, options = {}) {
     ? '<span class="stats-upset-victory" title="Mega win: the lower-powered team won." aria-label="Mega win">&#9733; Mega win!</span>'
     : "";
 
-  const renderPlayerLabel = (player) => {
+  const renderPlayerLabel = (player, descriptionAttr = "") => {
     const playerName = player.account?.name || "Unknown";
     const powerSuffix = includePlayerPower ? ` [${getPlayerPowerLabel(player.account)}]` : "";
     const playerLabel = `${escapeHtml(playerName)}${escapeHtml(powerSuffix)}`;
@@ -2880,7 +2898,7 @@ function renderMatchup(game, options = {}) {
       playerSearch: playerName,
       player: getAccountExpandKey(player.account)
     });
-    return `<a class="stats-team-player-link" href="index.html?${escapeHtml(playerParams.toString())}" target="_parent" aria-label="Open ${escapeHtml(playerName)} on Leaderboards">${playerLabel}</a>`;
+    return `<a class="stats-team-player-link" href="index.html?${escapeHtml(playerParams.toString())}" target="_parent" aria-label="Open ${escapeHtml(playerName)} on Leaderboards"${descriptionAttr}>${playerLabel}</a>`;
   };
 
   if (variant === "tiles") {
@@ -2934,18 +2952,22 @@ function renderMatchup(game, options = {}) {
               ? getAccountExpandKey(player.account)
               : "";
             const isHighlighted = accountKey && accountKey === highlightedAccountKey;
-            const label = renderPlayerLabel(player);
+            const rank = variant === "inline-power" ? getNumericGlobalRank(player.account) : null;
+            const playerPower = rank ? getPlayerPowerPercent(player.account) : null;
+            const tooltipLines = variant === "inline-power" ? getPlayerTooltipLines(player.account, rank, playerPower) : [];
+            const descriptionAttr = tooltipLines.length ? ` aria-description="${escapeHtml(tooltipLines.join(". "))}"` : "";
+            const label = renderPlayerLabel(player, descriptionAttr);
             const chip = accountKey
-              ? `<button class="stats-team-player-link" type="button" data-jump-account="${escapeHtml(accountKey)}" data-jump-game="${escapeHtml(currentGameKey)}">${label}</button>`
+              ? `<button class="stats-team-player-link" type="button" data-jump-account="${escapeHtml(accountKey)}" data-jump-game="${escapeHtml(currentGameKey)}"${descriptionAttr}>${label}</button>`
               : label;
-            const playerPower = variant === "inline-power" && getNumericGlobalRank(player.account) > 0
-              ? getPlayerPowerPercent(player.account)
-              : null;
             const powerLabel = playerPower === null ? "" : `Player strength: ${playerPower}%`;
             const playerPowerLine = powerLabel
               ? `<span class="stats-player-power-line" role="img" aria-label="${powerLabel}" style="--player-power-fill: ${playerPower}%; --player-power-hue: ${Math.round(playerPower * 1.2)}"></span>`
               : "";
-            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}"${powerLabel ? ` title="${powerLabel}"` : ""}>${playerPowerLine}${chip}</span>`;
+            const tooltipAttr = tooltipLines.length ? ` data-player-stats="${escapeHtml(tooltipLines.join("\n"))}"` : "";
+            const hasInteractiveChip = accountKey || (linkToLeaderboard && player.account);
+            const focusAttr = tooltipAttr && !hasInteractiveChip ? ` tabindex="0"${descriptionAttr}` : "";
+            return `<span class="stats-team-player${isHighlighted ? " is-current-player" : ""}"${tooltipAttr}${focusAttr}>${playerPowerLine}${chip}</span>`;
           })
           .join("");
         if (variant === "inline-power") {
@@ -3776,6 +3798,7 @@ function render() {
     updateStatusText([]);
     leaderboardGameCounts = new Map();
     globalRankMap = new Map();
+    globalTooltipAccounts = new Map();
     renderButtons();
     renderSummary([], []);
     renderPlayerComparison([]);
@@ -3791,6 +3814,7 @@ function render() {
   const globalAccountList = sortAccounts(globalAccounts.values()).filter((account) => !isBannedAccount(account));
   resolveActivePlayerShareKey(globalAccountList);
   globalRankMap = buildGlobalRankMap(globalAccountList);
+  globalTooltipAccounts = new Map(filterVisibleAccounts(globalAccountList).map(account => [getAccountExpandKey(account), account]));
 
   leaderboardGameCounts = new Map(Object.entries(leaderboardData.leaderboards)
     .map(([leaderboard, board]) => [leaderboard, Number(board.matches || 0)]));
@@ -4054,8 +4078,51 @@ document.addEventListener("click", (event) => {
   );
 });
 
+function setupPlayerStatsTooltip() {
+  const tooltip = document.createElement("div");
+  tooltip.className = "stats-sort-hint stats-player-stat-tooltip";
+  tooltip.setAttribute("aria-hidden", "true");
+  tooltip.hidden = true;
+  document.body.append(tooltip);
+
+  const selector = "[data-player-stats]";
+  const hide = () => { tooltip.hidden = true; };
+  const show = (event) => {
+    if (event.pointerType === "touch") return;
+    const chip = event.target.closest(selector);
+    if (!chip || chip.contains(event.relatedTarget)) return;
+
+    tooltip.textContent = chip.dataset.playerStats;
+    tooltip.hidden = false;
+    const anchor = chip.getBoundingClientRect();
+    const { width, height } = tooltip.getBoundingClientRect();
+    const viewportWidth = document.documentElement.clientWidth;
+    const left = Math.max(8, Math.min(anchor.left, viewportWidth - width - 8));
+    const top = anchor.bottom + height + 14 <= window.innerHeight
+      ? anchor.bottom + 6
+      : Math.max(8, anchor.top - height - 6);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  };
+  const leave = (event) => {
+    const chip = event.target.closest(selector);
+    if (chip && !chip.contains(event.relatedTarget)) hide();
+  };
+
+  document.addEventListener("pointerover", show);
+  document.addEventListener("pointerout", leave);
+  document.addEventListener("focusin", show);
+  document.addEventListener("focusout", leave);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hide();
+  });
+  window.addEventListener("scroll", hide, { capture: true, passive: true });
+  window.addEventListener("resize", hide);
+}
+
 async function init() {
   applyStateFromUrl();
+  setupPlayerStatsTooltip();
   setupSortHeaders();
   const rankTable = leaderboardRecentMatchesElement && ranksElement?.closest(".stats-table-wrap");
   if (rankTable) {

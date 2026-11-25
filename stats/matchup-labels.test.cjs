@@ -12,12 +12,17 @@ const context = vm.createContext({
   getPlayerPowerLabel: account => `${account.power}%`,
   getPlayerPowerPercent: account => account.power,
   getNumericGlobalRank: account => Number.isFinite(account?.power) ? 1 : null,
+  globalTooltipAccounts: new Map([['winner0', {elo: 1824.52, games: Array(10), winCount: 7}]]),
+  getAccountExpandKey: account => account.name,
+  getAccountDisplayStats: account => ({wins: account.winCount}),
+  formatRecordPercentage: (wins, games) => `${Math.round(100 * wins / games)}%`,
+  isBannedAccount: account => Boolean(account?.banned),
   renderMapFilterLink: (name, label, className) => `<a class="${className}" href="#map">${label}</a>`,
   escapeHtml: value => String(value)
 });
 vm.runInContext(
   source.slice(source.indexOf('function getMatchTeamStrengths('), source.indexOf('function getMatchTeamPowerDifference('))
-  + source.slice(source.indexOf('function renderMatchup('), source.indexOf('function getLastUpdateTime(')),
+  + source.slice(source.indexOf('function getPlayerTooltipLines('), source.indexOf('function getLastUpdateTime(')),
   context
 );
 function team(size, strength, result) {
@@ -40,6 +45,8 @@ test('1v1 matchup layouts keep personal percentages and hide duplicate team-powe
       assert.doesNotMatch(html, /class="stats-mega-win-star"/);
       const playerPower = Array.from(html.matchAll(/--player-power-fill: (\d+)%/g), match => Number(match[1]));
       assert.deepEqual(playerPower, [78, 25]);
+      assert.match(html, /data-player-stats="Global rank: #1\s+Player strength: 78%\s+Global ELO: 1824\.52\s+Global games: 10\s+Global win rate: 70%"/);
+      assert.doesNotMatch(html, /title="Player strength/);
       assert.doesNotMatch(html, /Mega win!|class="stats-upset-victory"/);
     } else {
       assert.match(html,/winner0\s*\[78%\]/);

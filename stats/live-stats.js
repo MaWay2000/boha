@@ -4096,9 +4096,9 @@ function setupPlayerStatsTooltip() {
 
     const hue = chip.dataset.playerStrengthHue;
     tooltip.style.setProperty("--player-tooltip-strength-hue", hue ?? "");
-    tooltip.replaceChildren(...chip.dataset.playerStats.split("\n").map((line, index) => {
+    tooltip.replaceChildren(...chip.dataset.playerStats.split("\n").map(line => {
       const row = document.createElement("div");
-      if (hue === undefined || index >= 2) {
+      if (hue === undefined) {
         row.textContent = line;
         return row;
       }

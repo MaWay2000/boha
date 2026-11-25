@@ -10,6 +10,7 @@ function orderRankOptions(popup) {
   // The Games filter already uses the total match count for each leaderboard.
   const filterOrder = new Map(Array.from(filterButtons.querySelectorAll("[data-leaderboard]"),
     (button, index) => [button.dataset.leaderboard, index]));
+  popup.querySelector("[data-player-rank-leaderboard='Combined']")?.remove();
   const options = [...popup.querySelectorAll("[data-player-rank-leaderboard]")];
   const position = (option) => filterOrder.get(option.dataset.playerRankLeaderboard) ?? filterOrder.size;
   options.sort((left, right) => position(left) - position(right));
@@ -81,7 +82,7 @@ recentTrigger?.addEventListener("click", () => {
     return;
   }
 
-  const options = Array.from(filterButtons.querySelectorAll("button[data-leaderboard]"), (source) => {
+  const options = Array.from(filterButtons.querySelectorAll("button[data-leaderboard]:not([hidden])"), (source) => {
     const option = document.createElement("button");
     const active = source.classList.contains("is-active");
     option.type = "button";
@@ -91,7 +92,7 @@ recentTrigger?.addEventListener("click", () => {
     option.textContent = source.textContent;
     option.addEventListener("click", () => {
       setRecentPickerOpen(false);
-      if (!active) source.click();
+      source.click();
       recentTrigger.focus();
     });
     return option;

@@ -742,10 +742,10 @@
               <details class="stats-leaderboard-filter-menu stats-games-filter-menu" id="statsGamesFilterMenu" name="player-header-menu">
                 <summary class="stats-menu-hint-trigger" aria-label="Games filter" aria-describedby="statsGamesFilterHint">
                   <span class="stats-filter-button stats-menu-hint-face">Games filter</span>
-                  <span class="stats-sort-hint stats-menu-hint" id="statsGamesFilterHint" role="tooltip">Filter the leaderboard and Recent Matches by game category, such as 1v1 or 3v3.</span>
+                  <span class="stats-sort-hint stats-menu-hint" id="statsGamesFilterHint" role="tooltip">Filter the leaderboard and Recent Matches. Select multiple categories to combine them.</span>
                 </summary>
                 <div class="stats-leaderboard-filter-popup stats-games-filter-popup">
-                  <div class="stats-toolbar" id="statsLeaderboardButtons"></div>
+                  <div class="stats-toolbar" id="statsLeaderboardButtons" role="group" aria-label="Game categories"></div>
                   <a class="stats-filter-button stats-games-filter-wavehoster" href="index.html?tab=wavehoster" target="_top">WaveHoster · Modded leaderboards</a>
                   <button class="stats-filter-button stats-games-filter-close" id="statsGamesFilterClose" type="button">Close</button>
                 </div>
@@ -956,8 +956,16 @@
 
   <script src="site-events.js?v=20261020-3"></script>
   <script src="embedded-page.js?v=20260720-1"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "./stats/published-loader.mjs?v=20261121-host-sync-1": "./stats/combined-game-filters.mjs?v=20261125-multi-select-1",
+        "./stats/personal-ratings.mjs?v=20261113-lazy-performance-1": "./stats/combined-game-filters.mjs?v=20261125-multi-select-1"
+      }
+    }
+  </script>
   <script type="module" src="stats/live-stats.js?v=20261125-recent-map-star-1"></script>
-  <script type="module" src="stats/player-rank-menu.js?v=20261125-recent-leaderboard-cell-1"></script>
+  <script type="module" src="stats/player-rank-menu.js?v=20261125-multi-select-1"></script>
   <script type="module" src="stats/match-map-star.js?v=20261125-map-star-duration-1"></script>
 </body>
 </html>

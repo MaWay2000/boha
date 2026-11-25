@@ -3074,8 +3074,10 @@ function renderTrendingPlayers(accountList, gameList = []) {
     if (!entry) {
       return `
         <article class="stats-trending-card">
-          <span>${escapeHtml(label)}</span>
-          <strong>--</strong>
+          <div class="stats-trending-metric">
+            <span>${escapeHtml(label)}:</span>
+            <strong>--</strong>
+          </div>
           <small>Not enough match history</small>
         </article>
       `;
@@ -3091,8 +3093,10 @@ function renderTrendingPlayers(accountList, gameList = []) {
     profileUrl.search = params.toString();
     return `
       <article class="stats-trending-card">
-        <span>${escapeHtml(label)}</span>
-        <strong>${escapeHtml(value)}</strong>
+        <div class="stats-trending-metric">
+          <span>${escapeHtml(label)}:</span>
+          <strong>${escapeHtml(value)}</strong>
+        </div>
         <a href="${escapeHtml(profileUrl.href)}" target="_parent" aria-label="Open ${escapeHtml(entry.account.name || "Unknown player")} profile">${escapeHtml(entry.account.name || "Unknown player")}</a>
         <small>${escapeHtml(detail)}</small>
       </article>

@@ -1627,13 +1627,9 @@ main {
 
 .stats-trending-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
-  grid-template-areas:
-    "label nickname ."
-    "value nickname ."
-    "detail nickname .";
-  align-items: center;
-  gap: 4px 10px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 1fr auto 1fr;
+  gap: 4px;
   min-width: 0;
   padding: 11px 12px;
   border: 1px solid rgba(149, 205, 255, 0.12);
@@ -1641,23 +1637,28 @@ main {
   background: rgba(3, 10, 17, 0.52);
 }
 
-.stats-trending-card > span {
-  grid-area: label;
+.stats-trending-metric {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  align-self: start;
+  column-gap: 6px;
+}
+
+.stats-trending-metric > span {
   color: var(--muted);
   font-size: 0.68rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.stats-trending-card > strong {
-  grid-area: value;
+.stats-trending-metric > strong {
   color: var(--text);
   font-family: "Oxanium", sans-serif;
   font-size: 1.12rem;
 }
 
 .stats-trending-card > a {
-  grid-area: nickname;
   justify-self: center;
   min-width: 0;
   color: var(--cyan);
@@ -1680,14 +1681,13 @@ main {
 }
 
 .stats-trending-card > small {
-  grid-area: detail;
+  align-self: end;
   color: var(--steel);
   font-size: 0.68rem;
 }
 
 .stats-trending-card:not(:has(> a)) {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "label" "value" "detail";
+  grid-template-rows: auto 1fr;
 }
 
 .stats-grid {

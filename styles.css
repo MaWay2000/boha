@@ -3519,7 +3519,7 @@ main {
 }
 
 .stats-profile-details > article:not(.stats-profile-history) {
-  display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 12px;
@@ -3534,6 +3534,7 @@ main {
 .stats-profile-details > article:not(.stats-profile-history) > div {
   flex: 1 1 24rem;
   min-width: 0;
+  align-items: center;
 }
 
 .stats-profile-details article {
@@ -4400,8 +4401,7 @@ main {
     max-width: 232px;
   }
 
-  .stats-profile-metrics,
-  .stats-profile-details {
+  .stats-profile-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -4458,8 +4458,7 @@ main {
     align-self: flex-start;
   }
 
-  .stats-profile-metrics,
-  .stats-profile-details {
+  .stats-profile-metrics {
     grid-template-columns: 1fr;
   }
 

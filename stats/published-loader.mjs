@@ -20,7 +20,9 @@ export function createJsonReader({fetchImpl = globalThis.fetch, workerFactory = 
     let text;
     try {
       const response = await fetchImpl(url, {cache, credentials: 'omit', signal: controller.signal});
-      if (!response.ok) throw new Error('Unable to load published data (' + response.status + ').');
+      if (!response.ok) {
+      throw Object.assign(new Error('Unable to load published data (' + response.status + ').'), {status: response.status});
+    }
       text = (await response.text()).replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
     } finally { clearTimeout(timer); }
     if (sha256 && globalThis.crypto?.subtle) {
@@ -73,6 +75,15 @@ export function createPublishedLoader({baseUrl, liveBaseUrl, read = createJsonRe
 function createLivePublishedLoader({baseUrl, liveBaseUrl, read}) {
   let payload = null, version = null, snapshotTime = 0, pending = null;
   const metadata = new WeakMap(), performanceLoads = new WeakMap();
+  async function retryLive(action) {
+    try {
+      return await action();
+    } catch (error) {
+      if (error.status >= 400 && error.status < 500 && ![408, 429].includes(error.status)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return action();
+    }
+  }
   async function manifest(base, source) {
     const value = await read(new URL('manifest.json', base), {background: false, cache: 'no-cache', timeoutMs: 5000});
     const hash = value?.files?.['leaderboards.json']?.sha256;
@@ -83,7 +94,7 @@ function createLivePublishedLoader({baseUrl, liveBaseUrl, read}) {
   async function load() {
     let backupPromise;
     const backup = () => backupPromise ||= manifest(baseUrl, 'github').catch(() => null);
-    const livePromise = manifest(liveBaseUrl, 'live').catch(() => null);
+    const livePromise = retryLive(() => manifest(liveBaseUrl, 'live')).catch(() => null);
     let candidates;
     if (!payload) candidates = await Promise.all([livePromise, backup()]);
     else {
@@ -106,7 +117,9 @@ function createLivePublishedLoader({baseUrl, liveBaseUrl, read}) {
       }
       try {
         const url = new URL('leaderboards.json', candidate.base); url.searchParams.set('v', candidate.hash);
-        const next = await read(url, {sha256: candidate.hash});
+        const next = candidate.source === 'live'
+          ? await retryLive(() => read(url, {sha256: candidate.hash, timeoutMs: 20_000}))
+          : await read(url, {sha256: candidate.hash});
         if (next?.format !== 1 || !Array.isArray(next.leaderboards?.Global?.players) || !Array.isArray(next.games)) {
           throw Error('Published leaderboard data is incomplete.');
         }
